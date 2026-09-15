@@ -30,13 +30,11 @@ export default async function DocumentationIndexPage() {
     <main className="flex flex-1 flex-col">
       <NavHeader title="Documentation" backHref="/" />
       <Container className="flex flex-col gap-6 py-6">
-        <div>
-          <h1 className="text-base font-bold text-text-primary">Documentation</h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            This page gathers the published articles explaining the experiment&rsquo;s purpose,
-            current release, administration, finances, privacy, technology, and future direction.
-          </p>
-        </div>
+        {/* NavHeader already renders the page's one <h1> ("Documentation") — no need to repeat it here. */}
+        <p className="text-sm text-text-secondary">
+          This page gathers the published articles explaining the experiment&rsquo;s purpose,
+          current release, administration, finances, privacy, technology, and future direction.
+        </p>
 
         <DocumentationList articles={articles} />
       </Container>

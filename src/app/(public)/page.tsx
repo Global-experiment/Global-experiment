@@ -21,7 +21,7 @@ export default function Home() {
             <span className="font-bold text-text-primary">{homeContent.brand}</span>{" "}
             <span className="text-text-tertiary">{homeContent.eyebrow}</span>
           </p>
-          <p className="mt-4 text-lg font-medium text-text-primary">{homeContent.subtitle}</p>
+          <h1 className="mt-4 text-lg font-medium text-text-primary">{homeContent.subtitle}</h1>
         </div>
 
         {/*

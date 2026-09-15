@@ -38,7 +38,7 @@ export function DocumentationList({ articles }: { articles: DocumentationArticle
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search"
-          className="w-full rounded-control border border-border-subtle bg-transparent py-3 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted"
+          className="w-full rounded-control border border-border-subtle bg-transparent py-3 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         />
       </div>
 

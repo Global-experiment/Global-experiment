@@ -72,7 +72,7 @@ export default function FeedbackPage() {
             onChange={(event) => setMessage(event.target.value)}
             rows={5}
             placeholder="Please develop your feedback for a better administration of your request."
-            className="w-full rounded-control border border-border-subtle bg-transparent px-4 py-3 text-sm text-text-primary placeholder:text-text-muted"
+            className="w-full rounded-control border border-border-subtle bg-transparent px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           />
         </div>
 

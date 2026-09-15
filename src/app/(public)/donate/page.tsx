@@ -10,12 +10,21 @@ const AMOUNTS = ["$2", "$5", "$10", "$20", "$50", "Other"];
 const PAYMENT_METHODS = ["Card payment via Stripe", "Apple Pay", "Google Pay", "PayPal"];
 
 /**
- * M1 navigation scaffold. Treasury stats below are the same illustrative
- * example values the Figma source itself uses (the Documentation content
- * explicitly notes design-material figures are examples, not live data) —
- * not wired to any real Treasury data, which is M3. Amount/frequency
- * selection is real UI state; the payment methods are real buttons that
- * don't perform a payment — see
+ * NOT LIVE DATA. Same illustrative example values the Figma source itself
+ * uses (the Documentation content explicitly notes design-material
+ * figures are examples) — real Treasury data is M3. Never wire this route
+ * to a real data source without renaming/removing this constant.
+ */
+const DEVELOPMENT_FIXTURE_STATS: Array<[string, string]> = [
+  ["USD 91.3K", "Balance"],
+  ["1.4", "Sustainability"],
+  ["USD 6.4", "Med. donation"],
+  ["USD 39.8K", "Expenses"],
+];
+
+/**
+ * M1 navigation scaffold. Amount/frequency selection is real UI state; the
+ * payment methods are real buttons that don't perform a payment — see
  * docs/architecture/decisions/008-route-shells.md.
  */
 export default function DonatePage() {
@@ -28,19 +37,15 @@ export default function DonatePage() {
       <NavHeader title="Donate" backHref="/" />
       <Container className="flex flex-col gap-6 py-6">
         <div>
-          <h1 className="text-base font-bold text-text-primary">Donate to the experiment</h1>
+          {/* h2, not h1: NavHeader already renders the page's <h1> ("Donate"). */}
+          <h2 className="text-base font-bold text-text-primary">Donate to the experiment</h2>
           <p className="mt-1 text-sm text-text-secondary">
             Thank you for considering donating to the experiment.
           </p>
         </div>
 
         <div className="grid grid-cols-4 gap-2 text-center">
-          {[
-            ["USD 91.3K", "Balance"],
-            ["1.4", "Sustainability"],
-            ["USD 6.4", "Med. donation"],
-            ["USD 39.8K", "Expenses"],
-          ].map(([value, label]) => (
+          {DEVELOPMENT_FIXTURE_STATS.map(([value, label]) => (
             <div key={label}>
               <p className="text-sm font-bold text-text-primary">{value}</p>
               <p className="text-xs text-text-tertiary">{label}</p>
