@@ -62,6 +62,15 @@ All secrets are server-side, validated at first use through a single typed
 schema, and never committed. See
 [004-server-side-secrets](./decisions/004-server-side-secrets.md).
 
+## Design tokens
+
+The visual system (grayscale palette, spacing, radius) is derived from a
+pixel-level audit of the approved Figma file, implemented as Tailwind theme
+tokens in `src/app/globals.css`. One color is intentionally adjusted from
+the observed value for WCAG AA contrast, and the font family is a
+placeholder pending confirmation. See
+[006-design-tokens](./decisions/006-design-tokens.md).
+
 ## v1 boundaries
 
 v1 is a much larger participant/governance/UGC platform (accounts, teams,
@@ -83,9 +92,13 @@ full reasoning and examples.
 These are tracked here rather than as ADRs because they are not yet decided;
 an ADR will be written once each is resolved.
 
-- **Analytics provider**: Matomo vs. self-hosted Plausible. Deferred to M4;
-  the `integrations/analytics/` boundary will be created when this is
-  resolved and the feature is actually built.
+- **Analytics provider**: Matomo vs. self-hosted Plausible. Deferred to M4
+  by client decision, regardless of implementation readiness; the
+  `integrations/analytics/` boundary will be created when this is resolved
+  and the feature is actually built. (Note: the Notion documentation content
+  itself states self-hosted Plausible is used, while a Contributors-database
+  record separately references Matomo access — a real conflict in the
+  source material, not yet reconciled. See the Notion export audit.)
 - **Multi-currency FX policy** for Treasury normalization (which rate,
   which date/source, how historical amounts are preserved). Must be
   confirmed before full Treasury implementation (M3).
@@ -99,3 +112,11 @@ an ADR will be written once each is resolved.
   `Publication status == Published`" — exact data-quality, sync-state, and
   allowed-public-field criteria need product/business input before M3
   design.
+- **Documentation "history" view**: the Figma design includes a version
+  history screen (Published/Previous/Initial versions), but neither the
+  Notion export nor the public Notion API exposes real page-revision data.
+  `/documentation/history` is intentionally not implemented until a real
+  data source exists (e.g. a Postgres snapshot taken on each Notion sync) —
+  see [003-notion-temporary-adapter](./decisions/003-notion-temporary-adapter.md)
+  for the adapter boundary this would extend. Not faked, not stubbed with
+  speculative data.
