@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { getEnv } from "@/shared/config/env";
+import { getDatabaseEnv } from "@/shared/config/env";
 
 type Database = ReturnType<typeof drizzle>;
 
@@ -17,7 +17,7 @@ let cachedDb: Database | undefined;
 export function getDb(): Database {
   if (cachedDb) return cachedDb;
 
-  const env = getEnv();
+  const env = getDatabaseEnv();
   const queryClient = postgres(env.DATABASE_URL, { max: 5 });
   cachedDb = drizzle(queryClient);
   return cachedDb;
