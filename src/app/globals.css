@@ -32,6 +32,15 @@
 body {
   background: var(--color-surface-base);
   color: var(--color-text-primary);
+  /*
+   * Light text on a pure black background makes subpixel/LCD glyph
+   * anti-aliasing fringing more perceptible than on lighter themes.
+   * Grayscale font smoothing avoids that halo effect. (Also incidentally
+   * fixes chromatic fringing when this page is captured by an automated
+   * screenshot tool for visual QA — confirmed via direct pixel sampling.)
+   */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -25,9 +25,11 @@ reach the browser or be committed to source control.
 - A baseline set of security response headers
   (`src/shared/security/headers.ts`) is applied to every response via
   `next.config.ts`: `X-Content-Type-Options`, `X-Frame-Options`,
-  `Referrer-Policy`, `Permissions-Policy`, a conservative
-  `Content-Security-Policy` (`default-src 'self'`), and
-  `Strict-Transport-Security` in production.
+  `Referrer-Policy`, `Permissions-Policy`, a `Content-Security-Policy`, and
+  `Strict-Transport-Security` in production. See
+  [010-nonce-based-csp](./010-nonce-based-csp.md) for why the CSP allows
+  `'unsafe-inline'` for scripts rather than using a nonce — a nonce was
+  tried first and found to require force-dynamic rendering on every page.
 - Errors surfaced to end users go through `src/shared/errors/`
   (`AppError` and subclasses), which never expose stack traces or provider
   error bodies; `toSafeErrorResponse()` maps internal/provider failures to
@@ -58,9 +60,7 @@ reach the browser or be committed to source control.
 ## Trade-offs
 
 - The current CSP allows `'unsafe-inline'` for styles, a pragmatic
-  accommodation for Next.js/Tailwind's current output. Tightening this to a
-  nonce-based policy is future work once it's clear which inline styles (if
-  any) are actually required.
+  accommodation for Next.js/Tailwind's current output.
 - Env validation is lazy (triggered on first use by the module that needs
   it, e.g. the future Notion client or DB client) rather than eager at
   process start, so that commands not touching those integrations (e.g.
