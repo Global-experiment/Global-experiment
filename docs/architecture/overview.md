@@ -19,6 +19,11 @@ Donations, Waitlist, Feedback, Issue reporting, and Contribution. It has no
 participant accounts, voting, governance engine, or admin platform — see
 "v1 boundaries" below for why that is a deliberate choice, not an omission.
 
+All of Home's destinations are navigable now (real routes, not disabled
+buttons), even though most of their backend behavior is a later milestone —
+see [008-route-shells](./decisions/008-route-shells.md) for the "navigation
+scaffold vs. feature completion" distinction this relies on.
+
 ## Style: modular monolith
 
 Global Experiment is one deployable Next.js (App Router, TypeScript)
@@ -55,6 +60,11 @@ is never the sole copy of technically important state. See
 [002-postgresql-supabase-infrastructure](./decisions/002-postgresql-supabase-infrastructure.md)
 and
 [003-notion-temporary-adapter](./decisions/003-notion-temporary-adapter.md).
+Production never silently falls back to placeholder content when an
+integration isn't configured — see
+[009-production-fixture-safety](./decisions/009-production-fixture-safety.md)
+and, for a related Next.js streaming/status-code gotcha this surfaced,
+[007-error-boundary-not-found-status](./decisions/007-error-boundary-not-found-status.md).
 
 ## Security & configuration
 
