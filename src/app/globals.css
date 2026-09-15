@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Design tokens — derived from the Figma v0.1 design audit
+ * (docs/architecture/decisions/006-design-tokens.md).
+ *
+ * Grayscale-only palette, black base surface, flat borders, no shadows.
+ * text-muted is intentionally lighter than the #737373 observed in the
+ * source file: that value measures ~4.4:1 against pure black, just under
+ * the WCAG AA 4.5:1 threshold for normal text. #949494 (~6.9:1) keeps the
+ * same visual role (muted/tertiary text) while passing AA with margin.
+ *
+ * font-sans is a system-font fallback stack, not a real brand typeface —
+ * the actual font family is still unconfirmed (see ADR 006). Swapping it
+ * later only requires changing this one variable.
+ */
+@theme {
+  --color-surface-base: #000000;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e7e7e7;
+  --color-text-tertiary: #b2b2b2;
+  --color-text-muted: #949494;
+  --color-border-subtle: #2e2e2e;
+  --color-border-faint: #1f1f1f;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --radius-control: 0.5rem;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface-base);
+  color: var(--color-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
