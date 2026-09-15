@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@next/env": "^16.3.5",
+    "@notionhq/client": "^5.26.0",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.5",
     "postgres": "^3.4.9",
