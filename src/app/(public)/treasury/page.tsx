@@ -7,7 +7,21 @@ import { NavHeader } from "@/shared/ui/NavHeader";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { DonateIcon } from "@/shared/ui/icons";
 
-const EXAMPLE_ENTRIES = [
+/**
+ * NOT LIVE DATA. Same illustrative example values the Figma source itself
+ * uses — real Treasury synchronization/reconciliation is M3. Never wire
+ * this route to a real data source without renaming/removing this
+ * constant; its name is deliberately unambiguous.
+ */
+const DEVELOPMENT_FIXTURE_STATS: Array<[string, string]> = [
+  ["USD 91.3K", "Balance"],
+  ["1.4", "Sustainability"],
+  ["USD 6.4", "Med. donation"],
+  ["USD 39.8K", "Expenses"],
+];
+
+/** NOT LIVE DATA — see DEVELOPMENT_FIXTURE_STATS above. */
+const DEVELOPMENT_FIXTURE_HISTORY = [
   { label: "+ EUR 8", tag: null, date: "Aug 12 09:14" },
   { label: "- CHF 70", tag: "Unqualified", date: "Aug 11 16:42" },
   { label: "+ INR 500", tag: null, date: "Aug 10 21:08" },
@@ -15,11 +29,8 @@ const EXAMPLE_ENTRIES = [
 ];
 
 /**
- * M1 navigation scaffold. Stats and history rows below are the same
- * illustrative example values the Figma source itself uses, not live
- * Treasury data — real synchronization/reconciliation is M3. The tab
- * toggle is real UI state (no data behind either tab yet). See
- * docs/architecture/decisions/008-route-shells.md.
+ * M1 navigation scaffold — see docs/architecture/decisions/008-route-shells.md.
+ * The tab toggle is real UI state; no data exists behind either tab yet.
  */
 export default function TreasuryPage() {
   const [tab, setTab] = useState<"expenses" | "donations">("expenses");
@@ -29,12 +40,7 @@ export default function TreasuryPage() {
       <NavHeader title="Treasury" backHref="/" />
       <Container className="flex flex-col gap-6 py-6">
         <div className="grid grid-cols-4 gap-2 text-center">
-          {[
-            ["USD 91.3K", "Balance"],
-            ["1.4", "Sustainability"],
-            ["USD 6.4", "Med. donation"],
-            ["USD 39.8K", "Expenses"],
-          ].map(([value, label]) => (
+          {DEVELOPMENT_FIXTURE_STATS.map(([value, label]) => (
             <div key={label}>
               <p className="text-sm font-bold text-text-primary">{value}</p>
               <p className="text-xs text-text-tertiary">{label}</p>
@@ -61,7 +67,7 @@ export default function TreasuryPage() {
         <div>
           <p className="mb-2 text-sm font-bold text-text-primary">History</p>
           <div>
-            {EXAMPLE_ENTRIES.map((entry, index) => (
+            {DEVELOPMENT_FIXTURE_HISTORY.map((entry, index) => (
               <div
                 key={index}
                 className="flex items-center justify-between gap-3 border-b border-border-faint py-3"
