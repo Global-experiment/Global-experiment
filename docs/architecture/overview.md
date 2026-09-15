@@ -70,7 +70,12 @@ and, for a related Next.js streaming/status-code gotcha this surfaced,
 
 All secrets are server-side, validated at first use through a single typed
 schema, and never committed. See
-[004-server-side-secrets](./decisions/004-server-side-secrets.md).
+[004-server-side-secrets](./decisions/004-server-side-secrets.md). The
+Content-Security-Policy allows `'unsafe-inline'` for scripts rather than
+using a nonce — see
+[010-nonce-based-csp](./decisions/010-nonce-based-csp.md) for why (a
+nonce-based CSP was tried first and found to require dynamic rendering on
+every page, breaking static generation site-wide).
 
 ## Design tokens
 
@@ -79,7 +84,9 @@ pixel-level audit of the approved Figma file, implemented as Tailwind theme
 tokens in `src/app/globals.css`. One color is intentionally adjusted from
 the observed value for WCAG AA contrast, and the font family is a
 placeholder pending confirmation. See
-[006-design-tokens](./decisions/006-design-tokens.md).
+[006-design-tokens](./decisions/006-design-tokens.md) and
+[visual-open-items](./visual-open-items.md) for the full list of
+approximated (not final) values.
 
 ## v1 boundaries
 
