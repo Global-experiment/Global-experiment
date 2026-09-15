@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
+import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { ContributeIcon, DonateIcon, TreasuryIcon, WaitlistIcon } from "@/shared/ui/icons";
 import { homeContent } from "./home-content";
 
@@ -23,16 +25,16 @@ export default function Home() {
         </div>
 
         {/*
-          Waitlist/Contribute/Donate/Treasury routes are not built in M1 —
-          rendered per the approved Figma layout but disabled (not linked to
-          a 404) rather than omitted, so the page structure matches the
-          design now and only needs an href + `disabled` flip later.
+          These routes are M1 navigation scaffolds: the route exists and
+          can be reviewed visually. The underlying business action
+          (persistence, payments, external integration) belongs to later
+          milestones — see docs/architecture/decisions/008-route-shells.md.
         */}
         <div className="grid grid-cols-2 gap-3">
           {homeContent.actions.map((action) => {
             const Icon = actionIcons[action.icon];
             return (
-              <Button key={action.label} variant="secondary" disabled icon={<Icon />} fullWidth>
+              <Button key={action.label} variant="secondary" href={action.href} icon={<Icon />} fullWidth>
                 {action.label}
               </Button>
             );
@@ -54,21 +56,26 @@ export default function Home() {
               </section>
             ))}
           </div>
+
+          <Link
+            href={homeContent.documentationLink.href}
+            className="mt-8 inline-block text-sm font-semibold text-text-primary underline underline-offset-2"
+          >
+            {homeContent.documentationLink.label}
+          </Link>
         </div>
       </Container>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border-faint bg-surface-base">
-        <Container className="py-3">
-          {(() => {
-            const Icon = actionIcons[homeContent.primaryAction.icon];
-            return (
-              <Button variant="primary" disabled icon={<Icon />} fullWidth>
-                {homeContent.primaryAction.label}
-              </Button>
-            );
-          })()}
-        </Container>
-      </div>
+      <StickyActionBar>
+        {(() => {
+          const Icon = actionIcons[homeContent.primaryAction.icon];
+          return (
+            <Button variant="primary" href={homeContent.primaryAction.href} icon={<Icon />} fullWidth>
+              {homeContent.primaryAction.label}
+            </Button>
+          );
+        })()}
+      </StickyActionBar>
     </main>
   );
 }

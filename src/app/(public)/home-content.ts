@@ -27,6 +27,12 @@ export interface HomeContent {
   sectionLabel: string;
   subsections: HomeSubsection[];
   primaryAction: HomeAction;
+  /**
+   * Not part of Figma's Home CTA grid (Documentation is reached from other
+   * pages' footer links there) — added per explicit instruction so Home
+   * always has a real entry point into Documentation.
+   */
+  documentationLink: { label: string; href: string };
 }
 
 export const homeContent: HomeContent = {
@@ -40,6 +46,7 @@ export const homeContent: HomeContent = {
     { label: "Treasury", href: "/treasury", icon: "treasury" },
   ],
   primaryAction: { label: "Join waitlist", href: "/waitlist", icon: "waitlist" },
+  documentationLink: { label: "Documentation", href: "/documentation" },
   sectionLabel: "Purpose and principles",
   subsections: [
     {
