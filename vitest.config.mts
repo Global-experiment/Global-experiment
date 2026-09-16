@@ -9,6 +9,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["./vitest.setup.ts"],
     // e2e/ contains Playwright specs (run via `npm run test:e2e`), not
     // Vitest tests — Vitest's default include pattern would otherwise
     // also match *.spec.ts there and try to run them with the wrong API.
