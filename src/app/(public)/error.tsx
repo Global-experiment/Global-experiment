@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Button } from "@/shared/ui/Button";
 import { ErrorState } from "@/shared/ui/ErrorState";
 import { logger } from "@/shared/logging/logger";
 import { rethrowNotFoundInErrorBoundary } from "@/shared/ui/rethrowNotFoundInErrorBoundary";
@@ -26,8 +27,13 @@ export default function PublicRouteError({
   return (
     <ErrorState
       title="This page is temporarily unavailable"
-      message="Please try again in a moment."
-      onRetry={reset}
+      code={500}
+      message="The page could not be loaded right now. Please try again in a moment."
+      action={
+        <Button onClick={reset} size="compact">
+          Try again
+        </Button>
+      }
     />
   );
 }

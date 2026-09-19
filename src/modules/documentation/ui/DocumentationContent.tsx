@@ -2,43 +2,49 @@ import type { DocumentationContentBlock } from "@/modules/documentation/domain/t
 import { RichText } from "@/shared/ui/RichText";
 import { richTextToPlain } from "@/shared/content/types";
 
-const headingClassName: Record<1 | 2 | 3 | 4, string> = {
-  1: "text-lg font-bold leading-snug text-text-primary",
-  2: "text-base font-bold leading-snug text-text-primary",
-  3: "text-sm font-bold leading-snug text-text-primary",
-  4: "text-sm font-bold leading-snug text-text-primary",
-};
-
 const headingTag = { 1: "h2", 2: "h3", 3: "h4", 4: "h5" } as const;
 
 /**
- * Renders the shared editorial content model for an article. Only heading
- * and paragraph blocks exist in current content; `unsupported` blocks
- * render nothing (and are logged at fetch time) rather than crashing.
+ * Article body in the Figma rhythm (figma.pdf p15): every heading and
+ * paragraph is 14px on an 18px line; headings are bold, sit 16px below the
+ * previous paragraph and 4px above their own text; consecutive paragraphs
+ * are separated by one blank line (18px). All heading levels share one
+ * size — the source hierarchy is preserved in the markup (h2–h5) only.
  *
- * Spacing is grouped: a heading sits close to the paragraph(s) that follow
- * it, with more room before the next heading. max-w-prose caps line length.
- * Headings start at h2 because NavHeader already renders the page's h1.
+ * Only heading and paragraph blocks exist in current content; `unsupported`
+ * blocks render nothing (they are logged at fetch time) rather than crashing.
+ * Headings start at h2 because the page's h1 is the header title. Callers
+ * may pass `headingLevelOffset` when the body sits under an h2 (index rows).
  */
-export function DocumentationContent({ blocks }: { blocks: DocumentationContentBlock[] }) {
+export function DocumentationContent({
+  blocks,
+  headingLevelOffset = 0,
+}: {
+  blocks: DocumentationContentBlock[];
+  headingLevelOffset?: 0 | 1;
+}) {
+  const visible = blocks.filter(
+    (block) =>
+      block.kind === "heading" || (block.kind === "paragraph" && richTextToPlain(block.text).trim() !== ""),
+  );
+
   return (
-    <div className="max-w-prose">
-      {blocks.map((block, index) => {
+    <div className="text-body text-text-primary">
+      {visible.map((block, index) => {
+        const previous = visible[index - 1];
         if (block.kind === "heading") {
-          const HeadingTag = headingTag[block.level];
+          const level = Math.min(4, block.level + headingLevelOffset) as 1 | 2 | 3 | 4;
+          const HeadingTag = headingTag[level];
           return (
-            <HeadingTag
-              key={index}
-              className={`${headingClassName[block.level]} ${index === 0 ? "" : "mt-8"}`}
-            >
+            <HeadingTag key={index} className={`font-bold ${index === 0 ? "" : "mt-4"}`}>
               <RichText text={block.text} />
             </HeadingTag>
           );
         }
         if (block.kind === "paragraph") {
-          if (richTextToPlain(block.text).trim() === "") return null; // Notion spacer paragraphs
+          const spacing = index === 0 ? "" : previous?.kind === "heading" ? "mt-1" : "mt-[1.125rem]";
           return (
-            <p key={index} className="mt-3 text-sm leading-relaxed text-text-secondary first:mt-0">
+            <p key={index} className={spacing}>
               <RichText text={block.text} />
             </p>
           );

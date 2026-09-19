@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
 import { RichText } from "@/shared/ui/RichText";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
-import { ContributeIcon, DonateIcon, TreasuryIcon, WaitlistIcon } from "@/shared/ui/icons";
+import { Icon } from "@/shared/ui/icons";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
 import { HomeSections } from "@/modules/home/ui/HomeSections";
 import {
@@ -20,29 +19,24 @@ import {
 // could surface as a real error status.
 export const dynamic = "force-dynamic";
 
-const actionIcons = {
-  waitlist: WaitlistIcon,
-  contribute: ContributeIcon,
-  donate: DonateIcon,
-  treasury: TreasuryIcon,
-} as const;
-
+/**
+ * figma.pdf p1 (mobile) / p33 (desktop) — one layout, one column width
+ * token: 44px identity row, 16px centered tagline, 2×2 grid of 40px
+ * outlined actions, 1px rule, left-aligned sections, white bottom CTA.
+ */
 export default async function Home() {
   const content = await getHomeContent();
-  const PrimaryIcon = actionIcons[homePrimaryAction.icon];
 
   return (
-    <main className="flex flex-1 flex-col pb-24">
-      <Container className="flex flex-col gap-8 py-10">
-        <div className="text-center">
-          <p className="text-base">
-            <span className="font-bold text-text-primary">{homeWordmark.brand}</span>{" "}
-            <span className="text-text-tertiary">{homeWordmark.eyebrow}</span>
-          </p>
-          <h1 className="mt-4 text-lg font-medium text-text-primary">
-            <RichText text={content.tagline} />
-          </h1>
-        </div>
+    <main className="flex flex-1 flex-col pb-16">
+      <Container>
+        <p className="flex h-11 items-center justify-center gap-1 text-body">
+          <span className="font-bold text-text-primary">{homeWordmark.brand}</span>
+          <span className="text-text-muted">{homeWordmark.eyebrow}</span>
+        </p>
+        <h1 className="mt-3 text-center text-lead font-normal text-text-primary">
+          <RichText text={content.tagline} />
+        </h1>
 
         {/*
           These routes are M1 navigation scaffolds: the route exists and
@@ -50,31 +44,29 @@ export default async function Home() {
           (persistence, payments, external integration) belongs to later
           milestones — see docs/architecture/decisions/008-route-shells.md.
         */}
-        <div className="grid grid-cols-2 gap-3">
-          {homeActions.map((action) => {
-            const Icon = actionIcons[action.icon];
-            return (
-              <Button key={action.label} variant="secondary" href={action.href} icon={<Icon />} fullWidth>
-                {action.label}
-              </Button>
-            );
-          })}
-        </div>
+        <nav aria-label="Main" className="mt-6 grid grid-cols-2 gap-2">
+          {homeActions.map((action) => (
+            <Button key={action.label} href={action.href} icon={<Icon name={action.icon} />} fullWidth>
+              {action.label}
+            </Button>
+          ))}
+        </nav>
 
-        <div className="border-t border-border-faint pt-8">
+        <hr className="mt-2 border-line" />
+
+        <div className="mt-4">
           <HomeSections content={content} />
-
-          <Link
-            href={homeDocumentationLink.href}
-            className="mt-8 inline-block text-sm font-semibold text-text-primary underline underline-offset-2"
-          >
-            {homeDocumentationLink.label}
-          </Link>
         </div>
+
+        <nav aria-label="Documentation" className="mt-[1.125rem]">
+          <Button href={homeDocumentationLink.href} icon={<Icon name={homeDocumentationLink.icon} />} fullWidth>
+            {homeDocumentationLink.label}
+          </Button>
+        </nav>
       </Container>
 
       <StickyActionBar>
-        <Button variant="primary" href={homePrimaryAction.href} icon={<PrimaryIcon />} fullWidth>
+        <Button variant="primary" href={homePrimaryAction.href} icon={<Icon name={homePrimaryAction.icon} />} fullWidth>
           {homePrimaryAction.label}
         </Button>
       </StickyActionBar>

@@ -1,14 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/shared/ui/icons";
 import { ArticleAccordionItem } from "./ArticleAccordionItem";
 import type { DocumentationArticleSummary } from "@/modules/documentation/domain/types";
 
 /**
- * Client-side filtering only — operates on the already-fetched summary
- * list, no additional Notion query per keystroke.
+ * Search control (32px outlined field, Material `search` glyph, 14px
+ * placeholder — figma.pdf p15) above the accordion rows. Filtering is
+ * client-side on the already-fetched summaries; no Notion query per
+ * keystroke. Rows have no dividers between them, as in the design.
  */
-export function DocumentationList({ articles }: { articles: DocumentationArticleSummary[] }) {
+export function DocumentationList({
+  articles,
+  children,
+}: {
+  articles: DocumentationArticleSummary[];
+  /** Page heading + intro, rendered between the search and the list. */
+  children?: React.ReactNode;
+}) {
   const [query, setQuery] = useState("");
   const trimmed = query.trim().toLowerCase();
   const filtered = trimmed ? articles.filter((a) => a.title.toLowerCase().includes(trimmed)) : articles;
@@ -16,19 +26,11 @@ export function DocumentationList({ articles }: { articles: DocumentationArticle
   return (
     <div>
       <div className="relative">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="M21 21l-4.3-4.3" />
-        </svg>
+        <Icon
+          name="search"
+          size={18}
+          className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-primary"
+        />
         <label htmlFor="documentation-search" className="sr-only">
           Search documentation
         </label>
@@ -38,14 +40,16 @@ export function DocumentationList({ articles }: { articles: DocumentationArticle
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search"
-          className="w-full rounded-control border border-border-subtle bg-transparent py-3 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="h-8 w-full rounded-control border border-line bg-transparent pr-2 pl-8 text-body text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         />
       </div>
 
+      {children}
+
       {filtered.length === 0 ? (
-        <p className="mt-6 text-sm text-text-muted">No articles match &ldquo;{query}&rdquo;.</p>
+        <p className="mt-3 text-body text-text-muted">No articles match &ldquo;{query}&rdquo;.</p>
       ) : (
-        <div className="mt-2">
+        <div className="mt-3">
           {filtered.map((article) => (
             <ArticleAccordionItem key={article.slug} article={article} />
           ))}
