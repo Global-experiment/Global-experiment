@@ -1,33 +1,39 @@
+import type { ReactNode } from "react";
+import { Container } from "./Container";
+
 interface ErrorStateProps {
-  title?: string;
-  message?: string;
-  onRetry?: () => void;
+  /** Short bold label, e.g. "Article not found". */
+  title: string;
+  /** HTTP status shown muted beside the title, as in figma.pdf p32 ("Invalid request  Error 400"). */
+  code: 400 | 404 | 500;
+  /** One or two plain sentences. Never raw error details. */
+  message: string;
+  /** Optional action rendered under the message (a Button). */
+  action?: ReactNode;
 }
 
 /**
- * Minimal, on-brand error presentation — no icon/illustration, no color
- * coding (consistent with the audited neutral visual language). Never
- * receives raw error details: callers must pass a safe, user-facing
- * message (see shared/errors/app-error.ts).
+ * The generic error layout from figma.pdf p32: a header row reading
+ * "Error", then "<title> Error <code>", then a 16px message. No icon, no
+ * illustration, no color. Callers pass safe, user-facing copy only (see
+ * shared/errors/app-error.ts).
  */
-export function ErrorState({
-  title = "Something went wrong",
-  message = "Please try again in a moment.",
-  onRetry,
-}: ErrorStateProps) {
+export function ErrorState({ title, code, message, action }: ErrorStateProps) {
   return (
-    <div role="alert" className="px-6 py-16 text-center">
-      <p className="text-base font-bold text-text-primary">{title}</p>
-      <p className="mt-2 text-sm text-text-muted">{message}</p>
-      {onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-6 rounded-control border border-border-subtle px-4 py-2 text-sm font-semibold text-text-primary hover:bg-white/5"
-        >
-          Try again
-        </button>
-      ) : null}
-    </div>
+    <main className="flex flex-1 flex-col">
+      <Container>
+        <div role="alert">
+          <div className="flex h-11 items-center">
+            <h1 className="text-body font-bold text-text-primary">Error</h1>
+          </div>
+          <p className="text-body">
+            <span className="font-bold text-text-primary">{title}</span>{" "}
+            <span className="text-text-muted">Error {code}</span>
+          </p>
+          <p className="mt-3 text-lead text-text-primary">{message}</p>
+        </div>
+        {action ? <div className="mt-5">{action}</div> : null}
+      </Container>
+    </main>
   );
 }

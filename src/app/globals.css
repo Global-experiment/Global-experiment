@@ -1,30 +1,45 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — derived from the Figma v0.1 design audit
- * (docs/architecture/decisions/006-design-tokens.md).
+ * Design tokens — measured from the vector figma.pdf export (412pt mobile
+ * frames, 1440pt desktop frames; values in pt map 1:1 to CSS px). See
+ * docs/architecture/design-fidelity.md for the measurement log and
+ * docs/architecture/decisions/006-design-tokens.md for the rationale.
  *
- * Grayscale-only palette, black base surface, flat borders, no shadows.
- * text-muted is intentionally lighter than the #737373 observed in the
- * source file: that value measures ~4.4:1 against pure black, just under
- * the WCAG AA 4.5:1 threshold for normal text. #949494 (~6.9:1) keeps the
- * same visual role (muted/tertiary text) while passing AA with margin.
- *
- * font-sans is a system-font fallback stack, not a real brand typeface —
- * the actual font family is still unconfirmed (see ADR 006). Swapping it
- * later only requires changing this one variable.
+ * Grayscale only, pure black surface, 1px flat borders, no shadows.
+ * Every repeated dimension in the UI (gutter, column, control heights,
+ * type scale) resolves to one of these tokens.
  */
 @theme {
+  /* Colors — pixel-sampled from the PDF render. */
   --color-surface-base: #000000;
   --color-text-primary: #ffffff;
-  --color-text-secondary: #e7e7e7;
-  --color-text-tertiary: #b2b2b2;
-  --color-text-muted: #949494;
-  --color-border-subtle: #2e2e2e;
-  --color-border-faint: #1f1f1f;
+  --color-text-muted: #b1b1b1; /* secondary/meta text, placeholders — 10.4:1 on black */
+  --color-line: #484848; /* borders, dividers, outlined controls */
+  --color-line-strong: #b1b1b1; /* selectable controls (amount picker, checkboxes) */
 
-  --radius-control: 0.5rem;
+  /* Geometry */
+  --radius-control: 0.25rem; /* 4px — buttons, inputs, tags, search */
+  --radius-sheet: 0.75rem; /* 12px — bottom sheet / desktop dialog */
+  --spacing-gutter: 0.5rem; /* 8px page gutter on every frame */
+  --container-page: 41rem; /* 656px = 640px desktop content column + 2 × gutter */
+  --container-dialog: 25rem; /* 400px desktop dialog (figma.pdf p34) */
 
+  /* Type scale — size / line-height pairs as measured. Weights are applied
+     per element (bold headings/labels, regular body). */
+  --text-body: 0.875rem; /* 14px */
+  --text-body--line-height: 1.125rem; /* 18px */
+  --text-lead: 1rem; /* 16px — tagline, page intro, error message, composer */
+  --text-lead--line-height: 1.25rem; /* 20px */
+  --text-meta: 0.75rem; /* 12px — timestamps, tags, stat labels, hints */
+  --text-meta--line-height: 0.875rem; /* 14px */
+
+  /*
+   * The typeface in the PDF is anonymised (exported as unnamed glyph sets),
+   * so the family is still unconfirmed; glyph shapes are consistent with
+   * Inter. A generic system stack is used until the client confirms —
+   * swapping it is this one line.
+   */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
 }
@@ -35,12 +50,19 @@ body {
   /*
    * Light text on a pure black background makes subpixel/LCD glyph
    * anti-aliasing fringing more perceptible than on lighter themes.
-   * Grayscale font smoothing avoids that halo effect. (Also incidentally
-   * fixes chromatic fringing when this page is captured by an automated
-   * screenshot tool for visual QA — confirmed via direct pixel sampling.)
+   * Grayscale font smoothing avoids that halo effect.
    */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Native <dialog> reset (base layer, so utilities still win): the Sheet
+   primitive owns all placement and sizing. */
+@layer base {
+  dialog {
+    max-width: none;
+    max-height: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

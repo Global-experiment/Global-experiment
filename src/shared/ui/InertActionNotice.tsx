@@ -6,7 +6,7 @@
  */
 export function InertActionNotice() {
   return (
-    <p role="status" className="mt-3 text-sm text-text-muted">
+    <p role="status" className="mt-3 text-body text-text-muted">
       This isn&rsquo;t connected yet — it will be available in a later milestone.
     </p>
   );

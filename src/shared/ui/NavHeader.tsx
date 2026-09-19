@@ -1,38 +1,35 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { Container } from "./Container";
+import { IconButton } from "./IconButton";
 
 interface NavHeaderProps {
   title: string;
-  /** When present, renders the back-arrow sub-page pattern; omit for the app-bar pattern (Home). */
+  /** Sub-page pattern: Material arrow_back on the gutter, title 32px in. Omit for pages without a back control (Home, success/error states). */
   backHref?: string;
+  /** Right-aligned icon controls (share, overflow menu). */
+  actions?: ReactNode;
 }
 
-export function NavHeader({ title, backHref }: NavHeaderProps) {
+/**
+ * 44px top row, no border (figma.pdf p15/p31: the app header has no rule
+ * under it — the line visible there belongs to the browser chrome).
+ *
+ * Icon controls are 40px hit areas around 20px glyphs; the boxes are pulled
+ * out by the 8px gutter so the glyphs sit where the design puts them
+ * without extending past the viewport.
+ */
+export function NavHeader({ title, backHref, actions }: NavHeaderProps) {
   return (
-    <header className="border-b border-border-faint py-4">
-      <Container className="flex items-center gap-3">
-        {backHref ? (
-          <Link
-            href={backHref}
-            aria-label="Back"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-text-primary hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </Link>
+    <header>
+      <Container className="flex h-11 items-center">
+        {backHref ? <IconButton href={backHref} label="Back" icon="arrow_back" className="-mx-gutter" /> : null}
+        <h1 className="min-w-0 truncate text-body font-bold text-text-primary">{title}</h1>
+        {actions ? (
+          /* Only icon controls overlap; the <dialog> a menu renders beside its trigger keeps its own margins. */
+          <div className="-mr-gutter ml-auto flex items-center [&>:is(a,button)~:is(a,button)]:-ml-3">
+            {actions}
+          </div>
         ) : null}
-        <h1 className="text-base font-bold text-text-primary">{title}</h1>
       </Container>
     </header>
   );

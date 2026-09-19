@@ -51,3 +51,6 @@ next-env.d.ts
 
 # local Claude Code session state (not project source)
 .claude/
+
+# client design reference (local only — never commit design exports without approval)
+/figma.pdf

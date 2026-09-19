@@ -2,9 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 type ButtonVariant = "primary" | "secondary";
+type ButtonSize = "control" | "compact";
 
 interface ButtonBaseProps {
   variant?: ButtonVariant;
+  /** control = 40px (action grid, CTAs, action rows); compact = 32px (inline actions under article text). */
+  size?: ButtonSize;
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -28,26 +31,38 @@ interface ButtonAsAction extends ButtonBaseProps {
 interface ButtonDisabled extends ButtonBaseProps {
   href?: string;
   onClick?: never;
-  /** Rendered as an inert, non-focusable control. Never use this for navigation. */
+  /** Inert control (e.g. submit before the form is fillable). Rendered as the gray CTA state from figma.pdf p19. Never use this for navigation. */
   disabled: true;
 }
 
 type ButtonProps = ButtonAsLink | ButtonAsAction | ButtonDisabled;
 
+/*
+ * Geometry measured from figma.pdf: 1px border, 4px radius, 14px bold label.
+ * With an icon the label starts 32px in (10px padding + 18px glyph + 4px
+ * gap); without one it starts 8px in. Labels are left-aligned in
+ * full-width rows, exactly as in the action grid and sheets.
+ */
 const baseClasses =
-  "inline-flex items-center gap-2 rounded-control border px-4 py-3 text-sm font-semibold transition-colors " +
+  "inline-flex items-center rounded-control border pr-2 text-body font-bold transition-colors " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
+const sizeClasses: Record<ButtonSize, string> = {
+  control: "h-10",
+  compact: "h-8",
+};
+
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "border-transparent bg-white text-black hover:bg-white/90 active:bg-white/80",
-  secondary: "border-border-subtle bg-transparent text-text-primary hover:bg-white/5 active:bg-white/10",
+  primary: "border-white bg-white text-black hover:bg-white/90 active:bg-white/80",
+  secondary: "border-line bg-transparent text-text-primary hover:bg-white/5 active:bg-white/10",
 };
 
 export function Button(props: ButtonProps) {
-  const { variant = "secondary", icon, children, className = "", fullWidth } = props;
+  const { variant = "secondary", size = "control", icon, children, className = "", fullWidth } = props;
   const classes = [
     baseClasses,
-    variantClasses[variant],
+    sizeClasses[size],
+    icon ? "gap-1 pl-2.5" : "pl-2",
     fullWidth ? "w-full justify-start" : "",
     className,
   ]
@@ -60,7 +75,7 @@ export function Button(props: ButtonProps) {
         type="button"
         disabled
         aria-disabled="true"
-        className={`${classes} cursor-not-allowed opacity-40`}
+        className={`${classes} cursor-not-allowed border-text-muted bg-text-muted text-black`}
       >
         {icon}
         {children}
@@ -70,7 +85,7 @@ export function Button(props: ButtonProps) {
 
   if (props.onClick) {
     return (
-      <button type="button" onClick={props.onClick} className={`${classes} cursor-pointer`}>
+      <button type="button" onClick={props.onClick} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
         {icon}
         {children}
       </button>
@@ -78,7 +93,7 @@ export function Button(props: ButtonProps) {
   }
 
   return (
-    <Link href={props.href} className={`${classes} cursor-pointer`}>
+    <Link href={props.href} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
       {icon}
       {children}
     </Link>
