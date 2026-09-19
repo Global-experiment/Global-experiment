@@ -60,9 +60,11 @@ is never the sole copy of technically important state. See
 [002-postgresql-supabase-infrastructure](./decisions/002-postgresql-supabase-infrastructure.md)
 and
 [003-notion-temporary-adapter](./decisions/003-notion-temporary-adapter.md).
-Production never silently falls back to placeholder content when an
-integration isn't configured — see
-[009-production-fixture-safety](./decisions/009-production-fixture-safety.md)
+The running application serves only live Notion content (Home and
+Documentation) — there is no fixture or placeholder fallback in any
+environment, and content is never cached, so Notion edits appear on refresh.
+See
+[009-live-notion-content-only](./decisions/009-live-notion-content-only.md)
 and, for a related Next.js streaming/status-code gotcha this surfaced,
 [007-error-boundary-not-found-status](./decisions/007-error-boundary-not-found-status.md).
 

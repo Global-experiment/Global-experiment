@@ -14,9 +14,9 @@ in on Hetzner), two related bugs were found by direct, isolated testing
 1. A request to a nonexistent article slug (`/documentation/[slug]`)
    returned HTTP 200 instead of 404, even though the correct not-found
    content rendered in the response body.
-2. After adding a production fixture-safety check (repository throws if
+2. After making the runtime Notion-only (the repository throws if
    Notion isn't configured — see
-   [009-production-fixture-safety](./009-production-fixture-safety.md)),
+   [009-live-notion-content-only](./009-live-notion-content-only.md)),
    the Documentation index returned HTTP 200 with the generic error UI
    instead of a real error status, even though the thrown error was
    correctly logged server-side.
@@ -38,8 +38,8 @@ Both trace to the same root cause, isolated through minimal reproductions:
 This was found twice: first with a shared `documentation/loading.tsx`
 wrapping both the index and `[slug]` (breaking `[slug]`'s 404s), and again
 after "fixing" that by giving the index page its own local `<Suspense>`
-for a loading skeleton (which then broke the index's own production
-fixture-safety error status the same way).
+for a loading skeleton (which then broke the index's own error
+status for a Notion/config failure the same way).
 
 ## Decision
 
@@ -71,7 +71,7 @@ fixture-safety error status the same way).
   requirement, not a nice-to-have.
 - **Keep a loading skeleton via Suspense and accept the status-code loss
   for the index specifically** (reasoned initially, since the index can't
-  404) — rejected once the fixture-safety check gave the index page a
+  404) — rejected once the Notion-only runtime gave the index page a
   real way to error too. Generalizing the rule to "no Suspense on any
   route that can produce a non-200 status" avoids re-litigating this per
   future route.

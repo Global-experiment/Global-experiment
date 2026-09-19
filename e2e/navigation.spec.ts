@@ -27,6 +27,18 @@ test.describe("No CSP violations or hydration failures on any page", () => {
   });
 });
 
+// These run against the live Notion workspace — the application has no
+// fixture or placeholder content. They assert structure that any valid
+// editorial content must satisfy, plus stable published article titles.
+test.describe("Home renders live Notion content", () => {
+  test("has a non-empty tagline heading and at least one editorial paragraph", async ({ page }) => {
+    const response = await page.goto("/");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { level: 1 })).not.toBeEmpty();
+    expect(await page.locator("main p").count()).toBeGreaterThan(1);
+  });
+});
+
 test.describe("Home navigation", () => {
   test("every CTA has a real, correct href — no disabled navigation controls", async ({ page }) => {
     await page.goto("/");
@@ -87,8 +99,8 @@ test.describe("Documentation index", () => {
       "href",
       "/documentation/introduction",
     );
-    // The full article body ("Fixture content...") is not duplicated on the index.
-    await expect(page.getByText("Fixture content")).not.toBeVisible();
+    // The full article body is not duplicated on the index.
+    await expect(page.getByText("The Global Experiment is an initiative")).not.toBeVisible();
   });
 
   test("navigating into an article shows the full content on its own route", async ({ page }) => {
@@ -97,6 +109,7 @@ test.describe("Documentation index", () => {
     await page.getByRole("link", { name: "Read full article" }).click();
     await expect(page).toHaveURL("/documentation/introduction");
     await expect(page.getByRole("heading", { name: "Summary" })).toBeVisible();
+    await expect(page.getByText("The Global Experiment is an initiative")).toBeVisible();
   });
 });
 

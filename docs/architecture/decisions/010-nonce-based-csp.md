@@ -37,10 +37,10 @@ Do not use nonces. Instead, use Next.js's own documented "Without Nonces"
 approach: a static CSP with `script-src 'self' 'unsafe-inline'` (plus
 `'unsafe-eval'` in development only, for React's debugging features),
 applied via `next.config.ts` — restoring static generation for every page
-that doesn't otherwise need to be dynamic (Home, Waitlist, Contribute,
-Donate, Treasury, Feedback, Issue all remain statically generated;
-Documentation stays dynamic for the unrelated reason in
-[009](./009-production-fixture-safety.md)).
+that doesn't otherwise need to be dynamic (Waitlist, Contribute,
+Donate, Treasury, Feedback, Issue remain statically generated; Home and
+Documentation are dynamic for the unrelated reason in
+[009](./009-live-notion-content-only.md)).
 
 This is deliberately re-evaluated against this codebase's actual risk: it
 has **zero** uses of `dangerouslySetInnerHTML` (verified by search), so
