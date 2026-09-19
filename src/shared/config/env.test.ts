@@ -5,60 +5,65 @@ const ORIGINAL_ENV = { ...process.env };
 beforeEach(() => {
   vi.resetModules();
   process.env = { ...ORIGINAL_ENV };
-  delete process.env.DATABASE_URL;
-  delete process.env.NOTION_API_KEY;
-  delete process.env.NOTION_DOCUMENTATION_DB_ID;
+  for (const key of [
+    "DATABASE_URL",
+    "NOTION_API_KEY",
+    "NOTION_DOCUMENTATION_DB_ID",
+    "NOTION_HOME_PAGE_ID",
+  ]) {
+    delete process.env[key];
+  }
 });
 
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 
-describe("getNotionEnv", () => {
-  it("throws a descriptive error when required variables are missing", async () => {
-    const { getNotionEnv, EnvValidationError } = await import("./env");
-    expect(() => getNotionEnv()).toThrow(EnvValidationError);
+describe("Notion environment scopes", () => {
+  it("each scope fails clearly, naming the missing variable, when unset", async () => {
+    const { getNotionClientEnv, getNotionDocumentationEnv, getNotionHomeEnv, EnvValidationError } =
+      await import("./env");
+
+    expect(() => getNotionClientEnv()).toThrow(EnvValidationError);
+    expect(() => getNotionClientEnv()).toThrow(/NOTION_API_KEY/);
+    expect(() => getNotionDocumentationEnv()).toThrow(/NOTION_DOCUMENTATION_DB_ID/);
+    expect(() => getNotionHomeEnv()).toThrow(/NOTION_HOME_PAGE_ID/);
   });
 
-  it("parses successfully when all required variables are present", async () => {
-    process.env.NOTION_API_KEY = "secret_abc";
-    process.env.NOTION_DOCUMENTATION_DB_ID = "db-id-123";
+  it("rejects empty values, not just absent ones", async () => {
+    process.env.NOTION_API_KEY = "";
+    const { getNotionClientEnv } = await import("./env");
+    expect(() => getNotionClientEnv()).toThrow(/NOTION_API_KEY/);
+  });
 
-    const { getNotionEnv } = await import("./env");
-    expect(getNotionEnv().NOTION_DOCUMENTATION_DB_ID).toBe("db-id-123");
+  it("parses successfully when present, and scopes are independent of each other", async () => {
+    process.env.NOTION_HOME_PAGE_ID = "home-id";
+    const { getNotionHomeEnv, getNotionDocumentationEnv } = await import("./env");
+    expect(getNotionHomeEnv().NOTION_HOME_PAGE_ID).toBe("home-id");
+    expect(() => getNotionDocumentationEnv()).toThrow(/NOTION_DOCUMENTATION_DB_ID/);
+  });
+
+  it("never echoes other secret values in an error message", async () => {
+    process.env.NOTION_API_KEY = "secret-value-that-must-not-leak";
+    process.env.NOTION_HOME_PAGE_ID = "";
+    const { getNotionHomeEnv } = await import("./env");
+    expect(() => getNotionHomeEnv()).toThrow(/NOTION_HOME_PAGE_ID/);
+    try {
+      getNotionHomeEnv();
+    } catch (error) {
+      expect(String(error)).not.toContain("secret-value-that-must-not-leak");
+    }
   });
 
   it("does not require DATABASE_URL", async () => {
-    process.env.NOTION_API_KEY = "secret_abc";
-    process.env.NOTION_DOCUMENTATION_DB_ID = "db-id-123";
-
-    const { getNotionEnv } = await import("./env");
-    expect(() => getNotionEnv()).not.toThrow();
+    process.env.NOTION_API_KEY = "k";
+    const { getNotionClientEnv } = await import("./env");
+    expect(() => getNotionClientEnv()).not.toThrow();
   });
 
-  it("caches the parsed result across calls", async () => {
-    process.env.NOTION_API_KEY = "secret_abc";
-    process.env.NOTION_DOCUMENTATION_DB_ID = "db-id-123";
-
-    const { getNotionEnv } = await import("./env");
-    const first = getNotionEnv();
-    process.env.NOTION_DOCUMENTATION_DB_ID = "changed";
-    expect(getNotionEnv()).toBe(first);
-  });
-});
-
-describe("isNotionConfigured", () => {
-  it("returns false when Notion variables are missing", async () => {
-    const { isNotionConfigured } = await import("./env");
-    expect(isNotionConfigured()).toBe(false);
-  });
-
-  it("returns true when Notion variables are present", async () => {
-    process.env.NOTION_API_KEY = "secret_abc";
-    process.env.NOTION_DOCUMENTATION_DB_ID = "db-id-123";
-
-    const { isNotionConfigured } = await import("./env");
-    expect(isNotionConfigured()).toBe(true);
+  it("does not expose an is-it-configured switch that could select placeholder content", async () => {
+    const env = await import("./env");
+    expect(Object.keys(env)).not.toContain("isNotionConfigured");
   });
 });
 
@@ -70,7 +75,6 @@ describe("getDatabaseEnv", () => {
 
   it("does not require Notion variables", async () => {
     process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
-
     const { getDatabaseEnv } = await import("./env");
     expect(() => getDatabaseEnv()).not.toThrow();
   });

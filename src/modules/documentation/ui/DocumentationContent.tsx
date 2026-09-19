@@ -1,52 +1,31 @@
-import type { DocumentationContentBlock, DocumentationRichText } from "@/modules/documentation/domain/types";
+import type { DocumentationContentBlock } from "@/modules/documentation/domain/types";
+import { RichText } from "@/shared/ui/RichText";
+import { richTextToPlain } from "@/shared/content/types";
 
-function RichText({ text }: { text: DocumentationRichText[] }) {
-  return (
-    <>
-      {text.map((item, index) => {
-        if (item.kind === "link") {
-          const isInternal = item.href.startsWith("/") || item.href.includes("globalexperiment.org");
-          return (
-            <a
-              key={index}
-              href={item.href}
-              className="underline decoration-border-subtle underline-offset-2 hover:decoration-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              {...(isInternal ? {} : { target: "_blank", rel: "noopener noreferrer" })}
-            >
-              {item.value}
-            </a>
-          );
-        }
-        return <span key={index}>{item.value}</span>;
-      })}
-    </>
-  );
-}
-
-const headingClassName: Record<1 | 2 | 3, string> = {
+const headingClassName: Record<1 | 2 | 3 | 4, string> = {
   1: "text-lg font-bold leading-snug text-text-primary",
   2: "text-base font-bold leading-snug text-text-primary",
   3: "text-sm font-bold leading-snug text-text-primary",
+  4: "text-sm font-bold leading-snug text-text-primary",
 };
 
+const headingTag = { 1: "h2", 2: "h3", 3: "h4", 4: "h5" } as const;
+
 /**
- * Renders the internal Documentation content model. Only heading and
- * paragraph blocks exist in current content; `unsupported` blocks (any
- * Notion block type not yet mapped) render nothing rather than crashing —
- * see modules/documentation/domain/types.ts.
+ * Renders the shared editorial content model for an article. Only heading
+ * and paragraph blocks exist in current content; `unsupported` blocks
+ * render nothing (and are logged at fetch time) rather than crashing.
  *
- * Spacing is grouped rather than uniform: a heading sits close to the
- * paragraph(s) that follow it, with more room before the next heading —
- * matching how the source content actually reads (short "subsection"
- * groups), not a flat list of evenly-spaced blocks. max-w-prose caps line
- * length at a readable measure independent of the page's wider container.
+ * Spacing is grouped: a heading sits close to the paragraph(s) that follow
+ * it, with more room before the next heading. max-w-prose caps line length.
+ * Headings start at h2 because NavHeader already renders the page's h1.
  */
 export function DocumentationContent({ blocks }: { blocks: DocumentationContentBlock[] }) {
   return (
     <div className="max-w-prose">
       {blocks.map((block, index) => {
         if (block.kind === "heading") {
-          const HeadingTag = (`h${block.level + 1}` as unknown) as "h2" | "h3" | "h4";
+          const HeadingTag = headingTag[block.level];
           return (
             <HeadingTag
               key={index}
@@ -57,6 +36,7 @@ export function DocumentationContent({ blocks }: { blocks: DocumentationContentB
           );
         }
         if (block.kind === "paragraph") {
+          if (richTextToPlain(block.text).trim() === "") return null; // Notion spacer paragraphs
           return (
             <p key={index} className="mt-3 text-sm leading-relaxed text-text-secondary first:mt-0">
               <RichText text={block.text} />

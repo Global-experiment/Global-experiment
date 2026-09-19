@@ -11,7 +11,7 @@ vi.mock("@/integrations/notion/resolveDataSourceId", () => ({
 }));
 
 vi.mock("@/shared/config/env", () => ({
-  getNotionEnv: () => ({ NOTION_API_KEY: "test", NOTION_DOCUMENTATION_DB_ID: "db-id" }),
+  getNotionDocumentationEnv: () => ({ NOTION_DOCUMENTATION_DB_ID: "db-id" }),
 }));
 
 const fetchPageContentMock = vi.fn();
@@ -94,5 +94,24 @@ describe("NotionDocumentationRepository", () => {
 
     expect(fetchPageContentMock).toHaveBeenCalledWith("42");
     expect(article?.content).toEqual([{ kind: "paragraph", text: [{ kind: "text", value: "Hi" }] }]);
+  });
+
+  it("a Notion failure is a ProviderError — never null, which the route would turn into a fake 404", async () => {
+    queryMock.mockRejectedValue(new Error("Notion is down"));
+    const { NotionDocumentationRepository } = await import("./NotionDocumentationRepository");
+    const { ProviderError } = await import("@/shared/errors/app-error");
+    const repo = new NotionDocumentationRepository();
+
+    await expect(repo.getBySlug("introduction")).rejects.toBeInstanceOf(ProviderError);
+    await expect(repo.listPublished()).rejects.toBeInstanceOf(ProviderError);
+  });
+
+  it("reads Notion on every call — nothing is cached between requests", async () => {
+    queryMock.mockResolvedValue({ results: [], has_more: false, next_cursor: null });
+    const { NotionDocumentationRepository } = await import("./NotionDocumentationRepository");
+    const repo = new NotionDocumentationRepository();
+    await repo.listPublished();
+    await repo.listPublished();
+    expect(queryMock).toHaveBeenCalledTimes(2);
   });
 });

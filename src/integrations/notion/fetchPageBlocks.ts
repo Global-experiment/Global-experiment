@@ -1,8 +1,9 @@
 import type { BlockObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import { getNotionClient } from "./client";
 import { mapNotionBlockToContentBlock } from "./blockMapper";
-import type { DocumentationContentBlock } from "@/modules/documentation/domain/types";
+import type { ContentBlock } from "@/shared/content/types";
 import { ProviderError } from "@/shared/errors/app-error";
+import { logger } from "@/shared/logging/logger";
 
 async function fetchBlockChildren(blockId: string): Promise<BlockObjectResponse[]> {
   const notion = getNotionClient();
@@ -26,17 +27,21 @@ async function fetchBlockChildren(blockId: string): Promise<BlockObjectResponse[
 }
 
 /**
- * Fetches a page's block content and maps it to our internal content model.
- * Current Documentation content has no nested blocks (see the Notion export
- * audit), but this recurses into any block's children defensively so
- * nested content doesn't silently disappear if it's added later.
+ * Fetches a page's block content and maps it to the shared content model.
+ * Recurses into children defensively so nested content doesn't silently
+ * disappear. Unsupported block types are logged (type name only — never
+ * content) so editors adding one are noticed rather than ignored.
  */
-export async function fetchPageContent(pageId: string): Promise<DocumentationContentBlock[]> {
+export async function fetchPageContent(pageId: string): Promise<ContentBlock[]> {
   const blocks = await fetchBlockChildren(pageId);
-  const content: DocumentationContentBlock[] = [];
+  const content: ContentBlock[] = [];
 
   for (const block of blocks) {
-    content.push(mapNotionBlockToContentBlock(block));
+    const mapped = mapNotionBlockToContentBlock(block);
+    if (mapped.kind === "unsupported") {
+      logger.warn("Unsupported Notion block type skipped", { blockType: mapped.type });
+    }
+    content.push(mapped);
     if (block.has_children) {
       content.push(...(await fetchPageContent(block.id)));
     }

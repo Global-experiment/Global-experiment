@@ -28,22 +28,35 @@ function createLazyEnvAccessor<Schema extends z.ZodTypeAny>(scope: string, schem
 
 /**
  * Each integration validates only the environment variables it actually
- * needs, on first use — so, for example, the Documentation feature (Notion)
- * never requires DATABASE_URL to be present, and vice versa. This mirrors
- * the least-privilege principle applied to credentials generally.
+ * needs, on first use, and fails loudly and specifically when they are
+ * missing or invalid. There is deliberately no "is it configured?" switch
+ * that could route the running application to placeholder content: CMS
+ * content comes from live Notion or the request fails (see ADR 009).
  */
 
-const notionEnvSchema = z.object({
+const notionClientEnvSchema = z.object({
   NOTION_API_KEY: z.string().min(1, "NOTION_API_KEY is required"),
+});
+
+const notionDocumentationEnvSchema = z.object({
   NOTION_DOCUMENTATION_DB_ID: z.string().min(1, "NOTION_DOCUMENTATION_DB_ID is required"),
 });
 
-export const getNotionEnv = createLazyEnvAccessor("Notion", notionEnvSchema);
+const notionHomeEnvSchema = z.object({
+  NOTION_HOME_PAGE_ID: z.string().min(1, "NOTION_HOME_PAGE_ID is required"),
+});
 
-/** Non-throwing check for call sites that need to pick a fallback (e.g. fixture data) instead of failing. */
-export function isNotionConfigured(): boolean {
-  return notionEnvSchema.safeParse(process.env).success;
-}
+/** Credential for the Notion API — the only thing the Notion client needs. */
+export const getNotionClientEnv = createLazyEnvAccessor("Notion client", notionClientEnvSchema);
+
+/** Which Notion database holds the Documentation articles. */
+export const getNotionDocumentationEnv = createLazyEnvAccessor(
+  "Notion Documentation",
+  notionDocumentationEnvSchema,
+);
+
+/** Which Notion page holds the Home editorial content. */
+export const getNotionHomeEnv = createLazyEnvAccessor("Notion Home", notionHomeEnvSchema);
 
 const databaseEnvSchema = z.object({
   DATABASE_URL: z

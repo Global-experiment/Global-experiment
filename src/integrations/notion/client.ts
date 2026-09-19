@@ -1,5 +1,5 @@
 import { Client } from "@notionhq/client";
-import { getNotionEnv } from "@/shared/config/env";
+import { getNotionClientEnv } from "@/shared/config/env";
 
 let cachedClient: Client | undefined;
 
@@ -11,7 +11,7 @@ let cachedClient: Client | undefined;
 export function getNotionClient(): Client {
   if (cachedClient) return cachedClient;
 
-  const env = getNotionEnv();
+  const env = getNotionClientEnv();
   cachedClient = new Client({ auth: env.NOTION_API_KEY });
   return cachedClient;
 }

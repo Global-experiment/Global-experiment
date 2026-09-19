@@ -82,6 +82,20 @@ describe("mapNotionPageProperties", () => {
     expect(mapped?.publishedAt).toEqual(new Date("2026-01-01T00:00:00.000Z"));
   });
 
+  it("reads a non-empty Archive relation (the live property type) as archived", () => {
+    const archived = mapNotionPageProperties(
+      validPublishedPage({ Archive: { type: "relation", relation: [{ id: "archive-entry" }] } }),
+    );
+    expect(archived?.archived).toBe(true);
+    expect(isPubliclyVisible(archived!)).toBe(false);
+  });
+
+  it("reads an empty Archive relation as not archived", () => {
+    const live = mapNotionPageProperties(validPublishedPage({ Archive: { type: "relation", relation: [] } }));
+    expect(live?.archived).toBe(false);
+    expect(isPubliclyVisible(live!)).toBe(true);
+  });
+
   it("reads a checked Archive checkbox as archived", () => {
     const mapped = mapNotionPageProperties(validPublishedPage({ Archive: archivedCheckbox }));
     expect(mapped?.archived).toBe(true);

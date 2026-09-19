@@ -23,6 +23,18 @@ describe("mapRichText", () => {
       { kind: "link", value: "Documentation", href: "https://example.org/docs" },
     ]);
   });
+
+  it("normalizes links to this site's own documentation into internal routes", () => {
+    expect(
+      mapRichText([richText("Privacy", "https://globalexperiment.org/documentation/privacy-and-personal-data")]),
+    ).toEqual([{ kind: "link", value: "Privacy", href: "/documentation/privacy-and-personal-data" }]);
+  });
+
+  it("keeps external and mailto links external", () => {
+    expect(mapRichText([richText("mail", "mailto:donations@globalexperiment.org")])).toEqual([
+      { kind: "link", value: "mail", href: "mailto:donations@globalexperiment.org" },
+    ]);
+  });
 });
 
 describe("mapNotionBlockToContentBlock", () => {
@@ -40,17 +52,30 @@ describe("mapNotionBlockToContentBlock", () => {
     });
   });
 
+  it("maps heading_4 blocks (used by the live Home tagline)", () => {
+    expect(
+      mapNotionBlockToContentBlock(block({ type: "heading_4", heading_4: { rich_text: [richText("T")] } })),
+    ).toEqual({ kind: "heading", level: 4, text: [{ kind: "text", value: "T" }] });
+  });
+
   it("maps paragraph blocks", () => {
     expect(
       mapNotionBlockToContentBlock(block({ type: "paragraph", paragraph: { rich_text: [richText("Hello")] } })),
     ).toEqual({ kind: "paragraph", text: [{ kind: "text", value: "Hello" }] });
   });
 
-  it("falls back to unsupported for any other block type", () => {
+  it("falls back to unsupported, reporting the exact Notion block type", () => {
     expect(mapNotionBlockToContentBlock(block({ type: "bulleted_list_item" }))).toEqual({
       kind: "unsupported",
+      type: "bulleted_list_item",
     });
-    expect(mapNotionBlockToContentBlock(block({ type: "image" }))).toEqual({ kind: "unsupported" });
-    expect(mapNotionBlockToContentBlock(block({ type: "code" }))).toEqual({ kind: "unsupported" });
+    expect(mapNotionBlockToContentBlock(block({ type: "image" }))).toEqual({
+      kind: "unsupported",
+      type: "image",
+    });
+    expect(mapNotionBlockToContentBlock(block({ type: "code" }))).toEqual({
+      kind: "unsupported",
+      type: "code",
+    });
   });
 });

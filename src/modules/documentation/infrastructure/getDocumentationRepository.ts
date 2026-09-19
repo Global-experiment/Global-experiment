@@ -1,34 +1,16 @@
-import { isNotionConfigured } from "@/shared/config/env";
-import { InternalError } from "@/shared/errors/app-error";
 import type { DocumentationRepository } from "@/modules/documentation/domain/DocumentationRepository";
 import { NotionDocumentationRepository } from "./NotionDocumentationRepository";
-import { FixtureDocumentationRepository } from "./FixtureDocumentationRepository";
 
 let cached: DocumentationRepository | undefined;
 
 /**
- * The one place that decides which DocumentationRepository implementation
- * is active. Falls back to fixture data only outside production, so the
- * feature can be built and browsed locally before live credentials
- * arrive — application/ and ui/ code never make this choice themselves.
- *
- * In production, missing Notion credentials fail loudly instead of
- * silently serving placeholder content to real visitors.
+ * The single composition point for the Documentation source. It is always
+ * live Notion — in development, staging and production alike. There is no
+ * fixture, mock or fallback repository in the running application: if
+ * Notion is misconfigured or unreachable the request fails clearly (see
+ * ADR 009). A future Postgres-backed repository replaces the class here.
  */
 export function getDocumentationRepository(): DocumentationRepository {
-  if (cached) return cached;
-
-  if (isNotionConfigured()) {
-    cached = new NotionDocumentationRepository();
-    return cached;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new InternalError(
-      "NOTION_API_KEY and NOTION_DOCUMENTATION_DB_ID must be set in production — refusing to fall back to fixture data.",
-    );
-  }
-
-  cached = new FixtureDocumentationRepository();
+  cached ??= new NotionDocumentationRepository();
   return cached;
 }

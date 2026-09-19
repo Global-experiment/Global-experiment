@@ -32,10 +32,8 @@ function getMultiSelect(property: NotionProperty | undefined): string[] {
 }
 
 /**
- * The Documentation export has no example where Status has a value other
- * than "Published", so the exact property type (select vs. the newer
- * dedicated "status" type) is unconfirmed — handled defensively for both.
- * Verify against the live schema once credentials are available.
+ * Confirmed against the live database: Status is a "select" property. The
+ * "status" type is also tolerated in case an editor converts it.
  */
 function getStatusName(property: NotionProperty | undefined): string | undefined {
   if (property?.type === "status") return property.status?.name ?? undefined;
@@ -44,13 +42,14 @@ function getStatusName(property: NotionProperty | undefined): string | undefined
 }
 
 /**
- * Archive is empty on every row in the export, so its exact property type
- * (checkbox vs. select) is unconfirmed — handled defensively for the
- * plausible shapes. Verify against the live schema once credentials are
- * available and simplify this if it turns out to be a plain checkbox.
+ * Confirmed against the live database: Archive is a "relation" property.
+ * A page is treated as archived when the relation is non-empty (it has been
+ * linked to an archive entry). Checkbox/select/status shapes are also
+ * tolerated in case an editor converts the property type.
  */
 function isArchivedProperty(property: NotionProperty | undefined): boolean {
   if (!property) return false;
+  if (property.type === "relation") return property.relation.length > 0;
   if (property.type === "checkbox") return property.checkbox;
   if (property.type === "select") return property.select !== null;
   if (property.type === "status") return property.status !== null && property.status.name !== "Not archived";

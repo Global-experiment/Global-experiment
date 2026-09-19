@@ -3,7 +3,7 @@ import { getNotionClient } from "@/integrations/notion/client";
 import { fetchPageContent } from "@/integrations/notion/fetchPageBlocks";
 import { resolveDataSourceId } from "@/integrations/notion/resolveDataSourceId";
 import { ProviderError } from "@/shared/errors/app-error";
-import { getNotionEnv } from "@/shared/config/env";
+import { getNotionDocumentationEnv } from "@/shared/config/env";
 import type { DocumentationRepository } from "@/modules/documentation/domain/DocumentationRepository";
 import type { DocumentationArticle, DocumentationArticleSummary } from "@/modules/documentation/domain/types";
 import {
@@ -20,7 +20,7 @@ interface MappedPage {
 
 async function fetchAllMappedPages(): Promise<MappedPage[]> {
   const notion = getNotionClient();
-  const env = getNotionEnv();
+  const env = getNotionDocumentationEnv();
 
   const pages: PageObjectResponse[] = [];
   let cursor: string | undefined;

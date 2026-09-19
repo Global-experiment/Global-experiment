@@ -11,25 +11,19 @@ afterEach(() => {
 });
 
 describe("getDocumentationRepository", () => {
-  it("uses the fixture repository outside production when Notion isn't configured", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-    const { getDocumentationRepository } = await import("./getDocumentationRepository");
-    const { FixtureDocumentationRepository } = await import("./FixtureDocumentationRepository");
-    expect(getDocumentationRepository()).toBeInstanceOf(FixtureDocumentationRepository);
-  });
+  for (const mode of ["development", "production", "test"] as const) {
+    it(`is always the live Notion repository in ${mode}`, async () => {
+      vi.stubEnv("NODE_ENV", mode);
+      const { getDocumentationRepository } = await import("./getDocumentationRepository");
+      const { NotionDocumentationRepository } = await import("./NotionDocumentationRepository");
+      expect(getDocumentationRepository()).toBeInstanceOf(NotionDocumentationRepository);
+    });
 
-  it("throws in production when Notion isn't configured, rather than silently using fixtures", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    const { getDocumentationRepository } = await import("./getDocumentationRepository");
-    expect(() => getDocumentationRepository()).toThrow(/NOTION_API_KEY/);
-  });
-
-  it("uses the Notion repository when configured, even in production", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    process.env.NOTION_API_KEY = "secret";
-    process.env.NOTION_DOCUMENTATION_DB_ID = "db-id";
-    const { getDocumentationRepository } = await import("./getDocumentationRepository");
-    const { NotionDocumentationRepository } = await import("./NotionDocumentationRepository");
-    expect(getDocumentationRepository()).toBeInstanceOf(NotionDocumentationRepository);
-  });
+    it(`fails clearly in ${mode} when Notion is not configured — no placeholder articles`, async () => {
+      vi.stubEnv("NODE_ENV", mode);
+      const { getDocumentationRepository } = await import("./getDocumentationRepository");
+      await expect(getDocumentationRepository().listPublished()).rejects.toThrow(/NOTION_API_KEY/);
+      await expect(getDocumentationRepository().getBySlug("introduction")).rejects.toThrow(/NOTION_API_KEY/);
+    });
+  }
 });
