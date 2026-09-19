@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
+import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
+import { StatsRow } from "@/shared/ui/StatsRow";
 import { InertActionNotice } from "@/shared/ui/InertActionNotice";
 
-const AMOUNTS = ["$2", "$5", "$10", "$20", "$50", "Other"];
+const AMOUNTS = ["$2", "$5", "$10", "$20", "$50"];
 const PAYMENT_METHODS = ["Card payment via Stripe", "Apple Pay", "Google Pay", "PayPal"];
 
 /**
@@ -15,53 +17,61 @@ const PAYMENT_METHODS = ["Card payment via Stripe", "Apple Pay", "Google Pay", "
  * figures are examples) — real Treasury data is M3. Never wire this route
  * to a real data source without renaming/removing this constant.
  */
-const DEVELOPMENT_FIXTURE_STATS: Array<[string, string]> = [
+const DEVELOPMENT_FIXTURE_STATS = [
   ["USD 91.3K", "Balance"],
   ["1.4", "Sustainability"],
   ["USD 6.4", "Med. donation"],
   ["USD 39.8K", "Expenses"],
-];
+] as const;
+
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
 /**
- * M1 navigation scaffold. Amount/frequency selection is real UI state; the
- * payment methods are real buttons that don't perform a payment — see
+ * M1 navigation scaffold in the figma.pdf p9–p11 layout: heading, stats,
+ * white-outlined Once/Monthly segmented control, 3×2 amount picker (with
+ * "Other" turning into a field), 40px payment rows. Selection is real UI
+ * state; the payment rows perform no payment (Stripe is M3). See
  * docs/architecture/decisions/008-route-shells.md.
  */
 export default function DonatePage() {
   const [frequency, setFrequency] = useState<"once" | "monthly">("once");
   const [amount, setAmount] = useState<string | null>(null);
+  const [otherAmount, setOtherAmount] = useState("");
   const [attempted, setAttempted] = useState(false);
 
   return (
-    <main className="flex flex-1 flex-col">
-      <NavHeader title="Donate" backHref="/" />
-      <Container className="flex flex-col gap-6 py-6">
-        <div>
-          {/* h2, not h1: NavHeader already renders the page's <h1> ("Donate"). */}
-          <h2 className="text-base font-bold text-text-primary">Donate to the experiment</h2>
-          <p className="mt-1 text-sm text-text-secondary">
-            Thank you for considering donating to the experiment.
-          </p>
-        </div>
+    <main className="flex flex-1 flex-col pb-6">
+      <NavHeader
+        title="Donate"
+        backHref="/"
+        actions={
+          <PageActionsMenu
+            title="Page actions"
+            actions={[
+              { label: "Send feedback", icon: "lightbulb", href: "/feedback" },
+              { label: "Report issue", icon: "new_releases", href: "/issue" },
+              { label: "Documentation", icon: "insert_drive_file", href: "/documentation" },
+            ]}
+          />
+        }
+      />
+      <Container className="pt-1">
+        {/* h2, not h1: NavHeader already renders the page's <h1> ("Donate"). */}
+        <h2 className="text-body font-bold text-text-primary">Donate to the experiment</h2>
+        <p className="mt-1 text-body text-text-primary">Thank you for considering donating to the experiment.</p>
 
-        <div className="grid grid-cols-4 gap-2 text-center">
-          {DEVELOPMENT_FIXTURE_STATS.map(([value, label]) => (
-            <div key={label}>
-              <p className="text-sm font-bold text-text-primary">{value}</p>
-              <p className="text-xs text-text-tertiary">{label}</p>
-            </div>
-          ))}
-        </div>
+        <StatsRow stats={DEVELOPMENT_FIXTURE_STATS} className="mt-5" />
 
-        <div className="flex rounded-control border border-border-subtle">
+        <div role="group" aria-label="Frequency" className="mt-6 flex h-10 rounded-full border border-white p-[3px]">
           {(["once", "monthly"] as const).map((value) => (
             <button
               key={value}
               type="button"
               onClick={() => setFrequency(value)}
               aria-pressed={frequency === value}
-              className={`flex-1 rounded-control py-2 text-sm font-semibold capitalize focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
-                frequency === value ? "bg-white text-black" : "text-text-secondary"
+              className={`flex-1 rounded-full border text-body capitalize ${focusRing} ${
+                frequency === value ? "border-white text-text-primary" : "border-transparent text-text-muted"
               }`}
             >
               {value}
@@ -69,27 +79,54 @@ export default function DonatePage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div role="group" aria-label="Amount" className="mt-2 grid grid-cols-3 gap-2">
           {AMOUNTS.map((value) => (
             <button
               key={value}
               type="button"
               onClick={() => setAmount(value)}
               aria-pressed={amount === value}
-              className={`rounded-control border px-4 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+              className={`h-10 rounded-control border text-body ${focusRing} ${
                 amount === value
-                  ? "border-transparent bg-white text-black"
-                  : "border-border-subtle text-text-primary hover:bg-white/5"
+                  ? "border-white bg-white text-black"
+                  : "border-line-strong text-text-primary hover:bg-white/5"
               }`}
             >
               {value}
             </button>
           ))}
+          {amount === "other" ? (
+            <>
+              <label htmlFor="donate-other" className="sr-only">
+                Other amount
+              </label>
+              <input
+                id="donate-other"
+                type="number"
+                inputMode="decimal"
+                min={1}
+                autoFocus
+                value={otherAmount}
+                onChange={(event) => setOtherAmount(event.target.value)}
+                placeholder="Other"
+                className={`h-10 w-full rounded-control border border-white bg-transparent text-center text-body text-text-primary placeholder:text-text-muted ${focusRing}`}
+              />
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAmount("other")}
+              aria-pressed={false}
+              className={`h-10 rounded-control border border-line-strong text-body text-text-primary hover:bg-white/5 ${focusRing}`}
+            >
+              Other
+            </button>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="mt-2 flex flex-col gap-2">
           {PAYMENT_METHODS.map((method) => (
-            <Button key={method} variant="secondary" onClick={() => setAttempted(true)} fullWidth>
+            <Button key={method} onClick={() => setAttempted(true)} fullWidth>
               {method}
             </Button>
           ))}

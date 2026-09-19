@@ -2,7 +2,13 @@
 
 ## Status
 
-Accepted
+Accepted — amended 2026-09-19: values re-measured from the vector
+`figma.pdf` export. Muted text is now the measured `#b1b1b1` (10.4:1 on
+black, so the earlier `#949494` accessibility adjustment is no longer
+needed); borders are the measured `#484848`; the control radius is 4px and
+the type scale is 14/18 body, 16/20 lead, 12/14 meta. The full measurement
+log is in [design-fidelity.md](../design-fidelity.md). The typeface remains
+unconfirmed.
 
 ## Context
 

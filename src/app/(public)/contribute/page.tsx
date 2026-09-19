@@ -10,17 +10,16 @@ export const metadata: Metadata = {
 const CONTRIBUTE_EMAIL = "contribute@globalexperiment.org";
 
 /**
- * Genuinely functional per the Figma/IA audit: Contribute doesn't need the
- * later AI/email-ingestion workflow to be useful now — it's a real mailto
- * link, not a shell awaiting backend work.
+ * Genuinely functional per the Figma/IA audit (figma.pdf p31): a real
+ * mailto link with a copy control, then one explanatory paragraph.
  */
 export default function ContributePage() {
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col pb-6">
       <NavHeader title="Contribute to the experiment" backHref="/" />
-      <Container className="py-6">
+      <Container className="pt-1">
         <ContributeEmailLink email={CONTRIBUTE_EMAIL} />
-        <p className="mt-4 text-sm text-text-secondary">
+        <p className="mt-5 text-body text-text-primary">
           Send an email to the above email address stating what your expertises are and on what
           aspects you might contribute to the development of the platform.
         </p>

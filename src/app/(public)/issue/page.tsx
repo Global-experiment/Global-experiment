@@ -1,10 +1,4 @@
-"use client";
-
-import { useState } from "react";
-import { Button } from "@/shared/ui/Button";
-import { Container } from "@/shared/ui/Container";
-import { NavHeader } from "@/shared/ui/NavHeader";
-import { InertActionNotice } from "@/shared/ui/InertActionNotice";
+import { ReportComposer } from "../ReportComposer";
 
 const ISSUE_TYPES = [
   { label: "Functional bug", description: "Feature doesn't behave as specified" },
@@ -30,65 +24,14 @@ const ISSUE_TYPES = [
  * a visual one). See docs/architecture/decisions/008-route-shells.md.
  */
 export default function IssuePage() {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-
-  function toggle(label: string) {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
-      return next;
-    });
-  }
-
   return (
-    <main className="flex flex-1 flex-col">
-      <NavHeader title="Report an issue" backHref="/" />
-      <Container className="flex flex-col gap-6 py-6">
-        <fieldset>
-          <legend className="mb-2 text-sm font-bold text-text-primary">Issue type</legend>
-          <div>
-            {ISSUE_TYPES.map((type) => (
-              <label
-                key={type.label}
-                className="flex cursor-pointer items-start gap-3 border-b border-border-faint py-3"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(type.label)}
-                  onChange={() => toggle(type.label)}
-                  className="mt-1 h-4 w-4"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-text-primary">{type.label}</span>
-                  <span className="block text-sm text-text-muted">{type.description}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <div>
-          <label htmlFor="issue-message" className="sr-only">
-            Please develop your issue
-          </label>
-          <textarea
-            id="issue-message"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            rows={5}
-            placeholder="Please develop your issue for a better administration of your request."
-            className="w-full rounded-control border border-border-subtle bg-transparent px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          />
-        </div>
-
-        <Button variant="primary" onClick={() => setSubmitted(true)} fullWidth>
-          Report issue
-        </Button>
-        {submitted ? <InertActionNotice /> : null}
-      </Container>
-    </main>
+    <ReportComposer
+      title="Report an issue"
+      messageLabel="Your issue report"
+      placeholder="Please develop your issue for a better administration of your request."
+      ctaLabel="Report issue"
+      typeSheetTitle="Issue type"
+      types={ISSUE_TYPES}
+    />
   );
 }

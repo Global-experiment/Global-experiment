@@ -22,7 +22,11 @@ participant accounts, voting, governance engine, or admin platform — see
 All of Home's destinations are navigable now (real routes, not disabled
 buttons), even though most of their backend behavior is a later milestone —
 see [008-route-shells](./decisions/008-route-shells.md) for the "navigation
-scaffold vs. feature completion" distinction this relies on.
+scaffold vs. feature completion" distinction this relies on. The UI
+reproduces the client's Figma frames measured from the vector export — see
+[design-fidelity.md](./design-fidelity.md) — and shares one responsive
+sheet/dialog primitive, see
+[011-responsive-sheet-and-inline-articles](./decisions/011-responsive-sheet-and-inline-articles.md).
 
 ## Style: modular monolith
 
