@@ -1,25 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
 import { StatsRow } from "@/shared/ui/StatsRow";
 import { InertActionNotice } from "@/shared/ui/InertActionNotice";
+import { PaymentMarks, type PaymentMethodId } from "./PaymentMarks";
 
 const AMOUNTS = ["$2", "$5", "$10", "$20", "$50"];
 /**
- * Payment rows from figma.pdf p9. `marks` are the client-supplied brand
- * assets under public/assets/icons/figma/; a row whose asset has not been
- * supplied yet shows its text label only (nothing is approximated).
+ * Payment rows from figma.pdf p9. The card row shows its text next to the
+ * three card marks; the wallet rows are the brand mark alone, so their text
+ * is visually hidden and kept as the accessible name.
  */
-const PAYMENT_METHODS: Array<{ label: string; marks: string[] }> = [
-  { label: "Card payment via Stripe", marks: ["payment-visa.svg"] },
-  { label: "Apple Pay", marks: [] },
-  { label: "Google Pay", marks: [] },
-  { label: "PayPal", marks: [] },
+const PAYMENT_METHODS: Array<{ id: PaymentMethodId; label: string; showLabel: boolean }> = [
+  { id: "card", label: "Card payment via Stripe", showLabel: true },
+  { id: "apple-pay", label: "Apple Pay", showLabel: false },
+  { id: "google-pay", label: "Google Pay", showLabel: false },
+  { id: "paypal", label: "PayPal", showLabel: false },
 ];
 
 /**
@@ -34,20 +34,6 @@ const DEVELOPMENT_FIXTURE_STATS = [
   ["USD 6.4", "Med. donation"],
   ["USD 39.8K", "Expenses"],
 ] as const;
-
-/**
- * A 24×16 white card chip (the Visa tile in the design) holding the
- * supplied mark. The file is displayed untouched — the chip supplies the
- * light background a dark mark needs on the black page. Decorative: the
- * row's text label names the method.
- */
-function PaymentMark({ file }: { file: string }) {
-  return (
-    <span className="flex h-4 w-6 items-center justify-center rounded-[3px] bg-white">
-      <Image src={`/assets/icons/figma/${file}`} alt="" width={22} height={22} unoptimized />
-    </span>
-  );
-}
 
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
@@ -152,21 +138,13 @@ export default function DonatePage() {
         <div className="mt-2 flex flex-col gap-2">
           {PAYMENT_METHODS.map((method) => (
             <Button
-              key={method.label}
+              key={method.id}
               onClick={() => setAttempted(true)}
-              icon={
-                method.marks.length > 0 ? (
-                  <span className="flex items-center gap-1">
-                    {method.marks.map((file) => (
-                      <PaymentMark key={file} file={file} />
-                    ))}
-                  </span>
-                ) : undefined
-              }
-              className="gap-2! pl-2!"
+              icon={<PaymentMarks method={method.id} />}
+              className="gap-2! pl-[7px]!"
               fullWidth
             >
-              {method.label}
+              {method.showLabel ? method.label : <span className="sr-only">{method.label}</span>}
             </Button>
           ))}
         </div>
