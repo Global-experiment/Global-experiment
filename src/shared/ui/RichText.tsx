@@ -3,7 +3,7 @@ import type { RichText as RichTextModel } from "@/shared/content/types";
 import { isInternalHref } from "@/shared/content/internalLinks";
 
 const linkClassName =
-  "underline underline-offset-2 hover:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+  "underline underline-offset-2 hover:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
 /**
  * Renders editorial rich text. Links are the only formatting honoured —

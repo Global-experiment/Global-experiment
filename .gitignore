@@ -54,3 +54,4 @@ next-env.d.ts
 
 # client design reference (local only — never commit design exports without approval)
 /figma.pdf
+/design.pdf

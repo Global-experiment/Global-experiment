@@ -18,10 +18,14 @@ type IconButtonProps =
  * glyph, not the hit area, is what aligns to the layout: callers pull the
  * box back with negative margins so the glyph sits on the 8px gutter
  * exactly as in the Figma frames.
+ *
+ * These have no border at rest (bare glyph buttons, per Figma), so a hover
+ * stroke is drawn with a non-layout-affecting ring instead of a border —
+ * background never changes on hover (client feedback item 5).
  */
 const classes =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-text-primary " +
-  "hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+  "hover:ring-1 hover:ring-content-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
 export function IconButton({ label, icon, size = 20, className = "", ...props }: IconButtonProps) {
   const icon_ = <Icon name={icon} size={size} />;

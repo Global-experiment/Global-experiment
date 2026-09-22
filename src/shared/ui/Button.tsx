@@ -38,14 +38,20 @@ interface ButtonDisabled extends ButtonBaseProps {
 type ButtonProps = ButtonAsLink | ButtonAsAction | ButtonDisabled;
 
 /*
- * Geometry measured from figma.pdf: 1px border, 4px radius, 14px bold label.
- * With an icon the label starts 32px in (10px padding + 18px glyph + 4px
- * gap); without one it starts 8px in. Labels are left-aligned in
- * full-width rows, exactly as in the action grid and sheets.
+ * Geometry: 40/32px height, 1px border, 4px radius, 14px bold label, 8px
+ * padding on both sides (client feedback item 4) regardless of whether an
+ * icon is present — the icon sits inside that padding with a 4px gap to the
+ * label, not additional outer padding.
+ *
+ * Hover changes the outline stroke only, never the background (client
+ * feedback item 5): secondary/outlined buttons move to the `content-50`
+ * token; the primary filled CTA has no distinct hover of its own since its
+ * border already matches its fill and Figma shows no separate hover state
+ * for it (a static export can't capture hover) — only its focus ring.
  */
 const baseClasses =
-  "inline-flex items-center rounded-control border pr-2 text-body font-bold transition-colors " +
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+  "inline-flex items-center rounded-control border px-2 text-body font-bold transition-colors " +
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
 const sizeClasses: Record<ButtonSize, string> = {
   control: "h-10",
@@ -53,8 +59,8 @@ const sizeClasses: Record<ButtonSize, string> = {
 };
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "border-white bg-white text-black hover:bg-white/90 active:bg-white/80",
-  secondary: "border-line bg-transparent text-text-primary hover:bg-white/5 active:bg-white/10",
+  primary: "border-inverse-surface bg-inverse-surface text-inverse-content",
+  secondary: "border-line bg-transparent text-text-primary hover:border-content-50",
 };
 
 export function Button(props: ButtonProps) {
@@ -62,7 +68,7 @@ export function Button(props: ButtonProps) {
   const classes = [
     baseClasses,
     sizeClasses[size],
-    icon ? "gap-1 pl-2.5" : "pl-2",
+    icon ? "gap-1" : "",
     fullWidth ? "w-full justify-start" : "",
     className,
   ]

@@ -14,24 +14,25 @@ export interface PageAction {
 }
 
 interface PageActionsMenuProps {
-  /** Accessible name of the sheet; also used for the trigger's label. */
-  title: string;
+  /** Accessible name of the sheet and the trigger button. Not shown visually — these menus have no header in Figma (client feedback item 9). */
+  label: string;
   actions: PageAction[];
-  /** Optional lead text above the rows (figma.pdf p3/p16). */
+  /** Optional lead text above the rows (figma.pdf p3/p12/p16). */
   children?: ReactNode;
 }
 
 /**
  * The `more_vert` overflow control from the Figma headers. Opens the shared
- * Sheet with one 40px action row per entry (p3, p12, p16).
+ * Sheet with one 40px action row per entry (p3, p12, p16) — no visible
+ * title, matching Figma.
  */
-export function PageActionsMenu({ title, actions, children }: PageActionsMenuProps) {
+export function PageActionsMenu({ label, actions, children }: PageActionsMenuProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <IconButton onClick={() => setOpen(true)} label={title} icon="more_vert" />
-      <Sheet open={open} onClose={() => setOpen(false)} title={title}>
+      <IconButton onClick={() => setOpen(true)} label={label} icon="more_vert" />
+      <Sheet open={open} onClose={() => setOpen(false)} ariaLabel={label}>
         {children ? <div className="pb-4 text-body">{children}</div> : null}
         <div className="flex flex-col gap-2">
           {actions.map((action) =>

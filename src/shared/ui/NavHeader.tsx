@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { Container } from "./Container";
-import { IconButton } from "./IconButton";
+import { HistoryBackButton } from "./HistoryBackButton";
 
 interface NavHeaderProps {
   title: string;
-  /** Sub-page pattern: Material arrow_back on the gutter, title 32px in. Omit for pages without a back control (Home, success/error states). */
+  /** Back destination when there's no real in-app history to return to (see HistoryBackButton). Omit for pages without a back control (Home, success/error states). */
   backHref?: string;
   /** Right-aligned icon controls (share, overflow menu). */
   actions?: ReactNode;
@@ -22,7 +22,7 @@ export function NavHeader({ title, backHref, actions }: NavHeaderProps) {
   return (
     <header>
       <Container className="flex h-11 items-center">
-        {backHref ? <IconButton href={backHref} label="Back" icon="arrow_back" className="-mx-gutter" /> : null}
+        {backHref ? <HistoryBackButton fallbackHref={backHref} className="-mx-gutter" /> : null}
         <h1 className="min-w-0 truncate text-body font-bold text-text-primary">{title}</h1>
         {actions ? (
           /* Only icon controls overlap; the <dialog> a menu renders beside its trigger keeps its own margins. */

@@ -1,22 +1,48 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — measured from the vector figma.pdf export (412pt mobile
- * frames, 1440pt desktop frames; values in pt map 1:1 to CSS px). See
- * docs/architecture/design-fidelity.md for the measurement log and
+ * Design tokens — measured from the vector figma.pdf/design.pdf export
+ * (412pt mobile frames, 1440pt desktop frames; values in pt map 1:1 to CSS
+ * px). See docs/architecture/design-fidelity.md for the measurement log and
  * docs/architecture/decisions/006-design-tokens.md for the rationale.
  *
- * Grayscale only, pure black surface, 1px flat borders, no shadows.
- * Every repeated dimension in the UI (gutter, column, control heights,
- * type scale) resolves to one of these tokens.
+ * Grayscale only, flat 1px borders, no shadows. Every repeated dimension in
+ * the UI (gutter, column, control heights, type scale) resolves to one of
+ * these tokens. Colors are defined twice: the dark values below (the
+ * client's actual design) and a light inversion applied by
+ * `[data-theme="light"]` further down — see ThemeToggle.tsx. Dark is the
+ * permanent default; light is a temporary review-only preview (item 7 of
+ * the M1 client feedback pass).
  */
 @theme {
-  /* Colors — pixel-sampled from the PDF render. */
+  /* Colors — pixel-sampled from the PDF render (dark, the shipped theme). */
   --color-surface-base: #000000;
   --color-text-primary: #ffffff;
   --color-text-muted: #b1b1b1; /* secondary/meta text, placeholders — 10.4:1 on black */
   --color-line: #484848; /* borders, dividers, outlined controls */
   --color-line-strong: #b1b1b1; /* selectable controls (amount picker, checkboxes) */
+
+  /*
+   * "Content 50" — the design system's 50%-opacity foreground token, used
+   * only for the hover stroke on outlined buttons (client feedback item 5).
+   * Not measurable from a static PDF (it has no hover states); defined here
+   * as 50% alpha over the current theme's foreground color, the literal
+   * reading of the name, and isolated to this one variable so an exact
+   * value from Figma variables can replace it later without touching any
+   * component.
+   */
+  --color-content-50: rgb(255 255 255 / 50%);
+
+  /*
+   * Inverted surface pair for filled/selected controls (primary CTA, the
+   * selected amount/segment). Dark theme: white fill, black content — the
+   * same literal white/black the components used before theming existed.
+   * Light theme inverts this to black fill, white content, which is the
+   * conventional light-mode treatment of the same "filled with the
+   * strongest foreground color" control.
+   */
+  --color-inverse-surface: #ffffff;
+  --color-inverse-content: #000000;
 
   /* Geometry */
   --radius-control: 0.25rem; /* 4px — buttons, inputs, tags, search */
@@ -42,6 +68,24 @@
    */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
+}
+
+/*
+ * Temporary light-mode preview (client feedback item 7). Overrides only the
+ * color custom properties Tailwind reads through `@theme` above — geometry
+ * and type scale are unchanged, so layout is identical in both themes. See
+ * shared/ui/ThemeToggle.tsx for how `data-theme` gets set; delete this block
+ * and the toggle together to remove the feature entirely.
+ */
+[data-theme="light"] {
+  --color-surface-base: #ffffff;
+  --color-text-primary: #000000;
+  --color-text-muted: #5c5c5c; /* ~7:1 on white */
+  --color-line: #d4d4d4;
+  --color-line-strong: #8a8a8a;
+  --color-content-50: rgb(0 0 0 / 50%);
+  --color-inverse-surface: #000000;
+  --color-inverse-content: #ffffff;
 }
 
 body {
