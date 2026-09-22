@@ -1,7 +1,9 @@
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
+import { FullBleedSeparator } from "@/shared/ui/FullBleedSeparator";
 import { RichText } from "@/shared/ui/RichText";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
+import { ThemeToggle } from "@/shared/ui/ThemeToggle";
 import { Icon } from "@/shared/ui/icons";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
 import { HomeSections } from "@/modules/home/ui/HomeSections";
@@ -22,7 +24,11 @@ export const dynamic = "force-dynamic";
 /**
  * figma.pdf p1 (mobile) / p33 (desktop) — one layout, one column width
  * token: 44px identity row, 16px centered tagline, 2×2 grid of 40px
- * outlined actions, 1px rule, left-aligned sections, white bottom CTA.
+ * outlined actions, full-bleed rule, left-aligned sections, white bottom
+ * CTA. The action grid is unchanged from the client's currently available
+ * Figma reference (figma.pdf and design.pdf are pixel-identical on this
+ * page) — see the client-feedback-pass report, item 3, for the "New
+ * buttons homepage" note this is waiting on.
  */
 export default async function Home() {
   const content = await getHomeContent();
@@ -30,10 +36,16 @@ export default async function Home() {
   return (
     <main className="flex flex-1 flex-col pb-16">
       <Container>
-        <p className="flex h-11 items-center justify-center gap-1 text-body">
-          <span className="font-bold text-text-primary">{homeWordmark.brand}</span>
-          <span className="text-text-muted">{homeWordmark.eyebrow}</span>
-        </p>
+        <div className="relative flex h-11 items-center justify-center text-body">
+          <p className="flex items-center gap-1">
+            <span className="font-bold text-text-primary">{homeWordmark.brand}</span>
+            <span className="text-text-muted">{homeWordmark.eyebrow}</span>
+          </p>
+          {/* Temporary, review-only — see ThemeToggle.tsx. */}
+          <div className="absolute top-1/2 right-0 -translate-y-1/2">
+            <ThemeToggle />
+          </div>
+        </div>
         <h1 className="mt-3 text-center text-lead font-normal text-text-primary">
           <RichText text={content.tagline} />
         </h1>
@@ -52,7 +64,7 @@ export default async function Home() {
           ))}
         </nav>
 
-        <hr className="mt-2 border-line" />
+        <FullBleedSeparator className="mt-2" />
 
         <div className="mt-4">
           <HomeSections content={content} />

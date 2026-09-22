@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { Button } from "@/shared/ui/Button";
+import { Checkbox } from "@/shared/ui/Checkbox";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { Sheet } from "@/shared/ui/Sheet";
@@ -24,10 +25,12 @@ interface ReportComposerProps {
 
 /**
  * Shared presentation for Send feedback (figma.pdf p23–25, p35) and
- * Report an issue (p27–29): a borderless 16px composer under the header,
- * a bottom CTA that is gray until something is written, and — on the CTA
- * — the type-selection sheet (bottom sheet on mobile, centered dialog on
- * desktop) with checkbox rows and the white confirm button.
+ * Report an issue (p27–29). The type-selection sheet opens first, before
+ * the composer is reachable at all (client feedback item 20 — reversing
+ * the earlier "compose, then pick a type" order): the page mounts with it
+ * open, and only shows the paragraph composer once it's been dismissed
+ * (by its own CTA, Escape, or the backdrop — type selection was already
+ * optional multi-select, never required to proceed).
  *
  * Nothing is sent or stored: confirming shows the inert-action notice.
  * The M2 pipeline (persistence, qualification) plugs in behind the same UI.
@@ -42,7 +45,7 @@ export function ReportComposer({
 }: ReportComposerProps) {
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [typeSheetOpen, setTypeSheetOpen] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const messageId = useId();
 
@@ -62,13 +65,18 @@ export function ReportComposer({
         <label htmlFor={messageId} className="sr-only">
           {messageLabel}
         </label>
+        {/*
+          No border, no focus outline (client feedback item 22) — a subtle
+          background tint marks focus instead, so keyboard users still get
+          a visible (if quiet) indicator.
+        */}
         <textarea
           id={messageId}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder={placeholder}
           rows={8}
-          className="w-full flex-1 resize-none bg-transparent text-lead text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-line"
+          className="w-full flex-1 resize-none bg-transparent text-lead text-text-primary placeholder:text-text-muted transition-colors focus:bg-text-primary/5 focus:outline-none"
         />
         {submitted ? <InertActionNotice /> : null}
       </Container>
@@ -79,41 +87,28 @@ export function ReportComposer({
             {ctaLabel}
           </Button>
         ) : (
-          <Button variant="primary" fullWidth onClick={() => setSheetOpen(true)}>
+          <Button variant="primary" fullWidth onClick={() => setSubmitted(true)}>
             {ctaLabel}
           </Button>
         )}
       </StickyActionBar>
 
-      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={typeSheetTitle}>
+      <Sheet open={typeSheetOpen} onClose={() => setTypeSheetOpen(false)} title={typeSheetTitle}>
         <fieldset>
           <legend className="sr-only">{typeSheetTitle}</legend>
           <div className="divide-y divide-line">
             {types.map((type) => (
-              <label key={type.label} className="flex cursor-pointer items-start gap-1 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={selected.has(type.label)}
-                  onChange={() => toggle(type.label)}
-                  className="mt-px size-4 shrink-0 accent-white"
-                />
-                <span>
-                  <span className="block text-body text-text-primary">{type.label}</span>
-                  <span className="mt-1 block text-meta text-text-muted">{type.description}</span>
-                </span>
-              </label>
+              <Checkbox
+                key={type.label}
+                checked={selected.has(type.label)}
+                onChange={() => toggle(type.label)}
+                label={type.label}
+                description={type.description}
+              />
             ))}
           </div>
         </fieldset>
-        <Button
-          variant="primary"
-          fullWidth
-          className="mt-3"
-          onClick={() => {
-            setSheetOpen(false);
-            setSubmitted(true);
-          }}
-        >
+        <Button variant="primary" fullWidth className="mt-3" onClick={() => setTypeSheetOpen(false)}>
           {ctaLabel}
         </Button>
       </Sheet>
