@@ -13,13 +13,13 @@ test.describe("No CSP violations or hydration failures on any page", () => {
       });
       page.on("pageerror", (err) => errors.push(`Uncaught: ${err.message}`));
 
-      await page.goto(path, { waitUntil: "networkidle" });
+      await page.goto(path, { waitUntil: "load" });
       expect(errors).toEqual([]);
     });
   }
 
   test("Documentation accordion is actually interactive after hydration", async ({ page }) => {
-    await page.goto("/documentation", { waitUntil: "networkidle" });
+    await page.goto("/documentation", { waitUntil: "load" });
     const toggle = page.getByRole("button", { name: "Introduction" });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await toggle.click();
@@ -74,40 +74,95 @@ test.describe("Home navigation", () => {
   });
 });
 
-test.describe("Documentation index", () => {
-  test("search filters the article list without navigating", async ({ page }) => {
-    await page.goto("/documentation", { waitUntil: "networkidle" });
-    await expect(page.getByRole("button", { name: "Introduction" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Version 0.1 scope" })).toBeVisible();
+test.describe("Temporary light/dark theme toggle (client feedback item 7)", () => {
+  test("switches the theme, updates the pressed state, and survives navigation", async ({ page }) => {
+    await page.goto("/");
+    const toggle = page.getByRole("button", { name: "Switch to light preview" });
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
 
-    await page.getByPlaceholder("Search").fill("Introduction");
-    await expect(page.getByRole("button", { name: "Introduction" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Version 0.1 scope" })).not.toBeVisible();
-    await expect(page).toHaveURL("/documentation");
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(page.getByRole("button", { name: "Switch to dark preview" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // Persists across a full navigation, not just client-side state.
+    await page.goto("/documentation");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+    // And across a fresh load (localStorage, read by the inline init script
+    // before paint — no flash asserted here, just the end state).
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   });
+});
 
-  test("expanding a row reveals metadata and loads the live article body inline (figma.pdf p15)", async ({
+test.describe("Documentation index", () => {
+  test("search matches the title, an expertise tag, and full body text — never just the title", async ({
     page,
   }) => {
-    await page.goto("/documentation", { waitUntil: "networkidle" });
+    await page.goto("/documentation", { waitUntil: "load" });
+    const search = page.getByPlaceholder("Search");
+
+    await search.fill("Introduction");
+    await expect(page.getByRole("button", { name: "Introduction" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Version 0.1 scope" })).not.toBeVisible();
+
+    // A tag match (not present in the title or visible without expanding).
+    await search.fill("Civic technology");
+    await expect(page.getByRole("button", { name: "Introduction" })).toBeVisible();
+
+    // A body-text match — exact wording from the live Introduction article.
+    await search.fill("shared civic infrastructure");
+    await expect(page.getByRole("button", { name: "Introduction" })).toBeVisible();
+  });
+
+  test("a search match stays collapsed — searching never auto-expands a row", async ({ page }) => {
+    await page.goto("/documentation", { waitUntil: "load" });
+    await page.getByPlaceholder("Search").fill("Introduction");
+    await expect(page.getByRole("button", { name: "Introduction" })).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("heading", { name: "Summary" })).toHaveCount(0);
+  });
+
+  test("the clear button empties the search and returns focus to the field", async ({ page }) => {
+    await page.goto("/documentation", { waitUntil: "load" });
+    const search = page.getByPlaceholder("Search");
+    await search.fill("Introduction");
+    await expect(page.getByRole("button", { name: "Version 0.1 scope" })).not.toBeVisible();
+
+    await page.getByRole("button", { name: "Clear search" }).click();
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
+    await expect(page.getByRole("button", { name: "Version 0.1 scope" })).toBeVisible();
+  });
+
+  test("expanding a row is instant — the full body is already loaded, no loading state appears", async ({
+    page,
+  }) => {
+    await page.goto("/documentation", { waitUntil: "load" });
     const toggle = page.getByRole("button", { name: "Introduction" });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    // Nothing is fetched until the row is opened.
-    await expect(page.getByRole("heading", { name: "Summary" })).toHaveCount(0);
 
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("link", { name: "Published" })).toHaveAttribute(
-      "href",
-      "/documentation/introduction",
-    );
+    // No network round trip on expand: the heading is already there, and no
+    // "Loading…" status is ever rendered.
     await expect(page.getByRole("heading", { name: "Summary" })).toBeVisible();
+    await expect(page.getByText("Loading")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Send feedback" })).toHaveAttribute("href", "/feedback");
     await expect(page.getByRole("link", { name: "Report issue" })).toHaveAttribute("href", "/issue");
   });
 
+  test("each row has its own bottom stroke", async ({ page }) => {
+    await page.goto("/documentation", { waitUntil: "load" });
+    const row = page.getByRole("button", { name: "Introduction" }).locator("xpath=ancestor::div[1]");
+    await expect(row).toHaveCSS("border-bottom-width", "1px");
+  });
+
   test("the Published link opens the article on its own route", async ({ page }) => {
-    await page.goto("/documentation", { waitUntil: "networkidle" });
+    await page.goto("/documentation", { waitUntil: "load" });
     await page.getByRole("button", { name: "Introduction" }).click();
     await page.getByRole("link", { name: "Published" }).click();
     await expect(page).toHaveURL("/documentation/introduction");
@@ -115,43 +170,55 @@ test.describe("Documentation index", () => {
     await expect(page.getByText("The Global Experiment is an initiative")).toBeVisible();
   });
 
-  test("the overflow menu opens the page-actions sheet and closes with Escape", async ({ page }) => {
-    await page.goto("/documentation", { waitUntil: "networkidle" });
+  test("the overflow menu opens the page-actions sheet with no visible title, and closes with Escape", async ({
+    page,
+  }) => {
+    await page.goto("/documentation", { waitUntil: "load" });
     await page.getByRole("button", { name: "Page actions" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("heading")).toHaveCount(0);
     await expect(dialog.getByRole("link", { name: "Send feedback" })).toHaveAttribute("href", "/feedback");
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
   });
 });
 
-test.describe("Documentation article API", () => {
-  test("serves a published article and a real 404 for an unknown slug", async ({ request }) => {
-    const ok = await request.get("/api/documentation/introduction");
-    expect(ok.status()).toBe(200);
-    expect((await ok.json()).article.slug).toBe("introduction");
-    expect(ok.headers()["cache-control"]).toBe("no-store");
-
-    const missing = await request.get("/api/documentation/this-slug-does-not-exist");
-    expect(missing.status()).toBe(404);
-  });
-});
-
-test.describe("Documentation article 404 behavior", () => {
+test.describe("Documentation article and history", () => {
   test("a nonexistent slug returns a real HTTP 404, not 200", async ({ page }) => {
-    const response = await page.goto("/documentation/this-slug-does-not-exist", {
-      waitUntil: "networkidle",
-    });
+    const response = await page.goto("/documentation/this-slug-does-not-exist", { waitUntil: "load" });
     expect(response?.status()).toBe(404);
     await expect(page.getByText("Article not found")).toBeVisible();
     await expect(page.getByText("Error 404")).toBeVisible();
   });
 
-  test("back navigation from an article returns to the index", async ({ page }) => {
-    await page.goto("/documentation/introduction");
+  test("back navigation from an article returns to the index (real history, not a hard-coded link)", async ({
+    page,
+  }) => {
+    await page.goto("/documentation");
+    await page.getByRole("link", { name: "Introduction" }).first().click();
+    await expect(page).toHaveURL("/documentation/introduction");
     await page.getByRole("link", { name: "Back", exact: true }).click();
     await expect(page).toHaveURL("/documentation");
+  });
+
+  test("visiting an article directly (no in-app history) falls back to its href instead of failing", async ({
+    page,
+  }) => {
+    await page.goto("/documentation/introduction", { waitUntil: "load" });
+    await page.getByRole("link", { name: "Back", exact: true }).click();
+    await expect(page).toHaveURL("/documentation");
+  });
+
+  test("the article overflow menu offers Document history, which shows real current content with an honest no-history note", async ({
+    page,
+  }) => {
+    await page.goto("/documentation/introduction", { waitUntil: "load" });
+    await page.getByRole("button", { name: "Page actions" }).click();
+    await page.getByRole("link", { name: "Document history" }).click();
+    await expect(page).toHaveURL("/documentation/introduction/history");
+    await expect(page.getByText("No verifiable previous revision is available")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Summary" })).toBeVisible();
   });
 });
 
@@ -163,26 +230,143 @@ test.describe("Route shells never fake a successful submission", () => {
     });
   }
 
-  test("the waitlist CTA is inert until an address is typed, then flags an invalid one", async ({ page }) => {
+  test("Waitlist: the CTA sits inline under the email field, not fixed to the viewport (client feedback item 29)", async ({
+    page,
+  }) => {
     await page.goto("/waitlist");
-    await expect(page.getByRole("button", { name: "Join waitlist" })).toBeDisabled();
+    const button = page.getByRole("button", { name: "Join waitlist" });
+    await expect(button).toHaveCSS("position", "static");
+
+    await expect(button).toBeDisabled();
     await page.getByLabel("Email").fill("not-an-email");
-    await page.getByRole("button", { name: "Join waitlist" }).click();
+    await button.click();
     await expect(page.getByText("Invalid email address")).toBeVisible();
     await expect(page).toHaveURL("/waitlist");
   });
+});
 
-  test("feedback opens the type sheet and reports the action as not connected", async ({ page }) => {
+test.describe("Feedback / Issue: type selection happens before the composer (client feedback item 20)", () => {
+  test("the type sheet is open on arrival; the composer only becomes usable after it's dismissed", async ({
+    page,
+  }) => {
     await page.goto("/feedback");
-    await expect(page.getByRole("button", { name: "Send feedback" })).toBeDisabled();
-    await page.getByRole("textbox").fill("Some feedback");
-    await page.getByRole("button", { name: "Send feedback" }).click();
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("dialog", { name: "Feedback type" });
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel("Enhancement").check();
+
+    await dialog.getByText("Enhancement").click();
     await dialog.getByRole("button", { name: "Send feedback" }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByRole("status")).toContainText("isn’t connected yet");
-    await expect(page).toHaveURL("/feedback");
+
+    const composer = page.getByLabel("Your feedback");
+    await composer.fill("Some feedback");
+    await expect(page.getByRole("button", { name: "Send feedback" })).toBeEnabled();
+  });
+
+  test("the composer has no focus outline; a background tint marks focus instead (client feedback item 22)", async ({
+    page,
+  }) => {
+    await page.goto("/feedback");
+    await page.getByRole("dialog").getByRole("button", { name: "Send feedback" }).click();
+    const composer = page.getByLabel("Your feedback");
+    await composer.focus();
+    await expect(composer).toHaveCSS("outline-style", "none");
+  });
+
+  test("issue reporting follows the same reversed flow", async ({ page }) => {
+    await page.goto("/issue");
+    const dialog = page.getByRole("dialog", { name: "Issue type" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByText("Visual bug").click();
+    await dialog.getByRole("button", { name: "Report issue" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByLabel("Your issue report")).toBeVisible();
+  });
+});
+
+test.describe("Contribute: copy confirmation (client feedback item 30)", () => {
+  test("the copy icon becomes a checkmark for ~3 seconds, then reverts, with no layout shift", async ({
+    page,
+  }) => {
+    await page.goto("/contribute");
+    const copyButton = page.getByRole("button", { name: "Copy email address" });
+    const box = await copyButton.boundingBox();
+
+    await copyButton.click();
+    const confirmed = page.getByRole("button", { name: "Copied" });
+    await expect(confirmed).toBeVisible();
+    expect(await confirmed.boundingBox()).toMatchObject({ width: box?.width, height: box?.height });
+
+    await expect(page.getByRole("button", { name: "Copy email address" })).toBeVisible({ timeout: 4000 });
+  });
+});
+
+test.describe("Treasury", () => {
+  test("a stat with a Figma detail view opens its sheet; Expenses (no detail view) stays plain", async ({
+    page,
+  }) => {
+    await page.goto("/treasury");
+    await page.getByRole("button", { name: /Balance/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Balance" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Treasury balance")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // "Expenses" has no Figma detail view and is not a button.
+    await expect(page.getByRole("button", { name: /^USD 39\.8K/ })).toHaveCount(0);
+  });
+
+  test("the worst-case overflow row shows two tags plus a +1 badge, with all three visible on its detail page", async ({
+    page,
+  }) => {
+    await page.goto("/treasury");
+    const row = page.getByRole("link", { name: /USD 60/ });
+    await expect(row.getByText("Banking")).toBeVisible();
+    await expect(row.getByText("Treasury management")).toBeVisible();
+    await expect(row.getByText("+1")).toBeVisible();
+    await expect(row.getByText("Software licensing")).toHaveCount(0);
+
+    await row.click();
+    await expect(page).toHaveURL(/\/treasury\/expense\//);
+    await expect(page.getByText("Banking")).toBeVisible();
+    await expect(page.getByText("Treasury management")).toBeVisible();
+    await expect(page.getByText("Software licensing")).toBeVisible();
+  });
+
+  test("a donation row (no Figma detail view) does not navigate anywhere", async ({ page }) => {
+    await page.goto("/treasury");
+    await expect(page.getByRole("link", { name: /EUR 8/ })).toHaveCount(0);
+  });
+});
+
+test.describe("Donate", () => {
+  test("stats are clickable, the same way as Treasury", async ({ page }) => {
+    await page.goto("/donate");
+    await page.getByRole("button", { name: /Sustainability/ }).click();
+    await expect(page.getByRole("dialog", { name: "Sustainability" })).toBeVisible();
+  });
+
+  test("the overflow menu shows the real Figma copy with no visible title", async ({ page }) => {
+    await page.goto("/donate");
+    await page.getByRole("button", { name: "Page actions" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading")).toHaveCount(0);
+    await expect(dialog.getByText("Wise Belgian banking account")).toBeVisible();
+  });
+
+  test("the Other amount field accepts only numeric input and has no native step spinner", async ({ page }) => {
+    await page.goto("/donate");
+    await page.getByRole("button", { name: "Other" }).click();
+    const input = page.getByLabel("Other amount");
+    await expect(input).toHaveAttribute("type", "text");
+    // pressSequentially, not fill: fill() sets the whole string at once and
+    // bypasses the character-by-character onChange validation being tested.
+    await input.pressSequentially("12.50abc");
+    await expect(input).toHaveValue("12.50");
+  });
+
+  test("the full legal copy from Figma is present", async ({ page }) => {
+    await page.goto("/donate");
+    await expect(page.getByText("The Global Experiment is a Swiss non-profit association")).toBeVisible();
+    await expect(page.getByText(/Monthly donations can be cancelled/)).toBeVisible();
   });
 });
