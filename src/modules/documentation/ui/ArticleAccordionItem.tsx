@@ -2,64 +2,38 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import type { DocumentationArticle, DocumentationArticleSummary } from "@/modules/documentation/domain/types";
+import type { DocumentationArticle } from "@/modules/documentation/domain/types";
 import { ShareButton } from "@/shared/ui/ShareButton";
 import { Tag } from "@/shared/ui/Tag";
 import { Icon } from "@/shared/ui/icons";
-import { ArticleActions } from "./ArticleActions";
+import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { DocumentationContent } from "./DocumentationContent";
 import { formatPublishedAt } from "./formatPublishedAt";
 
-type LoadState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "loaded"; article: DocumentationArticle }
-  | { status: "error" };
-
 /**
- * One 40px accordion row (figma.pdf p15). Expanding reveals the full
- * article inline — metadata row, expertise tags, body, feedback/issue
- * actions — loaded on demand from /api/documentation/[slug] (live Notion,
- * fetched once per expansion session, never bundled with the index). The
- * permanent article page stays reachable through the "Published" link and
- * the share control.
+ * One 40px accordion row (figma.pdf p15), with its own full-width bottom
+ * stroke for row-to-row distinction (client feedback item 18 — a border on
+ * the row itself, not a separate separator component). The article
+ * (including its full body) is already loaded by the index page — see
+ * listPublishedArticlesWithContent — so expanding is a pure local state
+ * toggle with no fetch and no loading spinner (client feedback item 16).
+ * The permanent article page stays reachable through the "Published" link
+ * and the share control.
  */
-export function ArticleAccordionItem({ article }: { article: DocumentationArticleSummary }) {
+export function ArticleAccordionItem({ article }: { article: DocumentationArticle }) {
   const [expanded, setExpanded] = useState(false);
-  const [state, setState] = useState<LoadState>({ status: "idle" });
   const panelId = useId();
   const articleHref = `/documentation/${article.slug}`;
 
-  async function load() {
-    setState({ status: "loading" });
-    try {
-      const response = await fetch(`/api/documentation/${article.slug}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(String(response.status));
-      const body = (await response.json()) as { article: Omit<DocumentationArticle, "publishedAt"> & { publishedAt: string } };
-      setState({
-        status: "loaded",
-        article: { ...body.article, publishedAt: new Date(body.article.publishedAt) },
-      });
-    } catch {
-      setState({ status: "error" });
-    }
-  }
-
-  function toggle() {
-    const next = !expanded;
-    setExpanded(next);
-    if (next && state.status === "idle") void load();
-  }
-
   return (
-    <div>
+    <div className="border-b border-line">
       <h2 className="text-body font-bold text-text-primary">
         <button
           type="button"
-          onClick={toggle}
+          onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          className="-mr-1 flex h-10 w-full items-center justify-between gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="-mr-1 flex h-10 w-full items-center justify-between gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
         >
           <span>{article.title}</span>
           <Icon name={expanded ? "expand_less" : "expand_more"} size={24} />
@@ -84,25 +58,8 @@ export function ArticleAccordionItem({ article }: { article: DocumentationArticl
         ) : null}
 
         <div className="mt-4">
-          {state.status === "loading" ? (
-            <p role="status" className="text-body text-text-muted">
-              Loading…
-            </p>
-          ) : null}
-          {state.status === "error" ? (
-            <p role="alert" className="text-body text-text-muted">
-              This article couldn&rsquo;t be loaded.{" "}
-              <button type="button" onClick={() => void load()} className="underline underline-offset-2">
-                Try again
-              </button>
-            </p>
-          ) : null}
-          {state.status === "loaded" ? (
-            <>
-              <DocumentationContent blocks={state.article.content} headingLevelOffset={1} />
-              <ArticleActions className="mt-5" />
-            </>
-          ) : null}
+          <DocumentationContent blocks={article.content} headingLevelOffset={1} />
+          <FeedbackIssueActions className="mt-5" />
         </div>
       </div>
     </div>

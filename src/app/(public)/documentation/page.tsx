@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import { listPublishedArticles } from "@/modules/documentation/application/listPublishedArticles";
+import { listPublishedArticlesWithContent } from "@/modules/documentation/application/listPublishedArticlesWithContent";
 import { DocumentationList } from "@/modules/documentation/ui/DocumentationList";
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 
@@ -9,7 +9,14 @@ import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationP
 // in Notion show on the next refresh. Deliberately no Suspense/loading.tsx
 // boundary either: streaming commits the HTTP status before an async
 // boundary resolves, so a thrown error would report 200 instead of a real
-// error status (ADR 007). The fetch is small (≤10 summaries).
+// error status (ADR 007).
+//
+// Every article's full body is fetched here too (not just the ≤10
+// summaries): the index needs it up front so a row expands instantly with
+// no per-click fetch, and so search can reach full article text and tags,
+// not just titles (client feedback items 15–16). See
+// NotionDocumentationRepository.listPublishedWithContent for the
+// concurrency-limited fetch strategy this relies on.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -22,7 +29,7 @@ export const metadata: Metadata = {
  * exists for this page; it uses the same centered column as desktop Home.
  */
 export default async function DocumentationIndexPage() {
-  const articles = await listPublishedArticles();
+  const articles = await listPublishedArticlesWithContent();
 
   return (
     <main className="flex flex-1 flex-col pb-6">

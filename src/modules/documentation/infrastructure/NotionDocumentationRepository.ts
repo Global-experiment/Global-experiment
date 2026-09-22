@@ -4,6 +4,7 @@ import { fetchPageContent } from "@/integrations/notion/fetchPageBlocks";
 import { resolveDataSourceId } from "@/integrations/notion/resolveDataSourceId";
 import { ProviderError } from "@/shared/errors/app-error";
 import { getNotionDocumentationEnv } from "@/shared/config/env";
+import { mapWithConcurrency } from "@/shared/async/mapWithConcurrency";
 import type { DocumentationRepository } from "@/modules/documentation/domain/DocumentationRepository";
 import type { DocumentationArticle, DocumentationArticleSummary } from "@/modules/documentation/domain/types";
 import {
@@ -17,6 +18,12 @@ interface MappedPage {
   pageId: string;
   mapped: MappedNotionPage;
 }
+
+// Notion's own guidance is an average of ~3 requests/second; this bounds
+// how many article bodies are fetched in flight at once when preloading
+// every article for instant expansion + full-text search (client feedback
+// items 15–16), instead of firing one request per article simultaneously.
+const CONTENT_FETCH_CONCURRENCY = 3;
 
 async function fetchAllMappedPages(): Promise<MappedPage[]> {
   const notion = getNotionClient();
@@ -47,14 +54,16 @@ async function fetchAllMappedPages(): Promise<MappedPage[]> {
   return mappedPages;
 }
 
+function publishedInOrder(pages: MappedPage[]): MappedPage[] {
+  return pages
+    .filter((entry) => isPubliclyVisible(entry.mapped))
+    .sort((a, b) => a.mapped.displayOrder - b.mapped.displayOrder);
+}
+
 export class NotionDocumentationRepository implements DocumentationRepository {
   async listPublished(): Promise<DocumentationArticleSummary[]> {
     const pages = await fetchAllMappedPages();
-    return pages
-      .map((entry) => entry.mapped)
-      .filter(isPubliclyVisible)
-      .sort((a, b) => a.displayOrder - b.displayOrder)
-      .map(toArticleSummary);
+    return publishedInOrder(pages).map((entry) => toArticleSummary(entry.mapped));
   }
 
   async getBySlug(slug: string): Promise<DocumentationArticle | null> {
@@ -68,5 +77,15 @@ export class NotionDocumentationRepository implements DocumentationRepository {
     const content = await fetchPageContent(match.pageId);
 
     return { ...toArticleSummary(match.mapped), content };
+  }
+
+  async listPublishedWithContent(): Promise<DocumentationArticle[]> {
+    const pages = await fetchAllMappedPages();
+    const ordered = publishedInOrder(pages);
+
+    return mapWithConcurrency(ordered, CONTENT_FETCH_CONCURRENCY, async (entry) => {
+      const content = await fetchPageContent(entry.pageId);
+      return { ...toArticleSummary(entry.mapped), content };
+    });
   }
 }

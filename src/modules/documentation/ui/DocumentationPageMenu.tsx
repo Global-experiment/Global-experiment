@@ -6,14 +6,25 @@ import { ShareButton } from "@/shared/ui/ShareButton";
 /**
  * Header controls shared by the Documentation index and article pages:
  * share, then the overflow sheet from figma.pdf p16 (share page, send
- * feedback, report issue) with its editorial note.
+ * feedback, report issue) with its editorial note. `historyHref` adds a
+ * "Document history" row (figma.pdf p17) — only the article page passes
+ * it, since history is per-article; see /documentation/[slug]/history for
+ * why it currently shows an empty state (client feedback item 19).
  */
-export function DocumentationPageMenu({ url, title }: { url: string; title: string }) {
+export function DocumentationPageMenu({
+  url,
+  title,
+  historyHref,
+}: {
+  url: string;
+  title: string;
+  historyHref?: string;
+}) {
   return (
     <>
       <ShareButton url={url} title={title} />
       <PageActionsMenu
-        title="Page actions"
+        label="Page actions"
         actions={[
           {
             label: "Share page",
@@ -22,6 +33,7 @@ export function DocumentationPageMenu({ url, title }: { url: string; title: stri
               void navigator.share?.({ url: new URL(url, window.location.origin).toString(), title }).catch(() => {});
             },
           },
+          ...(historyHref ? [{ label: "Document history", icon: "history" as const, href: historyHref }] : []),
           { label: "Send feedback", icon: "lightbulb", href: "/feedback" },
           { label: "Report issue", icon: "new_releases", href: "/issue" },
         ]}

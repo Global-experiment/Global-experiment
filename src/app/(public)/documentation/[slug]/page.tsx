@@ -5,7 +5,7 @@ import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { Tag } from "@/shared/ui/Tag";
 import { getArticleBySlug } from "@/modules/documentation/application/getArticleBySlug";
-import { ArticleActions } from "@/modules/documentation/ui/ArticleActions";
+import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { DocumentationContent } from "@/modules/documentation/ui/DocumentationContent";
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
@@ -51,7 +51,9 @@ export default async function DocumentationArticlePage({ params }: Documentation
       <NavHeader
         title={article.title}
         backHref="/documentation"
-        actions={<DocumentationPageMenu url={href} title={article.title} />}
+        actions={
+          <DocumentationPageMenu url={href} title={article.title} historyHref={`${href}/history`} />
+        }
       />
       <Container className="pt-1">
         <p className="text-meta text-text-muted">Published {formatPublishedAt(article.publishedAt)}</p>
@@ -65,7 +67,7 @@ export default async function DocumentationArticlePage({ params }: Documentation
         <div className="mt-4">
           <DocumentationContent blocks={article.content} />
         </div>
-        <ArticleActions className="mt-5" />
+        <FeedbackIssueActions className="mt-5" />
       </Container>
     </main>
   );
