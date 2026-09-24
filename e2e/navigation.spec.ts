@@ -59,10 +59,33 @@ test.describe("Home navigation", () => {
     await expect(page.locator("button[disabled]")).toHaveCount(0);
   });
 
-  test("the sticky Join waitlist bar navigates to /waitlist", async ({ page }) => {
+  test("the action grid follows the 2026-09-24 Figma: full-width Join waitlist, then Documentation, Treasury, Contribute, Donate", async ({
+    page,
+  }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Join waitlist" }).last().click();
+    const labels = await page.getByRole("navigation", { name: "Main" }).getByRole("link").allInnerTexts();
+    expect(labels.map((l) => l.trim())).toEqual(["Join waitlist", "Documentation", "Treasury", "Contribute", "Donate"]);
+  });
+
+  test("mobile: the sticky Join waitlist bar is shown and navigates to /waitlist", async ({ page }) => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.goto("/");
+    const links = page.getByRole("link", { name: "Join waitlist" });
+    await expect(links).toHaveCount(2);
+    const sticky = links.last();
+    await expect(sticky).toBeVisible();
+    await sticky.click();
     await expect(page).toHaveURL("/waitlist");
+  });
+
+  test("desktop (≥768px): no sticky CTA and no bottom space reserved for it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    // Only the in-grid Join waitlist remains; the fixed bar is display:none.
+    await expect(page.getByRole("link", { name: "Join waitlist" })).toHaveCount(1);
+    await expect(page.locator("div.fixed.bottom-0")).toBeHidden();
+    const mainPaddingBottom = await page.locator("main").evaluate((el) => getComputedStyle(el).paddingBottom);
+    expect(mainPaddingBottom).toBe("24px");
   });
 
   test("keyboard navigation reaches and activates a Home link", async ({ page }) => {

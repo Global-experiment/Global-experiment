@@ -13,8 +13,9 @@ that isn't present in either locally available export (`figma.pdf`, the
 original audit, and `design.pdf`, supplied with that feedback — confirmed
 by pixel-diffing every page of both):
 
-- **Home action buttons** ("New buttons homepage (see Figma)") — Home is
-  pixel-identical between the two exports. Unchanged pending the reference.
+- **Home action buttons** — resolved by the 2026-09-24 `figma.pdf` export
+  (mobile p1 only; the desktop frame p33 was not re-exported and desktop
+  follows the updated mobile button set).
 - **Donate Once/Monthly control** ("the big toggle... doesn't have the
   right feel") — Donate is also pixel-identical between the two exports.
   Replaced with a smaller, compact version of the same control as an

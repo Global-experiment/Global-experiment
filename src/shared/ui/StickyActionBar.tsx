@@ -15,14 +15,16 @@ import { useKeyboardInset } from "./useKeyboardInset";
  * covered height (client feedback item 11) instead of staying pinned to
  * the window edge, where the keyboard would hide it. Waitlist doesn't use
  * this component — its CTA sits inline under the email field instead
- * (client feedback item 29).
+ * (client feedback item 29). Home passes `md:hidden` (and `md:pb-6` on its
+ * <main>) so the bar exists on mobile only, with no space reserved on
+ * desktop.
  */
-export function StickyActionBar({ children }: { children: ReactNode }) {
+export function StickyActionBar({ children, className = "" }: { children: ReactNode; className?: string }) {
   const inset = useKeyboardInset();
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 bg-surface-base pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      className={`fixed inset-x-0 bottom-0 bg-surface-base pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ${className}`}
       style={inset > 0 ? { bottom: inset, paddingBottom: "0.5rem" } : undefined}
     >
       <Container>{children}</Container>

@@ -47,12 +47,24 @@ environmental and are not reproduced.
 | Mobile sheet | square corners, no border | `Sheet` (base classes) |
 | Desktop dialog | 400px wide, 1px #484848, rounded, centered | `Sheet` (`md:` classes) |
 
-## Vertical rhythm (Home, p1/p33 — identical on both)
+## Home (figma.pdf p1, 2026-09-24 export; p33 desktop not re-exported)
 
-identity row 44 → 12 → tagline (16/20) → 24 → 2×2 grid (40 + 8 + 40) → 8 →
-full-bleed rule → 16 → section label → 12 → section heading → 4 →
-paragraph(s) (18px between paragraphs) → 16 → next section. Bottom CTA:
-40px, 8px from the bottom edge (or above the keyboard, if open).
+The client's third export changed one page: p1 (mobile Home). Pixel-diffed
+against the previous export, p33 (desktop Home) and every other cached page
+are identical, so the desktop frame still shows the earlier 4-button grid
+with a sticky CTA.
+
+Mobile p1, measured: identity row 44 → 12 → tagline (16/20) → 24 →
+full-width "Join waitlist" (40, x 8…404) → 8 → 2×2 grid: Documentation |
+Treasury, Contribute | Donate (40 + 8 + 40, columns 8…201 / 210…404) → 24 →
+section label → 12 → section heading → 4 → paragraph(s) (18px between
+paragraphs) → 16 → next section. **The rule under the grid is gone** in this
+export. Bottom CTA: 40px, 8px from the bottom edge — mobile only.
+
+Desktop uses the same five-button set and order (there's no updated desktop
+frame; the sticky CTA is removed there per client feedback, so Join
+waitlist must live in the grid) in the same 640px column. Breakpoint for
+"desktop": Tailwind `md`, 768px.
 
 ## Vertical rhythm (Documentation index, p15)
 
@@ -117,19 +129,15 @@ this pass beyond the marks already in place (client feedback item 27).
   CSS variable (`--font-sans`).
 - **Corner radius.** ≈4px, read visually from a raster zoom, not vector
   geometry.
-- **Home "Documentation" row.** Not on the Home frame (the design reaches
-  Documentation from the Treasury/Donate sheets). Kept as a 40px action row
-  so the section is reachable from Home.
 - **Donate Once/Monthly control.** The client asked for the "big toggle" to
   be replaced (client feedback item 25); neither `figma.pdf` nor
   `design.pdf` shows an updated version of this control (confirmed by
   pixel-diffing every page of both exports — see above). Implemented as a
   smaller, compact segmented control with the same interaction pending that
   reference; do not treat this as the confirmed final design.
-- **Home action buttons.** The client's note "New buttons homepage (see
-  Figma)" (item 3) has no matching content in either locally available
-  export — Home is pixel-identical between them. Unchanged pending that
-  reference.
+- **Home action buttons.** Resolved by the 2026-09-24 export (p1): full-width
+  Join waitlist, then Documentation / Treasury / Contribute / Donate. The
+  desktop frame (p33) was not re-exported; desktop uses the same set.
 - **Article action icons.** p15 shows the `approval` glyph on both "Send
   feedback" and "Report issue"; p16/p3 show `lightbulb` and `new_releases`
   for the same actions. The specific glyphs are used everywhere (kept from
