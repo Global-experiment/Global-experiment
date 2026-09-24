@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NavigationTracker } from "@/shared/ui/NavigationTracker";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
+        <NavigationTracker />
         {children}
       </body>
     </html>

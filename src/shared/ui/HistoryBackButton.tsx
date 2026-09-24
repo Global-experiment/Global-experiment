@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icons";
+import { readNavigationDepth, shouldUseHistoryBack } from "./navigationDepth";
 
 interface HistoryBackButtonProps {
   /** Where to go if there's no useful in-app history to return to (a direct/external visit). */
@@ -20,20 +21,21 @@ const classes =
  * position, restored by the browser's native handling of a real
  * back/popstate navigation — instead of hard-coding a destination.
  *
- * `window.history.length > 1` is the signal that there's a previous entry
- * in *this tab's* history to go back to (it also counts entries from
- * outside the app, e.g. an external referrer, which is correct: a real
- * back button should return there too). A freshly opened tab, or a route
- * opened directly by URL, has no such entry — `<Link>` to `fallbackHref`
- * (Home, or a section index) is rendered underneath for that case and for
- * no-JS, and `router.back()` intercepts the click and takes over only when
- * real history exists.
+ * The signal for "there's a previous in-app page" is the tab's in-app
+ * navigation count (NavigationTracker / navigationDepth.ts), not
+ * `window.history.length`: that also counts entries from before the visitor
+ * arrived (an external referrer, a browser's blank new-tab entry), so a
+ * route opened directly by URL would "go back" out of the app. For a
+ * directly opened page the `<Link>` to `fallbackHref` (Home, or a section
+ * index) rendered underneath is used — also the no-JS behavior — and
+ * `router.back()` intercepts the click only when an earlier in-app page
+ * exists.
  */
 export function HistoryBackButton({ fallbackHref, className = "" }: HistoryBackButtonProps) {
   const router = useRouter();
 
   function handleClick(event: React.MouseEvent) {
-    if (typeof window !== "undefined" && window.history.length > 1) {
+    if (shouldUseHistoryBack(readNavigationDepth())) {
       event.preventDefault();
       router.back();
     }

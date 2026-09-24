@@ -218,8 +218,10 @@ test.describe("Documentation article and history", () => {
   test("back navigation from an article returns to the index (real history, not a hard-coded link)", async ({
     page,
   }) => {
-    await page.goto("/documentation");
-    await page.getByRole("link", { name: "Introduction" }).first().click();
+    await page.goto("/documentation", { waitUntil: "load" });
+    // The index row is a button; the article link is "Published" inside it.
+    await page.getByRole("button", { name: "Introduction" }).click();
+    await page.getByRole("link", { name: "Published" }).click();
     await expect(page).toHaveURL("/documentation/introduction");
     await page.getByRole("link", { name: "Back", exact: true }).click();
     await expect(page).toHaveURL("/documentation");
