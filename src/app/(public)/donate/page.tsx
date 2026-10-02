@@ -12,18 +12,14 @@ import { TREASURY_STATS } from "@/shared/treasury/presentationData";
 import { PaymentMarks, type PaymentMethodId } from "./PaymentMarks";
 
 /**
- * Payment rows from figma.pdf p9. `marks` are the client-supplied brand
- * assets under public/assets/icons/figma/; a row whose asset has not been
- * supplied yet shows its text label only (nothing is approximated). Per
- * the client's latest note, the payment-button design itself is being
- * benchmarked/updated separately — deliberately left alone here beyond the
- * marks already wired in (client feedback item 27).
+ * Payment rows from figma.pdf p9 — labels and casing match the exported
+ * text exactly ("Apple pay", "Google pay", "Proceed with Paypal").
  */
-const PAYMENT_METHODS: Array<{ id: PaymentMethodId; label: string; showLabel: boolean }> = [
-  { id: "card", label: "Card payment via Stripe", showLabel: true },
-  { id: "apple-pay", label: "Apple Pay", showLabel: false },
-  { id: "google-pay", label: "Google Pay", showLabel: false },
-  { id: "paypal", label: "PayPal", showLabel: false },
+const PAYMENT_METHODS: Array<{ id: PaymentMethodId; label: string }> = [
+  { id: "card", label: "Card payment via Stripe" },
+  { id: "apple-pay", label: "Apple pay" },
+  { id: "google-pay", label: "Google pay" },
+  { id: "paypal", label: "Proceed with Paypal" },
 ];
 
 // Only digits and at most one decimal point/comma — never rely on the
@@ -75,19 +71,12 @@ export default function DonatePage() {
 
         <ClickableStatsRow stats={TREASURY_STATS} className="mt-5" />
 
-        {/*
-          Compact per client feedback item 25 ("the big toggle... doesn't
-          have the right feel"): no exact replacement control is visible in
-          the client's currently available Figma reference (figma.pdf and
-          design.pdf both still show the original oversized pill) — see the
-          final report. This keeps the same interaction and copy at a
-          visibly smaller, less dominant size pending that reference.
-        */}
+        {/* Full-width pill per figma.pdf p9 — 40px tall, fully rounded ends. */}
         <div
           id="donate-amount"
           role="group"
           aria-label="Frequency"
-          className="mt-6 inline-flex h-8 gap-1 rounded-control border border-line p-0.5"
+          className="mt-6 flex h-10 gap-1 rounded-full border border-line p-1"
         >
           {(["once", "monthly"] as const).map((value) => (
             <button
@@ -95,7 +84,7 @@ export default function DonatePage() {
               type="button"
               onClick={() => setFrequency(value)}
               aria-pressed={frequency === value}
-              className={`rounded-[3px] px-2 text-meta capitalize ${focusRing} ${
+              className={`flex-1 rounded-full px-2 text-body capitalize ${focusRing} ${
                 frequency === value ? "bg-inverse-surface text-inverse-content" : "text-text-muted"
               }`}
             >
@@ -156,10 +145,9 @@ export default function DonatePage() {
               key={method.id}
               onClick={() => setAttempted(true)}
               icon={<PaymentMarks method={method.id} />}
-              className="gap-2! pl-[7px]!"
               fullWidth
             >
-              {method.showLabel ? method.label : <span className="sr-only">{method.label}</span>}
+              {method.label}
             </Button>
           ))}
         </div>
