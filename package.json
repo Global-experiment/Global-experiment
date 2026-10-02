@@ -2,6 +2,9 @@
   "name": "global-experiment",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,7 +16,12 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test:smoke": "vitest run --config vitest.smoke.config.mts"
+    "test:smoke": "vitest run --config vitest.smoke.config.mts",
+    "api:dev": "npm run dev -w @global-experiment/api",
+    "api:build": "npm run build -w @global-experiment/api",
+    "api:test": "npm run test -w @global-experiment/api",
+    "api:test:pg": "npm run test:pg -w @global-experiment/api",
+    "api:typecheck": "npm run typecheck -w @global-experiment/api"
   },
   "dependencies": {
     "@next/env": "^16.3.5",

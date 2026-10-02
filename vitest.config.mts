@@ -17,6 +17,7 @@ export default defineConfig({
     // (`npm test`) and run on its own via `npm run test:smoke`: it depends
     // on the network and Notion's API latency, and must not be able to
     // fail the normal unit-test run.
-    exclude: ["**/node_modules/**", "**/e2e/**", "**/*.smoke.test.ts"],
+    // apps/api has its own Vitest config (SWC for Nest decorators): `npm run api:test`.
+    exclude: ["**/node_modules/**", "**/e2e/**", "**/*.smoke.test.ts", "apps/**"],
   },
 });

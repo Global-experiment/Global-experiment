@@ -66,16 +66,3 @@ describe("Notion environment scopes", () => {
     expect(Object.keys(env)).not.toContain("isNotionConfigured");
   });
 });
-
-describe("getDatabaseEnv", () => {
-  it("throws a descriptive error when DATABASE_URL is missing", async () => {
-    const { getDatabaseEnv, EnvValidationError } = await import("./env");
-    expect(() => getDatabaseEnv()).toThrow(EnvValidationError);
-  });
-
-  it("does not require Notion variables", async () => {
-    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
-    const { getDatabaseEnv } = await import("./env");
-    expect(() => getDatabaseEnv()).not.toThrow();
-  });
-});

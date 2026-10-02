@@ -29,3 +29,53 @@ jobs:
       - run: npm test
 
       - run: npm run build
+
+      # Native API (apps/api). Its integration tests run real PostgreSQL
+      # in-process (PGlite) with the production migrations — no service
+      # container or database credentials needed in CI.
+      - run: npm run api:typecheck
+
+      - run: npm run api:test
+
+      - run: npm run api:build
+
+  # The production migration and the API suites against a real PostgreSQL 17
+  # server (production driver), complementing the fast PGlite run above.
+  api-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ge_ci
+          POSTGRES_DB: global_experiment_test
+          # Throwaway container reachable only from this job: no password,
+          # so no credential lives in the repository.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ge_ci -d global_experiment_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://ge_ci@localhost:5432/global_experiment_test
+      TEST_DATABASE_URL: postgresql://ge_ci@localhost:5432/global_experiment_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Apply the committed migrations exactly as an operator would…
+      - run: npm run db:migrate
+
+      # …and prove a re-run is a no-op.
+      - run: npm run db:migrate
+
+      - run: npm run api:test:pg

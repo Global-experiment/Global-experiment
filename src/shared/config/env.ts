@@ -58,10 +58,5 @@ export const getNotionDocumentationEnv = createLazyEnvAccessor(
 /** Which Notion page holds the Home editorial content. */
 export const getNotionHomeEnv = createLazyEnvAccessor("Notion Home", notionHomeEnvSchema);
 
-const databaseEnvSchema = z.object({
-  DATABASE_URL: z
-    .string()
-    .url({ message: "DATABASE_URL must be a valid Postgres connection string" }),
-});
-
-export const getDatabaseEnv = createLazyEnvAccessor("database", databaseEnvSchema);
+// No DATABASE_URL here: the Next.js app never connects to PostgreSQL. The
+// native API (apps/api) owns the database — see ADR 013.

@@ -1,5 +1,5 @@
-# dependencies
-/node_modules
+# dependencies (root and npm workspaces)
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -21,6 +21,8 @@
 
 # production
 /build
+# NestJS API build output
+/apps/*/dist/
 
 # misc
 .DS_Store

@@ -1,0 +1,48 @@
+{
+  "name": "@global-experiment/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Global Experiment native API (NestJS + PostgreSQL/Drizzle).",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:pg": "vitest run --config vitest.pg.config.mts",
+    "admin:set-owner": "node dist/auth/cli/set-owner.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/throttler": "^6.7.1",
+    "cookie-parser": "^1.4.7",
+    "drizzle-orm": "^0.45.2",
+    "express": "5.2.1",
+    "helmet": "^8.3.0",
+    "nestjs-pino": "^5.3.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "postgres": "^3.4.9",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@nestjs/cli": "^12.0.8",
+    "@nestjs/testing": "^12.1.2",
+    "@swc/core": "^1.16.13",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.13.4",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.3.1",
+    "typescript": "^5",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^5.0.1"
+  }
+}
