@@ -18,10 +18,17 @@ import { TREASURY_STATS, TREASURY_TRANSACTIONS } from "@/shared/treasury/present
  * a detail page — item 13), bottom Donate CTA, overflow sheet (p3). The tab
  * toggle is real UI state; no data exists behind either tab yet. See
  * docs/architecture/decisions/008-route-shells.md.
+ *
+ * Default shows every transaction chronologically; Expenses/Donations are
+ * selectable filters, and clicking the active one clears it back to all
+ * rather than requiring the other to always be selected.
  */
 export default function TreasuryPage() {
-  const [tab, setTab] = useState<"expenses" | "donations">("expenses");
-  const visible = TREASURY_TRANSACTIONS.filter((t) => (tab === "expenses" ? t.kind === "expense" : t.kind === "income"));
+  const [tab, setTab] = useState<"all" | "expenses" | "donations">("all");
+  const visible =
+    tab === "all"
+      ? TREASURY_TRANSACTIONS
+      : TREASURY_TRANSACTIONS.filter((t) => (tab === "expenses" ? t.kind === "expense" : t.kind === "income"));
 
   return (
     <main className="flex flex-1 flex-col pb-16">
@@ -48,7 +55,7 @@ export default function TreasuryPage() {
             <button
               key={value}
               type="button"
-              onClick={() => setTab(value)}
+              onClick={() => setTab((current) => (current === value ? "all" : value))}
               aria-pressed={tab === value}
               className={`h-8 rounded-full border px-2 text-meta capitalize focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary ${
                 tab === value ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line text-text-primary"

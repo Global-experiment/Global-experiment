@@ -361,6 +361,24 @@ test.describe("Treasury", () => {
     await page.goto("/treasury");
     await expect(page.getByRole("link", { name: /EUR 8/ })).toHaveCount(0);
   });
+
+  test("history defaults to every transaction; a filter narrows it, and reselecting it returns to all", async ({
+    page,
+  }) => {
+    await page.goto("/treasury");
+    const expensesFilter = page.getByRole("button", { name: /^expenses$/i });
+
+    await expect(page.getByText(/EUR 8/)).toBeVisible();
+    await expect(page.getByText(/CHF 70/)).toBeVisible();
+
+    await expensesFilter.click();
+    await expect(page.getByText(/EUR 8/)).toHaveCount(0);
+    await expect(page.getByText(/CHF 70/)).toBeVisible();
+
+    await expensesFilter.click();
+    await expect(page.getByText(/EUR 8/)).toBeVisible();
+    await expect(page.getByText(/CHF 70/)).toBeVisible();
+  });
 });
 
 test.describe("Donate", () => {
