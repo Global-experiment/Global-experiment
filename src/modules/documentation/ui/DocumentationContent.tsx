@@ -42,7 +42,7 @@ export function DocumentationContent({
           );
         }
         if (block.kind === "paragraph") {
-          const spacing = index === 0 ? "" : previous?.kind === "heading" ? "mt-1" : "mt-[1.125rem]";
+          const spacing = index === 0 ? "" : previous?.kind === "heading" ? "mt-1" : "mt-paragraph";
           return (
             <p key={index} className={spacing}>
               <RichText text={block.text} />

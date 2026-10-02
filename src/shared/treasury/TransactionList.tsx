@@ -12,15 +12,15 @@ const VISIBLE_TAGS = 2;
  * (client feedback item 13); donation rows have no detail view in Figma and
  * stay plain.
  */
-export function TransactionList({ transactions }: { transactions: TreasuryTransaction[] }) {
+export function TransactionList({ transactions, className = "" }: { transactions: TreasuryTransaction[]; className?: string }) {
   return (
-    <ul>
+    <ul className={className}>
       {transactions.map((transaction) => {
         const visibleTags = transaction.tags.slice(0, VISIBLE_TAGS);
         const hiddenCount = transaction.tags.length - visibleTags.length;
         const row = (
           <>
-            <span className="text-body font-bold text-text-primary">{transaction.label}</span>
+            <span className="shrink-0 whitespace-nowrap text-body font-bold text-text-primary">{transaction.label}</span>
             {visibleTags.map((tag) => (
               <Tag key={tag}>{tag}</Tag>
             ))}
@@ -29,7 +29,8 @@ export function TransactionList({ transactions }: { transactions: TreasuryTransa
           </>
         );
 
-        const rowClasses = "flex h-10 items-center gap-2 border-b border-line";
+        // Stroke runs through the 8px gutters, edge to edge of the content area (figma.pdf p2).
+        const rowClasses = "-mx-gutter flex min-h-10 items-center gap-2 border-b border-line px-gutter";
 
         return (
           <li key={transaction.id}>

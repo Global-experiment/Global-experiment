@@ -81,9 +81,9 @@ test.describe("Home navigation", () => {
   test("desktop (≥768px): no sticky CTA and no bottom space reserved for it", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    // Only the in-grid Join waitlist remains; the fixed bar is display:none.
+    // Only the in-grid Join waitlist remains; the sticky bar is display:none.
     await expect(page.getByRole("link", { name: "Join waitlist" })).toHaveCount(1);
-    await expect(page.locator("div.fixed.bottom-0")).toBeHidden();
+    await expect(page.locator("div.sticky.bottom-0")).toBeHidden();
     const mainPaddingBottom = await page.locator("main").evaluate((el) => getComputedStyle(el).paddingBottom);
     expect(mainPaddingBottom).toBe("24px");
   });
@@ -367,17 +367,19 @@ test.describe("Treasury", () => {
   }) => {
     await page.goto("/treasury");
     const expensesFilter = page.getByRole("button", { name: /^expenses$/i });
+    const donation = page.getByText("+ EUR 8", { exact: true });
+    const expense = page.getByText("- CHF 70", { exact: true });
 
-    await expect(page.getByText(/EUR 8/)).toBeVisible();
-    await expect(page.getByText(/CHF 70/)).toBeVisible();
-
-    await expensesFilter.click();
-    await expect(page.getByText(/EUR 8/)).toHaveCount(0);
-    await expect(page.getByText(/CHF 70/)).toBeVisible();
+    await expect(donation).toBeVisible();
+    await expect(expense).toBeVisible();
 
     await expensesFilter.click();
-    await expect(page.getByText(/EUR 8/)).toBeVisible();
-    await expect(page.getByText(/CHF 70/)).toBeVisible();
+    await expect(donation).toHaveCount(0);
+    await expect(expense).toBeVisible();
+
+    await expensesFilter.click();
+    await expect(donation).toBeVisible();
+    await expect(expense).toBeVisible();
   });
 });
 

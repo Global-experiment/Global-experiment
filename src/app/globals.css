@@ -48,6 +48,7 @@
   --radius-control: 0.25rem; /* 4px — buttons, inputs, tags, search */
   --radius-sheet: 0.75rem; /* 12px — bottom sheet / desktop dialog */
   --spacing-gutter: 0.5rem; /* 8px page gutter on every frame */
+  --spacing-paragraph: 1.125rem; /* 18px — one body line between paragraphs (figma.pdf p1, p4, p15) */
   --container-page: 41rem; /* 656px = 640px desktop content column + 2 × gutter */
   --container-dialog: 25rem; /* 400px desktop dialog (figma.pdf p34) */
 
@@ -59,6 +60,8 @@
   --text-lead--line-height: 1.25rem; /* 20px */
   --text-meta: 0.75rem; /* 12px — timestamps, tags, stat labels, hints */
   --text-meta--line-height: 0.875rem; /* 14px */
+  --text-caption: 0.625rem; /* 10px — Waitlist validation hint (figma.pdf p20) */
+  --text-caption--line-height: 0.875rem; /* 14px */
 
   /*
    * Inter, self-hosted via next/font/google (see layout.tsx) and exposed as
@@ -90,6 +93,14 @@
 body {
   background: var(--color-surface-base);
   color: var(--color-text-primary);
+  /*
+   * Figma's non-bold text is Inter Medium, not Regular: its exported glyph
+   * positions fit Inter 500 with zero tracking (4–5× lower error than 400
+   * on full paragraph lines, p1/p9/p15) and a body "l" stem measures 1.50pt
+   * (Inter 400 = 1.29, 500 = 1.58 at 14px). Bold labels fit Inter 700
+   * exactly, confirming the same font file. `font-bold` still wins.
+   */
+  font-weight: 500;
   /*
    * Light text on a pure black background makes subpixel/LCD glyph
    * anti-aliasing fringing more perceptible than on lighter themes.

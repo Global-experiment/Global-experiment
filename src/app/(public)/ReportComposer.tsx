@@ -59,9 +59,10 @@ export function ReportComposer({
   }
 
   return (
-    <main className="flex flex-1 flex-col pb-16">
+    <main className="flex flex-1 flex-col">
       <NavHeader title={title} backHref="/" />
-      <Container className="flex flex-1 flex-col pt-1">
+      {/* figma.pdf p24/p28: composer text starts 8px under the header. */}
+      <Container className="flex flex-1 flex-col pt-2">
         <label htmlFor={messageId} className="sr-only">
           {messageLabel}
         </label>
@@ -93,22 +94,27 @@ export function ReportComposer({
         )}
       </StickyActionBar>
 
-      <Sheet open={typeSheetOpen} onClose={() => setTypeSheetOpen(false)} title={typeSheetTitle}>
-        <fieldset>
+      <Sheet open={typeSheetOpen} onClose={() => setTypeSheetOpen(false)} title={typeSheetTitle} headerVariant="picker">
+        {/*
+          figma.pdf p23/p27: 54px rows (8px top, label, 5px, description,
+          8px bottom, then a full-width 1px rule under every row, the last
+          one included); the list tucks 3px up under the title row; the CTA
+          sits 8px under the last rule.
+        */}
+        <fieldset className="-mt-[0.1875rem]">
           <legend className="sr-only">{typeSheetTitle}</legend>
-          <div className="divide-y divide-line">
-            {types.map((type) => (
-              <Checkbox
-                key={type.label}
-                checked={selected.has(type.label)}
-                onChange={() => toggle(type.label)}
-                label={type.label}
-                description={type.description}
-              />
-            ))}
-          </div>
+          {types.map((type) => (
+            <Checkbox
+              key={type.label}
+              checked={selected.has(type.label)}
+              onChange={() => toggle(type.label)}
+              label={type.label}
+              description={type.description}
+              className="-mx-gutter border-b border-line px-gutter pt-2 pb-2"
+            />
+          ))}
         </fieldset>
-        <Button variant="primary" fullWidth className="mt-3" onClick={() => setTypeSheetOpen(false)}>
+        <Button variant="primary" fullWidth className="mt-2" onClick={() => setTypeSheetOpen(false)}>
           {ctaLabel}
         </Button>
       </Sheet>

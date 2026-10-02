@@ -104,9 +104,49 @@ regenerated from the Sharp source.
 | Home (success pages, not built) | `home` | reserved |
 
 Path data is generated verbatim from `@material-design-icons/svg/sharp` into
-`src/shared/ui/icons.tsx` (Apache-2.0). Glyph sizes: 16–18px inside buttons
-and small controls, 20px in headers and icon controls, 24px for the
-accordion chevron.
+`src/shared/ui/icons.tsx` (Apache-2.0). Glyph size: 16px everywhere —
+measured from glyph ink on figma.pdf (2026-10-02 export) for button icons
+(p1, p4), header back/share/overflow (p15), search (p15), accordion chevron
+(p15), expanded-row share (p15), sheet close (p4) and checkbox (p23). Each
+measured ink extent divided by the glyph's extent on Material's 24-unit grid
+gives 16.0 ±0.2 (e.g. `insert_drive_file` ink 13.5pt = 20/24 × 16).
+
+### Typeface and weights (verified 2026-10-02)
+
+Figma exports text as unnamed Type3 outlines, so family and weight were
+verified by fitting exported glyph positions against Inter in the browser:
+
+- Bold labels/headings fit Inter 700 with zero tracking (rms 0.04–0.17pt) —
+  same font file and metrics as the app.
+- Non-bold text (paragraphs, intros, tags, stat labels) fits **Inter 500**,
+  not 400 (paragraph lines: rms 0.3–0.7 at 500 vs 1.6–3.9 at 400; letter-
+  spacing can't explain it — the best-fit tracking differs per line of the
+  same style). A body "l" stem measures 1.50pt (Inter 400 = 1.29, 500 =
+  1.58). With 500, 35/41 lines of the Donate legal copy break exactly as in
+  Figma (32/41 at 400); the rest differ in content (bracketed links).
+- The Home eyebrow ("Early development") is 12pt, sharing a baseline with
+  the 14pt bold brand.
+- Short strings (the "Search" placeholder, "Once") are too short to tell
+  400 from 500 and inherit 500.
+
+### Icon and control positions (412pt frame, verified 2026-10-02)
+
+| Element | Figma | Rule |
+| --- | --- | --- |
+| Button icon / label | icon 16–32, label x=40 in a button at x=8 | 8px padding from the outer edge (Figma strokes sit inside the frame, so CSS uses 8px − 1px border), 16px icon, 8px gap |
+| Header back glyph / title | glyph 8–24, title x=32 | 32×40 icon box pulled into the gutter |
+| Header share / overflow glyphs | 364–380 / 388–404 | 32×40 boxes overlapping by 8px, right box pulled into the gutter |
+| Search icon / placeholder | icon 16–32, text x=40, field 32 tall | icon 8px inside the field |
+| Accordion chevron | 388–404, row 40 tall | ends on the content edge |
+| Tag | text x=12 in a tag at x=8, 24 tall | 4px padding from the outer edge |
+| Stat sheet | value 14pt 8px under the header row; caption 4px under it; first action button at y=234 | |
+| Paragraph spacing | 18pt (one body line) on p1, p4, p15 | `--spacing-paragraph` |
+
+Donate payment rows are internally inconsistent in Figma (p9): label x is
+104 for the card row (= 8px gap after the 80px card marks) but 61 for both
+Apple Pay (38px mark) and Google Pay (42px mark), and 79 for PayPal (60px
+mark). The shared 8px gap is used for all four; Google Pay and PayPal land
+5px right of Figma.
 
 `light_mode`/`dark_mode` back the temporary theme toggle (client feedback
 item 7), which isn't a Figma element at all — still a real Material Sharp

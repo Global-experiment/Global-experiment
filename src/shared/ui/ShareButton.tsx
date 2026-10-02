@@ -11,26 +11,33 @@ interface ShareButtonProps {
 }
 
 /**
- * The Material `share` control from the Figma headers and article rows.
- * Uses the Web Share API where the browser offers it (mobile), otherwise
- * copies the link. Purely client-side — nothing is sent anywhere.
+ * Shares `url` with the Web Share API where the browser offers it (mobile),
+ * otherwise copies it. Resolves to "copied" when it fell back to the
+ * clipboard, so callers can confirm that. Purely client-side.
  */
+export async function shareUrl(url: string, title?: string): Promise<"shared" | "copied" | "dismissed"> {
+  const absolute = new URL(url, window.location.origin).toString();
+  try {
+    if (typeof navigator.share === "function") {
+      await navigator.share({ url: absolute, title });
+      return "shared";
+    }
+    await navigator.clipboard.writeText(absolute);
+    return "copied";
+  } catch {
+    // User dismissed the share sheet, or clipboard access was refused.
+    return "dismissed";
+  }
+}
+
+/** The `share` control from the Figma headers and article rows. */
 export function ShareButton({ url, title, className }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
-    const absolute = new URL(url, window.location.origin).toString();
-    try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({ url: absolute, title });
-        return;
-      }
-      await navigator.clipboard.writeText(absolute);
+    if ((await shareUrl(url, title)) === "copied") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // User dismissed the share sheet, or clipboard access was refused —
-      // nothing to recover from.
     }
   }
 

@@ -33,7 +33,8 @@ export function PageActionsMenu({ label, actions, children }: PageActionsMenuPro
     <>
       <IconButton onClick={() => setOpen(true)} label={label} icon="more_vert" />
       <Sheet open={open} onClose={() => setOpen(false)} ariaLabel={label}>
-        {children ? <div className="pb-4 text-body">{children}</div> : null}
+        {/* figma.pdf p3/p12/p16/p18: paragraphs one line apart, rows 12px under the copy. */}
+        {children ? <div className="flex flex-col gap-paragraph pb-3 text-body">{children}</div> : null}
         <div className="flex flex-col gap-2">
           {actions.map((action) =>
             action.href ? (

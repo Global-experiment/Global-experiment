@@ -41,7 +41,8 @@ export default function WaitlistPage() {
   return (
     <main className="flex flex-1 flex-col pb-6">
       <NavHeader title="Join the waitlist" backHref="/" />
-      <Container className="pt-1">
+      {/* figma.pdf p19/p20: field 8px under the header, button 16px under the field, copy 12px under the button. */}
+      <Container className="pt-2">
         <label htmlFor="waitlist-email" className="sr-only">
           Email
         </label>
@@ -57,26 +58,26 @@ export default function WaitlistPage() {
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? "waitlist-email-error" : undefined}
           placeholder="Email"
-          className="h-10 w-full rounded-control border border-text-primary bg-transparent px-2 text-body text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+          className="h-10 w-full rounded-control border border-text-primary bg-transparent px-[calc(var(--spacing-gutter)-1px)] text-body text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
         />
         {invalid ? (
-          <p id="waitlist-email-error" className="mt-1 flex items-center gap-1 text-meta text-text-primary">
-            <Icon name="warning" size={16} />
+          <p id="waitlist-email-error" className="mt-1 flex items-center gap-1 text-caption text-text-primary">
+            <Icon name="warning" size={12} />
             Invalid email address
           </p>
         ) : null}
 
         {email.trim() === "" ? (
-          <Button disabled fullWidth className="mt-3">
+          <Button disabled fullWidth className="mt-4">
             Join waitlist
           </Button>
         ) : (
-          <Button variant="primary" fullWidth className="mt-3" onClick={submit}>
+          <Button variant="primary" fullWidth className="mt-4" onClick={submit}>
             Join waitlist
           </Button>
         )}
 
-        <p className="mt-5 text-body text-text-primary">
+        <p className="mt-3 text-body text-text-primary">
           The email address provided for the waitlist will only be used once, to notify you when
           the platform is up and running. It will not be used for any other purpose, and no
           further emails will be sent. The email address is also encrypted and will not be

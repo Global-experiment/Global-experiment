@@ -38,7 +38,7 @@ export const TREASURY_STATS: TreasuryStat[] = [
       paragraphs: [
         { body: "The balance is United States Dollars 91.301,07 and was last updated at 2:07 PM." },
         {
-          body: "The balance represents the current funds available in the experiment's Wise account. All funds are publicly disclosed, with no hidden reserves.",
+          body: "The balance represents the current funds available in the experiment’s Wise account. All funds are publicly disclosed, with no hidden reserves.",
         },
       ],
     },
@@ -113,4 +113,28 @@ export const TREASURY_TRANSACTIONS: TreasuryTransaction[] = [
     date: "Aug 09 13:25",
     detail: { amount: "USD 60", paidLabel: "Paid Aug 09 13:25" },
   },
+  { id: "usd-12", label: "+ USD 12", kind: "income", tags: [], date: "Aug 08 18:56" },
+  {
+    id: "chf-700-nonprofit",
+    label: "- CHF 700",
+    kind: "expense",
+    tags: ["Nonprofit management"],
+    date: "Aug 07 11:30",
+    detail: { amount: "CHF 700", paidLabel: "Paid Aug 07 11:30" },
+  },
+  { id: "brl-20", label: "+ BRL 20", kind: "income", tags: [], date: "Aug 06 22:17" },
+  {
+    id: "eur-18-ai",
+    label: "- EUR 18",
+    kind: "expense",
+    tags: ["Generative AI", "Web development", "Software licensing"],
+    date: "Aug 05 08:03",
+    detail: { amount: "EUR 18", paidLabel: "Paid Aug 05 08:03" },
+  },
 ];
+
+/** "This page was last updated at …" in the Treasury and Donate page-actions sheets (figma.pdf p3/p12) — illustrative, same time as the Balance detail. */
+export const TREASURY_LAST_UPDATED = "2:07 PM";
+
+/** The history total shown next to the "History" heading (figma.pdf p2) — illustrative, like everything here. */
+export const TREASURY_HISTORY_TOTAL = "1,256";

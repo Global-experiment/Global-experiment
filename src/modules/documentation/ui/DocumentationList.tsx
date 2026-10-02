@@ -43,8 +43,7 @@ export function DocumentationList({
       <div className="relative">
         <Icon
           name="search"
-          size={18}
-          className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-primary"
+          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-primary"
         />
         <label htmlFor="documentation-search" className="sr-only">
           Search documentation
@@ -56,7 +55,7 @@ export function DocumentationList({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search"
-          className="h-8 w-full rounded-control border border-line bg-transparent pr-8 pl-8 text-body text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary [&::-webkit-search-cancel-button]:hidden"
+          className="h-8 w-full rounded-control border border-line bg-transparent pr-8 pl-[calc(2rem-1px)] text-body text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary [&::-webkit-search-cancel-button]:hidden"
         />
         {query ? (
           <button
@@ -75,7 +74,7 @@ export function DocumentationList({
       {filtered.length === 0 ? (
         <p className="mt-3 text-body text-text-muted">No articles match &ldquo;{query}&rdquo;.</p>
       ) : (
-        <div className="mt-3">
+        <div className="mt-2">
           {filtered.map((article) => (
             <ArticleAccordionItem key={article.slug} article={article} />
           ))}

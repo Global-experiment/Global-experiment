@@ -9,7 +9,13 @@ import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { Icon } from "@/shared/ui/icons";
 import { ClickableStatsRow } from "@/shared/treasury/ClickableStatsRow";
 import { TransactionList } from "@/shared/treasury/TransactionList";
-import { TREASURY_STATS, TREASURY_TRANSACTIONS } from "@/shared/treasury/presentationData";
+import {
+  TREASURY_HISTORY_TOTAL,
+  TREASURY_LAST_UPDATED,
+  TREASURY_STATS,
+  TREASURY_TRANSACTIONS,
+} from "@/shared/treasury/presentationData";
+import { shareUrl } from "@/shared/ui/ShareButton";
 
 /**
  * M1 navigation scaffold in the figma.pdf p2 layout: stats (three of the
@@ -31,7 +37,7 @@ export default function TreasuryPage() {
       : TREASURY_TRANSACTIONS.filter((t) => (tab === "expenses" ? t.kind === "expense" : t.kind === "income"));
 
   return (
-    <main className="flex flex-1 flex-col pb-16">
+    <main className="flex flex-1 flex-col">
       <NavHeader
         title="Treasury"
         backHref="/"
@@ -39,15 +45,24 @@ export default function TreasuryPage() {
           <PageActionsMenu
             label="Page actions"
             actions={[
+              { label: "Share page", icon: "share", onClick: () => void shareUrl("/treasury", "Treasury") },
               { label: "Donate", icon: "volunteer_activism", href: "/donate" },
               { label: "Send feedback", icon: "lightbulb", href: "/feedback" },
               { label: "Report issue", icon: "new_releases", href: "/issue" },
               { label: "Documentation", icon: "insert_drive_file", href: "/documentation" },
             ]}
-          />
+          >
+            {/* figma.pdf p3, verbatim. */}
+            <p>This page was last updated at {TREASURY_LAST_UPDATED}.</p>
+            <p>
+              It automatically fetches data from Wise bank account. Some information are held private for
+              privacy purposes, but all transactions either donations or expenses, are publicly available.
+            </p>
+            <p>Info on fees.</p>
+          </PageActionsMenu>
         }
       />
-      <Container className="pt-1">
+      <Container className="pt-2">
         <ClickableStatsRow stats={TREASURY_STATS} />
 
         <div role="group" aria-label="Filter history" className="mt-4 flex gap-2">
@@ -57,7 +72,7 @@ export default function TreasuryPage() {
               type="button"
               onClick={() => setTab((current) => (current === value ? "all" : value))}
               aria-pressed={tab === value}
-              className={`h-8 rounded-full border px-2 text-meta capitalize focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary ${
+              className={`h-8 rounded-full border px-[calc(var(--spacing-gutter)-1px)] text-meta capitalize focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary ${
                 tab === value ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line text-text-primary"
               }`}
             >
@@ -66,8 +81,12 @@ export default function TreasuryPage() {
           ))}
         </div>
 
-        <h2 className="mt-4 text-body font-bold text-text-primary">History</h2>
-        <TransactionList transactions={visible} />
+        {/* figma.pdf p2: 14px bold heading, 12px muted total on the same baseline, rows 12px below. */}
+        <h2 className="mt-[0.9375rem] text-body text-text-primary">
+          <span className="font-bold">History</span>{" "}
+          <span className="text-meta text-text-muted">{TREASURY_HISTORY_TOTAL}</span>
+        </h2>
+        <TransactionList transactions={visible} className="mt-[0.6875rem]" />
       </Container>
 
       <StickyActionBar>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icons";
+import { iconButtonClasses } from "./IconButton";
 import { readNavigationDepth, shouldUseHistoryBack } from "./navigationDepth";
 
 interface HistoryBackButtonProps {
@@ -11,9 +12,6 @@ interface HistoryBackButtonProps {
   className?: string;
 }
 
-const classes =
-  "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-text-primary " +
-  "hover:ring-1 hover:ring-content-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
 /**
  * Every back control in the app (client feedback item 21): returns to
@@ -42,8 +40,8 @@ export function HistoryBackButton({ fallbackHref, className = "" }: HistoryBackB
   }
 
   return (
-    <Link href={fallbackHref} onClick={handleClick} aria-label="Back" className={`${classes} ${className}`}>
-      <Icon name="arrow_back" size={20} />
+    <Link href={fallbackHref} onClick={handleClick} aria-label="Back" className={`${iconButtonClasses} ${className}`}>
+      <Icon name="arrow_back" />
     </Link>
   );
 }

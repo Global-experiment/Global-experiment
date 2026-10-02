@@ -1,24 +1,28 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
-import { ShareButton } from "@/shared/ui/ShareButton";
+import { ShareButton, shareUrl } from "@/shared/ui/ShareButton";
 
 /**
  * Header controls shared by the Documentation index and article pages:
- * share, then the overflow sheet from figma.pdf p16 (share page, send
- * feedback, report issue) with its editorial note. `historyHref` adds a
- * "Document history" row (figma.pdf p17) — only the article page passes
- * it, since history is per-article; see /documentation/[slug]/history for
- * why it currently shows an empty state (client feedback item 19).
+ * share, then the overflow sheet — figma.pdf p16 (index: editorial note,
+ * share page, send feedback, report issue) and p18 (article: last-updated
+ * note, same rows). `historyHref` adds a "Document history" row on the
+ * article page; Figma shows no entry point for p17, so this is the only way
+ * to reach it.
  */
 export function DocumentationPageMenu({
   url,
   title,
   historyHref,
+  note,
 }: {
   url: string;
   title: string;
   historyHref?: string;
+  /** Lead copy above the rows; defaults to the index's editorial note (p16). */
+  note?: ReactNode;
 }) {
   return (
     <>
@@ -26,20 +30,18 @@ export function DocumentationPageMenu({
       <PageActionsMenu
         label="Page actions"
         actions={[
-          {
-            label: "Share page",
-            icon: "share",
-            onClick: () => {
-              void navigator.share?.({ url: new URL(url, window.location.origin).toString(), title }).catch(() => {});
-            },
-          },
+          { label: "Share page", icon: "share", onClick: () => void shareUrl(url, title) },
           ...(historyHref ? [{ label: "Document history", icon: "history" as const, href: historyHref }] : []),
           { label: "Send feedback", icon: "lightbulb", href: "/feedback" },
           { label: "Report issue", icon: "new_releases", href: "/issue" },
         ]}
       >
-        This page is updated by the admin team. Please send feedback and reports if you see anything
-        unclear or invalid.
+        {note ?? (
+          <p>
+            This page is updated by admin team. Please send feedback and reports if you see anything
+            unclear/invalid.
+          </p>
+        )}
       </PageActionsMenu>
     </>
   );

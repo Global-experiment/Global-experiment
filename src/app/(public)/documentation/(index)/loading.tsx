@@ -33,8 +33,7 @@ export default function DocumentationLoading() {
         <div className="relative">
           <Icon
             name="search"
-            size={18}
-            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-muted"
+            className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-muted"
           />
           <div className="h-8 w-full rounded-control border border-line bg-transparent pl-8 text-body text-text-muted" />
         </div>
@@ -49,14 +48,14 @@ export default function DocumentationLoading() {
           Loading documentation…
         </span>
 
-        <div className="mt-3" aria-hidden="true">
+        <div className="mt-2" aria-hidden="true">
           {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <div key={index} className="flex h-10 items-center justify-between border-b border-line">
               <div
                 className="h-3 animate-pulse rounded-control bg-text-muted/20"
                 style={{ width: `${45 + ((index * 13) % 35)}%` }}
               />
-              <Icon name="expand_more" size={24} className="shrink-0 text-text-muted/40" />
+              <Icon name="expand_more" className="shrink-0 text-text-muted/40" />
             </div>
           ))}
         </div>

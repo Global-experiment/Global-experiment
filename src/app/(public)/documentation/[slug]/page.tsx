@@ -8,7 +8,7 @@ import { getArticleBySlug } from "@/modules/documentation/application/getArticle
 import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { DocumentationContent } from "@/modules/documentation/ui/DocumentationContent";
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
-import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
+import { formatPublishedAt, formatUpdatedAt } from "@/modules/documentation/ui/formatPublishedAt";
 
 // getArticleBySlug() reads the same cached dataset the index page populates
 // (see getDocumentationDataset) rather than fetching fresh from Notion.
@@ -52,7 +52,12 @@ export default async function DocumentationArticlePage({ params }: Documentation
         title={article.title}
         backHref="/documentation"
         actions={
-          <DocumentationPageMenu url={href} title={article.title} historyHref={`${href}/history`} />
+          <DocumentationPageMenu
+            url={href}
+            title={article.title}
+            historyHref={`${href}/history`}
+            note={<p>This page was last updated {formatUpdatedAt(article.updatedAt)}.</p>}
+          />
         }
       />
       <Container className="pt-1">

@@ -17,9 +17,10 @@ export default function ContributePage() {
   return (
     <main className="flex flex-1 flex-col pb-6">
       <NavHeader title="Contribute to the experiment" backHref="/" />
-      <Container className="pt-1">
+      {/* figma.pdf p31: email 12px under the header, copy 12px under the email. */}
+      <Container className="pt-3">
         <ContributeEmailLink email={CONTRIBUTE_EMAIL} />
-        <p className="mt-5 text-body text-text-primary">
+        <p className="mt-3 text-body text-text-primary">
           Send an email to the above email address stating what your expertises are and on what
           aspects you might contribute to the development of the platform.
         </p>

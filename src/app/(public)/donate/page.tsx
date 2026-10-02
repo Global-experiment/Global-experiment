@@ -6,20 +6,23 @@ import { Container } from "@/shared/ui/Container";
 import { FullBleedSeparator } from "@/shared/ui/FullBleedSeparator";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
+import { ShareButton } from "@/shared/ui/ShareButton";
 import { InertActionNotice } from "@/shared/ui/InertActionNotice";
 import { ClickableStatsRow } from "@/shared/treasury/ClickableStatsRow";
-import { TREASURY_STATS } from "@/shared/treasury/presentationData";
+import { TREASURY_LAST_UPDATED, TREASURY_STATS } from "@/shared/treasury/presentationData";
 import { PaymentMarks, type PaymentMethodId } from "./PaymentMarks";
 
 /**
  * Payment rows from figma.pdf p9 — labels and casing match the exported
- * text exactly ("Apple pay", "Google pay", "Proceed with Paypal").
+ * text exactly ("Apple pay", "Google pay", "Proceed with Paypal"). Figma
+ * spaces the mark and label 8px on the Card and Apple Pay rows but 4px on
+ * Google Pay and PayPal; reproduced per row rather than normalized.
  */
-const PAYMENT_METHODS: Array<{ id: PaymentMethodId; label: string }> = [
+const PAYMENT_METHODS: Array<{ id: PaymentMethodId; label: string; tightGap?: boolean }> = [
   { id: "card", label: "Card payment via Stripe" },
   { id: "apple-pay", label: "Apple pay" },
-  { id: "google-pay", label: "Google pay" },
-  { id: "paypal", label: "Proceed with Paypal" },
+  { id: "google-pay", label: "Google pay", tightGap: true },
+  { id: "paypal", label: "Proceed with Paypal", tightGap: true },
 ];
 
 // Only digits and at most one decimal point/comma — never rely on the
@@ -50,6 +53,9 @@ export default function DonatePage() {
         title="Donate"
         backHref="/"
         actions={
+          <>
+          {/* figma.pdf p9: share before the overflow menu. */}
+          <ShareButton url="/donate" title="Donate" />
           <PageActionsMenu
             label="Page actions"
             actions={[
@@ -59,9 +65,14 @@ export default function DonatePage() {
               { label: "Documentation", icon: "insert_drive_file", href: "/documentation" },
             ]}
           >
-            The experiment uses Stripe as its payment provider and a Wise Belgian banking account, for
-            the Swiss non-profit association.
+            {/* figma.pdf p12 ("as it payment provider" in Figma corrected to "its"). */}
+            <p>This page was last updated at {TREASURY_LAST_UPDATED}.</p>
+            <p>
+              The experiment uses Stripe as its payment provider and a Wise Belgian banking account, for
+              the Swiss non-profit association.
+            </p>
           </PageActionsMenu>
+          </>
         }
       />
       <Container className="pt-1">
@@ -71,22 +82,22 @@ export default function DonatePage() {
 
         <ClickableStatsRow stats={TREASURY_STATS} className="mt-5" />
 
-        {/* Full-width pill per figma.pdf p9 — 40px tall, fully rounded ends. */}
-        <div
-          id="donate-amount"
-          role="group"
-          aria-label="Frequency"
-          className="mt-6 flex h-10 gap-1 rounded-full border border-line p-1"
-        >
-          {(["once", "monthly"] as const).map((value) => (
+        {/*
+          figma.pdf p9–p11: two unfilled 40px segments sharing a 1px seam,
+          rounded on their outer ends only. The selected one has a white
+          stroke and text (drawn on top, so the seam is white), the other a
+          muted stroke and text.
+        */}
+        <div id="donate-amount" role="group" aria-label="Frequency" className="mt-6 flex">
+          {(["once", "monthly"] as const).map((value, index) => (
             <button
               key={value}
               type="button"
               onClick={() => setFrequency(value)}
               aria-pressed={frequency === value}
-              className={`flex-1 rounded-full px-2 text-body capitalize ${focusRing} ${
-                frequency === value ? "bg-inverse-surface text-inverse-content" : "text-text-muted"
-              }`}
+              className={`h-10 flex-1 border text-body capitalize ${focusRing} ${
+                index === 0 ? "rounded-l-full" : "-ml-px rounded-r-full"
+              } ${frequency === value ? "relative z-10 border-text-primary text-text-primary" : "border-line-strong text-text-muted"}`}
             >
               {value}
             </button>
@@ -103,7 +114,7 @@ export default function DonatePage() {
               className={`h-10 rounded-control border text-body ${focusRing} ${
                 amount === value
                   ? "border-inverse-surface bg-inverse-surface text-inverse-content"
-                  : "border-line-strong text-text-primary hover:border-content-50"
+                  : "border-line-strong text-text-muted hover:border-content-50"
               }`}
             >
               {value}
@@ -132,7 +143,7 @@ export default function DonatePage() {
               type="button"
               onClick={() => setAmount("other")}
               aria-pressed={false}
-              className={`h-10 rounded-control border border-line-strong text-body text-text-primary hover:border-content-50 ${focusRing}`}
+              className={`h-10 rounded-control border border-line-strong text-body text-text-muted hover:border-content-50 ${focusRing}`}
             >
               Other
             </button>
@@ -145,6 +156,7 @@ export default function DonatePage() {
               key={method.id}
               onClick={() => setAttempted(true)}
               icon={<PaymentMarks method={method.id} />}
+              className={method.tightGap ? "gap-1!" : ""}
               fullWidth
             >
               {method.label}
@@ -154,9 +166,10 @@ export default function DonatePage() {
 
         {attempted ? <InertActionNotice /> : null}
 
-        <FullBleedSeparator className="mt-4" />
+        {/* figma.pdf p9: rule 12px under the payment rows; legal copy 10px under the rule, paragraphs run on with no gap. */}
+        <FullBleedSeparator className="mt-3" />
 
-        <div className="mt-4 flex flex-col gap-3 pb-2 text-body text-text-primary">
+        <div className="mt-2.5 flex flex-col pb-2 text-body text-text-primary">
           <p>
             The Global Experiment is a Swiss non-profit association. Donations support the development,
             operation and public-interest activities of the initiative. Donations do not purchase goods,

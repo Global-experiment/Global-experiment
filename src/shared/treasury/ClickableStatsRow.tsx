@@ -18,7 +18,8 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
 
   return (
     <>
-      <dl className={`grid grid-cols-4 gap-2 text-center ${className}`}>
+      {/* figma.pdf p2/p9: four equal columns on a 100pt pitch centered at 55.5/155.5/255/355.5 — i.e. 400px spanning 2px into each gutter. */}
+      <dl className={`-mx-0.5 grid grid-cols-4 text-center ${className}`}>
         {stats.map((stat) =>
           stat.detail ? (
             <button
@@ -28,14 +29,14 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
               className="rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
             >
               <dd className="text-body text-text-primary">{stat.value}</dd>
-              <dt className="mt-1 text-meta text-text-muted underline decoration-line underline-offset-2">
+              <dt className="mt-[0.3125rem] text-meta text-text-muted">
                 {stat.label}
               </dt>
             </button>
           ) : (
             <div key={stat.id}>
               <dd className="text-body text-text-primary">{stat.value}</dd>
-              <dt className="mt-1 text-meta text-text-muted">{stat.label}</dt>
+              <dt className="mt-[0.3125rem] text-meta text-text-muted">{stat.label}</dt>
             </div>
           ),
         )}
@@ -43,10 +44,11 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
 
       <Sheet open={open !== undefined} onClose={() => setOpenId(null)} title={open?.detail?.title ?? ""}>
         {open?.detail ? (
-          <div className="pb-4">
-            <p className="text-lead text-text-primary">{open.detail.value}</p>
-            <p className="text-meta text-text-muted">{open.detail.caption}</p>
-            <div className="mt-4 flex flex-col gap-4">
+          <div>
+            {/* figma.pdf p4: 14px value 8px under the header row, 12px caption 4px under it. */}
+            <p className="mt-2 text-body text-text-primary">{open.detail.value}</p>
+            <p className="mt-1 text-meta text-text-muted">{open.detail.caption}</p>
+            <div className="mt-4 flex flex-col gap-paragraph">
               {open.detail.paragraphs.map((paragraph, index) => (
                 <div key={index}>
                   {paragraph.heading ? (

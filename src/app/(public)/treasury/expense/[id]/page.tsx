@@ -29,12 +29,14 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
   }
 
   return (
-    <main className="flex flex-1 flex-col pb-16">
+    <main className="flex flex-1 flex-col">
       <NavHeader title="Expense" backHref="/treasury" />
       <Container className="pt-1">
         <p className="text-meta text-text-muted">{transaction.detail.paidLabel}</p>
         {transaction.tags.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-2">
+          // figma.pdf p7: tags 10px under the date, amount 16px under the tags,
+          // description 14px under the amount, actions 12px under the description.
+          <div className="mt-2.5 flex flex-wrap gap-2">
             {transaction.tags.map((tag) => (
               <Tag key={tag}>{tag}</Tag>
             ))}
@@ -42,9 +44,9 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
         ) : null}
         <p className="mt-4 text-body font-bold text-text-primary">{transaction.detail.amount}</p>
         {transaction.detail.description ? (
-          <p className="mt-1 text-body text-text-primary">{transaction.detail.description}</p>
+          <p className="mt-3.5 text-body text-text-primary">{transaction.detail.description}</p>
         ) : null}
-        <FeedbackIssueActions className="mt-5" />
+        <FeedbackIssueActions className="mt-3" />
       </Container>
 
       <StickyActionBar>

@@ -26,17 +26,19 @@ export function ArticleAccordionItem({ article }: { article: DocumentationArticl
   const articleHref = `/documentation/${article.slug}`;
 
   return (
-    <div className="border-b border-line">
+    // Stroke runs through the 8px gutters, edge to edge of the content area (figma.pdf p15/p17).
+    <div className="-mx-gutter border-b border-line px-gutter">
       <h2 className="text-body font-bold text-text-primary">
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
           aria-controls={panelId}
-          className="-mr-1 flex h-10 w-full items-center justify-between gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+          // 39px + the wrapper's 1px stroke = Figma's 40px row pitch (figma.pdf p15).
+          className="flex min-h-[2.4375rem] w-full items-center justify-between gap-2 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
         >
           <span>{article.title}</span>
-          <Icon name={expanded ? "expand_less" : "expand_more"} size={24} />
+          <Icon name={expanded ? "expand_less" : "expand_more"} />
         </button>
       </h2>
 
@@ -46,7 +48,8 @@ export function ArticleAccordionItem({ article }: { article: DocumentationArticl
             Published
           </Link>
           <span>{formatPublishedAt(article.publishedAt)}</span>
-          <ShareButton url={articleHref} title={article.title} className="-my-2.5 -mr-gutter ml-auto" />
+          {/* figma.pdf p15/p17: the share glyph in the Published row is muted, not white. */}
+          <ShareButton url={articleHref} title={article.title} className="-my-2.5 -mr-gutter ml-auto text-text-muted!" />
         </div>
 
         {article.expertise.length > 0 ? (

@@ -40,8 +40,11 @@ type ButtonProps = ButtonAsLink | ButtonAsAction | ButtonDisabled;
 /*
  * Geometry: 40/32px height, 1px border, 4px radius, 14px bold label, 8px
  * padding on both sides (client feedback item 4) regardless of whether an
- * icon is present — the icon sits inside that padding with a 4px gap to the
- * label, not additional outer padding.
+ * icon is present — a 16px icon then an 8px gap, so the label starts 32px
+ * in (figma.pdf p1/p4: label x=40 in a button at x=8). Heights are minimums
+ * with matching vertical padding: one line renders at exactly 40/32px, and
+ * a label that wraps (narrow screen, enlarged text) grows the button
+ * instead of overflowing it.
  *
  * Hover changes the outline stroke only, never the background (client
  * feedback item 5): secondary/outlined buttons move to the `content-50`
@@ -49,13 +52,16 @@ type ButtonProps = ButtonAsLink | ButtonAsAction | ButtonDisabled;
  * border already matches its fill and Figma shows no separate hover state
  * for it (a static export can't capture hover) — only its focus ring.
  */
+// Figma's 8px padding is measured from the button's outer edge (its 1px
+// stroke sits inside the frame); CSS padding starts inside the border, so
+// it's 8px minus the border to land the icon/label at the same x.
 const baseClasses =
-  "inline-flex items-center rounded-control border px-2 text-body font-bold transition-colors " +
+  "inline-flex items-center rounded-control border px-[calc(var(--spacing-gutter)-1px)] text-left text-body font-bold transition-colors " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
 const sizeClasses: Record<ButtonSize, string> = {
-  control: "h-10",
-  compact: "h-8",
+  control: "min-h-10 py-2.5",
+  compact: "min-h-8 py-1.5",
 };
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -68,7 +74,7 @@ export function Button(props: ButtonProps) {
   const classes = [
     baseClasses,
     sizeClasses[size],
-    icon ? "gap-1" : "",
+    icon ? "gap-2" : "",
     fullWidth ? "w-full justify-start" : "",
     className,
   ]

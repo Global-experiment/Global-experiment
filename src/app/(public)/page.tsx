@@ -27,19 +27,20 @@ export default async function Home() {
   const content = await getHomeContent();
 
   return (
-    <main className="flex flex-1 flex-col pb-16 md:pb-6">
+    <main className="flex flex-1 flex-col md:pb-6">
       <Container>
-        <div className="relative flex h-11 items-center justify-center text-body">
-          <p className="flex items-center gap-1">
-            <span className="font-bold text-text-primary">{homeWordmark.brand}</span>
-            <span className="text-text-muted">{homeWordmark.eyebrow}</span>
+        <div className="relative flex min-h-10 items-center justify-center">
+          {/* figma.pdf p1: 14px bold brand, 12px muted eyebrow, one shared baseline. */}
+          <p className="flex items-baseline gap-1">
+            <span className="text-body font-bold text-text-primary">{homeWordmark.brand}</span>
+            <span className="text-meta text-text-muted">{homeWordmark.eyebrow}</span>
           </p>
           {/* Temporary, review-only — see ThemeToggle.tsx. */}
           <div className="absolute top-1/2 right-0 -translate-y-1/2">
             <ThemeToggle />
           </div>
         </div>
-        <h1 className="mt-3 text-center text-lead font-normal text-text-primary">
+        <h1 className="mt-3.5 text-center text-lead text-text-primary">
           <RichText text={content.tagline} />
         </h1>
 
