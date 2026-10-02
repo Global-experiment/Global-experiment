@@ -9,6 +9,7 @@ import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { DocumentationContent } from "@/modules/documentation/ui/DocumentationContent";
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
+import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
 
 // getArticleBySlug() reads the same cached dataset the index page populates
 // (see getDocumentationDataset) rather than fetching fresh from Notion.
@@ -54,7 +55,7 @@ export default async function DocumentationHistoryPage({ params }: HistoryPagePr
       <NavHeader
         title="Document history"
         backHref={articleHref}
-        actions={<DocumentationPageMenu url={`${articleHref}/history`} title={`${article.title} — Document history`} />}
+        actions={<DocumentationPageMenu url={documentationAnchorHref(article.slug)} title={article.title} />}
       />
       <Container className="pt-1">
         <p role="status" className="text-body text-text-muted">
@@ -66,7 +67,7 @@ export default async function DocumentationHistoryPage({ params }: HistoryPagePr
         <div className="mt-6 border-t border-line pt-4">
           <p className="text-body font-bold text-text-primary">{article.title}</p>
           <p className="mt-1 text-meta text-text-muted">
-            Current version — {formatPublishedAt(article.publishedAt)}
+            Published version {formatPublishedAt(article.publishedAt)}
           </p>
           {article.expertise.length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">

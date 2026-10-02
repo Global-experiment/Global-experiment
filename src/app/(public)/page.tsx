@@ -3,7 +3,6 @@ import { Container } from "@/shared/ui/Container";
 import { RichText } from "@/shared/ui/RichText";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { ThemeToggle } from "@/shared/ui/ThemeToggle";
-import { Icon } from "@/shared/ui/icons";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
 import { HomeSections } from "@/modules/home/ui/HomeSections";
 import { homeActions, homePrimaryAction, homeWordmark } from "./home-navigation";
@@ -53,14 +52,14 @@ export default async function Home() {
         <nav aria-label="Main" className="mt-6 grid grid-cols-2 gap-2">
           <Button
             href={homePrimaryAction.href}
-            icon={<Icon name={homePrimaryAction.icon} />}
+            icon={homePrimaryAction.icon}
             fullWidth
             className="col-span-2"
           >
             {homePrimaryAction.label}
           </Button>
           {homeActions.map((action) => (
-            <Button key={action.label} href={action.href} icon={<Icon name={action.icon} />} fullWidth>
+            <Button key={action.label} href={action.href} icon={action.icon} fullWidth>
               {action.label}
             </Button>
           ))}
@@ -72,7 +71,7 @@ export default async function Home() {
       </Container>
 
       <StickyActionBar className="md:hidden">
-        <Button variant="primary" href={homePrimaryAction.href} icon={<Icon name={homePrimaryAction.icon} />} fullWidth>
+        <Button variant="primary" href={homePrimaryAction.href} icon={homePrimaryAction.icon} fullWidth>
           {homePrimaryAction.label}
         </Button>
       </StickyActionBar>

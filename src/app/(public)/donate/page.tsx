@@ -129,6 +129,9 @@ export default function DonatePage() {
                 id="donate-other"
                 type="text"
                 inputMode="decimal"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
                 autoFocus
                 value={otherAmount}
                 onChange={(event) => {
@@ -155,7 +158,7 @@ export default function DonatePage() {
             <Button
               key={method.id}
               onClick={() => setAttempted(true)}
-              icon={<PaymentMarks method={method.id} />}
+              leading={<PaymentMarks method={method.id} />}
               className={method.tightGap ? "gap-1!" : ""}
               fullWidth
             >

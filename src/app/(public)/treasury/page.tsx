@@ -6,8 +6,8 @@ import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
-import { Icon } from "@/shared/ui/icons";
 import { ClickableStatsRow } from "@/shared/treasury/ClickableStatsRow";
+import { INITIAL_HISTORY_FILTER, filterHistory, nextHistoryFilter } from "@/shared/treasury/historyFilter";
 import { TransactionList } from "@/shared/treasury/TransactionList";
 import {
   TREASURY_HISTORY_TOTAL,
@@ -25,16 +25,13 @@ import { shareUrl } from "@/shared/ui/ShareButton";
  * toggle is real UI state; no data exists behind either tab yet. See
  * docs/architecture/decisions/008-route-shells.md.
  *
- * Default shows every transaction chronologically; Expenses/Donations are
- * selectable filters, and clicking the active one clears it back to all
- * rather than requiring the other to always be selected.
+ * Default shows every transaction, newest first; Expenses/Donations are
+ * selectable filters — the active one clears back to all, the other one
+ * switches across (see historyFilter).
  */
 export default function TreasuryPage() {
-  const [tab, setTab] = useState<"all" | "expenses" | "donations">("all");
-  const visible =
-    tab === "all"
-      ? TREASURY_TRANSACTIONS
-      : TREASURY_TRANSACTIONS.filter((t) => (tab === "expenses" ? t.kind === "expense" : t.kind === "income"));
+  const [tab, setTab] = useState(INITIAL_HISTORY_FILTER);
+  const visible = filterHistory(TREASURY_TRANSACTIONS, tab);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -70,7 +67,7 @@ export default function TreasuryPage() {
             <button
               key={value}
               type="button"
-              onClick={() => setTab((current) => (current === value ? "all" : value))}
+              onClick={() => setTab((current) => nextHistoryFilter(current, value))}
               aria-pressed={tab === value}
               className={`h-8 rounded-full border px-[calc(var(--spacing-gutter)-1px)] text-meta capitalize focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary ${
                 tab === value ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line text-text-primary"
@@ -90,7 +87,7 @@ export default function TreasuryPage() {
       </Container>
 
       <StickyActionBar>
-        <Button variant="primary" href="/donate" icon={<Icon name="volunteer_activism" />} fullWidth>
+        <Button variant="primary" href="/donate" icon="volunteer_activism" fullWidth>
           Donate
         </Button>
       </StickyActionBar>

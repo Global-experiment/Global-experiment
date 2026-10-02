@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { getDocumentationRepository } from "@/modules/documentation/infrastructure/getDocumentationRepository";
-import type { DocumentationArticle } from "@/modules/documentation/domain/types";
+import type { DocumentationArticle, DocumentationArticleSummary } from "@/modules/documentation/domain/types";
 
 /**
  * The one place the Documentation UI's data comes from: every published
@@ -55,5 +55,39 @@ export async function getDocumentationDataset(): Promise<DocumentationArticle[]>
     ...article,
     publishedAt: new Date(article.publishedAt),
     updatedAt: new Date(article.updatedAt),
+  }));
+}
+
+type SerializedSummary = Omit<DocumentationArticleSummary, "publishedAt" | "updatedAt"> & {
+  publishedAt: string;
+  updatedAt: string;
+};
+
+const getCachedSummaries = unstable_cache(
+  async (): Promise<SerializedSummary[]> => {
+    const summaries = await getDocumentationRepository().listPublished();
+    return summaries.map((summary) => ({
+      ...summary,
+      publishedAt: summary.publishedAt.toISOString(),
+      updatedAt: summary.updatedAt.toISOString(),
+    }));
+  },
+  ["documentation-summaries", "v1"],
+  { revalidate: REVALIDATE_SECONDS, tags: [DOCUMENTATION_CACHE_TAG] },
+);
+
+/**
+ * Metadata only (title, slug, order, tags, dates) — one Notion query
+ * instead of the full dataset's 1 + one-per-article. The index renders its
+ * rows from this first and streams the bodies (getDocumentationDataset) in
+ * behind them, so a cold load shows the list after ~0.4s instead of waiting
+ * for every body. Same cache window and tag as the full dataset.
+ */
+export async function getDocumentationSummaries(): Promise<DocumentationArticleSummary[]> {
+  const summaries = await getCachedSummaries();
+  return summaries.map((summary) => ({
+    ...summary,
+    publishedAt: new Date(summary.publishedAt),
+    updatedAt: new Date(summary.updatedAt),
   }));
 }

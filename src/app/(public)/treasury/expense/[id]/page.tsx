@@ -4,7 +4,6 @@ import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { Tag } from "@/shared/ui/Tag";
-import { Icon } from "@/shared/ui/icons";
 import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { TREASURY_TRANSACTIONS } from "@/shared/treasury/presentationData";
 
@@ -50,7 +49,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
       </Container>
 
       <StickyActionBar>
-        <Button variant="primary" href="/donate" icon={<Icon name="volunteer_activism" />} fullWidth>
+        <Button variant="primary" href="/donate" icon="volunteer_activism" fullWidth>
           Donate
         </Button>
       </StickyActionBar>

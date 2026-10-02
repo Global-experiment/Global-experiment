@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { reportHref } from "@/shared/navigation/sourcePage";
+import { useCurrentSourcePage } from "@/shared/navigation/useCurrentSourcePage";
 import { Button } from "@/shared/ui/Button";
 import { Sheet } from "@/shared/ui/Sheet";
-import { Icon } from "@/shared/ui/icons";
 import type { TreasuryStat } from "./presentationData";
 
 /**
@@ -15,6 +16,7 @@ import type { TreasuryStat } from "./presentationData";
 export function ClickableStatsRow({ stats, className = "" }: { stats: TreasuryStat[]; className?: string }) {
   const [openId, setOpenId] = useState<TreasuryStat["id"] | null>(null);
   const open = stats.find((stat) => stat.id === openId);
+  const source = useCurrentSourcePage();
 
   return (
     <>
@@ -26,7 +28,7 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
               key={stat.id}
               type="button"
               onClick={() => setOpenId(stat.id)}
-              className="rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+              className="cursor-pointer rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
             >
               <dd className="text-body text-text-primary">{stat.value}</dd>
               <dt className="mt-[0.3125rem] text-meta text-text-muted">
@@ -61,16 +63,16 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
               ))}
             </div>
             <div className="mt-4 flex flex-col gap-2">
-              <Button href="/donate" icon={<Icon name="volunteer_activism" />} fullWidth>
+              <Button href="/donate" icon="volunteer_activism" fullWidth>
                 Donate
               </Button>
-              <Button href="/feedback" icon={<Icon name="lightbulb" />} fullWidth>
+              <Button href={reportHref("feedback", source)} icon="lightbulb" fullWidth>
                 Send feedback
               </Button>
-              <Button href="/issue" icon={<Icon name="new_releases" />} fullWidth>
+              <Button href={reportHref("issue", source)} icon="new_releases" fullWidth>
                 Report issue
               </Button>
-              <Button href="/documentation" icon={<Icon name="insert_drive_file" />} fullWidth>
+              <Button href="/documentation" icon="insert_drive_file" fullWidth>
                 Documentation
               </Button>
             </div>

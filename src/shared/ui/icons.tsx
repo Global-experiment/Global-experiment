@@ -4,15 +4,19 @@ import type { SVGProps } from "react";
  * UI icons as drawn in the client's Figma: the vector paths are taken
  * verbatim from figma.pdf (2026-10-02 export) — each glyph's exported
  * outline, offset to its integer-aligned icon frame and scaled to a 24-unit
- * grid. These are Figma's outline (unfilled) glyphs; re-extract from
- * figma.pdf rather than hand-editing a path.
+ * grid. Re-extract from figma.pdf rather than hand-editing a path.
+ *
+ * Client rule (latest review): every generic platform icon is OUTLINED,
+ * except on a PRIMARY call-to-action, which uses the FILLED form — the
+ * filled glyphs below are Figma's own primary-CTA artwork. Payment brand
+ * marks are separate assets (donate/PaymentMarks), not icons.
  *
  * Entries marked "not in Figma" have no Figma source and stay Material
  * Symbols Sharp (Apache-2.0).
  */
 export const iconPaths = {
   // figma.pdf p1, frame (16, 234) 16px
-  approval:
+  how_to_vote:
     "M18 13.001L17.32 13.001L15.32 15.001L17.23 15.001L19 17.001L5 17.001L6.78 15.001L8.83 15.001L6.83 13.001L6 13.001L3 16.001L3 20.001C3 21.101 3.89 22.001 4.99 22.001L19 22.001C20.1 22.001 21 21.111 21 20.001L21 16.001L18 13.001ZM19 20.001L5 20.001L5 19.001L19 19.001L19 20.001ZM11.34 15.021C11.73 15.411 12.36 15.411 12.75 15.021L19.11 8.661C19.5 8.271 19.5 7.641 19.11 7.251L14.16 2.301C13.78 1.901 13.15 1.901 12.76 2.291L6.39 8.661C6 9.051 6 9.681 6.39 10.071L11.34 15.021ZM13.46 4.411L17 7.951L12.05 12.901L8.51 9.361L13.46 4.411Z",
   // figma.pdf p1, frame (16, 282) 16px
   insert_drive_file:
@@ -78,21 +82,44 @@ export const iconPaths = {
     "M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z",
 } as const;
 
+/** Filled forms, used only on primary CTAs (see Button). */
+export const filledIconPaths = {
+  // figma.pdf p1 (sticky primary CTA), frame (16, 1870) 16px
+  how_to_vote:
+    "M18 13.2L17.32 13.2L15.32 15.2L17.23 15.2L19 17.2L5 17.2L6.78 15.2L8.83 15.2L6.83 13.2L6 13.2L3 16.2L3 22.2L21 22.2L21 16.2L18 13.2ZM19.81 8.16L13.45 1.8L5.68 9.56L12.04 15.92L19.81 8.16ZM13.46 4.61L17 8.15L12.05 13.1L8.51 9.56L13.46 4.61Z",
+  // figma.pdf p7 (sticky primary CTA), frame (16, 866) 16px
+  volunteer_activism:
+    "M5.5 11L1.5 11L1.5 22L5.5 22L5.5 11ZM16.5 3.25C17.15 2.49 18.16 2 19.2 2C21.05 2 22.5 3.45 22.5 5.3C22.5 7.57 19.59 10.2 16.5 13C13.41 10.19 10.5 7.56 10.5 5.3C10.5 3.45 11.95 2 13.8 2C14.84 2 15.85 2.49 16.5 3.25ZM22.5 17L13.5 17L11.41 16.27L11.74 15.32L13.5 16L17.5 16L17.5 14L9.47 11L7.5 11L7.5 20.02L14.5 22L22.5 19L22.5 17Z",
+} as const;
+
 export type IconName = keyof typeof iconPaths;
+export type IconVariant = "outlined" | "filled";
+
+export function hasFilledVariant(name: IconName): name is keyof typeof filledIconPaths {
+  return name in filledIconPaths;
+}
+
+/** The path for a variant; a glyph with no filled form stays outlined. */
+export function iconPath(name: IconName, variant: IconVariant = "outlined"): string {
+  return variant === "filled" && hasFilledVariant(name) ? filledIconPaths[name] : iconPaths[name];
+}
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
-  /** Rendered box size in CSS px (paths are on a 24-unit grid). */
-  size?: 12 | 16 | 18 | 20 | 24;
+  variant?: IconVariant;
+  /**
+   * Visible artwork box in CSS px. 16 everywhere (client: "visible icons are
+   * exactly 16px square"); 12 only for the Waitlist warning mark, which
+   * Figma draws at 12px.
+   */
+  size?: 12 | 16;
 }
 
 /**
  * Decorative by default (aria-hidden): every icon in this UI sits next to a
  * text label or inside a control that carries its own accessible name.
- * 16px is the frame size of every glyph in figma.pdf except the 12px
- * Waitlist warning.
  */
-export function Icon({ name, size = 16, className = "", ...rest }: IconProps) {
+export function Icon({ name, variant = "outlined", size = 16, className = "", ...rest }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -101,10 +128,12 @@ export function Icon({ name, size = 16, className = "", ...rest }: IconProps) {
       width={size}
       height={size}
       fill="currentColor"
+      data-icon={name}
+      data-variant={variant === "filled" && hasFilledVariant(name) ? "filled" : "outlined"}
       className={`shrink-0 ${className}`}
       {...rest}
     >
-      <path d={iconPaths[name]} />
+      <path d={iconPath(name, variant)} />
     </svg>
   );
 }

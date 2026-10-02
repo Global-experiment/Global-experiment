@@ -32,22 +32,36 @@ export function useKeyboardInset(): number {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
+    let frame = 0;
 
-    function update() {
-      // vv is narrowed to non-null by the enclosing closure over the
-      // local `vv` captured above (TypeScript can't see that across the
-      // event-listener boundary without this local alias).
+    function measure() {
+      frame = 0;
       const viewport = window.visualViewport;
       if (!viewport) return;
+      // Same value → React bails out, so steady scrolling doesn't re-render.
       setInset(computeKeyboardInset(window.innerHeight, viewport.height, viewport.offsetTop));
     }
 
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
+    // Coalesced to one read per frame. Besides the viewport's own events,
+    // window resize/orientationchange and focusout (keyboard dismissed)
+    // re-measure too, so no stale inset survives a rotation or a closed
+    // keyboard on browsers that report those late.
+    function update() {
+      if (!frame) frame = requestAnimationFrame(measure);
+    }
+
+    measure();
+    const targets: [EventTarget, string][] = [
+      [vv, "resize"],
+      [vv, "scroll"],
+      [window, "resize"],
+      [window, "orientationchange"],
+      [document, "focusout"],
+    ];
+    for (const [target, type] of targets) target.addEventListener(type, update);
     return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
+      for (const [target, type] of targets) target.removeEventListener(type, update);
+      if (frame) cancelAnimationFrame(frame);
     };
   }, []);
 

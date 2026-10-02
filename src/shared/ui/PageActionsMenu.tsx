@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { withReportSource } from "@/shared/navigation/sourcePage";
+import { useCurrentSourcePage } from "@/shared/navigation/useCurrentSourcePage";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 import { Sheet } from "./Sheet";
-import { Icon, type IconName } from "./icons";
+import type { IconName } from "./icons";
 
 export interface PageAction {
   label: string;
@@ -19,15 +21,19 @@ interface PageActionsMenuProps {
   actions: PageAction[];
   /** Optional lead text above the rows (figma.pdf p3/p12/p16). */
   children?: ReactNode;
+  /** Page the Send feedback / Report issue rows report from; defaults to the current page. */
+  source?: string;
 }
 
 /**
  * The `more_vert` overflow control from the Figma headers. Opens the shared
  * Sheet with one 40px action row per entry (p3, p12, p16) — no visible
- * title, matching Figma.
+ * title, matching Figma. Feedback/Issue rows carry `?source=`.
  */
-export function PageActionsMenu({ label, actions, children }: PageActionsMenuProps) {
+export function PageActionsMenu({ label, actions, children, source: explicitSource }: PageActionsMenuProps) {
   const [open, setOpen] = useState(false);
+  const currentPage = useCurrentSourcePage();
+  const source = explicitSource ?? currentPage;
 
   return (
     <>
@@ -38,7 +44,7 @@ export function PageActionsMenu({ label, actions, children }: PageActionsMenuPro
         <div className="flex flex-col gap-2">
           {actions.map((action) =>
             action.href ? (
-              <Button key={action.label} href={action.href} icon={<Icon name={action.icon} />} fullWidth>
+              <Button key={action.label} href={withReportSource(action.href, source)} icon={action.icon} fullWidth>
                 {action.label}
               </Button>
             ) : (
@@ -48,7 +54,7 @@ export function PageActionsMenu({ label, actions, children }: PageActionsMenuPro
                   setOpen(false);
                   action.onClick?.();
                 }}
-                icon={<Icon name={action.icon} />}
+                icon={action.icon}
                 fullWidth
               >
                 {action.label}

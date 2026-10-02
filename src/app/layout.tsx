@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { NavigationTracker } from "@/shared/ui/NavigationTracker";
 import "./globals.css";
@@ -15,6 +15,18 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 export const metadata: Metadata = {
   title: "Global Experiment",
   description: "Global Experiment — v0.1 public foundation.",
+};
+
+/**
+ * `resizes-content`: on Android Chrome the on-screen keyboard shrinks the
+ * layout viewport, so the sticky CTA lands above it natively with no
+ * JS offset and no page jump. iOS ignores the key; there useKeyboardInset
+ * (VisualViewport) lifts the bar instead.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
 };
 
 /**

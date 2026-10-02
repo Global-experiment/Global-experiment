@@ -19,9 +19,12 @@ const headingTag = { 1: "h2", 2: "h3", 3: "h4", 4: "h5" } as const;
 export function DocumentationContent({
   blocks,
   headingLevelOffset = 0,
+  highlight,
 }: {
   blocks: DocumentationContentBlock[];
   headingLevelOffset?: 0 | 1;
+  /** Search query to mark in the body (index search). */
+  highlight?: string;
 }) {
   const visible = blocks.filter(
     (block) =>
@@ -37,7 +40,7 @@ export function DocumentationContent({
           const HeadingTag = headingTag[level];
           return (
             <HeadingTag key={index} className={`font-bold ${index === 0 ? "" : "mt-4"}`}>
-              <RichText text={block.text} />
+              <RichText text={block.text} highlight={highlight} />
             </HeadingTag>
           );
         }
@@ -45,7 +48,7 @@ export function DocumentationContent({
           const spacing = index === 0 ? "" : previous?.kind === "heading" ? "mt-1" : "mt-paragraph";
           return (
             <p key={index} className={spacing}>
-              <RichText text={block.text} />
+              <RichText text={block.text} highlight={highlight} />
             </p>
           );
         }

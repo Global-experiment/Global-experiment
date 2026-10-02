@@ -26,6 +26,13 @@ describe("buildSearchHaystack", () => {
     expect(haystack).toContain("shared civic infrastructure");
   });
 
+  it("covers title and tags while the body hasn't arrived yet", () => {
+    const haystack = buildSearchHaystack({ ...article(), content: undefined });
+    expect(haystack).toContain("introduction");
+    expect(haystack).toContain("civic technology");
+    expect(haystack).not.toContain("shared civic infrastructure");
+  });
+
   it("skips unsupported blocks without throwing", () => {
     const haystack = buildSearchHaystack(
       article({ content: [{ kind: "unsupported", type: "image" }] }),

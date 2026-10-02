@@ -1,6 +1,8 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
+import { buildReportSubmission, type ReportSubmissionDraft } from "@/shared/navigation/reportSubmission";
+import { sourcePageFromSearch, type ReportKind } from "@/shared/navigation/sourcePage";
 import { Button } from "@/shared/ui/Button";
 import { Checkbox } from "@/shared/ui/Checkbox";
 import { Container } from "@/shared/ui/Container";
@@ -15,6 +17,7 @@ export interface ReportType {
 }
 
 interface ReportComposerProps {
+  kind: ReportKind;
   title: string;
   messageLabel: string;
   placeholder: string;
@@ -32,10 +35,15 @@ interface ReportComposerProps {
  * (by its own CTA, Escape, or the backdrop — type selection was already
  * optional multi-select, never required to proceed).
  *
- * Nothing is sent or stored: confirming shows the inert-action notice.
- * The M2 pipeline (persistence, qualification) plugs in behind the same UI.
+ * Nothing is sent or stored: confirming builds the submission draft
+ * (message, types and the validated `?source=` page) and shows the
+ * inert-action notice. The M2 pipeline (persistence, qualification) plugs
+ * in behind the same UI and posts that draft.
  */
+const noSubscribe = () => () => {};
+
 export function ReportComposer({
+  kind,
   title,
   messageLabel,
   placeholder,
@@ -46,8 +54,11 @@ export function ReportComposer({
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [typeSheetOpen, setTypeSheetOpen] = useState(true);
-  const [submitted, setSubmitted] = useState(false);
+  const [draft, setDraft] = useState<ReportSubmissionDraft | null>(null);
   const messageId = useId();
+  // Read on the client only so the page stays static (no useSearchParams Suspense boundary).
+  const search = useSyncExternalStore(noSubscribe, () => window.location.search, () => "");
+  const sourcePage = sourcePageFromSearch(search);
 
   function toggle(label: string) {
     setSelected((current) => {
@@ -59,17 +70,17 @@ export function ReportComposer({
   }
 
   return (
-    <main className="flex flex-1 flex-col">
-      <NavHeader title={title} backHref="/" />
+    <main className="flex flex-1 flex-col" data-source-page={sourcePage ?? undefined}>
+      <NavHeader title={title} backHref={sourcePage ?? "/"} />
       {/* figma.pdf p24/p28: composer text starts 8px under the header. */}
       <Container className="flex flex-1 flex-col pt-2">
         <label htmlFor={messageId} className="sr-only">
           {messageLabel}
         </label>
         {/*
-          No border, no focus outline (client feedback item 22) — a subtle
-          background tint marks focus instead, so keyboard users still get
-          a visible (if quiet) indicator.
+          No border, no focus outline and no background change on focus
+          (client feedback item 22 and the final pass) — the caret marks
+          focus. Native suggestions and spellcheck stay on.
         */}
         <textarea
           id={messageId}
@@ -77,9 +88,13 @@ export function ReportComposer({
           onChange={(event) => setMessage(event.target.value)}
           placeholder={placeholder}
           rows={8}
-          className="w-full flex-1 resize-none bg-transparent text-lead text-text-primary placeholder:text-text-muted transition-colors focus:bg-text-primary/5 focus:outline-none"
+          inputMode="text"
+          autoCorrect="on"
+          autoCapitalize="sentences"
+          spellCheck
+          className="w-full flex-1 resize-none bg-transparent text-lead text-text-primary placeholder:text-text-muted focus:outline-none"
         />
-        {submitted ? <InertActionNotice /> : null}
+        {draft ? <InertActionNotice /> : null}
       </Container>
 
       <StickyActionBar>
@@ -88,7 +103,7 @@ export function ReportComposer({
             {ctaLabel}
           </Button>
         ) : (
-          <Button variant="primary" fullWidth onClick={() => setSubmitted(true)}>
+          <Button variant="primary" fullWidth onClick={() => setDraft(buildReportSubmission({ kind, message, types: selected, sourcePage }))}>
             {ctaLabel}
           </Button>
         )}

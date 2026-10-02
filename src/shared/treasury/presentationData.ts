@@ -84,7 +84,7 @@ export interface TreasuryTransaction {
   id: string;
   label: string;
   kind: "income" | "expense";
-  /** Every tag; list rows show the first two plus a "+1"-style badge for the rest. */
+  /** Every tag; list rows show as many as fit plus a "+N" badge for the rest (TransactionTags). */
   tags: string[];
   date: string;
   /** Only expenses navigate to a detail page (client feedback item 13) — Figma shows no detail view for donations. */
@@ -106,7 +106,7 @@ export const TREASURY_TRANSACTIONS: TreasuryTransaction[] = [
     id: "usd-60-banking",
     label: "- USD 60",
     kind: "expense",
-    // Three tags on purpose: the worst-case "+1" overflow example the
+    // Three long tags on purpose: the "+N" overflow example the
     // client asked to see on the list row (client feedback item 14) — the
     // detail page below shows all three, none hidden.
     tags: ["Banking", "Treasury management", "Software licensing"],

@@ -144,6 +144,14 @@ body {
     max-width: none;
     max-height: none;
   }
+
+  /* Tailwind v4's preflight gives <button> the default arrow cursor; every
+     enabled button here is clickable (clickable Treasury stats, filter
+     pills, accordion rows, amounts…), so it shows the pointer. Disabled
+     buttons keep their own not-allowed cursor. */
+  button:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /*

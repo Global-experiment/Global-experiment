@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { Tag } from "@/shared/ui/Tag";
+import { TransactionTags } from "./TransactionTags";
 import type { TreasuryTransaction } from "./presentationData";
 
-const VISIBLE_TAGS = 2;
-
 /**
- * History rows (figma.pdf p2): a row's own bottom stroke, label, up to two
- * tags then a "+1" badge for anything past that so the row never wraps or
- * overflows (client feedback item 14) — the hidden tags are still all
- * visible on the expense's own detail page. Expense rows navigate there
+ * History rows (figma.pdf p2): a row's own bottom stroke, the amount, as
+ * many tags as fit then "+N" for the rest (TransactionTags), and the date —
+ * one line that never wraps or overflows (client feedback item 14); the
+ * amount and date never shrink. Every tag is still listed on the expense's
+ * own detail page. Expense rows navigate there
  * (client feedback item 13); donation rows have no detail view in Figma and
  * stay plain.
  */
@@ -16,16 +15,11 @@ export function TransactionList({ transactions, className = "" }: { transactions
   return (
     <ul className={className}>
       {transactions.map((transaction) => {
-        const visibleTags = transaction.tags.slice(0, VISIBLE_TAGS);
-        const hiddenCount = transaction.tags.length - visibleTags.length;
         const row = (
           <>
             <span className="shrink-0 whitespace-nowrap text-body font-bold text-text-primary">{transaction.label}</span>
-            {visibleTags.map((tag) => (
-              <Tag key={tag}>{tag}</Tag>
-            ))}
-            {hiddenCount > 0 ? <Tag>{`+${hiddenCount}`}</Tag> : null}
-            <span className="ml-auto shrink-0 text-meta text-text-muted">{transaction.date}</span>
+            <TransactionTags tags={transaction.tags} />
+            <span className="shrink-0 whitespace-nowrap text-meta text-text-muted">{transaction.date}</span>
           </>
         );
 

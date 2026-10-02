@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Icon, type IconName } from "./icons";
 
 type ButtonVariant = "primary" | "secondary";
 type ButtonSize = "control" | "compact";
@@ -8,7 +9,13 @@ interface ButtonBaseProps {
   variant?: ButtonVariant;
   /** control = 40px (action grid, CTAs, action rows); compact = 32px (inline actions under article text). */
   size?: ButtonSize;
-  icon?: ReactNode;
+  /**
+   * Platform icon by name. Button picks the form (client rule): FILLED on a
+   * primary CTA, OUTLINED everywhere else — pages never choose it.
+   */
+  icon?: IconName;
+  /** Non-icon leading artwork (payment brand marks), rendered as given. */
+  leading?: ReactNode;
   children: ReactNode;
   className?: string;
   fullWidth?: boolean;
@@ -70,7 +77,12 @@ const variantClasses: Record<ButtonVariant, string> = {
 };
 
 export function Button(props: ButtonProps) {
-  const { variant = "secondary", size = "control", icon, children, className = "", fullWidth } = props;
+  const { variant = "secondary", size = "control", children, className = "", fullWidth } = props;
+  const icon = props.icon ? (
+    <Icon name={props.icon} variant={variant === "primary" && !props.disabled ? "filled" : "outlined"} />
+  ) : (
+    props.leading
+  );
   const classes = [
     baseClasses,
     sizeClasses[size],

@@ -30,7 +30,7 @@ export const homeWordmark = {
 export const homePrimaryAction: HomeAction = {
   label: "Join waitlist",
   href: "/waitlist",
-  icon: "approval",
+  icon: "how_to_vote",
 };
 
 /** The 2×2 grid under the primary action, in reading order. */

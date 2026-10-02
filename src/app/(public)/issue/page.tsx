@@ -26,6 +26,7 @@ const ISSUE_TYPES = [
 export default function IssuePage() {
   return (
     <ReportComposer
+      kind="issue"
       title="Report an issue"
       messageLabel="Your issue report"
       placeholder="Please develop your issue for a better administration of your request."

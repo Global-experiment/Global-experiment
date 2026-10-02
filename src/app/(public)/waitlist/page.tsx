@@ -49,7 +49,11 @@ export default function WaitlistPage() {
         <input
           id="waitlist-email"
           type="email"
+          inputMode="email"
           autoComplete="email"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
           value={email}
           onChange={(event) => {
             setEmail(event.target.value);
@@ -62,7 +66,7 @@ export default function WaitlistPage() {
         />
         {invalid ? (
           <p id="waitlist-email-error" className="mt-1 flex items-center gap-1 text-caption text-text-primary">
-            <Icon name="warning" size={12} />
+            <Icon name="warning" />
             Invalid email address
           </p>
         ) : null}

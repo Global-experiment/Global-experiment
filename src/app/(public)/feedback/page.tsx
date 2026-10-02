@@ -18,6 +18,7 @@ const FEEDBACK_TYPES = [
 export default function FeedbackPage() {
   return (
     <ReportComposer
+      kind="feedback"
       title="Send a feedback"
       messageLabel="Your feedback"
       placeholder="Please develop your feedback for a better administration of your request."

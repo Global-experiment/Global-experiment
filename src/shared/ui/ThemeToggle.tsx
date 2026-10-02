@@ -60,7 +60,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(theme === "light" ? "dark" : "light")}
       aria-pressed={theme === "light"}
-      className="inline-flex size-10 shrink-0 items-center justify-center rounded-control text-text-primary hover:ring-1 hover:ring-content-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+      className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
     >
       <Icon name={theme === "light" ? "dark_mode" : "light_mode"} />
       <span className="sr-only">{theme === "light" ? "Switch to dark preview" : "Switch to light preview"}</span>

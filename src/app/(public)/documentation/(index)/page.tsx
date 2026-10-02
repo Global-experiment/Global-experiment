@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import { getDocumentationDataset } from "@/modules/documentation/application/getDocumentationDataset";
+import {
+  getDocumentationDataset,
+  getDocumentationSummaries,
+} from "@/modules/documentation/application/getDocumentationDataset";
 import { DocumentationList } from "@/modules/documentation/ui/DocumentationList";
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 
@@ -26,7 +29,13 @@ export const metadata: Metadata = {
  * exists for this page; it uses the same centered column as desktop Home.
  */
 export default async function DocumentationIndexPage() {
-  const articles = await getDocumentationDataset();
+  // Rows wait only for the one metadata query; bodies stream in behind them.
+  // Both share the same 60s cache window, so warm loads resolve together.
+  const content = getDocumentationDataset();
+  // The client reports a body failure itself; this only keeps a rejection
+  // from going unhandled if the summaries fail first and the page errors.
+  content.catch(() => {});
+  const articles = await getDocumentationSummaries();
 
   return (
     <main className="flex flex-1 flex-col pb-6">
@@ -36,7 +45,7 @@ export default async function DocumentationIndexPage() {
         actions={<DocumentationPageMenu url="/documentation" title="Documentation" />}
       />
       <Container className="pt-1">
-        <DocumentationList articles={articles}>
+        <DocumentationList articles={articles} content={content}>
           {/* NavHeader renders the page's <h1>; this is the in-page section heading from the design. */}
           <h2 className="mt-2 text-lead font-bold text-text-primary">Documentation</h2>
           <p className="mt-1 text-lead text-text-primary">

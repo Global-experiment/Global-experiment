@@ -5,7 +5,7 @@ import { Icon } from "@/shared/ui/icons";
 const SKELETON_ROW_COUNT = 6;
 
 /**
- * Shown while getDocumentationDataset() resolves (Suspense fallback for the
+ * Shown while getDocumentationSummaries() resolves (Suspense fallback for the
  * index route — client feedback item: "professional loading experience",
  * not a blank screen or a bare "Loading..." string). The header, search
  * affordance, heading and intro are static copy already known without any

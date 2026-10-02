@@ -9,7 +9,8 @@ const CONFIRMATION_MS = 3000;
  * 16px underlined mailto link followed by the Material Sharp
  * `content_copy` control. On a successful copy, the icon swaps to
  * `check_circle` for exactly 3 seconds and then reverts (client feedback
- * item 30) — same 20px icon box throughout, so nothing shifts. Real
+ * item 30) — both outlined 16px glyphs in the same IconButton box (no
+ * hover visuals), so nothing shifts. Real
  * client-side clipboard use, no backend. A failed copy leaves the icon as
  * `content_copy`: never shows a false success.
  */
