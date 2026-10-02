@@ -9,6 +9,7 @@ function article(overrides: Partial<DocumentationArticle> = {}): DocumentationAr
     displayOrder: 1,
     expertise: ["Civic technology"],
     publishedAt: new Date("2026-08-12T09:14:00.000Z"),
+    updatedAt: new Date("2026-08-12T14:07:00.000Z"),
     content: [
       { kind: "heading", level: 1, text: [{ kind: "text", value: "Summary" }] },
       { kind: "paragraph", text: [{ kind: "text", value: "A shared civic infrastructure for participation." }] },

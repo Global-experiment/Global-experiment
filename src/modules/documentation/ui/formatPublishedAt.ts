@@ -13,6 +13,20 @@ const timeFormatter = new Intl.DateTimeFormat("en", {
  * and client render the same string (no hydration mismatch, no
  * viewer-timezone drift in a published-date stamp).
  */
+const clockFormatter = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
+
+/**
+ * "at 2:07 PM" (figma.pdf p18's "This page was last updated at 2:07 PM.")
+ * when `date` is today, else "on Aug 12 at 2:07 PM" — a bare clock time
+ * would be misleading for an older edit. UTC, like formatPublishedAt.
+ */
+export function formatUpdatedAt(date: Date, now: Date = new Date()): string {
+  const time = clockFormatter.format(date);
+  return dateFormatter.format(date) === dateFormatter.format(now) && date.getUTCFullYear() === now.getUTCFullYear()
+    ? `at ${time}`
+    : `on ${dateFormatter.format(date)} at ${time}`;
+}
+
 export function formatPublishedAt(date: Date): string {
   const hasTime = date.getUTCHours() !== 0 || date.getUTCMinutes() !== 0;
   const day = dateFormatter.format(date);

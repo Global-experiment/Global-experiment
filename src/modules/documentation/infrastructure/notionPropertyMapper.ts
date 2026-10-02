@@ -62,6 +62,7 @@ export interface MappedNotionPage {
   displayOrder: number;
   expertise: string[];
   publishedAt: Date;
+  updatedAt: Date;
   status: string | undefined;
   archived: boolean;
 }
@@ -109,6 +110,7 @@ export function mapNotionPageProperties(page: PageObjectResponse): MappedNotionP
     displayOrder,
     expertise: getMultiSelect(properties["Expertise"]),
     publishedAt,
+    updatedAt: new Date(page.last_edited_time),
     status: getStatusName(properties["Status"]),
     archived: isArchivedProperty(properties["Archive"]),
   };
@@ -131,5 +133,6 @@ export function toArticleSummary(mapped: MappedNotionPage): DocumentationArticle
     displayOrder: mapped.displayOrder,
     expertise: mapped.expertise,
     publishedAt: mapped.publishedAt,
+    updatedAt: mapped.updatedAt,
   };
 }

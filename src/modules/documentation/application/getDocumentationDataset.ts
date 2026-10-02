@@ -29,18 +29,31 @@ const REVALIDATE_SECONDS = 60;
 
 export const DOCUMENTATION_CACHE_TAG = "documentation";
 
-type SerializedArticle = Omit<DocumentationArticle, "publishedAt"> & { publishedAt: string };
+type SerializedArticle = Omit<DocumentationArticle, "publishedAt" | "updatedAt"> & {
+  publishedAt: string;
+  updatedAt: string;
+};
 
 const getCachedDataset = unstable_cache(
   async (): Promise<SerializedArticle[]> => {
     const articles = await getDocumentationRepository().listPublishedWithContent();
-    return articles.map((article) => ({ ...article, publishedAt: article.publishedAt.toISOString() }));
+    return articles.map((article) => ({
+      ...article,
+      publishedAt: article.publishedAt.toISOString(),
+      updatedAt: article.updatedAt.toISOString(),
+    }));
   },
-  ["documentation-dataset"],
+  // Bump the version whenever SerializedArticle's shape changes, so entries
+  // persisted in the data cache by an older build are never read back.
+  ["documentation-dataset", "v2"],
   { revalidate: REVALIDATE_SECONDS, tags: [DOCUMENTATION_CACHE_TAG] },
 );
 
 export async function getDocumentationDataset(): Promise<DocumentationArticle[]> {
   const articles = await getCachedDataset();
-  return articles.map((article) => ({ ...article, publishedAt: new Date(article.publishedAt) }));
+  return articles.map((article) => ({
+    ...article,
+    publishedAt: new Date(article.publishedAt),
+    updatedAt: new Date(article.updatedAt),
+  }));
 }

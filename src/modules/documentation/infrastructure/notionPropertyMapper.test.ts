@@ -9,6 +9,7 @@ function page(properties: Record<string, unknown>, overrides: Record<string, unk
   return {
     id: "page-id",
     created_time: "2026-01-01T00:00:00.000Z",
+    last_edited_time: "2026-08-12T14:07:00.000Z",
     properties,
     ...overrides,
   } as unknown as PageObjectResponse;
@@ -137,6 +138,7 @@ describe("toArticleSummary", () => {
       displayOrder: 1,
       expertise: ["Civic technology"],
       publishedAt: mapped.publishedAt,
+      updatedAt: new Date("2026-08-12T14:07:00.000Z"),
     });
     expect(summary).not.toHaveProperty("status");
     expect(summary).not.toHaveProperty("archived");

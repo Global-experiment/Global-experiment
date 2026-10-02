@@ -19,6 +19,8 @@ export interface DocumentationArticleSummary {
   displayOrder: number;
   expertise: string[];
   publishedAt: Date;
+  /** When the source page was last edited — shown in the article's page-actions sheet (figma.pdf p18). */
+  updatedAt: Date;
 }
 
 export interface DocumentationArticle extends DocumentationArticleSummary {
