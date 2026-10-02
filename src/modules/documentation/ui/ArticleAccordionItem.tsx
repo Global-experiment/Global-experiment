@@ -15,7 +15,7 @@ import { formatPublishedAt } from "./formatPublishedAt";
  * stroke for row-to-row distinction (client feedback item 18 — a border on
  * the row itself, not a separate separator component). The article
  * (including its full body) is already loaded by the index page — see
- * listPublishedArticlesWithContent — so expanding is a pure local state
+ * getDocumentationDataset — so expanding is a pure local state
  * toggle with no fetch and no loading spinner (client feedback item 16).
  * The permanent article page stays reachable through the "Published" link
  * and the share control.

@@ -10,6 +10,8 @@ import { DocumentationContent } from "@/modules/documentation/ui/DocumentationCo
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
 
+// getArticleBySlug() reads the same cached dataset the index page populates
+// (see getDocumentationDataset) rather than fetching fresh from Notion.
 export const dynamic = "force-dynamic";
 
 const loadArticle = cache(getArticleBySlug);

@@ -1,22 +1,15 @@
 import type { Metadata } from "next";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import { listPublishedArticlesWithContent } from "@/modules/documentation/application/listPublishedArticlesWithContent";
+import { getDocumentationDataset } from "@/modules/documentation/application/getDocumentationDataset";
 import { DocumentationList } from "@/modules/documentation/ui/DocumentationList";
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 
-// Live Notion on every request — no route cache, no data cache — so edits
-// in Notion show on the next refresh. Deliberately no Suspense/loading.tsx
-// boundary either: streaming commits the HTTP status before an async
-// boundary resolves, so a thrown error would report 200 instead of a real
-// error status (ADR 007).
-//
-// Every article's full body is fetched here too (not just the ≤10
-// summaries): the index needs it up front so a row expands instantly with
-// no per-click fetch, and so search can reach full article text and tags,
-// not just titles (client feedback items 15–16). See
-// NotionDocumentationRepository.listPublishedWithContent for the
-// concurrency-limited fetch strategy this relies on.
+// getDocumentationDataset() is cached server-side (unstable_cache, 60s
+// revalidate — see that file), so this no longer hits Notion on every
+// request; force-dynamic stays only so the route keeps rendering per
+// request rather than being statically generated at build time, which
+// would require Notion to be reachable during `next build`.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -29,7 +22,7 @@ export const metadata: Metadata = {
  * exists for this page; it uses the same centered column as desktop Home.
  */
 export default async function DocumentationIndexPage() {
-  const articles = await listPublishedArticlesWithContent();
+  const articles = await getDocumentationDataset();
 
   return (
     <main className="flex flex-1 flex-col pb-6">

@@ -11,7 +11,7 @@ import type { DocumentationArticle } from "@/modules/documentation/domain/types"
  * placeholder — figma.pdf p15) above the accordion rows.
  *
  * `articles` arrive fully preloaded (title, tags and body — see
- * listPublishedArticlesWithContent), so search reaches full article text
+ * getDocumentationDataset), so search reaches full article text
  * and tags, not just the title (client feedback item 15), with zero extra
  * Notion calls per keystroke — each article's searchable text is computed
  * once with useMemo, not on every render. Matching rows stay collapsed:

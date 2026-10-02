@@ -10,13 +10,13 @@ import { DocumentationContent } from "@/modules/documentation/ui/DocumentationCo
 import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
 
-// Live Notion on every request — no route cache, no data cache — so edits in
-// Notion show on the next refresh. No Suspense boundary (ADR 007).
+// getArticleBySlug() reads the same cached dataset the index page populates
+// (see getDocumentationDataset) rather than fetching fresh from Notion.
 export const dynamic = "force-dynamic";
 
 // generateMetadata and the page both need the article; memoize within one
-// request so Notion is read once per request, not twice. This is per-request
-// de-duplication only, never a persistent cache.
+// request so the dataset cache is read once per request, not twice. This is
+// per-request de-duplication only, on top of the persistent cache below it.
 const loadArticle = cache(getArticleBySlug);
 
 interface DocumentationArticlePageProps {
