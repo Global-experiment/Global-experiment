@@ -10,6 +10,10 @@ import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationP
 // request; force-dynamic stays only so the route keeps rendering per
 // request rather than being statically generated at build time, which
 // would require Notion to be reachable during `next build`.
+//
+// loading.tsx now gives this route a Suspense boundary (see that file for
+// the professional-loading-state rationale and the narrow ADR 007 trade-off
+// it reopens).
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
