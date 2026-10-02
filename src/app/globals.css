@@ -97,6 +97,33 @@ body {
    */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Scrollbar follows the current theme instead of the browser default. */
+  scrollbar-color: var(--color-line-strong) var(--color-surface-base);
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border: 3px solid var(--color-surface-base);
+  border-radius: 999px;
+}
+
+/*
+ * Selection inverts per theme: dark text on a light highlight in dark mode,
+ * light text on a dark highlight in light mode — the same inverse-surface
+ * pair filled/selected controls already use.
+ */
+::selection {
+  background-color: var(--color-inverse-surface);
+  color: var(--color-inverse-content);
 }
 
 /* Native <dialog> reset (base layer, so utilities still win): the Sheet
@@ -105,6 +132,52 @@ body {
   dialog {
     max-width: none;
     max-height: none;
+  }
+}
+
+/*
+ * Mobile-only slide-up + backdrop fade for Sheet (bottom-sheet behaviour,
+ * client feedback item 10). Desktop deliberately gets no animation — Figma
+ * shows no transition for the centered dialog there. `@starting-style` +
+ * `allow-discrete` lets a native <dialog> animate both its open AND close
+ * transitions in CSS alone; the reduced-motion block above already zeroes
+ * these durations for users who ask for it.
+ */
+@media (width < 48rem) {
+  dialog.sheet {
+    transition:
+      translate 0.25s ease,
+      overlay 0.25s allow-discrete,
+      display 0.25s allow-discrete;
+    translate: 0 0;
+  }
+
+  dialog.sheet:not([open]) {
+    translate: 0 100%;
+  }
+
+  @starting-style {
+    dialog.sheet[open] {
+      translate: 0 100%;
+    }
+  }
+
+  dialog.sheet::backdrop {
+    transition:
+      opacity 0.25s ease,
+      overlay 0.25s allow-discrete,
+      display 0.25s allow-discrete;
+    opacity: 1;
+  }
+
+  dialog.sheet:not([open])::backdrop {
+    opacity: 0;
+  }
+
+  @starting-style {
+    dialog.sheet[open]::backdrop {
+      opacity: 0;
+    }
   }
 }
 

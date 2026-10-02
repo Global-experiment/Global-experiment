@@ -49,7 +49,7 @@ export function Sheet({ open, onClose, title, ariaLabel, children }: SheetProps)
         if (event.target === event.currentTarget) onClose();
       }}
       className={
-        "fixed inset-x-0 top-auto bottom-0 m-0 w-full bg-surface-base p-0 text-text-primary backdrop:bg-black/60 " +
+        "sheet fixed inset-x-0 top-auto bottom-0 m-0 w-full bg-surface-base p-0 text-text-primary backdrop:bg-black/60 " +
         "md:inset-0 md:m-auto md:max-w-dialog md:rounded-sheet md:border md:border-line"
       }
     >
