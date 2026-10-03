@@ -43,6 +43,8 @@
    */
   --color-inverse-surface: #ffffff;
   --color-inverse-content: #000000;
+  /* Raised surface for admin toasts (figma.pdf p40–p43: #1f1f1f pill). */
+  --color-surface-raised: #1f1f1f;
 
   /* Geometry */
   --radius-control: 0.25rem; /* 4px — buttons, inputs, tags, search */
@@ -88,6 +90,7 @@
   --color-content-50: rgb(0 0 0 / 50%);
   --color-inverse-surface: #000000;
   --color-inverse-content: #ffffff;
+  --color-surface-raised: #ebebeb;
 }
 
 body {

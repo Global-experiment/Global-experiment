@@ -256,6 +256,51 @@ integration, E2E, both builds, diff + secret review, public site check).
   long-term. The Next.js `/api/health` route stays until the reverse-proxy
   cutover, then is renamed or retired. No production proxy change yet.
 
+## 12b. Phase 2A + 3A — native directory and admin (2026-10-03)
+
+Implemented on `feature/native-admin-core` (not merged):
+
+- **Schema (migration 0001):** `people`, `organizations`,
+  `expertise_domains → expertise_fields → expertise_items`, join tables
+  `people_organizations`, `people_expertise`, `organization_expertise`
+  (composite PKs, reverse indexes). Person/organization deletion cascades
+  to links only; expertise in use and parents with children are `restrict`.
+  Names/emails are not unique (duplicates stay visible). Taxonomy names are
+  unique among siblings, case-insensitively.
+- **State / Source:** lookup tables `person_states` / `person_sources`
+  (`key`, `label`, `sort_order`) referenced by FK with `on update
+  cascade` — not PostgreSQL enums. Seeded with the Figma states (Sourced,
+  Contacted, Collaborating) and the brief's provenance examples (Candide, AI,
+  Contribution email, Waitlist, Notion import); all provisional and editable.
+  "State ascending" sorts by `sort_order` (lifecycle), not alphabetically.
+- **API:** `/api/admin/people` (list, create, get, patch, PUT/DELETE
+  organization and expertise links, `/options`), `/api/admin/organizations`
+  (list, create, get, patch, PUT/DELETE expertise links),
+  `/api/admin/expertise` (`/tree`, create/rename/delete domains, fields,
+  items — delete only when unused). No DELETE for people/organizations
+  (retention undecided). Shared list contract
+  (`common/listing/list-query.ts`): `page`, `pageSize ≤ 100`, `search`
+  (ILIKE, wildcards escaped), up to 3 `sort=field:dir`, up to 12
+  `filter=field:op[:value]`; repeated `is` filters on one field mean
+  "any of" (Figma p41: State is Sourced + State is Contacted), everything
+  else ANDs.
+- **Next ↔ API:** the browser only calls same-origin `/api/admin/*`;
+  Next.js rewrites it to `ADMIN_API_ORIGIN` (dev default
+  `http://127.0.0.1:4000`), so the SameSite=Strict cookie and CSRF Origin
+  check are unchanged. The `/admin` layout asks
+  `GET /api/admin/auth/session` server-side; Next.js holds no auth logic.
+- **Admin UI:** `/admin/login`, `/admin/people`, `/admin/people/[id]`,
+  `/admin/organizations`, `/admin/organizations/[id]`, `/admin/expertise`,
+  `/admin/fields`, `/admin/domains`, `/admin/profile` (sign out). Desktop
+  only. Glyphs extracted from figma.pdf p40–p44
+  (`src/modules/admin/ui/adminIcons.tsx`).
+- **Demo data:** `npm run api:seed:demo` (`-- --reset` removes it) —
+  synthetic records with reserved `de000000-…` ids, idempotent, refuses
+  production and any database not named `*_dev` / `*_test`.
+- **Admin E2E:** `e2e/admin.spec.ts` runs browser → Next → NestJS →
+  PostgreSQL 17 against `TEST_DATABASE_URL` (wiped, migrated and seeded by
+  `apps/api/src/testing/e2e-setup.ts`), API on port 4100.
+
 ## 13. Unresolved requirements (do not decide silently)
 
 1. **"Number" column** (Figma People table): meaning undefined — not phone,
@@ -276,3 +321,13 @@ integration, E2E, both builds, diff + secret review, public site check).
 9. Analytics, Services, Technical dashboard scope (Figma Monitoring group).
 10. Retention periods for waitlist and submission personal data.
 11. Any automation that moves, charges or refunds money.
+12. People saved views (Sourcing, Discussions, Contributors, Collaborators,
+    "+3"): shown in the admin but inert until their filters are defined.
+13. People columns "Access grant" and "Expenses" (future modules) and the
+    second "Organization" column on figma.pdf p44 (looks like a duplicate).
+14. Deleting / archiving People and Organizations (retention policy).
+15. Organizations fields beyond name, website and note (no Figma frame);
+    record pages for People/Organizations and the taxonomy screens have no
+    Figma frame either and reuse the People table's visual system.
+16. The sort control's Figma label "Last published first" has no People
+    field; the admin labels the actual sort ("Last created first").

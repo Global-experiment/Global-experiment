@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:pg": "vitest run --config vitest.pg.config.mts",
-    "admin:set-owner": "node dist/auth/cli/set-owner.js"
+    "admin:set-owner": "node dist/auth/cli/set-owner.js",
+    "seed:demo": "node dist/seed/cli.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",

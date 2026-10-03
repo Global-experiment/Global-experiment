@@ -21,7 +21,8 @@
     "api:build": "npm run build -w @global-experiment/api",
     "api:test": "npm run test -w @global-experiment/api",
     "api:test:pg": "npm run test:pg -w @global-experiment/api",
-    "api:typecheck": "npm run typecheck -w @global-experiment/api"
+    "api:typecheck": "npm run typecheck -w @global-experiment/api",
+    "api:seed:demo": "npm run api:build && npm run seed:demo -w @global-experiment/api"
   },
   "dependencies": {
     "@next/env": "^16.3.5",

@@ -9,7 +9,10 @@ import type { AppConfig } from "./common/config/env.js";
 import { DatabaseModule } from "./common/database/database.module.js";
 import { AllExceptionsFilter } from "./common/errors/all-exceptions.filter.js";
 import { LoggingModule } from "./common/logging/logging.module.js";
+import { ExpertiseModule } from "./expertise/expertise.module.js";
 import { HealthModule } from "./health/health.module.js";
+import { OrganizationsModule } from "./organizations/organizations.module.js";
+import { PeopleModule } from "./people/people.module.js";
 
 @Module({})
 export class AppModule {
@@ -25,6 +28,9 @@ export class AppModule {
         ThrottlerModule.forRoot({ throttlers: [{ name: "default", ttl: 60_000, limit: 300 }] }),
         HealthModule,
         AuthModule,
+        PeopleModule,
+        OrganizationsModule,
+        ExpertiseModule,
       ],
       providers: [
         // Global guards run in this order.

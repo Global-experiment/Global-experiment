@@ -8,6 +8,13 @@
       "when": 1790957775259,
       "tag": "0000_foundation_admin_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790982919223,
+      "tag": "0001_native_core_directory",
+      "breakpoints": true
     }
   ]
 }
