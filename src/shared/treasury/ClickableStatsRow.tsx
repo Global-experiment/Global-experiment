@@ -1,51 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { reportHref } from "@/shared/navigation/sourcePage";
-import { useCurrentSourcePage } from "@/shared/navigation/useCurrentSourcePage";
+import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
 import { Button } from "@/shared/ui/Button";
 import { Sheet } from "@/shared/ui/Sheet";
 import type { TreasuryStat } from "./presentationData";
 
 /**
- * The four Treasury/Donate stats, each opening its own detail sheet when
- * Figma shows one (client feedback items 12/23) — Balance, Sustainability
- * and Median donation do; Expenses doesn't (see presentationData.ts) and stays a
- * plain, non-interactive figure rather than opening an empty sheet.
+ * The four Treasury/Donate stats, every one clickable (client, Review #3
+ * item 8): each opens its detail sheet — what the stat means and how it is
+ * calculated — in the same responsive Sheet. The sheet's Send feedback /
+ * Report issue rows close it and open the report qualification over the
+ * same page.
  */
 export function ClickableStatsRow({ stats, className = "" }: { stats: TreasuryStat[]; className?: string }) {
   const [openId, setOpenId] = useState<TreasuryStat["id"] | null>(null);
   const open = stats.find((stat) => stat.id === openId);
-  const source = useCurrentSourcePage();
 
   return (
     <>
       {/* figma.pdf p2/p9: four equal columns on a 100pt pitch centered at 55.5/155.5/255/355.5 — i.e. 400px spanning 2px into each gutter. */}
       <dl className={`-mx-0.5 grid grid-cols-4 text-center ${className}`}>
-        {stats.map((stat) =>
-          stat.detail ? (
-            <button
-              key={stat.id}
-              type="button"
-              onClick={() => setOpenId(stat.id)}
-              className="cursor-pointer rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
-            >
-              <dd className="text-body text-text-primary">{stat.value}</dd>
-              <dt className="mt-[0.3125rem] text-meta text-text-muted">
-                {stat.label}
-              </dt>
-            </button>
-          ) : (
-            <div key={stat.id}>
-              <dd className="text-body text-text-primary">{stat.value}</dd>
-              <dt className="mt-[0.3125rem] text-meta text-text-muted">{stat.label}</dt>
-            </div>
-          ),
-        )}
+        {stats.map((stat) => (
+          <button
+            key={stat.id}
+            type="button"
+            onClick={() => setOpenId(stat.id)}
+            className="cursor-pointer rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+          >
+            <dd className="text-body text-text-primary">{stat.value}</dd>
+            <dt className="mt-[0.3125rem] text-meta text-text-muted">{stat.label}</dt>
+          </button>
+        ))}
       </dl>
 
-      <Sheet open={open !== undefined} onClose={() => setOpenId(null)} title={open?.detail?.title ?? ""}>
-        {open?.detail ? (
+      <Sheet open={open !== undefined} onClose={() => setOpenId(null)} title={open?.detail.title ?? ""}>
+        {open ? (
           <div>
             {/* figma.pdf p4: 14px value 8px under the header row, 12px caption 4px under it. */}
             <p className="mt-2 text-body text-text-primary">{open.detail.value}</p>
@@ -66,12 +56,12 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
               <Button href="/donate" icon="volunteer_activism" fullWidth>
                 Donate
               </Button>
-              <Button href={reportHref("feedback", source)} icon="lightbulb" fullWidth>
+              <ReportLaunchButton kind="feedback" icon="lightbulb" fullWidth onLaunch={() => setOpenId(null)}>
                 Send feedback
-              </Button>
-              <Button href={reportHref("issue", source)} icon="new_releases" fullWidth>
+              </ReportLaunchButton>
+              <ReportLaunchButton kind="issue" icon="new_releases" fullWidth onLaunch={() => setOpenId(null)}>
                 Report issue
-              </Button>
+              </ReportLaunchButton>
               <Button href="/documentation" icon="insert_drive_file" fullWidth>
                 Documentation
               </Button>

@@ -13,12 +13,13 @@ export interface TreasuryStat {
   value: string;
   label: string;
   /**
-   * Detail-sheet copy. Figma only shows a detail view for three of the
-   * four stats (Balance, Sustainability, Median donation) — Expenses has
-   * none, so it's left undetailed rather than inventing copy for it (see
-   * docs/architecture/design-fidelity.md).
+   * Detail-sheet copy. Every stat has one (client, Review #3 item 8: "every
+   * stat is clickable and provides a description on the stat, how to
+   * understand it and how it is calculated"). Balance, Sustainability and
+   * Median donation use Figma's copy (p4–p6); Figma has no Expenses frame,
+   * so its copy below is presentation-only and awaits client confirmation.
    */
-  detail?: {
+  detail: {
     title: string;
     value: string;
     caption: string;
@@ -77,7 +78,30 @@ export const TREASURY_STATS: TreasuryStat[] = [
       ],
     },
   },
-  { id: "expenses", value: "USD 39.8K", label: "Expenses" },
+  {
+    id: "expenses",
+    value: "USD 39.8K",
+    label: "Expenses",
+    // PRESENTATION COPY — no Figma frame and no approved wording yet. The
+    // figure is Figma's example value, not a sum of TREASURY_TRANSACTIONS
+    // below, and the copy deliberately describes how the stat is meant to be
+    // calculated once the live Treasury source (M3, Wise) exists. Confirm
+    // the wording and the counting rules with the client.
+    detail: {
+      title: "Expenses",
+      value: "$ 39.8K",
+      caption: "Total expenses",
+      paragraphs: [
+        {
+          body: "Expenses is the total amount the experiment has paid out from its Wise account. Every expense is public and listed in the history, with what it was spent on.",
+        },
+        {
+          heading: "How it is calculated",
+          body: "It adds up every outgoing payment recorded in the experiment’s Wise account, converted to United States Dollars. Incoming donations are not counted.",
+        },
+      ],
+    },
+  },
 ];
 
 export interface TreasuryTransaction {

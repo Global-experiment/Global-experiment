@@ -1,30 +1,12 @@
 import { ReportComposer } from "../ReportComposer";
 
-const FEEDBACK_TYPES = [
-  { label: "Feature request", description: "Asks for new capability" },
-  { label: "Enhancement", description: "Improve existing capability" },
-  { label: "UX friction", description: "Usable but confusing/inefficient" },
-  { label: "Content suggestion", description: "Wording, documentation, copy" },
-  { label: "Comparison", description: "References a competitor product" },
-  { label: "Praise", description: "Unsolicited compliment" },
-];
-
 /**
- * M1 navigation scaffold. Type selection and the message field are real UI
- * state; submitting does not persist anything, call AI qualification, or
- * create a Notion entry — that pipeline is M2. See
+ * M1 navigation scaffold. Qualification, the paragraph and its session
+ * draft are real UI state; submitting does not persist anything, call AI
+ * qualification, or create a Notion entry — that pipeline is M2. Copy and
+ * types live in src/shared/report/reportKinds.ts. See
  * docs/architecture/decisions/008-route-shells.md.
  */
 export default function FeedbackPage() {
-  return (
-    <ReportComposer
-      kind="feedback"
-      title="Send a feedback"
-      messageLabel="Your feedback"
-      placeholder="Please develop your feedback for a better administration of your request."
-      ctaLabel="Send feedback"
-      typeSheetTitle="Feedback type"
-      types={FEEDBACK_TYPES}
-    />
-  );
+  return <ReportComposer kind="feedback" />;
 }

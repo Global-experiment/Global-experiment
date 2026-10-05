@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { withReportSource } from "@/shared/navigation/sourcePage";
 import { useCurrentSourcePage } from "@/shared/navigation/useCurrentSourcePage";
+import { reportKindForHref } from "@/shared/report/reportKinds";
+import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 import { Sheet } from "./Sheet";
@@ -28,7 +29,9 @@ interface PageActionsMenuProps {
 /**
  * The `more_vert` overflow control from the Figma headers. Opens the shared
  * Sheet with one 40px action row per entry (p3, p12, p16) — no visible
- * title, matching Figma. Feedback/Issue rows carry `?source=`.
+ * title, matching Figma. "/feedback" and "/issue" rows close this menu and
+ * open the report's qualification sheet over the same page (Review #3
+ * item 5), carrying this page as the report's source.
  */
 export function PageActionsMenu({ label, actions, children, source: explicitSource }: PageActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -42,9 +45,21 @@ export function PageActionsMenu({ label, actions, children, source: explicitSour
         {/* figma.pdf p3/p12/p16/p18: paragraphs one line apart, rows 12px under the copy. */}
         {children ? <div className="flex flex-col gap-paragraph pb-3 text-body">{children}</div> : null}
         <div className="flex flex-col gap-2">
-          {actions.map((action) =>
-            action.href ? (
-              <Button key={action.label} href={withReportSource(action.href, source)} icon={action.icon} fullWidth>
+          {actions.map((action) => {
+            const reportKind = action.href ? reportKindForHref(action.href) : undefined;
+            return reportKind ? (
+              <ReportLaunchButton
+                key={action.label}
+                kind={reportKind}
+                source={source}
+                icon={action.icon}
+                fullWidth
+                onLaunch={() => setOpen(false)}
+              >
+                {action.label}
+              </ReportLaunchButton>
+            ) : action.href ? (
+              <Button key={action.label} href={action.href} icon={action.icon} fullWidth>
                 {action.label}
               </Button>
             ) : (
@@ -59,8 +74,8 @@ export function PageActionsMenu({ label, actions, children, source: explicitSour
               >
                 {action.label}
               </Button>
-            ),
-          )}
+            );
+          })}
         </div>
       </Sheet>
     </>

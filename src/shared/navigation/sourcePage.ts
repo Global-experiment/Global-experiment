@@ -38,12 +38,6 @@ export function reportHref(kind: ReportKind, source: string | null | undefined):
   return safe ? `${base}?source=${encodeURIComponent(safe)}` : base;
 }
 
-/** Rewrites a plain "/feedback" or "/issue" href to carry the source; other hrefs pass through. */
-export function withReportSource(href: string, source: string | null | undefined): string {
-  if (href === "/feedback") return reportHref("feedback", source);
-  if (href === "/issue") return reportHref("issue", source);
-  return href;
-}
 
 /** Reads and validates `source` from a query string (e.g. `location.search`). */
 export function sourcePageFromSearch(search: string): string | null {

@@ -33,6 +33,21 @@ export function shouldDismissSheet({
   return offset >= FLICK_MIN_PX && velocity >= FLICK_VELOCITY;
 }
 
+/** Movement (px) before a touch on the sheet's content commits to "drag" or "scroll". */
+export const DECISION_SLOP_PX = 6;
+
+/**
+ * Who owns a touch that started on the sheet's content (not its handle):
+ * the sheet (drag down to close) only when the content is scrolled to the
+ * top and the finger moves mainly downward; otherwise native scrolling of
+ * the sheet's own content. Below the slop it's still undecided.
+ */
+export function contentGestureOwner({ dx, dy, scrollTop }: { dx: number; dy: number; scrollTop: number }): "drag" | "scroll" | "undecided" {
+  if (Math.abs(dx) < DECISION_SLOP_PX && Math.abs(dy) < DECISION_SLOP_PX) return "undecided";
+  if (scrollTop > 0) return "scroll";
+  return dy > 0 && dy >= Math.abs(dx) ? "drag" : "scroll";
+}
+
 export interface DragSample {
   y: number;
   t: number;

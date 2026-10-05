@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "@/shared/ui/icons";
 import { ArticleAccordionItem } from "./ArticleAccordionItem";
 import { focusRow, initialAccordionState, isExpanded, queryChanged, toggleRow } from "./accordionState";
@@ -94,8 +94,40 @@ export function DocumentationList({
     }
   }
 
-  useEffect(() => {
-    if (target && hash === appliedHash) document.getElementById(target)?.scrollIntoView({ block: "start" });
+  // Scroll to the deep-linked article — and keep it there while the layout
+  // settles (Review #3 item 7). The first scroll happens while article bodies
+  // are still streaming in, when the page may not even be scrollable yet;
+  // a one-off scrollIntoView then left visitors at the top. So: align after
+  // layout (next frame), re-align on every size change of the page until
+  // the content has arrived, and stop at the first sign of the visitor
+  // scrolling themselves (or after a few seconds). Instant, not smooth, so
+  // reduced-motion needs nothing extra; rows have no sticky header above.
+  useLayoutEffect(() => {
+    if (!target || hash !== appliedHash) return;
+    const row = document.getElementById(target);
+    if (!row) return;
+    let frame = 0;
+    const align = () => {
+      frame = 0;
+      row.scrollIntoView({ block: "start", behavior: "instant" });
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(align);
+    };
+    const resize = new ResizeObserver(schedule);
+    const userEvents = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    const stop = () => {
+      resize.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+      frame = -1; // never schedule again
+      for (const type of userEvents) window.removeEventListener(type, stop);
+      clearTimeout(timeout);
+    };
+    const timeout = setTimeout(stop, 5000);
+    schedule();
+    resize.observe(document.body);
+    for (const type of userEvents) window.addEventListener(type, stop, { passive: true });
+    return stop;
   }, [target, hash, appliedHash]);
 
   function changeQuery(value: string) {
