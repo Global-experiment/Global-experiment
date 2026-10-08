@@ -73,10 +73,23 @@ export default defineConfig({
   ],
   use: {
     baseURL: `http://localhost:${port}`,
-    // Contribute's copy button correctly shows no confirmation at all when
-    // navigator.clipboard.writeText() is denied (never a false success) —
-    // Chromium denies it by default in a fresh context, so the permission
-    // has to be granted explicitly for that behavior to be exercised.
-    permissions: ["clipboard-read", "clipboard-write"],
   },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+        // Contribute's copy button correctly shows no confirmation at all when
+        // navigator.clipboard.writeText() is denied (never a false success) —
+        // Chromium denies it by default in a fresh context, so the permission
+        // has to be granted explicitly for that behavior to be exercised.
+        // (Chromium-only permission names: WebKit rejects them.)
+        permissions: ["clipboard-read", "clipboard-write"],
+      },
+    },
+    // Page centering with classic scrollbars must hold in Safari's engine
+    // too (it handles scrollbar-gutter differently): only that spec runs
+    // here. Needs `npx playwright install webkit` once.
+    { name: "webkit", use: { browserName: "webkit" }, testMatch: /scrollbar\.spec\.ts/ },
+  ],
 });
