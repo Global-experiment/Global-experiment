@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AdminIcon } from "./adminIcons";
 import { AdminButton, chipInput, focusRing, Popover } from "./controls";
@@ -9,6 +10,8 @@ export interface RelationOption {
   label: string;
   /** Secondary text, e.g. "Software · Technology" for an expertise. */
   detail?: string;
+  /** The linked record's own page; when set, the selected item is a link to it. */
+  href?: string;
 }
 
 /**
@@ -61,7 +64,13 @@ export function RelationPicker({
           {selected.map((option) => (
             <li key={option.id} className="flex min-h-[26px] items-center gap-2">
               <span>
-                {option.label}
+                {option.href ? (
+                  <Link href={option.href} className={`underline underline-offset-2 ${focusRing}`}>
+                    {option.label}
+                  </Link>
+                ) : (
+                  option.label
+                )}
                 {option.detail ? <span className="text-text-muted"> · {option.detail}</span> : null}
               </span>
               <button

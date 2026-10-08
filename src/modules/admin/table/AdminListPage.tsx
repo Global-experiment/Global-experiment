@@ -133,14 +133,17 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
     setOpenPopover(null);
   };
 
+  // One viewport-tall column (client, 2026-10-05): title row, toolbar and
+  // pager never scroll; the table below is the only scroll container, on
+  // both axes, so its column header stays visible too (see DataTable).
   return (
-    <main>
-      <header className="flex h-10 items-center gap-2 px-2">
+    <main className="flex h-full min-h-0 flex-col">
+      <header className="flex h-10 shrink-0 items-center gap-2 px-2">
         <h1 className="mr-auto text-body font-bold">{config.title}</h1>
         {config.actions}
       </header>
 
-      <div className="flex h-10 items-center gap-2 px-2">
+      <div data-admin-toolbar className="flex h-10 shrink-0 items-center gap-2 px-2">
         <div className="mr-auto flex min-w-0 items-center">{config.views}</div>
 
         <label className={`${toolbarBox} w-40 pr-1 pl-2`}>
@@ -214,16 +217,18 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
       </div>
 
       {result?.status === "error" && !loading ? (
-        <div className="px-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2">
           <StatusMessage tone="error">
             {result.error.status === 0 ? result.error.message : `Couldn't load ${config.noun}: ${result.error.message}`}
           </StatusMessage>
           <AdminButton onClick={() => setReloadToken((token) => token + 1)}>Retry</AdminButton>
         </div>
       ) : !page ? (
-        <StatusMessage>Loading {config.noun}…</StatusMessage>
+        <div className="min-h-0 flex-1">
+          <StatusMessage>Loading {config.noun}…</StatusMessage>
+        </div>
       ) : page.items.length === 0 ? (
-        <div className="px-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2">
           <StatusMessage>
             {state.search || activeFilters.length > 0 ? `No ${config.noun} match this search or these filters.` : `No ${config.noun} yet.`}
           </StatusMessage>
@@ -251,7 +256,7 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
             busy={loading}
             caption={`${config.title}: ${page.total} total`}
           />
-          <footer className="flex h-10 items-center gap-2 border-t border-line px-2 text-body text-text-muted">
+          <footer className="flex h-10 shrink-0 items-center gap-2 border-t border-line px-2 text-body text-text-muted">
             <span role="status">
               {(page.page - 1) * page.pageSize + 1}–{(page.page - 1) * page.pageSize + page.items.length} of {page.total}
             </span>

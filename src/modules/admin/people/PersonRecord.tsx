@@ -40,7 +40,7 @@ export async function searchOrganizations(text: string, signal: AbortSignal): Pr
   const query = new URLSearchParams({ pageSize: "20", sort: "name:asc" });
   if (text.trim()) query.set("search", text.trim());
   const page = await adminApi<Page<Organization>>(`/organizations?${query}`, { signal });
-  return page.items.map((organization) => ({ id: organization.id, label: organization.name }));
+  return page.items.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` }));
 }
 
 /**

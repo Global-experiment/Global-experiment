@@ -51,6 +51,17 @@ export class OrganizationsService {
     await this.repository.unlinkExpertise(id, expertiseId);
   }
 
+  async linkPerson(id: string, personId: string): Promise<void> {
+    if (!(await this.repository.exists(id))) throw new NotFoundError("Organization not found.");
+    if (!(await this.repository.personExists(personId))) throw new NotFoundError("Person not found.");
+    await this.repository.linkPerson(id, personId);
+  }
+
+  async unlinkPerson(id: string, personId: string): Promise<void> {
+    if (!(await this.repository.exists(id))) throw new NotFoundError("Organization not found.");
+    await this.repository.unlinkPerson(id, personId);
+  }
+
   private async assertExpertise(ids?: string[]) {
     if (!ids?.length) return;
     if ((await countExistingExpertise(this.db, ids)) !== ids.length) {

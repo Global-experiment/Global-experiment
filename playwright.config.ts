@@ -60,7 +60,9 @@ export default defineConfig({
       : []),
     {
       command: `npx next dev -p ${port}`,
-      url: `http://localhost:${port}`,
+      // A page with no live-Notion dependency: server readiness mustn't hinge
+      // on a third-party API (Home is a 500 while Notion is unreachable).
+      url: `http://localhost:${port}/waitlist`,
       reuseExistingServer: true,
       // The readiness probe's own request can land on the Documentation
       // route's live, uncached Notion preload (same reason as `timeout`

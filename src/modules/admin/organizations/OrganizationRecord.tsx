@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import type { ExpertiseTree, Organization, OrganizationInput } from "../api/types";
+import type { ExpertiseTree, Organization, OrganizationInput, Page, Person } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { expertiseSearch } from "../people/PersonRecord";
 import { formatDate } from "../people/peopleTable";
-import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
+import { AdminButton, StatusMessage } from "../ui/controls";
 import { PropertyRow, RecordHeader, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
@@ -17,13 +16,21 @@ interface Draft {
   website: string;
   note: string;
   expertise: RelationOption[];
+  people: RelationOption[];
 }
+
+const personOption = (person: { id: string; name: string }): RelationOption => ({
+  id: person.id,
+  label: person.name,
+  href: `/admin/people/${person.id}`,
+});
 
 const toDraft = (organization: Organization): Draft => ({
   name: organization.name,
   website: organization.website ?? "",
   note: organization.note ?? "",
   expertise: organization.expertise.map((item) => ({ id: item.id, label: item.name, detail: `${item.field.name} · ${item.domain.name}` })),
+  people: organization.people.map(personOption),
 });
 
 function patchFor(base: Draft, draft: Draft): OrganizationInput {
@@ -36,7 +43,30 @@ function patchFor(base: Draft, draft: Draft): OrganizationInput {
   return patch;
 }
 
-/** /admin/organizations/[id]. People are linked from each person's record (one place to edit a membership). */
+/** People added/removed in the draft — applied through the organization's link endpoints. */
+function peopleChanges(base: Draft, draft: Draft) {
+  const before = new Set(base.people.map((person) => person.id));
+  const after = new Set(draft.people.map((person) => person.id));
+  return {
+    added: [...after].filter((id) => !before.has(id)),
+    removed: [...before].filter((id) => !after.has(id)),
+  };
+}
+
+async function searchPeople(text: string, signal: AbortSignal): Promise<RelationOption[]> {
+  const query = new URLSearchParams({ pageSize: "20", sort: "name:asc" });
+  if (text.trim()) query.set("search", text.trim());
+  const page = await adminApi<Page<Person>>(`/people?${query}`, { signal });
+  return page.items.map(personOption);
+}
+
+/**
+ * /admin/organizations/[id]. People can be linked/unlinked here exactly as
+ * organizations are on a person's record (client, 2026-10-05): the same
+ * relation picker, saved with the page. The link is one shared
+ * people_organizations row, so it shows on both records, each linking to
+ * the other.
+ */
 export function OrganizationRecord({ id }: { id: string }) {
   const toast = useToast();
   const organization = useAdminData<Organization>(`/organizations/${id}`);
@@ -70,7 +100,8 @@ export function OrganizationRecord({ id }: { id: string }) {
   const base = toDraft(loaded);
   const draft = edit?.version === version ? edit.draft : base;
   const patch = patchFor(base, draft);
-  const dirty = Object.keys(patch).length > 0;
+  const links = peopleChanges(base, draft);
+  const dirty = Object.keys(patch).length > 0 || links.added.length > 0 || links.removed.length > 0;
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
 
   async function save(event: React.FormEvent) {
@@ -79,11 +110,16 @@ export function OrganizationRecord({ id }: { id: string }) {
     setSaving(true);
     setError(null);
     try {
-      await adminApi(`/organizations/${id}`, { method: "PATCH", body: patch });
+      if (Object.keys(patch).length > 0) await adminApi(`/organizations/${id}`, { method: "PATCH", body: patch });
+      for (const personId of links.added) await adminApi(`/organizations/${id}/people/${personId}`, { method: "PUT" });
+      for (const personId of links.removed) await adminApi(`/organizations/${id}/people/${personId}`, { method: "DELETE" });
+      // The edit stays until the refreshed record (new updatedAt) replaces it.
       organization.reload();
       toast("Organization updated");
     } catch (caught) {
       setError(caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : "Couldn't save.");
+      // Some steps may have applied: show the server's state.
+      organization.reload();
     } finally {
       setSaving(false);
     }
@@ -127,19 +163,7 @@ export function OrganizationRecord({ id }: { id: string }) {
           <RelationPicker label="Expertise" selected={draft.expertise} onChange={(next) => set("expertise", next)} search={searchExpertise} />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="People">
-          {loaded.people.length === 0 ? (
-            <span className="text-text-muted">No people linked yet — add the organization from a person&rsquo;s record.</span>
-          ) : (
-            <ul>
-              {loaded.people.map((person) => (
-                <li key={person.id}>
-                  <Link href={`/admin/people/${person.id}`} className={`underline underline-offset-2 ${focusRing}`}>
-                    {person.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <RelationPicker label="Person" selected={draft.people} onChange={(next) => set("people", next)} search={searchPeople} />
         </PropertyRow>
         <PropertyRow icon="schedule" label="Created">
           <span>{formatDate(loaded.createdAt)}</span>

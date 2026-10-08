@@ -106,8 +106,9 @@ test.describe("people administration", () => {
     await page.keyboard.press("Escape");
     await expect(page).toHaveURL(/sort=name%3Aasc/);
     await expect(page.getByRole("button", { name: "Name ascending" })).toBeVisible();
+    // The label updates with the URL; the re-sorted rows arrive with the API response.
+    await expect.poll(async () => (await firstCellTexts(page)).slice(0, 3)).toEqual(["Alex Demo", "Alex Example", "Alex Sample"]);
     const names = await firstCellTexts(page);
-    expect(names.slice(0, 3)).toEqual(["Alex Demo", "Alex Example", "Alex Sample"]);
     expect([...names].sort((a, b) => a.localeCompare(b))).toEqual(names);
   });
 
@@ -161,6 +162,7 @@ test.describe("people administration", () => {
   test("validation errors from the API are shown next to the field, nothing is saved", async ({ page }) => {
     await page.goto("/admin/people?q=cyril%20demo");
     await rows(page).first().getByRole("link").click();
+    await expect(page).toHaveURL(/\/admin\/people\/de000000-/);
     await page.getByLabel("Email").fill("not-an-email");
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Invalid email address." })).toBeVisible();
