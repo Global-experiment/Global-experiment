@@ -115,6 +115,17 @@ body {
   scrollbar-color: var(--color-line-strong) var(--color-surface-base);
 }
 
+/*
+ * Admin only (client, 2026-10-05): a two-finger horizontal trackpad swipe
+ * that runs past a scroll edge must not turn into browser back/forward.
+ * Scoped to pages rendering [data-admin] (AdminShell, admin login) — the
+ * public site keeps the browser's default gestures. The admin scroll
+ * containers set the same on themselves.
+ */
+html:has([data-admin]),
+html:has([data-admin]) body {
+  overscroll-behavior-x: none;
+}
 ::-webkit-scrollbar {
   width: 12px;
   height: 12px;

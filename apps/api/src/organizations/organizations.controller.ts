@@ -11,8 +11,11 @@ import { OrganizationsService } from "./organizations.service.js";
 const IdParam = new ZodValidationPipe(z.uuid("Invalid id."));
 
 /**
- * /api/admin/organizations — owner-only. People ↔ Organization links are
- * managed from the person (PUT/DELETE /api/admin/people/:id/organizations/:id).
+ * /api/admin/organizations — owner-only (the global admin session and CSRF
+ * Origin guards cover every `admin/*` controller). People ↔ Organization
+ * links can be managed from either side — here (PUT/DELETE
+ * :id/people/:personId) or from the person (PUT/DELETE
+ * /api/admin/people/:id/organizations/:id) — over the same table.
  * No DELETE for organizations yet (retention undecided).
  */
 @Controller("admin/organizations")
@@ -52,5 +55,17 @@ export class OrganizationsController {
   @HttpCode(204)
   unlinkExpertise(@Param("id", IdParam) id: string, @Param("expertiseId", IdParam) expertiseId: string) {
     return this.organizations.unlinkExpertise(id, expertiseId);
+  }
+
+  @Put(":id/people/:personId")
+  @HttpCode(204)
+  linkPerson(@Param("id", IdParam) id: string, @Param("personId", IdParam) personId: string) {
+    return this.organizations.linkPerson(id, personId);
+  }
+
+  @Delete(":id/people/:personId")
+  @HttpCode(204)
+  unlinkPerson(@Param("id", IdParam) id: string, @Param("personId", IdParam) personId: string) {
+    return this.organizations.unlinkPerson(id, personId);
   }
 }

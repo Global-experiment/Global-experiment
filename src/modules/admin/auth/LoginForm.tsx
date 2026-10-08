@@ -34,7 +34,7 @@ export function LoginForm({ next }: { next?: string }) {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-surface-base px-2 font-normal text-text-primary">
+    <main data-admin className="flex min-h-dvh items-center justify-center bg-surface-base px-2 font-normal text-text-primary">
       <form onSubmit={submit} className="flex w-full max-w-[360px] flex-col gap-2" aria-describedby={error ? "login-error" : undefined}>
         <h1 className="text-body font-bold">Global Experiment admin</h1>
         <label htmlFor="login-email" className="mt-2 text-body text-text-muted">

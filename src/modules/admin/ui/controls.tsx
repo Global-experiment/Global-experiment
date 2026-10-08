@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   type ComponentProps,
   type ReactNode,
@@ -92,6 +93,11 @@ export function MenuCheck({ checked }: { checked: boolean }) {
  * Anchored popover (column menu, filters, sort): closes on Escape or an
  * outside press and returns focus to its trigger. Positioned by the caller
  * inside a `relative` wrapper, exactly where Figma draws it.
+ *
+ * Opening does NOT move focus (client, 2026-10-05: the first option looked
+ * pre-selected). The panel follows its trigger in the DOM, so Tab from the
+ * trigger walks straight into it; Escape works wherever focus is and puts
+ * focus back on the trigger.
  */
 export function Popover({
   open,
@@ -110,10 +116,21 @@ export function Popover({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Closing while focus is inside (an action that closes it, Escape) would drop
+  // focus on <body> once the panel unmounts: hand it back to the trigger.
+  // Layout-effect cleanup runs while the panel is still in the DOM.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const panel = ref.current;
+    const trigger = triggerRef;
+    return () => {
+      if (panel?.contains(document.activeElement)) trigger.current?.focus();
+    };
+  }, [open, triggerRef]);
+
   useEffect(() => {
     if (!open) return;
     const panel = ref.current;
-    panel?.querySelector<HTMLElement>("select, input, button, [tabindex='0']")?.focus();
     const onPointer = (event: PointerEvent) => {
       const target = event.target as Node;
       if (panel?.contains(target) || triggerRef.current?.contains(target)) return;

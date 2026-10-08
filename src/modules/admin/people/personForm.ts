@@ -34,7 +34,7 @@ export function draftFromPerson(person: Person): PersonDraft {
     x: person.x ?? "",
     otherContact: person.otherContact ?? "",
     lastFollowupDate: person.lastFollowupAt ? person.lastFollowupAt.slice(0, 10) : "",
-    organizations: person.organizations.map((organization) => ({ id: organization.id, label: organization.name })),
+    organizations: person.organizations.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` })),
     expertise: person.expertise.map((item) => ({ id: item.id, label: item.name, detail: `${item.field.name} · ${item.domain.name}` })),
   };
 }

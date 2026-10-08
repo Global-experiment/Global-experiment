@@ -135,6 +135,43 @@ export class OrganizationsRepository {
     });
   }
 
+  async personExists(personId: string): Promise<boolean> {
+    const [row] = await this.db.select({ id: people.id }).from(people).where(eq(people.id, personId)).limit(1);
+    return row !== undefined;
+  }
+
+  /**
+   * Organization ↔ Person, from the organization's side: the same
+   * people_organizations row the person's side manages. Idempotent; a real
+   * change touches both records' updatedAt, since both now show it.
+   */
+  async linkPerson(organizationId: string, personId: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const added = await tx
+        .insert(peopleOrganizations)
+        .values({ personId, organizationId })
+        .onConflictDoNothing()
+        .returning({ personId: peopleOrganizations.personId });
+      if (added.length > 0) await this.touchBoth(tx, organizationId, personId);
+    });
+  }
+
+  async unlinkPerson(organizationId: string, personId: string): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const removed = await tx
+        .delete(peopleOrganizations)
+        .where(and(eq(peopleOrganizations.organizationId, organizationId), eq(peopleOrganizations.personId, personId)))
+        .returning({ personId: peopleOrganizations.personId });
+      if (removed.length > 0) await this.touchBoth(tx, organizationId, personId);
+    });
+  }
+
+  private async touchBoth(tx: Executor, organizationId: string, personId: string) {
+    const now = new Date();
+    await tx.update(organizations).set({ updatedAt: now }).where(eq(organizations.id, organizationId));
+    await tx.update(people).set({ updatedAt: now }).where(eq(people.id, personId));
+  }
+
   private async replaceExpertise(tx: Executor, organizationId: string, expertiseIds?: string[]) {
     if (expertiseIds === undefined) return;
     await tx.delete(organizationExpertise).where(eq(organizationExpertise.organizationId, organizationId));

@@ -58,14 +58,21 @@ const NAV: { section: string; items: NavItem[] }[] = [
  * glyph at 8px, label at 28px), 13px between sections. The current item
  * is white, others muted. Text is Inter Regular (the admin frames use 400,
  * not the public site's 500); titles and buttons are bold. Desktop only.
+ *
+ * Exactly one viewport tall (client, 2026-10-05): the page itself never
+ * scrolls, in either direction, so the nav is always fully visible. The
+ * nav and the content column scroll vertically on their own; on list
+ * pages only the table scrolls (see AdminListPage). `data-admin` scopes
+ * the admin-only overscroll rules in globals.css (no trackpad
+ * back/forward swipes).
  */
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
     <ToastProvider>
-      <div className="grid min-h-dvh min-w-[1024px] grid-cols-[240px_minmax(0,1fr)] bg-surface-base font-normal text-text-primary">
-        <nav aria-label="Admin" className="sticky top-0 h-dvh overflow-y-auto border-r border-line pt-[9px]">
+      <div data-admin className="grid h-dvh grid-cols-[240px_minmax(0,1fr)] overflow-hidden bg-surface-base font-normal text-text-primary">
+        <nav aria-label="Admin" className="h-dvh overflow-y-auto overscroll-contain border-r border-line pt-[9px]">
           {NAV.map(({ section, items }, index) => (
             <div key={section} className={index === 0 ? "" : "mt-[13px]"}>
               <p className="px-2 text-meta text-text-muted">{section}</p>
@@ -97,7 +104,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="min-w-0">{children}</div>
+        <div data-admin-content className="relative h-dvh min-w-0 overflow-x-hidden overflow-y-auto overscroll-x-none">{children}</div>
       </div>
     </ToastProvider>
   );
