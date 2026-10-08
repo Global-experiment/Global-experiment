@@ -23,4 +23,19 @@ describe("computeKeyboardInset", () => {
   it("rounds a fractional covered height to the nearest pixel", () => {
     expect(computeKeyboardInset(800, 500.6, 0)).toBe(299);
   });
+
+  it("ignores viewport differences while no text field is focused (browser toolbars collapsing on scroll)", () => {
+    // Same numbers as a 300px keyboard, but nothing editable has focus: no keyboard, no lift.
+    expect(computeKeyboardInset(800, 500, 0, false)).toBe(0);
+    expect(computeKeyboardInset(800, 740, 0, false)).toBe(0);
+    expect(computeKeyboardInset(800, 500, 0, true)).toBe(300);
+  });
+
+  it("follows the keyboard closing and the orientation changing (no stale inset)", () => {
+    expect(computeKeyboardInset(800, 500, 0, true)).toBe(300);
+    // Keyboard dismissed: focus left the field, viewport restored.
+    expect(computeKeyboardInset(800, 800, 0, false)).toBe(0);
+    // Rotated to landscape with the keyboard still open: recomputed from the new sizes.
+    expect(computeKeyboardInset(400, 180, 0, true)).toBe(220);
+  });
 });

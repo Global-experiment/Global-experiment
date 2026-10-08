@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DISTANCE_MAX_PX, recentVelocity, sheetDragOffset, shouldDismissSheet } from "./sheetDrag";
+import { contentGestureOwner, DISTANCE_MAX_PX, recentVelocity, sheetDragOffset, shouldDismissSheet } from "./sheetDrag";
 
 describe("sheet drag", () => {
   it("never moves the sheet above its resting position", () => {
@@ -24,6 +24,15 @@ describe("sheet drag", () => {
 
   it("snaps back on a slow, short drag", () => {
     expect(shouldDismissSheet({ offset: 30, velocity: 0.1, height: 600 })).toBe(false);
+  });
+
+  it("lets a content swipe drag the sheet only from the top and mostly downward", () => {
+    expect(contentGestureOwner({ dx: 2, dy: 3, scrollTop: 0 })).toBe("undecided");
+    expect(contentGestureOwner({ dx: 1, dy: 20, scrollTop: 0 })).toBe("drag");
+    // Upward swipe, sideways swipe, or content already scrolled: native scrolling.
+    expect(contentGestureOwner({ dx: 0, dy: -20, scrollTop: 0 })).toBe("scroll");
+    expect(contentGestureOwner({ dx: 30, dy: 10, scrollTop: 0 })).toBe("scroll");
+    expect(contentGestureOwner({ dx: 0, dy: 20, scrollTop: 40 })).toBe("scroll");
   });
 
   it("measures velocity over the recent window only", () => {

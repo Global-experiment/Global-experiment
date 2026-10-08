@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
 
 type ButtonVariant = "primary" | "secondary";
@@ -25,6 +25,12 @@ interface ButtonAsLink extends ButtonBaseProps {
   /** Internal navigation — renders a real <Link>, never a disabled control. */
   href: string;
   onClick?: never;
+  /**
+   * Runs on click before navigation; calling `event.preventDefault()`
+   * keeps the visitor on the page (e.g. report entry points open their
+   * qualification sheet first, while staying a real link for new tabs).
+   */
+  onNavigate?: (event: MouseEvent<HTMLAnchorElement>) => void;
   disabled?: false;
 }
 
@@ -32,12 +38,14 @@ interface ButtonAsAction extends ButtonBaseProps {
   /** A real, enabled action that isn't navigation (e.g. a not-yet-connected form submit). */
   href?: never;
   onClick: () => void;
+  onNavigate?: never;
   disabled?: false;
 }
 
 interface ButtonDisabled extends ButtonBaseProps {
   href?: string;
   onClick?: never;
+  onNavigate?: never;
   /** Inert control (e.g. submit before the form is fillable). Rendered as the gray CTA state from figma.pdf p19. Never use this for navigation. */
   disabled: true;
 }
@@ -117,7 +125,7 @@ export function Button(props: ButtonProps) {
   }
 
   return (
-    <Link href={props.href} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
+    <Link href={props.href} onClick={props.onNavigate} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
       {icon}
       {children}
     </Link>

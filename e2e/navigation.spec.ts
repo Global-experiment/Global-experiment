@@ -83,7 +83,8 @@ test.describe("Home navigation", () => {
     await page.goto("/");
     // Only the in-grid Join waitlist remains; the sticky bar is display:none.
     await expect(page.getByRole("link", { name: "Join waitlist" })).toHaveCount(1);
-    await expect(page.locator("div.sticky.bottom-0")).toBeHidden();
+    await expect(page.locator("[data-action-bar]")).toBeHidden();
+    await expect(page.locator("[data-action-bar-spacer]")).toBeHidden();
     const mainPaddingBottom = await page.locator("main").evaluate((el) => getComputedStyle(el).paddingBottom);
     expect(mainPaddingBottom).toBe("24px");
   });
@@ -388,7 +389,12 @@ test.describe("Feedback / Issue: type selection happens before the composer (cli
     await page.goto("/treasury");
     await page.getByRole("button", { name: "Page actions" }).click();
     await page.getByRole("dialog").getByRole("link", { name: "Send feedback" }).click();
-    await expect(page).toHaveURL("/feedback?source=%2Ftreasury");
+    // Qualification opens over Treasury first (Review #3 item 5), then the composer.
+    const picker = page.getByRole("dialog", { name: "Feedback type" });
+    await expect(picker).toBeVisible();
+    await expect(page).toHaveURL("/treasury");
+    await picker.getByRole("button", { name: "Send feedback" }).click();
+    await expect(page).toHaveURL("/feedback?source=%2Ftreasury&qualified=1");
     await expect(page.locator("main")).toHaveAttribute("data-source-page", "/treasury");
 
     await page.goto("/issue?source=https%3A%2F%2Fevil.example%2F");
@@ -425,18 +431,26 @@ test.describe("Contribute: copy confirmation (client feedback item 30)", () => {
 });
 
 test.describe("Treasury", () => {
-  test("a stat with a Figma detail view opens its sheet; Expenses (no detail view) stays plain", async ({
-    page,
-  }) => {
+  test("every stat opens its detail sheet — Expenses included (Review #3 item 8)", async ({ page }) => {
     await page.goto("/treasury");
     await page.getByRole("button", { name: /Balance/ }).click();
     const dialog = page.getByRole("dialog", { name: "Balance" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("Treasury balance")).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
 
-    // "Expenses" has no Figma detail view and is not a button.
-    await expect(page.getByRole("button", { name: /^USD 39\.8K/ })).toHaveCount(0);
+    for (const name of ["Balance", "Sustainability", "Med. donation", "Expenses"]) {
+      await expect(page.getByRole("button", { name: new RegExp(name.replace(".", "\\.")) })).toHaveCSS("cursor", "pointer");
+    }
+    await page.getByRole("button", { name: /USD 39\.8K\s*Expenses/ }).click();
+    const expenses = page.getByRole("dialog", { name: "Expenses" });
+    await expect(expenses).toBeVisible();
+    await expect(expenses.getByText("$ 39.8K")).toBeVisible();
+    await expect(expenses.getByText("Total expenses")).toBeVisible();
+    await expect(expenses.getByText("How it is calculated")).toBeVisible();
+    await expenses.getByRole("button", { name: "Close" }).click();
+    await expect(expenses).toBeHidden();
   });
 
   test("rows show as many tags as fit, +N only for hidden ones, recomputed on resize; all tags on the detail page", async ({

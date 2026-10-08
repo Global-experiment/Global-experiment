@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reportHref, sanitizeSourcePage, sourcePageFromSearch, withReportSource } from "./sourcePage";
+import { reportHref, sanitizeSourcePage, sourcePageFromSearch } from "./sourcePage";
 
 describe("sanitizeSourcePage", () => {
   it.each([
@@ -44,12 +44,6 @@ describe("report links", () => {
   it("drop an invalid source instead of forwarding it", () => {
     expect(reportHref("feedback", "https://evil.example")).toBe("/feedback");
     expect(reportHref("issue", null)).toBe("/issue");
-  });
-
-  it("rewrite only plain report hrefs", () => {
-    expect(withReportSource("/feedback", "/donate")).toBe("/feedback?source=%2Fdonate");
-    expect(withReportSource("/issue", "/donate")).toBe("/issue?source=%2Fdonate");
-    expect(withReportSource("/documentation", "/donate")).toBe("/documentation");
   });
 
   it("round-trip through the query string", () => {

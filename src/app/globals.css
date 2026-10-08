@@ -115,6 +115,43 @@ body {
   scrollbar-color: var(--color-line-strong) var(--color-surface-base);
 }
 
+/*
+ * Review #3 item 1: with classic (non-overlay) scrollbars — Windows, or macOS
+ * set to "always show" — expanding a Documentation article made the page
+ * scroll, the vertical scrollbar appeared, the viewport narrowed by its
+ * width and every centered column jumped sideways. Reserving the gutter
+ * keeps the content box the same width whether or not the page scrolls.
+ * Overlay scrollbars (mobile, default macOS) take no space, so nothing
+ * changes there. Safari < 18.2 lacks scrollbar-gutter; it falls back to
+ * an always-present scrollbar track for the same result.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
+/*
+ * While a Sheet is open (Review #3 item 3): the page behind a modal must
+ * not scroll, and a swipe that starts on the sheet must never chain to the
+ * document — at the top of the page that chained swipe is the browser's
+ * pull-to-refresh, which reloaded the page instead of closing the sheet.
+ * Only applies while a sheet is actually open; the gutter stays reserved,
+ * so locking the scroll doesn't shift the page either.
+ */
+html:has(dialog.sheet[open]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+dialog.sheet {
+  overscroll-behavior: contain;
+}
+
 ::-webkit-scrollbar {
   width: 12px;
   height: 12px;
