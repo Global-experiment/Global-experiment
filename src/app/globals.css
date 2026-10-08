@@ -116,32 +116,43 @@ body {
 }
 
 /*
- * Review #3 item 1: with classic (non-overlay) scrollbars — Windows, or macOS
- * set to "always show" — expanding a Documentation article made the page
- * scroll, the vertical scrollbar appeared, the viewport narrowed by its
- * width and every centered column jumped sideways. Reserving the gutter
- * keeps the content box the same width whether or not the page scrolls.
- * Overlay scrollbars (mobile, default macOS) take no space, so nothing
- * changes there. Safari < 18.2 lacks scrollbar-gutter; it falls back to
- * an always-present scrollbar track for the same result.
+ * Page centering with classic (non-overlay) scrollbars — Windows, or macOS
+ * set to "always show" (client, Review #3 item 1 and follow-up): expanding
+ * a Documentation article makes the page scroll, the vertical scrollbar
+ * appears, and a column centered in the narrowed viewport moves by half
+ * the scrollbar's width.
+ *
+ * `margin-left: calc(100vw - 100%)` on the root keeps every centered
+ * column centered on the WINDOW whether or not the scrollbar is showing:
+ * 100vw always includes the scrollbar, 100% doesn't, so the difference is
+ * the scrollbar's width when it's present and 0 when it isn't. The root
+ * then spans [scrollbar, window − scrollbar] — symmetric, never wider than
+ * the viewport, so no horizontal overflow. Overlay scrollbars (phones,
+ * default macOS) take no space: the margin is 0 and nothing changes.
+ *
+ * Deliberately NOT `scrollbar-gutter: stable both-edges`: WebKit (Safari's
+ * engine) reports support but only reserves the gutters once the page
+ * actually overflows, so the column still jumped there (measured: 12px in
+ * Playwright WebKit 26.6); and the two techniques can't be combined — in
+ * Chromium, which does reserve both gutters, the margin would compensate
+ * twice. This one behaves the same in every engine.
+ *
+ * Fixed full-width elements are laid out against the viewport minus the
+ * scrollbar, so StickyActionBar applies the same margin. Sheets need none:
+ * they only exist while page scrolling is locked (below), with no scrollbar.
+ * Not on admin pages: their shell is exactly one viewport and never scrolls.
  */
-html {
-  scrollbar-gutter: stable;
+html:not(:has([data-admin])) {
+  margin-left: calc(100vw - 100%);
 }
-
-@supports not (scrollbar-gutter: stable) {
-  html {
-    overflow-y: scroll;
-  }
-}
-
 /*
  * While a Sheet is open (Review #3 item 3): the page behind a modal must
  * not scroll, and a swipe that starts on the sheet must never chain to the
  * document — at the top of the page that chained swipe is the browser's
  * pull-to-refresh, which reloaded the page instead of closing the sheet.
- * Only applies while a sheet is actually open; the gutter stays reserved,
- * so locking the scroll doesn't shift the page either.
+ * Only applies while a sheet is actually open. Locking it hides the
+ * scrollbar, but the centering above follows that too (its margin drops
+ * to 0), so nothing shifts.
  */
 html:has(dialog.sheet[open]) {
   overflow: hidden;
@@ -162,17 +173,6 @@ dialog.sheet {
 html:has([data-admin]),
 html:has([data-admin]) body {
   overscroll-behavior-x: none;
-}
-
-/* The admin page itself never scrolls (its panes do): no reserved page gutter. */
-html:has([data-admin]) {
-  scrollbar-gutter: auto;
-}
-
-@supports not (scrollbar-gutter: stable) {
-  html:has([data-admin]) {
-    overflow-y: auto;
-  }
 }
 
 ::-webkit-scrollbar {
