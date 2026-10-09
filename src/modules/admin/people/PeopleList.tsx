@@ -21,7 +21,7 @@ import { PEOPLE_COLUMNS, PEOPLE_DEFAULT_SORT, peopleFields } from "./peopleTable
 function Views() {
   const pending = ["Sourcing", "Discussions", "Contributors", "Collaborators"];
   return (
-    <ul aria-label="Views" className="flex items-center gap-4 text-body">
+    <ul aria-label="Views" className="flex shrink-0 items-center gap-4 text-body whitespace-nowrap">
       <li>
         <span aria-current="true" className="flex items-center gap-1 text-text-primary">
           <AdminIcon name="view_all" />
