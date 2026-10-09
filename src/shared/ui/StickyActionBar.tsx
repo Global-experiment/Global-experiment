@@ -19,9 +19,9 @@ import { useKeyboardInset } from "./useKeyboardInset";
  * browser itself as its toolbars show/hide, with no script in the loop.
  *
  * Its inline extent matches the page's scrollbar-aware centering
- * (globals.css): `ml-[calc(100vw-100%)]` insets it by the scrollbar width
- * when a classic scrollbar shows, so its centered column lines up with
- * the page's (fixed boxes are laid out against viewport minus scrollbar).
+ * (globals.css): it takes the same `--scrollbar-offset` margin when a
+ * classic scrollbar shows, so its column lines up with the page's at every
+ * width (fixed boxes are laid out against viewport minus scrollbar).
  *
  * Content can't hide behind it: an in-flow spacer reserves the bar's
  * height — exact CSS for the standard bar before hydration (8px + 40px +
@@ -63,7 +63,7 @@ export function StickyActionBar({ children, className = "" }: { children: ReactN
       <div
         ref={barRef}
         data-action-bar
-        className={`fixed inset-x-0 bottom-0 z-20 ml-[calc(100vw-100%)] bg-surface-base pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ${className}`}
+        className={`fixed inset-x-0 bottom-0 z-20 ml-(--scrollbar-offset) bg-surface-base pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ${className}`}
         style={inset > 0 ? { bottom: inset, paddingBottom: "0.5rem" } : undefined}
       >
         <Container>{children}</Container>

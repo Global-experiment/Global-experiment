@@ -82,6 +82,66 @@ test("the fixed bottom bar and an open sheet line up with the centered column", 
   expect(await noHorizontalOverflow(page)).toBe(true);
 });
 
+test.describe("narrow window (full-width column)", () => {
+  // The column fills the window here, so there's no free space to center
+  // it in: its left edge must simply stay put while the scrollbar comes and
+  // goes (expanding articles, a sheet locking scroll).
+  test.use({ viewport: { width: 500, height: 700 } });
+
+  test("expanding articles and opening a sheet never move the content's left edge", async ({ page }) => {
+    await page.goto("/documentation", { waitUntil: "load" });
+    const heading = page.locator("main h2").first();
+    const x = async () => (await heading.boundingBox())!.x;
+    const startX = await x();
+
+    const rows = page.locator("h2 > button[aria-expanded]");
+    for (const index of [0, 1, 2]) await rows.nth(index).click();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight)).toBe(true);
+    expect(await x()).toBe(startX);
+
+    await page.getByRole("button", { name: "Page actions" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    expect(await x()).toBe(startX);
+    // The bottom sheet spans the whole window, with no uncovered scrollbar strip.
+    const sheet = await columnGaps(page, "dialog[open]");
+    expect([sheet.left, sheet.right]).toEqual([0, 0]);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+
+    for (const index of [0, 1, 2]) await rows.nth(index).click();
+    expect(await x()).toBe(startX);
+    expect(await noHorizontalOverflow(page)).toBe(true);
+  });
+
+  test("the fixed bottom bar lines up with the content", async ({ page }) => {
+    await page.goto("/treasury", { waitUntil: "load" });
+    await page.evaluate(() => {
+      document.querySelector("main")!.style.minHeight = "3000px";
+    });
+    const column = await columnGaps(page);
+    const bar = await columnGaps(page, "[data-action-bar] .mx-auto");
+    expect(Math.abs(bar.left - column.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(bar.right - column.right)).toBeLessThanOrEqual(1);
+  });
+});
+
+// Window widths around the column's own width (41rem = 656px), where the
+// free space beside it is smaller than the scrollbar: the column must not
+// move there either.
+for (const width of [640, 656, 662, 668, 674, 680, 700]) {
+  test(`at ${width}px the column doesn't move when the scrollbar appears`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 700 });
+    await page.goto("/documentation", { waitUntil: "load" });
+    const before = await columnGaps(page);
+    const rows = page.locator("h2 > button[aria-expanded]");
+    for (const index of [0, 1, 2]) await rows.nth(index).click();
+    const after = await columnGaps(page);
+    expect(after.scrollbar).toBeGreaterThan(0);
+    expect(after.left).toBe(before.left);
+    expect(await noHorizontalOverflow(page)).toBe(true);
+  });
+}
+
 test("public pages have no horizontal overflow with classic scrollbars", async ({ page }) => {
   for (const path of ["/", "/documentation", "/treasury", "/donate", "/waitlist", "/contribute", "/feedback", "/issue"]) {
     await page.goto(path, { waitUntil: "load" });

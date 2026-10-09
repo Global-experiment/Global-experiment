@@ -122,28 +122,40 @@ body {
  * appears, and a column centered in the narrowed viewport moves by half
  * the scrollbar's width.
  *
- * `margin-left: calc(100vw - 100%)` on the root keeps every centered
- * column centered on the WINDOW whether or not the scrollbar is showing:
- * 100vw always includes the scrollbar, 100% doesn't, so the difference is
- * the scrollbar's width when it's present and 0 when it isn't. The root
- * then spans [scrollbar, window − scrollbar] — symmetric, never wider than
- * the viewport, so no horizontal overflow. Overlay scrollbars (phones,
- * default macOS) take no space: the margin is 0 and nothing changes.
+ * A left margin on the root of `100vw - 100%` keeps a centered column
+ * centered on the WINDOW whether or not the scrollbar is showing: 100vw
+ * always includes the scrollbar, 100% doesn't, so the difference is the
+ * scrollbar's width when it's present and 0 when it isn't. The root then
+ * spans [scrollbar, window − scrollbar] — symmetric, never wider than the
+ * viewport, so no horizontal overflow. Overlay scrollbars (phones, default
+ * macOS) take no space: the margin is 0 and nothing changes.
  *
  * Deliberately NOT `scrollbar-gutter: stable both-edges`: WebKit (Safari's
  * engine) reports support but only reserves the gutters once the page
  * actually overflows, so the column still jumped there (measured: 12px in
- * Playwright WebKit 26.6); and the two techniques can't be combined — in
- * Chromium, which does reserve both gutters, the margin would compensate
- * twice. This one behaves the same in every engine.
+ * Playwright WebKit 26.6); in Chromium, top-layer sheets and the backdrop
+ * are laid out inside reserved gutters, leaving uncovered strips; and the
+ * two techniques can't be combined (the margin would compensate twice).
+ * This one behaves the same in every engine.
  *
  * Fixed full-width elements are laid out against the viewport minus the
  * scrollbar, so StickyActionBar applies the same margin. Sheets need none:
  * they only exist while page scrolling is locked (below), with no scrollbar.
  * Not on admin pages: their shell is exactly one viewport and never scrolls.
+ *
+ * The offset is capped by the free space beside the column (the window
+ * minus the 41rem column, halved): in a narrow window the column fills the
+ * width, and shifting it by the whole scrollbar would move its left edge
+ * instead (client, 2026-10-09). Capped, the left edge stays put at every
+ * width — wide: centered on the window; narrow: offset 0, the scrollbar
+ * simply narrows the page from the right, as on any site. No gutter is
+ * reserved, so sheets and their backdrop always cover the whole window.
+ * Exposed as --scrollbar-offset for StickyActionBar (`100%` resolves where
+ * it's used: the bar's containing block has the root's width).
  */
 html:not(:has([data-admin])) {
-  margin-left: calc(100vw - 100%);
+  --scrollbar-offset: min(100vw - 100%, max(0px, (100vw - var(--container-page)) / 2));
+  margin-left: var(--scrollbar-offset);
 }
 /*
  * While a Sheet is open (Review #3 item 3): the page behind a modal must
