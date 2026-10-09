@@ -341,7 +341,7 @@ export function ColumnsControl<Row>({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
-    <div className="relative flex">
+    <div className="relative flex shrink-0">
       <button
         ref={trigger}
         type="button"

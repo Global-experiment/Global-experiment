@@ -46,6 +46,24 @@ async function freeze(page: Page, name: string) {
   await page.keyboard.press("Escape");
 }
 
+test("view tabs never run under the toolbar controls, however narrow the window", async ({ page }) => {
+  // 1100px leaves the People tabs less room than they need (client screenshot, 2026-10-09).
+  for (const width of [1100, 1280]) {
+    await page.setViewportSize({ width, height: 720 });
+    await openPeople(page);
+    const views = page.locator("[data-admin-views]");
+    const search = page.locator("[data-admin-toolbar] label").first();
+    const viewsRight = await views.evaluate((el) => el.getBoundingClientRect().right);
+    const searchLeft = await search.evaluate((el) => el.getBoundingClientRect().left);
+    expect(viewsRight, `${width}px`).toBeLessThanOrEqual(searchLeft);
+    // Every control keeps its full width.
+    expect((await search.boundingBox())!.width).toBe(160);
+    // Tabs that don't fit are clipped to the tabs' own area (and scroll there), not painted over Search.
+    const clipped = await views.evaluate((el) => getComputedStyle(el).overflowX);
+    expect(clipped).toBe("auto");
+  }
+});
+
 test("only the table scrolls sideways; the page never does and the nav stays fully visible", async ({ page }) => {
   await openPeople(page);
   const box = scroller(page);

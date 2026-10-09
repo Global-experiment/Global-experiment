@@ -144,9 +144,17 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
       </header>
 
       <div data-admin-toolbar className="flex h-10 shrink-0 items-center gap-2 px-2">
-        <div className="mr-auto flex min-w-0 items-center">{config.views}</div>
+        {/* The view tabs take whatever width the controls leave and scroll
+            sideways inside it (no visible scrollbar) — never under Search.
+            The last 24px fade out, so cut-off tabs read as "more this way". */}
+        <div
+          data-admin-views
+          className="flex min-w-0 flex-1 items-center overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {config.views}
+        </div>
 
-        <label className={`${toolbarBox} w-40 pr-1 pl-2`}>
+        <label className={`${toolbarBox} w-40 shrink-0 pr-1 pl-2`}>
           <AdminIcon name="search" />
           <span className="sr-only">Search {config.noun}</span>
           <input
@@ -166,7 +174,7 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
           ) : null}
         </label>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             ref={sortTrigger}
             type="button"
@@ -188,7 +196,7 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
           />
         </div>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             ref={filterTrigger}
             type="button"
