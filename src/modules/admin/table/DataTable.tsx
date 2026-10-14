@@ -40,7 +40,8 @@ const RESIZE_STEP = 16;
 /**
  * The Figma admin table (figma.pdf p40), made a full data table (client,
  * 2026-10-14): a 36px header band (raised surface, bold muted labels with
- * their type glyph), a 1px rule under every row and between all cells,
+ * their type glyph), a 1px rule under every row, between all cells and
+ * after the last column,
  * 8px cell padding, 14/18 text, rows growing with content, and the row
  * under the pointer highlighted. Clicking a header opens its column menu (Freeze/Hide).
  * Rows link to the record (the first cell is a real link for keyboard and
@@ -213,7 +214,7 @@ export function DataTable<Row extends { id: string }>({
                 }}
                 className={`sticky top-0 z-10 h-9 border-b border-line bg-surface-header px-2 text-left align-middle font-bold text-text-muted ${
                   index > 0 && index !== frozenCount ? "border-l" : ""
-                } ${frozenEdge(index)} ${
+                } ${index === arranged.length - 1 ? "border-r" : ""} ${frozenEdge(index)} ${
                   dragging === column.id ? "opacity-50" : ""
                 } ${dropAt === index ? "shadow-[inset_2px_0_0_var(--color-text-primary)]" : ""} ${
                   dropAt === index + 1 && index === arranged.length - 1 ? "shadow-[inset_-2px_0_0_var(--color-text-primary)]" : ""
@@ -310,7 +311,7 @@ export function DataTable<Row extends { id: string }>({
                   style={frozenStyle(index, false)}
                   className={`${index < frozenCount ? "sticky" : ""} border-b border-line bg-surface-base px-2 py-2 align-top break-words text-text-primary group-hover:bg-surface-hover ${
                     index > 0 && index !== frozenCount ? "border-l" : ""
-                  } ${frozenEdge(index)}`}
+                  } ${index === arranged.length - 1 ? "border-r" : ""} ${frozenEdge(index)}`}
                 >
                   {index === 0 && recordHref ? (
                     <Link href={recordHref(row)} className={`block ${focusRing}`}>

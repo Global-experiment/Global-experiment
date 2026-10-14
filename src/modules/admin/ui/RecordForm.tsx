@@ -11,14 +11,21 @@ import { focusRing } from "./controls";
  * - a 40px header: back arrow 8px in, the bold title 8px after it;
  * - the properties column: rows 32px tall and 16px apart, a 168px label
  *   cell (type glyph 4px in, muted label at 24px) and the value from there;
- *   values read as plain text — borderless until hovered or focused;
+ *   every value is a visible field (client, 2026-10-14: Figma's borderless
+ *   values didn't read as editable) — a 1px rule, lighter on hover, white
+ *   when focused; single-line fields stop at 560px, notes at 720px; limits
+ *   ("up to 10 expertise") as muted help text under the field;
  * - a right panel (400px at 1440, narrowing to 280px at 1024) behind a 1px
  *   rule: 34px meta rows (label at 24px, value at 176px), then full-width
  *   32px buttons 8px apart. Room is left under them for the History panel.
  */
 
-/** Borderless value input: text at 8px, a ring only on hover / focus. */
-export const recordInput = `h-8 w-full rounded-control bg-transparent px-2 text-body text-text-primary outline-none placeholder:text-text-muted hover:ring-1 hover:ring-line focus-visible:ring-1 focus-visible:ring-text-primary`;
+/** The field look shared by every record value (no text colour or width: callers add them). */
+const recordField =
+  "h-8 w-full rounded-control bg-transparent px-2 text-body font-normal outline-none ring-1 ring-line placeholder:text-text-muted hover:ring-text-muted focus-visible:ring-text-primary";
+
+/** A single-line value: a visible field, text at 8px, at most 560px wide. */
+export const recordInput = `${recordField} max-w-[560px] text-text-primary`;
 
 /**
  * Multi-line value in the same borderless style, growing with its text
@@ -32,7 +39,7 @@ export function AutoGrowTextarea({ value, className = "", ...rest }: Omit<Compon
     element.style.height = "auto";
     element.style.height = `${element.scrollHeight}px`;
   }, [value]);
-  return <textarea ref={ref} rows={1} value={value} className={`${recordInput} block min-h-8 resize-none overflow-hidden py-[7px] ${className}`} {...rest} />;
+  return <textarea ref={ref} rows={1} value={value} className={`${recordField} block min-h-8 max-w-[720px] resize-none overflow-hidden py-[7px] text-text-primary ${className}`} {...rest} />;
 }
 
 const calendarDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -40,9 +47,9 @@ const calendarDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
 export const formatCalendarDay = (day: string) => calendarDay.format(new Date(`${day}T00:00:00Z`));
 
 /**
- * A calendar date in the record's borderless style: the value reads
- * "Oct 14, 2026" (or a muted "Empty"), never the browser's light-grey
- * mm/dd/yyyy mask. Pressing it opens the native picker in its dark
+ * A calendar date in the record's field style: the value reads
+ * "Oct 14, 2026" (or a muted "Choose a date"), never the browser's
+ * light-grey mm/dd/yyyy mask. Pressing it opens the native picker in its dark
  * scheme; a clear button removes the date.
  */
 export function DateField({
@@ -83,10 +90,13 @@ export function DateField({
         id={id}
         type="button"
         onClick={open}
-        aria-label={`${label}: ${value ? formatCalendarDay(value) : "empty"}. Choose a date`}
-        className={`${recordInput} relative cursor-pointer text-left ${value ? "" : "text-text-muted"}`}
+        aria-label={`${label}: ${value ? formatCalendarDay(value) : "not set"}. Choose a date`}
+        className={`${recordField} relative flex cursor-pointer items-center gap-2 text-left ${value ? "text-text-primary" : "text-text-muted"}`}
       >
-        {value ? formatCalendarDay(value) : "Empty"}
+        <span data-date-value className="flex-1 truncate">
+          {value ? formatCalendarDay(value) : "Choose a date"}
+        </span>
+        <AdminIcon name="schedule" className="text-text-muted" />
       </button>
       {value ? (
         <button
@@ -148,7 +158,7 @@ export function PropertyRow({
   icon: AdminIconName;
   label: string;
   htmlFor?: string;
-  /** Figma's grey note under the label, e.g. "People can have up to 10 expertise." */
+  /** Muted help text under the field, e.g. "People can have up to 10 expertise." */
   hint?: string;
   error?: string;
   children: ReactNode;
@@ -162,14 +172,14 @@ export function PropertyRow({
           <AdminIcon name={icon} />
           {label}
         </Label>
-        {hint ? (
-          <p data-hint className="mt-0.5 w-40 rounded-control bg-surface-raised p-2 text-meta leading-4 text-text-primary">
-            {hint}
-          </p>
-        ) : null}
       </div>
       <div className="flex min-h-8 min-w-0 flex-col justify-center text-body">
         {children}
+        {hint ? (
+          <p data-hint className="mt-1 px-0.5 text-meta text-text-muted">
+            {hint}
+          </p>
+        ) : null}
         {error ? (
           <p role="alert" className="mt-1 px-2 text-meta text-text-primary">
             {error}

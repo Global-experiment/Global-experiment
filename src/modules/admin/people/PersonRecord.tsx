@@ -18,14 +18,22 @@ import { draftFromPerson, hasChanges, personPatch, type PersonDraft } from "./pe
 
 type TextField = "email" | "phone" | "website" | "linkedin" | "x" | "otherContact" | "wiseRecipientId";
 
-const CONTACT_FIELDS: { field: TextField; label: string; icon: "alternate_email" | "call" | "link" | "title"; type?: string; inputMode?: "email" | "tel" | "url" }[] = [
-  { field: "email", label: "Email", icon: "alternate_email", type: "email", inputMode: "email" },
-  { field: "phone", label: "Phone", icon: "call", type: "tel", inputMode: "tel" },
-  { field: "website", label: "Website", icon: "link", inputMode: "url" },
-  { field: "linkedin", label: "Linkedin", icon: "link", inputMode: "url" },
-  { field: "x", label: "X", icon: "link" },
-  { field: "otherContact", label: "Other contact", icon: "title" },
-  { field: "wiseRecipientId", label: "Wise recipient ID", icon: "title" },
+const CONTACT_FIELDS: {
+  field: TextField;
+  label: string;
+  icon: "alternate_email" | "call" | "link" | "title";
+  /** An example of what goes in the field. */
+  placeholder: string;
+  type?: string;
+  inputMode?: "email" | "tel" | "url";
+}[] = [
+  { field: "email", label: "Email", icon: "alternate_email", placeholder: "name@example.com", type: "email", inputMode: "email" },
+  { field: "phone", label: "Phone", icon: "call", placeholder: "+41 79 123 45 67", type: "tel", inputMode: "tel" },
+  { field: "website", label: "Website", icon: "link", placeholder: "https://example.org", inputMode: "url" },
+  { field: "linkedin", label: "Linkedin", icon: "link", placeholder: "https://www.linkedin.com/in/…", inputMode: "url" },
+  { field: "x", label: "X", icon: "link", placeholder: "https://x.com/…" },
+  { field: "otherContact", label: "Other contact", icon: "title", placeholder: "Another way to reach them" },
+  { field: "wiseRecipientId", label: "Wise recipient ID", icon: "title", placeholder: "Wise recipient ID" },
 ];
 
 const CONTACT_PILLS = [
@@ -168,7 +176,16 @@ export function PersonRecord({ id }: { id: string }) {
       <RecordLayout backHref="/admin/people" backLabel="People" title={draft.name} panel={panel}>
         {formError ? <StatusMessage tone="error">{formError}</StatusMessage> : null}
         <PropertyRow icon="title" label="Name" htmlFor="person-name" error={errors.name}>
-          <input id="person-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" className={recordInput} />
+          <input
+            id="person-name"
+            value={draft.name}
+            onChange={(e) => set("name", e.target.value)}
+            maxLength={200}
+            required
+            autoComplete="off"
+            placeholder="Full name"
+            className={recordInput}
+          />
         </PropertyRow>
         <PropertyRow icon="select" label="State" error={errors.stateKey}>
           <Pills
@@ -197,7 +214,7 @@ export function PersonRecord({ id }: { id: string }) {
             value={draft.personalNote}
             onChange={(e) => set("personalNote", e.target.value)}
             maxLength={5000}
-            placeholder="Empty"
+            placeholder="Add a note…"
           />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="Organization" hint={LIMIT_HINTS.personOrganizations} error={errors.organizations}>
@@ -218,7 +235,7 @@ export function PersonRecord({ id }: { id: string }) {
             onChange={(value) => set("doNotContact", value === "do_not_contact")}
           />
         </PropertyRow>
-        {CONTACT_FIELDS.map(({ field, label, icon, type, inputMode }) => (
+        {CONTACT_FIELDS.map(({ field, label, icon, placeholder, type, inputMode }) => (
           <PropertyRow key={field} icon={icon} label={label} htmlFor={`person-${field}`} error={errors[field]}>
             <input
               id={`person-${field}`}
@@ -228,7 +245,7 @@ export function PersonRecord({ id }: { id: string }) {
               onChange={(e) => set(field, e.target.value)}
               autoComplete="off"
               spellCheck={false}
-              placeholder="Empty"
+              placeholder={placeholder}
               className={recordInput}
             />
           </PropertyRow>
