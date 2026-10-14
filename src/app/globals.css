@@ -45,6 +45,9 @@
   --color-inverse-content: #000000;
   /* Raised surface for admin toasts (figma.pdf p40–p43: #1f1f1f pill). */
   --color-surface-raised: #1f1f1f;
+  /* Admin data tables (client, 2026-10-14): the header band and the hovered row. */
+  --color-surface-header: #1a1a1a;
+  --color-surface-hover: #121212;
   /* Admin user-card avatar placeholder (admin-desktop.pdf p2: 24px #d9d9d9 disc). */
   --color-avatar: #d9d9d9;
 
@@ -93,6 +96,8 @@
   --color-inverse-surface: #000000;
   --color-inverse-content: #ffffff;
   --color-surface-raised: #ebebeb;
+  --color-surface-header: #f0f0f0;
+  --color-surface-hover: #f6f6f6;
   --color-avatar: #8a8a8a;
 }
 

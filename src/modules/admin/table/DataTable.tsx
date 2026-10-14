@@ -38,10 +38,11 @@ export interface TableColumn<Row> {
 const RESIZE_STEP = 16;
 
 /**
- * The Figma admin table (figma.pdf p40): header labels muted with their
- * type glyph (header row 33px, text on the bottom edge), 1px rules above
- * every row and between cells, 4px cell padding, 14/18 text, rows growing
- * with content. Clicking a header opens its column menu (Freeze/Hide).
+ * The Figma admin table (figma.pdf p40), made a full data table (client,
+ * 2026-10-14): a 36px header band (raised surface, bold muted labels with
+ * their type glyph), a 1px rule under every row and between all cells,
+ * 8px cell padding, 14/18 text, rows growing with content, and the row
+ * under the pointer highlighted. Clicking a header opens its column menu (Freeze/Hide).
  * Rows link to the record (the first cell is a real link for keyboard and
  * screen-reader users; the rest of the row is a mouse convenience).
  *
@@ -210,7 +211,9 @@ export function DataTable<Row extends { id: string }>({
                   setDragging(null);
                   setDropAt(null);
                 }}
-                className={`sticky top-0 z-10 h-[33px] border-b border-line bg-surface-base px-1 pb-[3px] text-left align-bottom font-normal text-text-muted ${frozenEdge(index)} ${
+                className={`sticky top-0 z-10 h-9 border-b border-line bg-surface-header px-2 text-left align-middle font-bold text-text-muted ${
+                  index > 0 && index !== frozenCount ? "border-l" : ""
+                } ${frozenEdge(index)} ${
                   dragging === column.id ? "opacity-50" : ""
                 } ${dropAt === index ? "shadow-[inset_2px_0_0_var(--color-text-primary)]" : ""} ${
                   dropAt === index + 1 && index === arranged.length - 1 ? "shadow-[inset_-2px_0_0_var(--color-text-primary)]" : ""
@@ -290,21 +293,22 @@ export function DataTable<Row extends { id: string }>({
           </tr>
         </thead>
         <tbody className={busy ? "opacity-60" : ""}>
-          {rows.map((row, rowIndex) => (
+          {/* Every row is underlined, the last one too (client, 2026-10-14; Figma rules only between rows). */}
+          {rows.map((row) => (
             <tr
               key={row.id}
               onClick={(event) => {
                 if (!recordHref || (event.target as HTMLElement).closest("a, button")) return;
                 router.push(recordHref(row));
               }}
-              className={recordHref ? "cursor-pointer" : ""}
+              className={`group ${recordHref ? "cursor-pointer" : ""}`}
             >
               {arranged.map((column, index) => (
                 <td
                   key={column.id}
                   data-column={column.id}
                   style={frozenStyle(index, false)}
-                  className={`${index < frozenCount ? "sticky" : ""} ${rowIndex > 0 ? "border-t" : ""} border-line bg-surface-base px-1 py-1 align-top break-words text-text-primary ${
+                  className={`${index < frozenCount ? "sticky" : ""} border-b border-line bg-surface-base px-2 py-2 align-top break-words text-text-primary group-hover:bg-surface-hover ${
                     index > 0 && index !== frozenCount ? "border-l" : ""
                   } ${frozenEdge(index)}`}
                 >

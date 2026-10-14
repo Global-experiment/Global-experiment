@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { RedirectToLogin } from "@/modules/admin/auth/RedirectToLogin";
 import { getAdminSession } from "@/modules/admin/api/server";
 import { AdminShell } from "@/modules/admin/ui/AdminShell";
+import { ADMIN_SIDEBAR_COLLAPSED, ADMIN_SIDEBAR_COOKIE } from "@/modules/admin/ui/sidebarPrefs";
 
 /**
  * Every admin screen except login. The NestJS session decides access: no
@@ -33,5 +35,11 @@ export default async function AdminAppLayout({ children }: LayoutProps<"/admin">
     );
   }
 
-  return <AdminShell admin={session.admin}>{children}</AdminShell>;
+  // The remembered sidebar width, so the first paint is already right.
+  const collapsed = (await cookies()).get(ADMIN_SIDEBAR_COOKIE)?.value === ADMIN_SIDEBAR_COLLAPSED;
+  return (
+    <AdminShell admin={session.admin} initialCollapsed={collapsed}>
+      {children}
+    </AdminShell>
+  );
 }
