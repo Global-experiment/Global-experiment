@@ -268,10 +268,16 @@ append-only table serves it and the Monitoring → History page:
 
 ### 3.3 Background jobs
 
-Today imports run as in-memory jobs inside the API process (lost on
-restart). Proposal: **pg-boss** (PostgreSQL-backed queue, no Redis, FOSS),
-running in the API process for v0.1 (a separate worker process later
-without code changes). Jobs:
+**Built in module 1b:** **pg-boss** (PostgreSQL-backed queue in its own
+`pgboss` schema, no Redis, FOSS, pinned 12.35.0) runs in the API process
+behind a `JobQueue` interface (`apps/api/src/jobs/`; a separate worker
+process later without code changes; tests use an in-process driver,
+`JOBS_DRIVER=inprocess`). Built on it: Notion imports (one at a time —
+an `exclusive` queue — surviving an API restart, on demand or scheduled
+by `imports.<key>.schedule`, a cron in UTC or `off`, read at start) and
+Stripe fee reconciliation (every `STRIPE_FEE_RECONCILE_MINUTES`). Stripe
+event processing still runs in the webhook request (it is fast and
+idempotent); moving it to a job stays planned. Jobs:
 
 | Job | Trigger | Notes |
 |---|---|---|
@@ -291,8 +297,9 @@ Technical dashboard, and never holds secrets in its payload.
 Treasury supporting documents (invoices, receipts) are the only uploads in
 v0.1. Behind a `FileStorage` interface (`put`, `get`, `delete`, `exists`):
 
-- **v0.1 adapter: local disk** on the VPS (`/var/lib/global-experiment/files`,
-  outside every web root, owned by the API user), named by SHA-256, served
+- **v0.1 adapter: local disk** (built in 1b, `FILE_STORAGE_DIR`) on the VPS
+  (`/var/lib/global-experiment/files`, outside every web root, owned by the
+  API user, files 0600 written atomically), named by SHA-256, served
   only through an authenticated API route with `Content-Disposition:
   attachment`. Included in the backup.
 - Later: an S3-compatible adapter (e.g. Hetzner Object Storage) with no

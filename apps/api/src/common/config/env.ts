@@ -4,6 +4,10 @@ const booleanFromString = z
   .enum(["true", "false", "1", "0"])
   .transform((value) => value === "true" || value === "1");
 
+/** A 5-field cron expression (minute hour day month weekday) or "off"; checked again by the job runner. */
+export const CRON_OR_OFF = /^(off|(\S+\s+){4}\S+)$/;
+const cronOrOff = z.string().trim().regex(CRON_OR_OFF, 'must be a 5-field cron expression or "off"');
+
 const originList = z
   .string()
   .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean))
@@ -34,6 +38,8 @@ const envSchema = z
     NOTION_EXPERTISE_DB_ID: z.string().trim().optional(),
     NOTION_PEOPLE_DB_ID: z.string().trim().optional(),
     NOTION_ORGANIZATIONS_DB_ID: z.string().trim().optional(),
+    /** npm run api:import:treasury (roadmap module 1b). */
+    NOTION_TREASURY_DB_ID: z.string().trim().optional(),
     /** Tests only: read the import source from a JSON file instead of Notion. */
     IMPORT_FIXTURE_FILE: z.string().trim().optional(),
 
@@ -58,6 +64,28 @@ const envSchema = z
     /** Environment defaults of the donation settings (data-model.md §1.1). */
     /** Default of the donations.enabled setting: Checkout is refused until donations open. */
     DONATIONS_ENABLED: booleanFromString.default(false),
+    /** Environment defaults of the Treasury settings (pending client answers; data-model.md §1.1). */
+    TREASURY_PUBLIC_RECIPIENT_NAMES: booleanFromString.default(false),
+    TREASURY_PUBLISH_UNQUALIFIED: booleanFromString.default(false),
+    TREASURY_WISE_CONNECTED: booleanFromString.default(false),
+    TREASURY_DONATION_APPEAL: booleanFromString.default(false),
+    /** Default schedules of the Notion imports: a 5-field cron expression (server time zone: UTC), or "off". */
+    IMPORT_SCHEDULE_TAXONOMY: cronOrOff.default("off"),
+    IMPORT_SCHEDULE_DIRECTORY: cronOrOff.default("off"),
+    IMPORT_SCHEDULE_TREASURY: cronOrOff.default("off"),
+    /**
+     * Treasury supporting documents (overview §3.4): a private directory
+     * outside every web root, owned by the API user, included in backups.
+     * Defaults: production /var/lib/global-experiment/files, elsewhere
+     * ./.data/files next to the API.
+     */
+    FILE_STORAGE_DIR: z.string().trim().min(1).optional(),
+    /**
+     * Background jobs (overview §3.3): "pgboss" (PostgreSQL queue, the
+     * default) or "inprocess" (runs jobs at once in this process, no
+     * durability — the default under NODE_ENV=test).
+     */
+    JOBS_DRIVER: z.enum(["pgboss", "inprocess"]).optional(),
     /** Private preview link (/donate?preview=<token>): a test checkout while donations are closed. */
     DONATIONS_PREVIEW_TOKEN: z.string().trim().regex(/^[A-Za-z0-9_-]{32,128}$/, "must be 32–128 letters, digits, - or _").optional(),
     DONATIONS_MONTHLY: booleanFromString.default(false),
@@ -109,6 +137,7 @@ const envSchema = z
           expertise: id(env.NOTION_EXPERTISE_DB_ID),
           people: id(env.NOTION_PEOPLE_DB_ID),
           organizations: id(env.NOTION_ORGANIZATIONS_DB_ID),
+          treasury: id(env.NOTION_TREASURY_DB_ID),
         },
         fixtureFile: id(env.IMPORT_FIXTURE_FILE),
       },
@@ -126,6 +155,19 @@ const envSchema = z
         webUrl: new URL(env.WEB_INTERNAL_URL ?? "http://127.0.0.1:3000").origin,
         secret: id(env.REVALIDATE_SECRET),
       },
+      treasuryDefaults: {
+        publicRecipientNames: env.TREASURY_PUBLIC_RECIPIENT_NAMES,
+        publishUnqualified: env.TREASURY_PUBLISH_UNQUALIFIED,
+        wiseConnected: env.TREASURY_WISE_CONNECTED,
+        donationAppeal: env.TREASURY_DONATION_APPEAL,
+      },
+      importSchedules: {
+        taxonomy: env.IMPORT_SCHEDULE_TAXONOMY,
+        directory: env.IMPORT_SCHEDULE_DIRECTORY,
+        treasury: env.IMPORT_SCHEDULE_TREASURY,
+      },
+      fileStorageDir: env.FILE_STORAGE_DIR ?? (production ? "/var/lib/global-experiment/files" : ".data/files"),
+      jobsDriver: env.JOBS_DRIVER ?? (env.NODE_ENV === "test" ? "inprocess" : "pgboss"),
       donationPreviewToken: id(env.DONATIONS_PREVIEW_TOKEN),
       donationDefaults: {
         enabled: env.DONATIONS_ENABLED,

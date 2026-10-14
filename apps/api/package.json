@@ -16,7 +16,8 @@
     "purge-demo-data": "node dist/scripts/purge-demo-data.js",
     "purge-test-donations": "node dist/scripts/purge-test-donations.js",
     "import:taxonomy": "node dist/scripts/import-taxonomy.js",
-    "import:directory": "node dist/scripts/import-directory.js"
+    "import:directory": "node dist/scripts/import-directory.js",
+    "import:treasury": "node dist/scripts/import-treasury.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
@@ -28,6 +29,7 @@
     "express": "5.2.1",
     "helmet": "^8.3.0",
     "nestjs-pino": "^5.3.0",
+    "pg-boss": "12.35.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "postgres": "^3.4.9",

@@ -33,6 +33,7 @@ export interface NotionProperty {
   checkbox?: boolean;
   date?: { start: string; end?: string | null } | null;
   unique_id?: { prefix: string | null; number: number | null };
+  number?: number | null;
 }
 
 export interface NotionPage {

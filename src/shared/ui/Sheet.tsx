@@ -55,6 +55,13 @@ interface SheetProps {
    * (p4–p6: y=22).
    */
   headerVariant?: "detail" | "picker";
+  /**
+   * A second-level sheet (Common pages p15–p16, "← Filter dates"): the
+   * header's leading control goes back to the first level instead of closing.
+   */
+  onBack?: () => void;
+  /** Right-aligned text action in the header row ("Erase filters", "Reset" — Common pages p14–p16). */
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
@@ -80,7 +87,7 @@ interface SheetProps {
  * Release past the distance/velocity threshold closes; otherwise it snaps
  * back. Both reuse the CSS transition, which prefers-reduced-motion zeroes.
  */
-export function Sheet({ open, onClose, title, ariaLabel, headerVariant = "detail", children }: SheetProps) {
+export function Sheet({ open, onClose, title, ariaLabel, headerVariant = "detail", onBack, headerAction, children }: SheetProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const pressedBackdrop = useRef(false);
@@ -275,8 +282,13 @@ export function Sheet({ open, onClose, title, ariaLabel, headerVariant = "detail
           <div aria-hidden="true" className="mx-auto mt-1 h-0.5 w-4 rounded-full bg-line md:hidden" />
           {title ? (
             <div className={`${headerVariant === "picker" ? "mt-px" : "mt-1"} flex min-h-10 items-center md:-mt-px`}>
-              <IconButton onClick={onClose} label="Close" icon="close" className="-ml-gutter" />
+              {onBack ? (
+                <IconButton onClick={onBack} label="Back" icon="arrow_back" className="-ml-gutter" />
+              ) : (
+                <IconButton onClick={onClose} label="Close" icon="close" className="-ml-gutter" />
+              )}
               <h2 className="min-w-0 py-1 break-words text-body font-bold">{title}</h2>
+              {headerAction ? <div className="ml-auto shrink-0">{headerAction}</div> : null}
             </div>
           ) : (
             <div className="pt-2" />

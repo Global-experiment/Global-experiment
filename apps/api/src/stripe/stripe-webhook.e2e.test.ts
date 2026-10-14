@@ -514,7 +514,7 @@ describe("Treasury figures in production show live entries only", () => {
 
   beforeAll(async () => {
     // A test key on a production server (the sandbox phase): test rows are recorded but never public.
-    t = await createTestApp({ NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://globalexperiment.org" }, [
+    t = await createTestApp({ NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://globalexperiment.org", JOBS_DRIVER: "inprocess" }, [
       { provide: STRIPE_GATEWAY, useValue: stripe },
       { provide: RevalidationService, useValue: { revalidate: vi.fn(async () => true) } },
     ]);

@@ -91,7 +91,10 @@ Every change writes an audit event. Declared keys in v0.1:
 | `donations.monthly` | boolean | `DONATIONS_MONTHLY` = false | Monthly donations (Stripe subscriptions) |
 | `donations.extra_methods` | boolean | `DONATIONS_EXTRA_METHODS` = false | PayPal and SEPA rows (Q19) |
 | `donations.default_currency` | `EUR` \| `USD` \| `CHF` | `DONATIONS_DEFAULT_CURRENCY` = USD | Donate page's initial currency |
-| `treasury.wise_connected` | boolean | false | Shows Balance and Sustainability (hidden until Wise) |
+| `treasury.wise_connected` | boolean | `TREASURY_WISE_CONNECTED` = false | Shows Balance and Sustainability (hidden until Wise) |
+| `treasury.public_recipient_names` | boolean | `TREASURY_PUBLIC_RECIPIENT_NAMES` = false | Public pages show an expense's recipient name; off: only the public description (pending client answer) |
+| `treasury.publish_unqualified` | boolean | `TREASURY_PUBLISH_UNQUALIFIED` = false | Unqualified expenses may be published ("Not qualified yet"); off: only Qualified / Not required entries can be published or are public (Q25, pending) |
+| `treasury.donation_appeal` | boolean | `TREASURY_DONATION_APPEAL` = false | The Treasury page's "Cry for donation" banner (set by hand until Wise gives a Sustainability score) |
 
 The table is created by **migration 0006** (module 1, which is the first
 to need flags) with the `donations.*` keys declared
@@ -324,6 +327,33 @@ Test-mode rows are removed with `npm run api:purge-test-donations`
 transaction, only with a backup from the last 24 hours). Expense types are public facts of a published expense
 and are read from `treasury_entry_expense_types` by entry id (module 1b).
 
+**Public Treasury API (module 1b):** `GET /api/treasury/overview?currency=`
+(Med. donation, Expenses total and count per currency, the banner flag,
+the last visible change, and the filter values that have data — currencies,
+expense types, first and last date; Balance and Sustainability are `null`
+until Wise), `GET /api/treasury/entries?type&currency&from&to&expenseType&sort&page&pageSize`
+(type `expense` or `donation` — donations with their refunds and disputes;
+sorts by date or absolute amount) and `GET /api/treasury/entries/:number`.
+On top of the view and the mode rule: while `treasury.publish_unqualified`
+is off only Qualified / Not required entries are public, even one published
+while it was on; a recipient's name is selected only while
+`treasury.public_recipient_names` is on. Every response is cached by the
+web server under the `treasury` tag (on-demand revalidation after each
+change — Stripe webhooks, admin publication and review, applied Treasury
+imports — and a 5-minute fallback).
+
+**Admin rules (module 1b, `/api/admin/treasury`):** Notion-managed entries
+are read-only (409 `managed_in_notion`) — edit in Notion, then import;
+native Stripe entries change only their internal note and publication;
+publishing needs the public mode (never a test-mode entry in production),
+a public description once reviewed, and `treasury.publish_unqualified` for
+an unqualified one; review statuses apply to native expenses only, and
+Qualified / Not required are offered only with a recipient. The record's
+`permissions` block carries these rules (with the reason when refused) so
+the page never offers a refused action. Owner role only until `treasury.*`
+permissions exist (Q8). No create or delete endpoint: expenses come from
+Notion, donations from Stripe.
+
 Native Stripe entries (module 1): `managed_by = 'native'`, `source =
 'stripe'`, review `not_required`, published at once; name / public
 description "Anonymous donation", "Donation refund" / "Refunded donation",
@@ -354,12 +384,20 @@ Monthly donors = active subscriptions of the public mode.
 | `content_type` | text | `application/pdf`, `image/png`, `image/jpeg` (CHECK) |
 | `size_bytes` | integer | 1 … 20 MB (CHECK, Q5) |
 | `sha256` | char(64) | Hex; unique per entry |
-| `storage_key` | text | Unique; opaque key for the storage adapter |
+| `storage_key` | text | Opaque key for the storage adapter (`sha256/<2>/<sha256>`): content-addressed, so the same file attached to two entries is stored once; indexed, not unique. The bytes are removed when the last document using them is deleted |
 | `uploaded_by_admin_id` | uuid → admin_users `set null` | |
 | `uploaded_at` | timestamptz | |
 
-*Private* entirely. Deleting a document is an audited action; whether
-files may ever be deleted (accounting retention) is Q5/Q11.
+*Private* entirely: listed, uploaded, downloaded and deleted only by the
+owner in the admin (`/api/admin/treasury/:id/documents`,
+`/api/admin/treasury/documents/:id`, always `Content-Disposition:
+attachment`, `nosniff`, `no-store`); never in a public response. The type is
+judged from the file's bytes (PDF, PNG or JPEG), never its name. Files live
+behind the file-storage adapter (`FILE_STORAGE_DIR`, production
+`/var/lib/global-experiment/files`: outside the web root, in the backups);
+an S3-compatible adapter can replace it without a schema change (Q5).
+Deleting a document becomes an audited action with module 2; whether files
+may ever be deleted (accounting retention) is Q5/Q11.
 
 ### 4.4 `stripe_events` (exactly-once webhook processing)
 

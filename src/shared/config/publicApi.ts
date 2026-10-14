@@ -82,3 +82,79 @@ export function fetchDonationSummary(currency: DonationCurrency): Promise<ApiRes
 export function fetchCheckoutStatus(sessionId: string): Promise<ApiResult<CheckoutStatus>> {
   return getJson(`/api/donations/checkout/${encodeURIComponent(sessionId)}`, { cache: "no-store" });
 }
+
+/** One public Treasury entry (apps/api/src/treasury/treasury-public.contracts.ts). No personal data. */
+export interface PublicTreasuryEntry {
+  number: number;
+  type: "donation" | "expense" | "refund" | "dispute";
+  currency: DonationCurrency;
+  /** Signed minor units: expenses and refunds are negative. */
+  amount: number;
+  cadence: string;
+  occurredOn: string;
+  occurredAt: string | null;
+  publishedAt: string;
+  /** False → "Not qualified yet" (listed only while unqualified entries may be published). */
+  qualified: boolean;
+  description: string | null;
+  expenseTypes: { key: string; label: string }[];
+  /** Only while recipient names are public (treasury.public_recipient_names). */
+  recipient: { kind: "person" | "organization"; name: string } | null;
+  adjustsNumber: number | null;
+}
+
+export interface TreasuryOverview {
+  currency: DonationCurrency;
+  wiseConnected: boolean;
+  balance: number | null;
+  sustainability: number | null;
+  medianDonation: number | null;
+  donationCount: number;
+  expensesTotal: number;
+  expenseCount: number;
+  donationAppeal: boolean;
+  lastUpdatedAt: string | null;
+  filters: { currencies: DonationCurrency[]; expenseTypes: { key: string; label: string }[]; firstDate: string | null; lastDate: string | null };
+}
+
+export interface TreasuryEntriesQuery {
+  type?: "expense" | "donation";
+  currency?: readonly string[];
+  from?: string;
+  to?: string;
+  expenseType?: readonly string[];
+  sort?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface TreasuryEntriesPage {
+  items: PublicTreasuryEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+const treasuryCache = { next: { revalidate: TREASURY_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.treasury] } };
+
+export function fetchTreasuryOverview(currency: DonationCurrency): Promise<ApiResult<TreasuryOverview>> {
+  return getJson(`/api/treasury/overview?currency=${currency}`, treasuryCache);
+}
+
+export function fetchTreasuryEntries(query: TreasuryEntriesQuery): Promise<ApiResult<TreasuryEntriesPage>> {
+  const params = new URLSearchParams();
+  if (query.type) params.set("type", query.type);
+  if (query.currency?.length) params.set("currency", query.currency.join(","));
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  if (query.expenseType?.length) params.set("expenseType", query.expenseType.join(","));
+  if (query.sort) params.set("sort", query.sort);
+  if (query.page) params.set("page", String(query.page));
+  if (query.pageSize) params.set("pageSize", String(query.pageSize));
+  const search = params.toString();
+  return getJson(`/api/treasury/entries${search ? `?${search}` : ""}`, treasuryCache);
+}
+
+export function fetchTreasuryEntry(number: number): Promise<ApiResult<PublicTreasuryEntry>> {
+  return getJson(`/api/treasury/entries/${number}`, treasuryCache);
+}

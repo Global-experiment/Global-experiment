@@ -1,8 +1,9 @@
-import { Inject, Injectable, type OnApplicationBootstrap, type OnApplicationShutdown } from "@nestjs/common";
+import { Inject, Injectable, type OnApplicationBootstrap, type OnModuleInit } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
 import type { AppConfig } from "../common/config/env.js";
+import { everyMinutesCron, JOB_QUEUE, type JobQueue } from "../jobs/job-queue.js";
 import { PUBLIC_CACHE_TAGS, RevalidationService } from "../revalidation/revalidation.service.js";
 import { amountsFromBalance, TreasuryLedgerRepository } from "../treasury/treasury-ledger.repository.js";
 import { STRIPE_GATEWAY, type StripeGateway } from "./stripe.gateway.js";
@@ -13,12 +14,13 @@ const BATCH = 50;
  * Late fees: some payment methods settle after the webhook, so Stripe's
  * balance transaction (and thus the fee) isn't known yet. Every
  * STRIPE_FEE_RECONCILE_MINUTES this fills fee and net for those entries —
- * once; known amounts are never overwritten. A timer in the API process
- * for now; it moves to the job runner with module 1b (roadmap).
+ * once; known amounts are never overwritten. A scheduled job on the job
+ * queue (overview §3.3, roadmap 1b): one run at a time, wherever it runs.
  */
+export const FEE_RECONCILE_QUEUE = "stripe.fee-reconcile";
+
 @Injectable()
-export class StripeFeeReconciliationService implements OnApplicationBootstrap, OnApplicationShutdown {
-  private timer: NodeJS.Timeout | undefined;
+export class StripeFeeReconciliationService implements OnModuleInit, OnApplicationBootstrap {
   private running = false;
 
   constructor(
@@ -28,20 +30,24 @@ export class StripeFeeReconciliationService implements OnApplicationBootstrap, O
     private readonly ledger: TreasuryLedgerRepository,
     private readonly revalidation: RevalidationService,
     private readonly logger: PinoLogger,
+    @Inject(JOB_QUEUE) private readonly queue: JobQueue,
   ) {
     this.logger.setContext(StripeFeeReconciliationService.name);
   }
 
-  onApplicationBootstrap(): void {
-    const minutes = this.config.stripe.feeReconcileMinutes;
-    // Tests call reconcile() directly; a timer would race them.
-    if (!this.stripe || minutes === 0 || this.config.nodeEnv === "test") return;
-    this.timer = setInterval(() => void this.reconcile(), minutes * 60_000);
-    this.timer.unref();
+  onModuleInit(): void {
+    this.queue.define(FEE_RECONCILE_QUEUE, () => this.reconcile(), { policy: "exclusive", retryLimit: 0, expireInSeconds: 600 });
   }
 
-  onApplicationShutdown(): void {
-    clearInterval(this.timer);
+  /** Every STRIPE_FEE_RECONCILE_MINUTES (0 or no Stripe: off). Tests call reconcile() directly. */
+  async onApplicationBootstrap(): Promise<void> {
+    const minutes = this.config.stripe.feeReconcileMinutes;
+    const cron = this.stripe && minutes > 0 ? everyMinutesCron(minutes) : null;
+    try {
+      await this.queue.schedule(FEE_RECONCILE_QUEUE, "every", cron, {});
+    } catch (error) {
+      this.logger.error({ reason: error instanceof Error ? error.name : "unknown" }, "Couldn't schedule the Stripe fee fill-in");
+    }
   }
 
   /** One pass; returns how many entries got their fee. */

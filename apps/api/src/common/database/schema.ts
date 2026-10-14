@@ -9,4 +9,5 @@ export * from "../../organizations/organizations.schema.js";
 export * from "../../people/people.schema.js";
 export * from "../../settings/settings.schema.js";
 export * from "../../stripe/stripe.schema.js";
+export * from "../../treasury/treasury-documents.schema.js";
 export * from "../../treasury/treasury.schema.js";

@@ -63,12 +63,13 @@ test.describe("qualification opens over the page you came from (item 5)", () => 
   });
 
   test("the same launcher serves Treasury's stat sheets", async ({ page }) => {
+    test.skip(!process.env.E2E_ADMIN_ENABLED, "The Treasury stats come from the API (TEST_DATABASE_URL isn't configured).");
     await page.goto("/treasury");
-    await page.getByRole("button", { name: /Balance/ }).click();
-    await page.getByRole("dialog", { name: "Balance" }).getByRole("link", { name: "Report issue" }).click();
+    await page.getByRole("button", { name: /Med. donation/ }).click();
+    await page.getByRole("dialog", { name: "Median donation" }).getByRole("link", { name: "Report issue" }).click();
     const picker = page.getByRole("dialog", { name: "Issue type" });
     await expect(picker).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "Balance" })).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Median donation" })).toBeHidden();
     await expect(page).toHaveURL("/treasury");
     await picker.getByRole("button", { name: "Report issue" }).click();
     await expect(page).toHaveURL("/issue?source=%2Ftreasury&qualified=1");
@@ -250,9 +251,11 @@ test.describe("mobile", () => {
   });
 
   test("a long sheet's own content still scrolls normally; a downward swipe while scrolled scrolls back instead of dragging", async ({ page }) => {
-    await page.setViewportSize({ width: 412, height: 480 });
+    test.skip(!process.env.E2E_ADMIN_ENABLED, "The banner comes from the API (TEST_DATABASE_URL isn't configured).");
+    await page.setViewportSize({ width: 412, height: 380 });
     await page.goto("/treasury");
-    await page.getByRole("button", { name: /Sustainability/ }).click();
+    // The "Cry for donation" banner's "sustainability" explains the score (the stat itself waits for Wise).
+    await page.getByRole("button", { name: "sustainability", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Sustainability" });
     await expect(dialog).toBeVisible();
     await page.waitForTimeout(350);

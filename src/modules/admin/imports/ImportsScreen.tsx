@@ -9,7 +9,7 @@ import { useToast } from "../ui/Toast";
 import { canApply, formatWhen, jobLine, KIND_LABEL, MODE_LABEL, runChanges, runKindLabel } from "./importDisplay";
 
 const POLL_MS = 1000;
-const KINDS: ImportKind[] = ["taxonomy", "directory"];
+const KINDS: ImportKind[] = ["taxonomy", "directory", "treasury"];
 
 /**
  * /admin/imports — the "Notion import" page. Dry runs and applies run as

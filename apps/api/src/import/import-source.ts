@@ -3,9 +3,10 @@ import type { AppConfig } from "../common/config/env.js";
 import { readDirectory, type DirectorySource } from "./directory/directory-source.js";
 import { NotionClient, type NotionDatabase, type NotionPage, type NotionReader } from "./notion/notion-client.js";
 import { readTaxonomy, type TaxonomySource } from "./taxonomy/taxonomy-source.js";
+import { readTreasury, type TreasurySource } from "./treasury/treasury-source.js";
 
-export type ImportKind = "taxonomy" | "directory";
-export const IMPORT_KINDS: readonly ImportKind[] = ["taxonomy", "directory"];
+export type ImportKind = "taxonomy" | "directory" | "treasury";
+export const IMPORT_KINDS: readonly ImportKind[] = ["taxonomy", "directory", "treasury"];
 
 /** Where the admin import page reads from. Injected, so API tests never call Notion. */
 export const IMPORT_SOURCE = Symbol("IMPORT_SOURCE");
@@ -15,11 +16,13 @@ export interface ImportSource {
   unavailable(kind: ImportKind): string | undefined;
   taxonomy(): Promise<TaxonomySource>;
   directory(): Promise<DirectorySource>;
+  treasury(): Promise<TreasurySource>;
 }
 
 const NEEDS: Record<ImportKind, (keyof AppConfig["notion"]["databases"])[]> = {
   taxonomy: ["domains", "fields", "expertise"],
   directory: ["people", "organizations"],
+  treasury: ["treasury"],
 };
 const VARIABLE: Record<keyof AppConfig["notion"]["databases"], string> = {
   domains: "NOTION_DOMAINS_DB_ID",
@@ -27,6 +30,7 @@ const VARIABLE: Record<keyof AppConfig["notion"]["databases"], string> = {
   expertise: "NOTION_EXPERTISE_DB_ID",
   people: "NOTION_PEOPLE_DB_ID",
   organizations: "NOTION_ORGANIZATIONS_DB_ID",
+  treasury: "NOTION_TREASURY_DB_ID",
 };
 
 /** The live source: the Notion API with the server's token (never sent to the browser). */
@@ -41,13 +45,14 @@ export function notionImportSource(config: AppConfig): ImportSource {
     unavailable,
     taxonomy: () => readTaxonomy(client(), { domains: databases.domains!, fields: databases.fields!, expertise: databases.expertise! }),
     directory: () => readDirectory(client(), { people: databases.people!, organizations: databases.organizations! }),
+    treasury: () => readTreasury(client(), databases.treasury!),
   };
 }
 
 /**
  * Tests only (NODE_ENV=test, enforced by the config): a JSON file shaped
  * like the Notion API — `{ "<database>": { "properties": {…}, "pages": […] } }`
- * for domains, fields, expertise, people, organizations — read through the
+ * for domains, fields, expertise, people, organizations, treasury — read through the
  * very same mapping code as Notion.
  */
 export function fixtureImportSource(file: string): ImportSource {
@@ -76,6 +81,7 @@ export function fixtureImportSource(file: string): ImportSource {
     unavailable: () => undefined,
     taxonomy: () => readTaxonomy(reader(), { domains: "domains", fields: "fields", expertise: "expertise" }),
     directory: () => readDirectory(reader(), { people: "people", organizations: "organizations" }),
+    treasury: () => readTreasury(reader(), "treasury"),
   };
 }
 

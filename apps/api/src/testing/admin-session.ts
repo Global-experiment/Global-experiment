@@ -31,6 +31,8 @@ export async function signedInAdmin(t: TestApp) {
     patch: (path: string, body: object) => withAuth(server().patch(path)).send(body),
     put: (path: string) => withAuth(server().put(path)),
     delete: (path: string) => withAuth(server().delete(path)),
+    /** multipart/form-data with one file field. */
+    upload: (path: string, field: string, bytes: Buffer, fileName: string) => withAuth(server().post(path)).attach(field, bytes, fileName),
   };
 }
 
