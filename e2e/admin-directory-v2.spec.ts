@@ -15,8 +15,8 @@ const STATE = "test-results/.auth/admin-directory-v2.json";
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage({ storageState: { cookies: [], origins: [] } });
   await page.goto("/admin/login");
-  await page.getByLabel("Email").fill(E2E_ADMIN.email);
-  await page.getByLabel("Password").fill(E2E_ADMIN.password);
+  await page.getByLabel("Email address").fill(E2E_ADMIN.email);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_ADMIN.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/admin\/people/, { timeout: 15_000 });
   mkdirSync("test-results/.auth", { recursive: true });
@@ -34,8 +34,7 @@ test("pick expertise on a person: server search with path and team chips, chips 
   await rows(page).first().getByRole("link").click();
   await expect(page).toHaveURL(/\/admin\/people\/de000000-/);
 
-  await page.getByRole("button", { name: "Add expertise" }).click();
-  const picker = page.getByRole("dialog", { name: "Add expertise" });
+  const picker = page.getByRole("list", { name: "Expertise results" });
   // Deprecated expertise isn't offered.
   await page.getByLabel("Search expertise").fill("copywriting");
   await expect(picker).toContainText("No matches.");
@@ -55,7 +54,7 @@ test("pick expertise on a person: server search with path and team chips, chips 
   await expect(page.getByLabel("Expertise rollup")).toContainText("Product design");
   await expect(page.getByLabel("Expertise rollup")).toContainText("Design");
 
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "Remove Interaction design" })).toBeVisible();
@@ -66,7 +65,8 @@ test("the completeness indicator follows the form", async ({ page }) => {
   await rows(page).first().getByRole("link").click();
   const completeness = page.getByRole("status").filter({ hasText: /^(Complete|Missing: )/ });
   await expect(completeness).toBeVisible();
-  await page.getByLabel("State").selectOption("");
+  // Pressing the selected State pill clears it.
+  await page.getByRole("group", { name: "State" }).locator("[aria-pressed=true]").click();
   await expect(completeness).toContainText("State");
 });
 
@@ -92,36 +92,53 @@ test("filter overdue follow-ups, and show the optional Completeness column", asy
   await expect(page.getByRole("columnheader", { name: "Completeness", exact: true })).toBeVisible();
 });
 
-test("taxonomy screens are read-only, with domain / status / team / Stable ID filters", async ({ page }) => {
+test("taxonomy screens are read-only, with the list toolbar: domain / status / team filters and search", async ({ page }) => {
   await page.goto("/admin/expertise");
   await expect(page.getByText("Managed in Notion – updated by the importer.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Rename|Delete/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Rename|Delete|New/ })).toHaveCount(0);
   const counter = page.getByRole("status").filter({ hasText: / of \d+$/ });
-  await expect(counter).toHaveText("24 of 24");
+  await expect(counter).toHaveText("1–24 of 24");
 
-  await page.getByLabel("Domain").selectOption({ label: "Design" });
-  await expect(counter).toHaveText("5 of 24");
-  await page.getByLabel("Status").selectOption({ label: "Deprecated" });
-  await expect(counter).toHaveText("1 of 24");
+  await page.getByRole("button", { name: "Filter" }).click();
+  const popover = page.getByRole("dialog", { name: "Filters" });
+  await popover.locator("li").nth(0).getByLabel("Field").selectOption("domain");
+  await popover.locator("li").nth(0).getByLabel("Value").selectOption({ label: "Design" });
+  await expect(counter).toHaveText("1–5 of 5");
+  await popover.getByRole("button", { name: "New filter" }).click();
+  await popover.locator("li").nth(1).getByLabel("Field").selectOption("status");
+  await popover.locator("li").nth(1).getByLabel("Value").selectOption({ label: "Deprecated" });
+  await expect(counter).toHaveText("1–1 of 1");
   await expect(page.getByRole("cell", { name: "Copywriting", exact: true })).toBeVisible();
+  await popover.getByRole("button", { name: "Remove all filters" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/admin\/expertise$/);
+  await expect(counter).toHaveText("1–24 of 24");
 
-  await page.getByRole("button", { name: "Clear filters" }).click();
-  await page.getByLabel("Search expertise by name or Stable ID").fill("02.01.");
-  await expect(counter).toHaveText("3 of 24"); // Design > Product design
-  await page.getByLabel("Search expertise by name or Stable ID").fill("");
-  await page.getByLabel("Team").selectOption({ label: "Treasury" });
+  await page.getByRole("searchbox", { name: "Search expertise" }).fill("02.01.");
+  await expect(counter).toHaveText("1–3 of 3"); // Design > Product design
+  await page.getByRole("searchbox", { name: "Search expertise" }).fill("");
+  await expect(counter).toHaveText("1–24 of 24");
+  await page.getByRole("button", { name: "Filter" }).click();
+  await popover.locator("li").nth(0).getByLabel("Field").selectOption("team");
+  await popover.locator("li").nth(0).getByLabel("Value").selectOption({ label: "Treasury" });
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/filter=team%3Ais%3Atreasury/);
   // Columns: Name, Stable ID, Status, Field, Domain, Teams, People, Organizations.
-  const teamCells = await page.locator("tbody tr td:nth-child(6)").allInnerTexts();
-  expect(teamCells.length).toBeGreaterThan(0);
-  for (const teams of teamCells) expect(teams).toContain("Treasury");
+  await expect(page.getByRole("columnheader", { name: "Teams", exact: true })).toBeVisible();
+  await expect
+    .poll(async () => {
+      const teamCells = await page.locator("tbody tr td:nth-child(6)").allInnerTexts();
+      return teamCells.length > 0 && teamCells.every((teams) => teams.includes("Treasury"));
+    })
+    .toBe(true);
 
   await page.goto("/admin/domains");
-  await expect(page.getByRole("status").filter({ hasText: / of \d+$/ })).toHaveText("4 of 4");
+  await expect(page.getByRole("status").filter({ hasText: / of \d+$/ })).toHaveText("1–4 of 4");
 });
 
 test("run a taxonomy dry run from the import page", async ({ page }) => {
   await page.goto("/admin/people");
-  await page.getByRole("link", { name: "Notion import" }).click();
+  await page.getByRole("link", { name: "Import Notion" }).click();
   await expect(page).toHaveURL(/\/admin\/imports$/);
   await expect(page.getByRole("heading", { name: "Notion import", level: 1 })).toBeVisible();
 

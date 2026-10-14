@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
 import { z } from "zod";
@@ -15,6 +15,17 @@ export const LoginRequest = z.object({
   password: z.string().min(1).max(1024),
 });
 export type LoginRequest = z.infer<typeof LoginRequest>;
+
+/** A blank name clears it (the user card then shows the email's local part). */
+export const ProfileRequest = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .max(80, "Display name must be 80 characters or fewer.")
+    .nullable()
+    .transform((value) => value || null),
+});
+export type ProfileRequest = z.infer<typeof ProfileRequest>;
 
 const LOGIN_LIMIT = { default: { limit: 5, ttl: 15 * 60 * 1000 } };
 
@@ -47,6 +58,16 @@ export class AuthController {
   @Get("session")
   session(@Req() req: AdminRequest) {
     if (!req.admin) throw new UnauthenticatedError();
-    return { admin: { id: req.admin.id, email: req.admin.email, role: req.admin.role } };
+    const { id, email, role, displayName } = req.admin;
+    return { admin: { id, email, role, displayName } };
+  }
+
+  /** PATCH /api/admin/auth/profile — the signed-in admin's own display name. */
+  @Patch("profile")
+  async updateProfile(@Req() req: AdminRequest, @Body(new ZodValidationPipe(ProfileRequest)) body: ProfileRequest) {
+    if (!req.admin) throw new UnauthenticatedError();
+    await this.auth.setDisplayName(req.admin.id, body.displayName);
+    const { id, email, role } = req.admin;
+    return { admin: { id, email, role, displayName: body.displayName } };
   }
 }

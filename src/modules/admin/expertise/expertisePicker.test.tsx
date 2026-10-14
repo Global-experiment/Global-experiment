@@ -67,7 +67,7 @@ describe("expertise picker rendering", () => {
 
   it("renders linked expertise as chips with the path tooltip and a remove button each", () => {
     const html = renderToStaticMarkup(
-      <RelationPicker label="Expertise" display="chips" selected={[linkedExpertiseOption(assemblies), linkedExpertiseOption(petitions)]} onChange={() => undefined} search={noSearch} />,
+      <RelationPicker label="Expertise" selected={[linkedExpertiseOption(assemblies), linkedExpertiseOption(petitions)]} onChange={() => undefined} search={noSearch} />,
     );
     expect(html).toContain('aria-label="Linked expertise"');
     expect(html).toContain('title="Government &gt; Participation &gt; Citizen assemblies"');
@@ -75,22 +75,25 @@ describe("expertise picker rendering", () => {
     // The Deprecated one is greyed out, and its status is readable by screen readers.
     expect(html).toMatch(/data-muted="true"[^>]*title="Government &gt; Participation &gt; Petitions \(Deprecated\)"|title="Government &gt; Participation &gt; Petitions \(Deprecated\)"[^>]*data-muted="true"/);
     expect(html).toContain('<span class="sr-only">Government &gt; Participation &gt; Petitions (Deprecated)</span>');
-    expect(html).toContain("Add expertise");
+    // Figma's inline search line (a combobox), not an "Add" button.
+    expect(html).toContain('role="combobox"');
+    expect(html).toContain('placeholder="Search"');
   });
 
   it("shows the Fields / Domains rollup under the chips", () => {
-    const html = renderToStaticMarkup(<ExpertiseField selected={[assemblies, optics].map(linkedExpertiseOption)} onChange={() => undefined} />);
+    const hint = "People can have up to 10 expertise.";
+    const html = renderToStaticMarkup(<ExpertiseField selected={[assemblies, optics].map(linkedExpertiseOption)} onChange={() => undefined} limitMessage={hint} />);
     expect(html).toContain('aria-label="Expertise rollup"');
     expect(html).toContain("<dt>Fields</dt><dd>Participation, Physics</dd>");
     expect(html).toContain("<dt>Domains</dt><dd>Government, Science</dd>");
-    expect(renderToStaticMarkup(<ExpertiseField selected={[]} onChange={() => undefined} />)).not.toContain("Expertise rollup");
+    expect(renderToStaticMarkup(<ExpertiseField selected={[]} onChange={() => undefined} limitMessage={hint} />)).not.toContain("Expertise rollup");
   });
 
-  it("keeps the line layout (with record links) for other relations", () => {
+  it("links a chip's label to the record when the option has one", () => {
     const html = renderToStaticMarkup(
       <RelationPicker label="Organization" selected={[{ id: "o1", label: "Civic Lab", href: "/admin/organizations/o1" }]} onChange={() => undefined} search={noSearch} />,
     );
     expect(html).toContain('href="/admin/organizations/o1"');
-    expect(html).not.toContain("Linked organization");
+    expect(html).toContain('aria-label="Linked organization"');
   });
 });

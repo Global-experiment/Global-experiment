@@ -81,6 +81,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: /admin-figma.spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -90,6 +91,14 @@ export default defineConfig({
         // (Chromium-only permission names: WebKit rejects them.)
         permissions: ["clipboard-read", "clipboard-write"],
       },
+    },
+    // The Figma conformance suite duplicates a record, which would change the
+    // fixture counts the other admin specs assert: it runs after them.
+    {
+      name: "chromium-figma",
+      dependencies: ["chromium"],
+      testMatch: /admin-figma.spec.ts/,
+      use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine
     // too (it handles scrollbar-gutter differently): only that spec runs

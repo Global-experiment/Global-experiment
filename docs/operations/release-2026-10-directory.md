@@ -149,6 +149,10 @@ npm ci
 npm run build                                     # website (reads ADMIN_API_ORIGIN from .env.local)
 grep -c 'api/admin' .next/routes-manifest.json    # Expected: 1 or more (admin proxy built in)
 npm run api:build
+# The build runs as root; the website runs as globalexp and writes its page cache here
+# ("Failed to update prerender cache … EACCES" otherwise — fixed on 2026-10-14):
+chown -R globalexp:globalexp /opt/global-experiment/.next
+stat -c '%U' /opt/global-experiment/.next/cache    # Expected: globalexp
 ```
 
 **Stop** if `git pull` refuses (local changes) or a build fails — the
@@ -414,6 +418,7 @@ with_env sh -c 'psql "$DATABASE_URL" -At -c "select current_database(), count(*)
 git checkout 4eb86de
 npm ci && npm run build && npm run api:build
 grep -c 'api/admin' .next/routes-manifest.json    # 1 or more
+chown -R globalexp:globalexp /opt/global-experiment/.next   # the website writes its cache here (see step 2)
 
 systemctl start global-experiment-api.service global-experiment.service
 # then the health checks of step 7 — the running API database is global_experiment_demo_dev again

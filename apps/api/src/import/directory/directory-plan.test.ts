@@ -295,3 +295,81 @@ describe("directory import plan", () => {
     expect(plan.ignored).toMatchObject({ expensesLinks: 3, accessGrantLinks: 3 });
   });
 });
+
+describe("directory import plan: relationship limits", () => {
+  const pages = (prefix: string, count: number) => Array.from({ length: count }, (_, index) => `${prefix}-${index + 1}`);
+  const expertiseSnapshot = (count: number, parts: Partial<DirectorySnapshot> = {}) =>
+    snapshot({
+      expertiseByPage: new Map(pages("exp-page", count).map((page, index) => [page, `EXP${index + 1}`])),
+      expertiseNames: new Map(pages("exp-page", count).map((_, index) => [`EXP${index + 1}`, `Skill ${index + 1}`])),
+      ...parts,
+    });
+
+  it("imports a person's first 10 expertise in Notion order, flags the person and lists the ones left out", () => {
+    const plan = planDirectoryImport(source([], [person("p1", "Ada Lovelace", { expertisePageIds: pages("exp-page", 12) })]), expertiseSnapshot(12));
+
+    expect(plan.personExpertise.add.map((link) => link.expertiseId)).toEqual(pages("EXP", 10).map((_, index) => `EXP${index + 1}`));
+    expect(plan.issues.filter((i) => i.code === "over_limit").map((i) => [i.kind, i.detail])).toEqual([
+      ["flagged", "Has 12 expertise (max 10): the first 10 from Notion imported, 2 left out (listed under Links skipped)."],
+      ["link_skipped", 'Expertise link to "Skill 11" left out: over the limit of 10 expertise per person.'],
+      ["link_skipped", 'Expertise link to "Skill 12" left out: over the limit of 10 expertise per person.'],
+    ]);
+    expect(countDirectoryPlan(plan).person.flagged).toBe(1);
+  });
+
+  it("caps an organization's expertise at 10 as well", () => {
+    const plan = planDirectoryImport(source([org("o1", "Civic Lab", { expertisePageIds: pages("exp-page", 11) })], []), expertiseSnapshot(11));
+    expect(plan.organizationExpertise.add).toHaveLength(10);
+    expect(issues(plan).filter((i) => i.includes("over_limit"))).toEqual([
+      "flagged:over_limit:Civic Lab",
+      "link_skipped:over_limit:Civic Lab",
+    ]);
+  });
+
+  it("keeps a person's first 5 organizations: the person's own list first, then links from the organizations' side", () => {
+    const organizations = pages("o", 7).map((page, index) => org(page, `Org ${index + 1}`));
+    // The person lists o-1…o-4; o-5, o-6 and o-7 list the person from their side.
+    organizations[4] = { ...organizations[4]!, peoplePageIds: ["p1"] };
+    organizations[5] = { ...organizations[5]!, peoplePageIds: ["p1"] };
+    organizations[6] = { ...organizations[6]!, peoplePageIds: ["p1"] };
+    const plan = planDirectoryImport(source(organizations, [person("p1", "Ada Lovelace", { organizationPageIds: pages("o", 4) })]), snapshot());
+
+    expect(plan.personOrganization.add.map((link) => ("pageId" in link.organization ? link.organization.pageId : ""))).toEqual(["o-1", "o-2", "o-3", "o-4", "o-5"]);
+    expect(plan.issues.filter((i) => i.code === "over_limit").map((i) => i.detail)).toEqual([
+      "Has 7 organizations (max 5): the first 5 from Notion imported, 2 left out (listed under Links skipped).",
+      'Link to organization "Org 6" left out: over the limit of 5 organizations per person.',
+      'Link to organization "Org 7" left out: over the limit of 5 organizations per person.',
+    ]);
+  });
+
+  it("counts links the import leaves alone (to admin-made records) first, and removes imported links over the cap", () => {
+    // P1 (imported earlier) has 2 links to admin-made organizations and 1 imported link that Notion now lists 4th.
+    const db = { people: [dbPerson("P1", { notionPageId: "p1", name: "Ada Lovelace" })], organizations: [dbOrg("A1"), dbOrg("A2"), ...pages("o", 4).map((page, index) => dbOrg(`O${index + 1}`, { notionPageId: page, name: `Org ${index + 1}` }))] };
+    const plan = planDirectoryImport(
+      source(
+        pages("o", 4).map((page, index) => org(page, `Org ${index + 1}`)),
+        [person("p1", "Ada Lovelace", { organizationPageIds: pages("o", 4) })],
+      ),
+      snapshot({
+        ...db,
+        personOrganization: [
+          { personId: "P1", organizationId: "A1" },
+          { personId: "P1", organizationId: "A2" },
+          { personId: "P1", organizationId: "O4" },
+        ],
+      }),
+    );
+    // 2 kept + 3 from Notion = 5. O4 is over the cap: not kept.
+    expect(plan.personOrganization.add.map((link) => ("dbId" in link.organization ? link.organization.dbId : ""))).toEqual(["O1", "O2", "O3"]);
+    expect(plan.personOrganization.remove).toEqual([{ personId: "P1", organizationId: "O4" }]);
+    expect(plan.issues.find((i) => i.kind === "flagged" && i.code === "over_limit")?.detail).toBe(
+      "Has 6 organizations (max 5): 2 existing kept, the first 3 from Notion imported, 1 left out (listed under Links skipped).",
+    );
+  });
+
+  it("leaves records within the limits unflagged", () => {
+    const plan = planDirectoryImport(source([], [person("p1", "Ada Lovelace", { expertisePageIds: pages("exp-page", 10) })]), expertiseSnapshot(10));
+    expect(plan.personExpertise.add).toHaveLength(10);
+    expect(plan.issues.filter((i) => i.code === "over_limit")).toEqual([]);
+  });
+});

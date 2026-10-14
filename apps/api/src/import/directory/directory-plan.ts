@@ -1,3 +1,4 @@
+import { RELATION_LIMITS } from "../../common/relation-limits.js";
 import { demoMarkers } from "../demo-markers.js";
 import { vocabularyMatcher, type Vocabulary } from "../taxonomy/taxonomy-plan.js";
 import type { DirectorySource, SourceOrganization, SourcePerson } from "./directory-source.js";
@@ -20,6 +21,11 @@ import type { DirectorySource, SourceOrganization, SourcePerson } from "./direct
  *   doesn't is removed only between two records of this import (manual
  *   links to admin-made records are never touched).
  * - Records Notion no longer has are reported, never deleted.
+ * - Relationship caps (common/relation-limits.ts): a person keeps at most
+ *   5 organizations and 10 expertise, an organization 10 expertise. Over
+ *   the cap, the first ones in Notion order are imported (after any links
+ *   the import leaves alone), the record is flagged, and every link left
+ *   out is listed.
  */
 
 export type DirectoryKind = "organization" | "person";
@@ -62,6 +68,8 @@ export interface DirectorySnapshot {
   organizationExpertise: { organizationId: string; expertiseId: string }[];
   /** Expertise items imported from Notion: page id → row id. */
   expertiseByPage: Map<string, string>;
+  /** Expertise row id → name, for reporting links left out over the limit. */
+  expertiseNames?: Map<string, string>;
   states: Vocabulary[];
   sources: Vocabulary[];
 }
@@ -79,6 +87,7 @@ export type IssueCode =
   | "unresolved_organization"
   | "unresolved_person"
   | "unresolved_expertise"
+  | "over_limit"
   | "missing_from_notion";
 
 export type IssueKind = "skipped" | "flagged" | "value_skipped" | "link_skipped" | "missing";
@@ -140,6 +149,8 @@ const byCreation = (a: { createdTime: string; pageId: string }, b: { createdTime
   a.createdTime.localeCompare(b.createdTime) || a.pageId.localeCompare(b.pageId);
 const key = (value: string | null) => value?.trim().toLowerCase() || null;
 const refKey = (ref: Ref) => ("dbId" in ref ? `db:${ref.dbId}` : `page:${ref.pageId}`);
+const overLimitDetail = (what: string, total: number, limit: number, imported: number, kept: number, left: number) =>
+  `Has ${total} ${what} (max ${limit}): ${kept > 0 ? `${kept} existing kept, ` : ""}the first ${imported} from Notion imported, ${left} left out (listed under Links skipped).`;
 
 export function planDirectoryImport(source: DirectorySource, snapshot: DirectorySnapshot): DirectoryPlan {
   const issues: Issue[] = [];
@@ -379,6 +390,34 @@ export function planDirectoryImport(source: DirectorySource, snapshot: Directory
   const existingPairs = new Set(snapshot.personOrganization.map((link) => `db:${link.personId}|db:${link.organizationId}`));
   const importedPeople = new Set(plannedPeople.map((record) => record.dbId).filter(Boolean));
   const importedOrganizations = new Set(plannedOrganizations.map((record) => record.dbId).filter(Boolean));
+
+  // Cap: a person keeps at most 5 organizations. Links this import leaves
+  // alone (to admin-made records) count first, then Notion's in Notion order
+  // (the person's own list, then links read from the organizations' side).
+  const keptOrganizations = new Map<string, number>();
+  for (const link of snapshot.personOrganization) {
+    if (importedPeople.has(link.personId) && importedOrganizations.has(link.organizationId)) continue;
+    keptOrganizations.set(`db:${link.personId}`, (keptOrganizations.get(`db:${link.personId}`) ?? 0) + 1);
+  }
+  const personByRef = new Map(people.map((record) => [refKey(personRef.get(record.pageId)!), record]));
+  const organizationName = new Map(plannedOrganizations.map((record) => [refKey(orgRef.get(record.pageId)!), record.values.name]));
+  const pairsByPerson = new Map<string, string[]>();
+  for (const [id, pair] of pairs) pairsByPerson.set(refKey(pair.person), [...(pairsByPerson.get(refKey(pair.person)) ?? []), id]);
+  for (const [personKey, ids] of pairsByPerson) {
+    const kept = keptOrganizations.get(personKey) ?? 0;
+    const allowance = Math.max(0, RELATION_LIMITS.organizationsPerPerson - kept);
+    if (ids.length <= allowance) continue;
+    const person = personByRef.get(personKey)!;
+    const left = ids.slice(allowance).map((id) => {
+      const pair = pairs.get(id)!;
+      pairs.delete(id);
+      return organizationName.get(refKey(pair.organization)) ?? "(unknown)";
+    });
+    issue("person", person, "flagged", "over_limit", overLimitDetail("organizations", ids.length + kept, RELATION_LIMITS.organizationsPerPerson, allowance, kept, left.length));
+    for (const name of left) {
+      linkSkipped("person", person, "over_limit", `Link to organization "${name}" left out: over the limit of ${RELATION_LIMITS.organizationsPerPerson} organizations per person.`);
+    }
+  }
   const personOrganization: LinkPlan = {
     add: [...pairs].filter(([id]) => !existingPairs.has(id)).map(([, pair]) => pair),
     // Only between two records of this import: links to admin-made (or skipped / vanished) records stay.
@@ -407,6 +446,31 @@ export function planDirectoryImport(source: DirectorySource, snapshot: Directory
           continue;
         }
         desired.set(`${refKey(ref)}|${expertiseId}`, { owner: ref, expertiseId });
+      }
+    }
+    // Cap: at most 10 expertise per owner. Links this import never removes
+    // (to admin-made expertise, or on records outside the import) count first.
+    const kept = new Map<string, number>();
+    for (const link of existing) {
+      if (imported.has(link.ownerId) && notionExpertise.has(link.expertiseId)) continue;
+      kept.set(`db:${link.ownerId}`, (kept.get(`db:${link.ownerId}`) ?? 0) + 1);
+    }
+    const ownerByRef = new Map(owners.map((owner) => [refKey(refs.get(owner.pageId)!), owner]));
+    const byOwner = new Map<string, string[]>();
+    for (const [id, link] of desired) byOwner.set(refKey(link.owner), [...(byOwner.get(refKey(link.owner)) ?? []), id]);
+    for (const [ownerKey, ids] of byOwner) {
+      const keptCount = kept.get(ownerKey) ?? 0;
+      const allowance = Math.max(0, RELATION_LIMITS.expertise - keptCount);
+      if (ids.length <= allowance) continue;
+      const owner = ownerByRef.get(ownerKey)!;
+      const left = ids.slice(allowance).map((id) => {
+        const { expertiseId } = desired.get(id)!;
+        desired.delete(id);
+        return snapshot.expertiseNames?.get(expertiseId) ?? expertiseId;
+      });
+      issue(entity, owner, "flagged", "over_limit", overLimitDetail("expertise", ids.length + keptCount, RELATION_LIMITS.expertise, allowance, keptCount, left.length));
+      for (const name of left) {
+        linkSkipped(entity, owner, "over_limit", `Expertise link to "${name}" left out: over the limit of ${RELATION_LIMITS.expertise} expertise per ${entity}.`);
       }
     }
     const existingKeys = new Set(existing.map((link) => `db:${link.ownerId}|${link.expertiseId}`));

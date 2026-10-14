@@ -1,4 +1,6 @@
 import type { ExpertiseTree, VocabularyEntry } from "../api/types";
+import type { ListField } from "../table/fields";
+import type { LocalListSpec } from "../table/localList";
 
 export type TaxonomyLevel = "domain" | "field" | "expertise";
 
@@ -16,18 +18,6 @@ export interface TaxonomyRow {
   peopleCount: number;
   organizationCount: number;
 }
-
-export interface TaxonomyFilter {
-  /** Name or Stable ID, case-insensitive. */
-  q: string;
-  domainId: string;
-  fieldId: string;
-  /** A status key; "none" for rows without a status. */
-  status: string;
-  team: string;
-}
-
-export const EMPTY_FILTER: TaxonomyFilter = { q: "", domainId: "", fieldId: "", status: "", team: "" };
 
 /** The tree flattened to one level's rows, in domain → field → name order. */
 export function taxonomyRows(level: TaxonomyLevel, tree: ExpertiseTree): TaxonomyRow[] {
@@ -64,14 +54,57 @@ export function taxonomyRows(level: TaxonomyLevel, tree: ExpertiseTree): Taxonom
   });
 }
 
-export function filterTaxonomyRows(level: TaxonomyLevel, rows: readonly TaxonomyRow[], filter: TaxonomyFilter): TaxonomyRow[] {
-  const q = filter.q.trim().toLowerCase();
-  return rows.filter((row) => {
-    if (q && !row.name.toLowerCase().includes(q) && !(row.stableId ?? "").toLowerCase().includes(q)) return false;
-    if (filter.status && (row.status?.key ?? "none") !== filter.status) return false;
-    if (level !== "domain" && filter.domainId && row.domain.id !== filter.domainId) return false;
-    if (level === "expertise" && filter.fieldId && row.field?.id !== filter.fieldId) return false;
-    if (level === "expertise" && filter.team && !row.teams.some((team) => team.key === filter.team)) return false;
-    return true;
-  });
+const NO_STATUS = "none";
+
+/**
+ * What the list toolbar can filter and sort on, per level (filters run in
+ * the browser over the loaded tree — see table/localList.ts). Domain and
+ * field filter by id (names can repeat across domains) and sort by name.
+ */
+export function taxonomyListSpec(level: TaxonomyLevel): LocalListSpec<TaxonomyRow> {
+  return {
+    values: {
+      name: (row) => row.name,
+      stable_id: (row) => row.stableId,
+      status: (row) => row.status?.key ?? NO_STATUS,
+      domain: (row) => row.domain.id,
+      field: (row) => row.field?.id ?? null,
+      team: (row) => row.teams.map((team) => team.key),
+      fields: (row) => row.fieldCount,
+      expertise: (row) => row.itemCount,
+      people: (row) => row.peopleCount,
+      organizations: (row) => row.organizationCount,
+    },
+    sortValues: {
+      status: (row) => row.status?.label ?? null,
+      domain: (row) => row.domain.name,
+      field: (row) => row.field?.name ?? null,
+    },
+    searchText: (row) => [row.name, row.stableId, ...(level === "expertise" ? [row.field?.name ?? null, row.domain.name] : [])],
+  };
+}
+
+export function taxonomyFields(level: TaxonomyLevel, rows: readonly TaxonomyRow[]): ListField[] {
+  const unique = (entries: [string, string][]) => [...new Map(entries)].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  const statuses = unique(rows.map((row) => [row.status?.key ?? NO_STATUS, row.status?.label ?? "No status"]));
+  const domains = unique(rows.map((row) => [row.domain.id, row.domain.name]));
+  const fields = unique(rows.flatMap((row): [string, string][] => (row.field ? [[row.field.id, `${row.field.name} · ${row.domain.name}`]] : [])));
+  const teams = unique(rows.flatMap((row) => row.teams.map((team): [string, string] => [team.key, team.label])));
+  const count = (id: string, label: string): ListField => ({ id, label, icon: "numbers", operators: [], sort: "text" });
+  return [
+    { id: "name", label: "Name", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
+    { id: "stable_id", label: "Stable ID", icon: "title", operators: ["contains", "is_empty", "is_not_empty"], sort: "text" },
+    { id: "status", label: "Status", icon: "select", operators: ["is", "is_not"], options: statuses, sort: "text" },
+    ...(level === "domain" ? [] : [{ id: "domain", label: "Domain", icon: "arrow_outward", operators: ["is", "is_not"], options: domains, sort: "text" } satisfies ListField]),
+    ...(level === "expertise"
+      ? [
+          { id: "field", label: "Field", icon: "arrow_outward", operators: ["is", "is_not"], options: fields, sort: "text" } satisfies ListField,
+          { id: "team", label: "Teams", icon: "select", operators: ["is", "is_not", "is_empty", "is_not_empty"], options: teams } satisfies ListField,
+        ]
+      : []),
+    ...(level === "domain" ? [count("fields", "Fields")] : []),
+    ...(level === "expertise" ? [] : [count("expertise", "Expertise")]),
+    count("people", "People"),
+    count("organizations", "Organizations"),
+  ];
 }

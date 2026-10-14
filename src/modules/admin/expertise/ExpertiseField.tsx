@@ -2,6 +2,7 @@
 
 import { adminApi } from "../api/client";
 import type { ExpertiseSearchItem, Page } from "../api/types";
+import { RELATION_LIMITS } from "../relationLimits";
 import { RelationPicker, type RelationOption, type RelationSearchResult } from "../ui/RelationPicker";
 import { expertiseRollup, searchResultOption } from "./expertiseOptions";
 
@@ -16,15 +17,24 @@ export async function searchExpertise(text: string, signal: AbortSignal, page: n
 }
 
 /**
- * Expertise on a person / organization record: linked items as chips (full
- * path in the tooltip, greyed out unless Active), the picker, and the
- * Fields and Domains they roll up to — computed from the links, not stored.
+ * Expertise on a person / organization record: the inline picker (at most
+ * 10, as the API enforces), linked items as chips (full path in the
+ * tooltip, greyed out unless Active), and the Fields and Domains they roll
+ * up to — computed from the links, not stored.
  */
-export function ExpertiseField({ selected, onChange }: { selected: RelationOption[]; onChange: (next: RelationOption[]) => void }) {
+export function ExpertiseField({
+  selected,
+  onChange,
+  limitMessage,
+}: {
+  selected: RelationOption[];
+  onChange: (next: RelationOption[]) => void;
+  limitMessage: string;
+}) {
   const { fields, domains } = expertiseRollup(selected);
   return (
     <div className="flex flex-col gap-1">
-      <RelationPicker label="Expertise" display="chips" selected={selected} onChange={onChange} search={searchExpertise} />
+      <RelationPicker label="Expertise" selected={selected} onChange={onChange} search={searchExpertise} max={RELATION_LIMITS.expertise} limitMessage={limitMessage} />
       {selected.length > 0 ? (
         <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-meta text-text-muted" aria-label="Expertise rollup">
           <dt>Fields</dt>

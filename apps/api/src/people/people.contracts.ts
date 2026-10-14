@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { listQuerySchema } from "../common/listing/list-query.js";
+import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 
 /** Request contracts (validated) and response shapes (stable JSON) for /api/admin/people. */
 
@@ -14,10 +15,11 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
-const uniqueIds = z
-  .array(z.uuid())
-  .max(100)
-  .refine((ids) => new Set(ids).size === ids.length, "Duplicate ids.");
+const uniqueIds = (max: number, message: string) =>
+  z
+    .array(z.uuid())
+    .max(max, message)
+    .refine((ids) => new Set(ids).size === ids.length, "Duplicate ids.");
 
 const personFields = {
   name: z.string().trim().min(1, "Name is required.").max(200),
@@ -41,8 +43,8 @@ const personFields = {
   wiseRecipientId: optionalText(100),
   /** Next planned follow-up, a calendar date (YYYY-MM-DD). */
   nextFollowupOn: z.iso.date().nullable().optional(),
-  organizationIds: uniqueIds.optional(),
-  expertiseIds: uniqueIds.optional(),
+  organizationIds: uniqueIds(RELATION_LIMITS.organizationsPerPerson, LIMIT_MESSAGES.personOrganizations).optional(),
+  expertiseIds: uniqueIds(RELATION_LIMITS.expertise, LIMIT_MESSAGES.personExpertise).optional(),
 };
 
 export const CreatePersonRequest = z.strictObject(personFields);

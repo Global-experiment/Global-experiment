@@ -4,6 +4,7 @@ import { Highlight } from "@/shared/ui/Highlight";
 import { Icon } from "@/shared/ui/icons";
 import { formatPersonNumber, type ExpertiseTree, type Organization, type PeopleOptions, type Person } from "../api/types";
 import type { TableColumn } from "../table/DataTable";
+import { formatCalendarDay } from "../ui/RecordForm";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
 
@@ -12,8 +13,7 @@ export const PEOPLE_DEFAULT_SORT: SortRule[] = [{ field: "created", direction: "
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 export const formatDate = (iso: string | null) => (iso ? dateFormat.format(new Date(iso)) : "");
 /** A calendar date (YYYY-MM-DD) shown as that same day, whatever the viewer's time zone. */
-const calendarFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-export const formatCalendarDate = (day: string | null) => (day ? calendarFormat.format(new Date(`${day}T00:00:00Z`)) : "");
+export const formatCalendarDate = (day: string | null) => (day ? formatCalendarDay(day) : "");
 
 const lines = (values: string[], search: string): ReactNode =>
   values.map((value, index) => (

@@ -33,5 +33,5 @@ export default async function AdminAppLayout({ children }: LayoutProps<"/admin">
     );
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return <AdminShell admin={session.admin}>{children}</AdminShell>;
 }

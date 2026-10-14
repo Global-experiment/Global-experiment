@@ -1,8 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ExpertiseTree } from "../api/types";
+import type { FilterRule, ListState } from "../table/listState";
+import { applyListState } from "../table/localList";
 import { TaxonomyScreen } from "./TaxonomyScreen";
-import { EMPTY_FILTER, filterTaxonomyRows, taxonomyRows } from "./taxonomyFilters";
+import { taxonomyFields, taxonomyListSpec, taxonomyRows } from "./taxonomyFilters";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => undefined, push: () => undefined }),
+  usePathname: () => "/admin/expertise",
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 // Test fixtures only.
 const status = (key: string, label: string) => ({ key, label });
@@ -59,29 +67,57 @@ describe("taxonomy screen filters", () => {
     expect(taxonomyRows("expertise", tree).map((row) => row.name)).toEqual(["Procurement", "Citizen assemblies", "Petitions", "Optics"]);
   });
 
-  it("filters expertise by domain, field, status, team, and name or Stable ID", () => {
-    const rows = taxonomyRows("expertise", tree);
-    const names = (filter: Partial<typeof EMPTY_FILTER>) => filterTaxonomyRows("expertise", rows, { ...EMPTY_FILTER, ...filter }).map((row) => row.name);
-    expect(names({ domainId: "d1" })).toEqual(["Procurement", "Citizen assemblies", "Petitions"]);
-    expect(names({ fieldId: "f1" })).toEqual(["Citizen assemblies", "Petitions"]);
-    expect(names({ status: "deprecated" })).toEqual(["Petitions"]);
-    expect(names({ status: "none" })).toEqual(["Procurement"]);
-    expect(names({ team: "moderation" })).toEqual(["Citizen assemblies"]);
-    expect(names({ q: "07.02.pet" })).toEqual(["Petitions"]);
-    expect(names({ q: "OPTI" })).toEqual(["Optics"]);
-    expect(names({ domainId: "d1", status: "active" })).toEqual(["Citizen assemblies"]);
+  const state = (parts: Partial<ListState>): ListState => ({ search: "", sort: [], filters: [], page: 1, ...parts });
+  const names = (filters: FilterRule[], parts: Partial<ListState> = {}) =>
+    applyListState(taxonomyRows("expertise", tree), taxonomyListSpec("expertise"), state({ filters, ...parts }), 50).items.map((row) => row.name);
+
+  it("filters expertise by domain, field, status, team, and searches name, Stable ID, field and domain", () => {
+    expect(names([{ field: "domain", operator: "is", value: "d1" }])).toEqual(["Procurement", "Citizen assemblies", "Petitions"]);
+    expect(names([{ field: "field", operator: "is", value: "f1" }])).toEqual(["Citizen assemblies", "Petitions"]);
+    expect(names([{ field: "status", operator: "is", value: "deprecated" }])).toEqual(["Petitions"]);
+    expect(names([{ field: "status", operator: "is", value: "none" }])).toEqual(["Procurement"]);
+    expect(names([{ field: "team", operator: "is", value: "moderation" }])).toEqual(["Citizen assemblies"]);
+    expect(names([{ field: "team", operator: "is_empty" }])).toEqual(["Procurement", "Petitions"]);
+    expect(names([{ field: "stable_id", operator: "is_empty" }])).toEqual(["Procurement"]);
+    expect(names([], { search: "07.02.pet" })).toEqual(["Petitions"]);
+    expect(names([], { search: "OPTI" })).toEqual(["Optics"]);
+    expect(names([], { search: "physics" })).toEqual(["Optics"]);
+    // Filters AND together; incomplete rows (no value yet) are ignored.
+    expect(
+      names([
+        { field: "domain", operator: "is", value: "d1" },
+        { field: "status", operator: "is", value: "active" },
+        { field: "name", operator: "contains", value: "" },
+      ]),
+    ).toEqual(["Citizen assemblies"]);
   });
 
-  it("ignores filters that don't apply to the level", () => {
-    const domains = taxonomyRows("domain", tree);
-    expect(filterTaxonomyRows("domain", domains, { ...EMPTY_FILTER, domainId: "d2", team: "tech" }).map((row) => row.name)).toEqual(["Government", "Science"]);
+  it("sorts by several rules (by name where the filter uses ids), empty values last, and pages", () => {
+    expect(names([], { sort: [{ field: "people", direction: "desc" }] })).toEqual(["Citizen assemblies", "Optics", "Petitions", "Procurement"]);
+    expect(names([], { sort: [{ field: "domain", direction: "desc" }, { field: "name", direction: "asc" }] })).toEqual(["Optics", "Citizen assemblies", "Petitions", "Procurement"]);
+    expect(names([], { sort: [{ field: "stable_id", direction: "desc" }] }).at(-1)).toBe("Procurement");
+    const page2 = applyListState(taxonomyRows("expertise", tree), taxonomyListSpec("expertise"), state({ page: 2 }), 3);
+    expect([page2.page, page2.total, page2.items.map((row) => row.name)]).toEqual([2, 4, ["Optics"]]);
+  });
+
+  it("offers each level only its own filters, with choices from the data", () => {
+    const ids = (level: "domain" | "field" | "expertise") => taxonomyFields(level, taxonomyRows(level, tree)).map((field) => field.id);
+    expect(ids("domain")).toEqual(["name", "stable_id", "status", "fields", "expertise", "people", "organizations"]);
+    expect(ids("field")).toEqual(["name", "stable_id", "status", "domain", "expertise", "people", "organizations"]);
+    expect(ids("expertise")).toEqual(["name", "stable_id", "status", "domain", "field", "team", "people", "organizations"]);
+    const field = taxonomyFields("expertise", taxonomyRows("expertise", tree)).find((candidate) => candidate.id === "field")!;
+    expect(field.options).toEqual([
+      { value: "f2", label: "Administration · Government" },
+      { value: "f1", label: "Participation · Government" },
+      { value: "f3", label: "Physics · Science" },
+    ]);
   });
 
   it("renders read-only, with the Notion note and no editing controls", () => {
     const html = renderToStaticMarkup(<TaxonomyScreen level="expertise" />);
     expect(html).toContain("Managed in Notion – updated by the importer.");
     expect(html).toContain('href="/admin/imports"');
-    expect(html).toContain('aria-label="Filter expertise"');
+    expect(html).toContain("Import Notion");
     expect(html).not.toMatch(/Rename|Delete|New expertise/);
   });
 });

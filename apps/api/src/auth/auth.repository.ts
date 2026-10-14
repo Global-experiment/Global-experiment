@@ -14,7 +14,7 @@ export interface ActiveSessionRecord {
   sessionId: string;
   lastSeenAt: Date;
   expiresAt: Date;
-  admin: { id: string; email: string; role: string };
+  admin: { id: string; email: string; role: string; displayName: string | null };
 }
 
 @Injectable()
@@ -55,6 +55,7 @@ export class AuthRepository {
         adminId: adminUsers.id,
         email: adminUsers.email,
         role: adminUsers.role,
+        displayName: adminUsers.displayName,
       })
       .from(adminSessions)
       .innerJoin(adminUsers, eq(adminUsers.id, adminSessions.adminUserId))
@@ -65,8 +66,12 @@ export class AuthRepository {
       sessionId: row.sessionId,
       lastSeenAt: row.lastSeenAt,
       expiresAt: row.expiresAt,
-      admin: { id: row.adminId, email: row.email, role: row.role },
+      admin: { id: row.adminId, email: row.email, role: row.role, displayName: row.displayName },
     };
+  }
+
+  async setDisplayName(adminUserId: string, displayName: string | null): Promise<void> {
+    await this.db.update(adminUsers).set({ displayName, updatedAt: new Date() }).where(eq(adminUsers.id, adminUserId));
   }
 
   async touchSession(sessionId: string, at: Date): Promise<void> {

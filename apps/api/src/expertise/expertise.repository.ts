@@ -127,7 +127,7 @@ export class ExpertiseRepository {
           when lower(${stable}) like ${contains} then 5
           when lower(${expertiseFields.name}) like ${contains} then 6
           else 7 end`
-      : sql<number>`0`;
+      : undefined; // no ranking without a query (a bare "order by 0" is a column position in PostgreSQL)
 
     const base = this.db
       .select({
@@ -148,7 +148,7 @@ export class ExpertiseRepository {
     const [rows, [count]] = await Promise.all([
       base
         .where(where)
-        .orderBy(asc(rank), asc(name), asc(sql`lower(${expertiseFields.name})`), asc(expertiseItems.id))
+        .orderBy(...(rank ? [asc(rank)] : []), asc(name), asc(sql`lower(${expertiseFields.name})`), asc(expertiseItems.id))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
       this.db

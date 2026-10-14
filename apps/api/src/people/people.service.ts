@@ -51,6 +51,12 @@ export class PeopleService {
     return person;
   }
 
+  async duplicate(id: string): Promise<PersonDto> {
+    const person = await this.repository.duplicate(id);
+    if (!person) throw new NotFoundError("Person not found.");
+    return person;
+  }
+
   async link(kind: "organization" | "expertise", personId: string, targetId: string): Promise<void> {
     await this.assertPerson(personId);
     await this.assertTarget(kind, targetId);

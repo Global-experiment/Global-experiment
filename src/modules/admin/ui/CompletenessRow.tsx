@@ -8,7 +8,7 @@ import { PropertyRow } from "./RecordForm";
 export function CompletenessRow({ missing }: { missing: readonly string[] }) {
   return (
     <PropertyRow icon="check_box" label="Completeness">
-      <span role="status" data-complete={missing.length === 0 ? "true" : "false"} className={missing.length === 0 ? "" : "text-text-muted"}>
+      <span role="status" data-complete={missing.length === 0 ? "true" : "false"} className={`px-2 ${missing.length === 0 ? "" : "text-text-muted"}`}>
         {completenessLabel(missing)}
       </span>
     </PropertyRow>

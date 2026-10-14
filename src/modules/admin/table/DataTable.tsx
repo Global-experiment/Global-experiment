@@ -70,7 +70,8 @@ export function DataTable<Row extends { id: string }>({
   rows: readonly Row[];
   prefs: ColumnPrefs;
   onPrefsChange: (prefs: ColumnPrefs) => void;
-  recordHref: (row: Row) => string;
+  /** Each row's record page; without it rows aren't links (read-only collections). */
+  recordHref?: (row: Row) => string;
   search: string;
   busy: boolean;
   caption: string;
@@ -293,10 +294,10 @@ export function DataTable<Row extends { id: string }>({
             <tr
               key={row.id}
               onClick={(event) => {
-                if ((event.target as HTMLElement).closest("a, button")) return;
+                if (!recordHref || (event.target as HTMLElement).closest("a, button")) return;
                 router.push(recordHref(row));
               }}
-              className="cursor-pointer"
+              className={recordHref ? "cursor-pointer" : ""}
             >
               {arranged.map((column, index) => (
                 <td
@@ -307,7 +308,7 @@ export function DataTable<Row extends { id: string }>({
                     index > 0 && index !== frozenCount ? "border-l" : ""
                   } ${frozenEdge(index)}`}
                 >
-                  {index === 0 ? (
+                  {index === 0 && recordHref ? (
                     <Link href={recordHref(row)} className={`block ${focusRing}`}>
                       {column.render(row, search)}
                     </Link>

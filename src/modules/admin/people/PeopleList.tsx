@@ -6,44 +6,11 @@ import { adminApi, AdminApiError } from "../api/client";
 import type { ExpertiseTree, Organization, Page, PeopleOptions, Person } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { AdminListPage } from "../table/AdminListPage";
-import { AdminIcon } from "../ui/adminIcons";
+import { ViewTabs } from "../table/ViewTabs";
 import { AdminButton, chipInput, Popover } from "../ui/controls";
 import { useToast } from "../ui/Toast";
 import { NotionImportControl } from "./NotionImportControl";
 import { PEOPLE_COLUMNS, PEOPLE_DEFAULT_SORT, peopleFields } from "./peopleTable";
-
-/**
- * Figma's saved-view tabs (p40). Only "All" has a defined meaning; what
- * Sourcing / Discussions / Contributors / Collaborators and the "+3" views
- * filter on is an open client decision, so they're shown but inert rather
- * than guessed.
- */
-function Views() {
-  const pending = ["Sourcing", "Discussions", "Contributors", "Collaborators"];
-  return (
-    <ul aria-label="Views" className="flex shrink-0 items-center gap-4 text-body whitespace-nowrap">
-      <li>
-        <span aria-current="true" className="flex items-center gap-1 text-text-primary">
-          <AdminIcon name="view_all" />
-          All
-        </span>
-      </li>
-      {pending.map((view) => (
-        <li key={view}>
-          <span aria-disabled="true" title="View definition pending client decision" className="flex items-center gap-1 text-text-muted">
-            <AdminIcon name="view_column" />
-            {view}
-          </span>
-        </li>
-      ))}
-      <li>
-        <span aria-disabled="true" title="Views pending client decision" className="text-text-muted">
-          +3
-        </span>
-      </li>
-    </ul>
-  );
-}
 
 function NewPersonControl() {
   const router = useRouter();
@@ -122,7 +89,8 @@ export function PeopleList() {
         fields,
         columns: PEOPLE_COLUMNS,
         recordHref: (person) => `/admin/people/${person.id}`,
-        views: <Views />,
+        // Only "All" until the client defines the saved views (ViewTabs is ready for them).
+        views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
         actions: (
           <>
             <NotionImportControl />

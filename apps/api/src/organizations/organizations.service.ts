@@ -40,6 +40,12 @@ export class OrganizationsService {
     return organization;
   }
 
+  async duplicate(id: string): Promise<OrganizationDto> {
+    const organization = await this.repository.duplicate(id);
+    if (!organization) throw new NotFoundError("Organization not found.");
+    return organization;
+  }
+
   async linkExpertise(id: string, expertiseId: string): Promise<void> {
     if (!(await this.repository.exists(id))) throw new NotFoundError("Organization not found.");
     if ((await countExistingExpertise(this.db, [expertiseId])) === 0) throw new NotFoundError("Expertise not found.");
