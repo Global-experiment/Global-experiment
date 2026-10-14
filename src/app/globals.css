@@ -230,6 +230,21 @@ html:has([data-admin]) body {
   button:not(:disabled) {
     cursor: pointer;
   }
+
+  /* Browser autofill (saved email/password) must not repaint fields in the
+     browser's own light-blue/yellow: the field keeps the page's surface and
+     text colours in both themes. Chrome's autofill background can't be
+     overridden directly — an inset shadow covers it, and the long
+     transition keeps its colour from ever fading in. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:autofill {
+    -webkit-text-fill-color: var(--color-text-primary);
+    caret-color: var(--color-text-primary);
+    box-shadow: 0 0 0 1000px var(--color-surface-base) inset;
+    transition: background-color 600000s 0s, color 600000s 0s;
+  }
 }
 
 /*
