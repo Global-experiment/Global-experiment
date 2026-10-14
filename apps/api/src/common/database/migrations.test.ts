@@ -87,7 +87,9 @@ describe("migration 0002 — directory aligned with Notion", () => {
     expect(await rows(client, "select key from teams order by sort_order")).toEqual(
       ["communication", "compliance", "moderation", "operations", "tech", "treasury"].map((key) => ({ key })),
     );
-    expect(await rows(client, "select key from taxonomy_statuses")).toEqual([{ key: "active" }]);
+    expect(await rows(client, "select key from taxonomy_statuses order by sort_order")).toEqual(
+      ["active", "proposed", "deprecated"].map((key) => ({ key })), // proposed/deprecated added by 0003
+    );
 
     // No directory records: vocabulary only, never sample data.
     for (const table of ["people", "organizations", "expertise_domains", "expertise_fields", "expertise_items"]) {
@@ -160,6 +162,39 @@ describe("migration 0002 — directory aligned with Notion", () => {
   });
 });
 
+describe("migration 0003 — taxonomy import", () => {
+  it("enforces the Domain Stable ID format found in Notion (domain.NN.slug)", async () => {
+    const client = await databaseAt(journal.entries.length);
+    await client.exec("insert into expertise_domains (name, stable_id) values ('Government', 'domain.07.government_democracy_and_public_affairs')");
+    for (const bad of ["domain.7.x", "07.government", "http://domain.07.x", "domain.07.Upper", "domain.07.with-hyphen"]) {
+      await expect(client.exec(`insert into expertise_domains (name, stable_id) values ('${bad}', '${bad}')`)).rejects.toThrow(/expertise_domains_stable_id_shape/);
+    }
+  });
+
+  it("seeds the Notion statuses Active, Proposed and Deprecated", async () => {
+    const client = await databaseAt(journal.entries.length);
+    expect(await rows(client, "select key, label from taxonomy_statuses order by sort_order")).toEqual([
+      { key: "active", label: "Active" },
+      { key: "proposed", label: "Proposed" },
+      { key: "deprecated", label: "Deprecated" },
+    ]);
+  });
+
+  it("records import runs with a known mode and a sane time range", async () => {
+    const client = await databaseAt(journal.entries.length);
+    await client.exec(
+      "insert into import_runs (kind, mode, started_at, finished_at, triggered_by) values ('taxonomy', 'dry_run', now(), now(), 'cli:test')",
+    );
+    expect(await rows(client, "select counts, issues from import_runs")).toEqual([{ counts: {}, issues: [] }]);
+    await expect(client.exec("insert into import_runs (kind, mode, started_at, triggered_by) values ('taxonomy', 'yolo', now(), 'x')")).rejects.toThrow(
+      /import_runs_mode_known/,
+    );
+    await expect(
+      client.exec("insert into import_runs (kind, mode, started_at, finished_at, triggered_by) values ('taxonomy', 'apply', now(), now() - interval '1 hour', 'x')"),
+    ).rejects.toThrow(/import_runs_finished_after_start/);
+  });
+});
+
 describe("0002 constraints", () => {
   const ITEM = "33333333-3333-4333-8333-333333333333";
   const FIELD = "22222222-2222-4222-8222-222222222222";
@@ -192,10 +227,10 @@ describe("0002 constraints", () => {
     }
   });
 
-  it("stores any Domain Stable ID (format still open), up to 120 characters", async () => {
+  it("checks the Domain Stable ID (format decided in 0003)", async () => {
     const client = await ready();
     await accepts(client, `update expertise_domains set stable_id = 'domain.07.civic_participation' where id = '${DOMAIN}'`);
-    await rejects(client, `update expertise_domains set stable_id = '${"d".repeat(121)}' where id = '${DOMAIN}'`, /expertise_domains_stable_id_length/);
+    await rejects(client, `update expertise_domains set stable_id = '${"d".repeat(121)}' where id = '${DOMAIN}'`, /expertise_domains_stable_id_shape/);
   });
 
   it("keeps Stable IDs, Notion page IDs and PER/ORG numbers unique", async () => {

@@ -101,32 +101,59 @@ validates first, §5):
 |---|---|---|---|
 | Expertise item | `NN.NN.slug` | `07.02.participatory_democracy`, `14.05.sex_work_experience` | `^[0-9]{2}\.[0-9]{2}\.[a-z0-9_]+$` |
 | Field | `field.NN.NN.slug` | `field.07.02.…` | `^field\.[0-9]{2}\.[0-9]{2}\.[a-z0-9_]+$` |
-| Domain | unknown (Q2) | — | none: nullable, length ≤ 120 only |
+| Domain | `domain.NN.slug` | `domain.07.government_democracy_and_public_affairs` | `^domain\.[0-9]{2}\.[a-z0-9_]+$` (migration 0003) |
 
-Slugs are lowercase letters, digits and underscores. The Domain format
-could not be checked: the Notion integration available to the project
-(2026-10-14) sees only the Documentation, CRM and Research databases, not
-the "0.1 native" Domains database. An item's `NN.NN` should equal its
-field's `NN.NN`; a mismatch is imported anyway and flagged in the import
-report (a cross-row rule, kept in the import rather than a trigger).
+Slugs are lowercase letters, digits and underscores. An item's `NN.NN`
+should equal its field's `NN.NN`, and a field's first `NN` its domain's;
+a mismatch is imported anyway and flagged in the import report (a cross-row
+rule, kept in the import rather than a trigger).
+
+**The Notion data (inspected 2026-10-14, read-only):** 14 domains, 120
+fields, 1105 expertise items — all Active, none archived, every item with
+exactly one field, no duplicate names or Stable IDs, no NN mismatches, all
+14 domains on `domain.NN.slug` (numbers 01–14). The 1105 (versus ~750 in an
+earlier export) are not duplicates or leftovers: every row was created on
+2026-09-25, i.e. the taxonomy was rebuilt larger that day (3–19 items per
+field, median 10). Status options in Notion: Active, Proposed, Deprecated
+(seeded by 0003). Teams on items: Compliance 537, Communication 331,
+Tech 235, Treasury 118, Moderation 100, Operations 79 (124 items have none).
+
+**The `http://` bug, explained:** Notion turned the start of many Stable
+IDs into links (`04.01.construction` → `http://04.01.construction/`),
+splitting the value into text segments — 6 domains, 38 fields, 197 items
+(18%). A CSV export shows the link, hence the `http://`. The API's visible
+text is correct once every segment is joined, which the importer does
+(links ignored); it still strips a typed `http://` as a safety net.
 
 ## 5. Notion import rules
 
-The import is a re-runnable copy from Notion into PostgreSQL, run by the
-owner from the admin ("Notion import" control, today inert). Whether it
-runs once or repeatedly is Q1. It gets its own provenance tables when it
-is built (not part of migration 0002): `import_runs` (who, when, counts,
-outcome) and `import_items` (run, Notion page ID, entity, resulting row,
-payload hash, outcome, flags).
+The import is a re-runnable copy from Notion into PostgreSQL. Whether it
+runs once or repeatedly is Q1. Every run — dry, applied or failed — is
+recorded in `import_runs` (migration 0003: kind, started/finished, mode,
+counts and issues as JSON, triggered by).
+
+**Built: the taxonomy importer** (`npm run api:import:taxonomy`,
+`apps/api/src/import/taxonomy`): dry run by default (full report, writes
+only the `import_runs` row); `--apply` writes in one transaction, planned
+inside it; `--deprecate-missing` sets rows Notion no longer has to
+"deprecated" (never deletes). Order: domains → fields → items → team
+links. Parents come from the Notion relation (Field → Domain,
+Expertise → Field); a row whose parent isn't imported is skipped, and so
+are its children. Unknown Status/Team values are left out and reported.
+Only changed rows are written: a second run reports 0 changes. The Notion
+client paginates and retries 429/5xx with backoff. People and
+Organizations importers come next, with the same rules.
 
 1. **Matching.** A Notion page is matched to an existing row by
    `notion_page_id` first, then — for taxonomy rows — by `stable_id`. No
    other key is used: never name, never email. A page with no match is
    inserted.
-2. **Stable ID clean-up.** Strip one leading `http://` (Notion's auto-link
-   bug, about 15% of IDs), trim whitespace, then validate against §4. An ID
+2. **Stable ID clean-up.** Join the text segments (Notion's auto-links,
+   §4), strip one leading `http://`, trim, then validate against §4. An ID
    that is still invalid is **not stored**; the row is kept (matched by page
    ID) and flagged `invalid_stable_id` with the raw value in the run report.
+   A second row with an already-used Stable ID is imported with an empty
+   one and flagged `duplicate_stable_id`.
 3. **Duplicates.** People and Organizations sharing a name or an email
    (case-insensitive, trimmed) stay separate rows and are **flagged, never
    merged** — in the run report and as a computed "possible duplicate"
@@ -422,9 +449,8 @@ constraints, API).
    edits to imported fields)? This also decides whether PER-n / ORG-n
    numbers can still be issued in Notion without colliding with numbers
    assigned in the admin.
-2. **Domain Stable ID format.** What does a Domain's Stable ID look like
-   (fields are `field.NN.NN.slug`, items `NN.NN.slug`)? Until then it is
-   stored without a format check.
+2. ~~**Domain Stable ID format.**~~ Resolved 2026-10-14 from the Notion
+   data: `domain.NN.slug`, checked by migration 0003.
 3. **Required (`*`) fields.** Which Notion properties carry the `*` for
    People, Organizations and the taxonomy?
 4. **Treasury fees.** Is `net = gross − fee` (fee stored as a positive

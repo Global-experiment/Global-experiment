@@ -59,8 +59,8 @@ export const expertiseDomains = pgTable(
     uniqueIndex("expertise_domains_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
     index("expertise_domains_status_key_idx").on(table.statusKey),
     check("expertise_domains_name_present", sql`length(btrim(${table.name})) between 1 and 120`),
-    // The Domain Stable ID format isn't known yet (open question): length only.
-    check("expertise_domains_stable_id_length", sql`${table.stableId} is null or length(${table.stableId}) between 1 and 120`),
+    // domain.NN.slug — the one format all 14 Notion domains use (checked 2026-10-14, migration 0003).
+    check("expertise_domains_stable_id_shape", sql`${table.stableId} is null or ${table.stableId} ~ '^domain\\.[0-9]{2}\\.[a-z0-9_]+$'`),
   ],
 );
 
