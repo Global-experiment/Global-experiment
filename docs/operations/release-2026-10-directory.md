@@ -436,3 +436,36 @@ Fill in as you go (no secrets): `STAMP`, dump file names and SHA-256, owner
 password result (step 4b), migration NOTICE count, purge totals, taxonomy dry
 run / apply / second dry run results, verification counts, and anything that
 differed from **Expected**.
+
+### Run of 2026-10-14 (release `812afde`)
+
+| Step | Result |
+|---|---|
+| 0 Pre-flight | Running API on `api-demo.env` → `global_experiment_demo_dev`; `api.env` → `global_experiment`; `NODE_ENV=production`. Archive held only demo records; owner password hash differed. Decision: production = `global_experiment`. |
+| 1 Backup | `STAMP=20261014-114324`, no service stopped. `ge-prod-20261014-114324.dump` (30,887 bytes, 13 TABLE DATA) SHA-256 `2f5b4ef9b1cee4eb40a575389c02f4b59ab1a4fdb6eeb87f9452c7a2af9d6663`; `ge-demo-archive-20261014-114324.dump` (35,436 bytes, 13 TABLE DATA) SHA-256 `d2bdf578c8dae6d6a50c6e3124e698c2913eb8627fbf04977f5722762fdb0f3a`. Both copied to `ge-db-backups`, hashes identical. Env files and systemd units copied. |
+| 2 Update and build | Services stopped 12:18:56 UTC. `develop` fast-forwarded `4eb86de..812afde`; `npm ci` (638 packages), web build, API build OK; `api/admin` in routes manifest (3). |
+| 3 Notion settings | 6 `NOTION_*` variables added to `api.env` (transferred via a temp file, deleted on both sides); `api.env` still `root:root 600`. |
+| 4 `demo-db.conf` | Moved to `/root/backups/demo-db.conf.removed-20261014-114324`; unit now only `EnvironmentFile=/etc/global-experiment/api.env`. `api-demo.env` left in place, unused. |
+| 4b Owner password | Before: different. One-transaction update of `password_hash` (1 owner matched). After: **identical**. |
+| 5 Migrations | Applied successfully; 5 migrations; sources `candide,ai,contribution_email,other`; statuses `active,proposed,deprecated`. 0 "source removed" NOTICE lines. |
+| 6 Purge | Dry run on `global_experiment`: 0 person, 0 organization, 0 expertise, 0 field, 0 domain. `--confirm` skipped. |
+| 7 Restart and health | Services started 12:21:19 UTC, both active, no API errors. Running API database `global_experiment`. api health 200, web home 200, web docs 200, public site 200, admin proxy 400, imports guarded 401. |
+| 8 Taxonomy import | Dry run: Notion 14 / 120 / 1105, created 14 / 120 / 1105, 1400 team links, 0 skipped / flagged / missing. Apply (one transaction): same. Second dry run: 0 changes. |
+| 9 Verify | `global_experiment`: domains 14, fields 120, expertise 1105, team links 1400, people 0, organizations 0, demo people 0, demo organizations 0, import runs 3. Archive untouched: 2 migrations, 48 people, 12 organizations. |
+
+**Downtime:** 12:18:56 → 12:21:19 UTC (14:18:56 → 14:21:19 Zurich), about
+2 min 23 s for both the website and the admin.
+
+**Differed from Expected (none blocking):**
+
+- Migration output also shows two Drizzle bookkeeping NOTICEs (`schema
+  "drizzle" already exists`, `relation "__drizzle_migrations" already
+  exists`) — normal for a database that already has migrations.
+- The website logs `EACCES … .next/cache/fetch-cache` ("Failed to update
+  prerender cache"): `.next/cache` is owned by root while the service runs as
+  `globalexp`. Already present before the release (110 lines since
+  2026-10-10); pages are served normally (home, documentation and its 8 Notion
+  pages return 200 with content). To fix separately:
+  `chown -R globalexp:globalexp /opt/global-experiment/.next/cache`.
+- The admin browser login was left to the owner (password not known to the
+  operator).
