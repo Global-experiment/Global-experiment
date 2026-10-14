@@ -5,9 +5,9 @@ import { E2E_ADMIN } from "./admin-credentials";
 /**
  * Native admin, end to end through the real stack: browser → Next.js →
  * (same-origin /api/admin proxy) → NestJS → PostgreSQL 17 test database,
- * seeded with the demo dataset by the API's e2e-setup (see
+ * loaded with test-only fixtures by the API's e2e-setup (see
  * playwright.config.ts). Serial: the tests share one owner session (login
- * is rate-limited) and edit the same seeded records.
+ * is rate-limited) and edit the same fixture records.
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the admin stack isn't running.");
 test.describe.configure({ mode: "serial" });
@@ -65,10 +65,8 @@ test.describe("people administration", () => {
     for (const column of ["Name", "State", "Source", "Expertise", "Personal note", "Organization"]) {
       await expect(page.getByRole("columnheader", { name: column, exact: true })).toBeVisible();
     }
-    // The Notion import control is honest: nothing is imported.
-    await page.getByRole("button", { name: "Notion import" }).click();
-    await expect(page.getByRole("dialog", { name: "Notion import" })).toContainText("Nothing has been imported");
-    await page.keyboard.press("Escape");
+    // The Notion import control opens the import page.
+    await expect(page.getByRole("link", { name: "Notion import" })).toHaveAttribute("href", "/admin/imports");
   });
 
   test("search runs in the API and highlights matches", async ({ page }) => {
@@ -175,9 +173,9 @@ test.describe("people administration", () => {
     await expect(page.getByRole("heading", { name: "Organizations", level: 1 })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: /of 12$/ })).toBeVisible();
     await page.goto("/admin/expertise");
-    await expect(page.getByRole("cell", { name: "Full-stack development" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Full-stack development", exact: true })).toBeVisible();
     await page.goto("/admin/domains");
-    await expect(page.getByRole("cell", { name: "Governance" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Governance", exact: true })).toBeVisible();
   });
 
   test("sign out revokes the session", async ({ page }) => {

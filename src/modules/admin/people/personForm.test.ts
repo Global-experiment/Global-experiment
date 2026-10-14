@@ -4,6 +4,8 @@ import { draftFromPerson, hasChanges, personPatch } from "./personForm";
 
 const person: Person = {
   id: "p1",
+  personNumber: 7,
+  notionPageId: null,
   name: "Ada Example",
   state: { key: "sourced", label: "Sourced" },
   source: null,
@@ -15,11 +17,15 @@ const person: Person = {
   linkedin: null,
   x: null,
   otherContact: null,
-  lastFollowupAt: "2026-09-01T09:00:00.000Z",
+  wiseRecipientId: null,
+  nextFollowupOn: "2026-09-01",
+  lastFollowupAtLegacy: "2026-08-15T09:00:00.000Z",
+  followUpOverdue: false,
+  missing: ["Source"],
   createdAt: "2026-08-01T09:00:00.000Z",
   updatedAt: "2026-08-01T09:00:00.000Z",
   organizations: [{ id: "o1", name: "Lab" }],
-  expertise: [{ id: "e1", name: "Web", field: { id: "f1", name: "Software" }, domain: { id: "d1", name: "Tech" } }],
+  expertise: [{ id: "e1", name: "Web", stableId: "03.01.web", status: { key: "active", label: "Active" }, field: { id: "f1", name: "Software" }, domain: { id: "d1", name: "Tech" } }],
 };
 
 describe("person record form", () => {
@@ -45,9 +51,18 @@ describe("person record form", () => {
     });
   });
 
-  it("converts the follow-up date to a UTC timestamp, or clears it", () => {
-    expect(original.lastFollowupDate).toBe("2026-09-01");
-    expect(personPatch(original, { ...original, lastFollowupDate: "2026-10-02" })).toEqual({ lastFollowupAt: "2026-10-02T00:00:00.000Z" });
-    expect(personPatch(original, { ...original, lastFollowupDate: "" })).toEqual({ lastFollowupAt: null });
+  it("sends the next follow-up as a plain date, or clears it", () => {
+    expect(original.nextFollowupOn).toBe("2026-09-01");
+    expect(personPatch(original, { ...original, nextFollowupOn: "2026-10-02" })).toEqual({ nextFollowupOn: "2026-10-02" });
+    expect(personPatch(original, { ...original, nextFollowupOn: "" })).toEqual({ nextFollowupOn: null });
+  });
+
+  it("treats the Wise recipient ID as free text", () => {
+    expect(personPatch(original, { ...original, wiseRecipientId: "  12345678 " })).toEqual({ wiseRecipientId: "12345678" });
+    expect(personPatch({ ...original, wiseRecipientId: "x" }, { ...original, wiseRecipientId: "" })).toEqual({ wiseRecipientId: null });
+  });
+
+  it("never sends the read-only legacy follow-up value", () => {
+    expect(Object.keys(original)).not.toContain("lastFollowupAtLegacy");
   });
 });

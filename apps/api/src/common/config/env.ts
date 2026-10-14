@@ -24,6 +24,18 @@ const envSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     /** Defaults to true in production; only ever false for plain-http local development. */
     COOKIE_SECURE: booleanFromString.optional(),
+    /**
+     * Notion "0.1 native" (admin import page). Server-side only: the token
+     * never reaches the browser. Without them the import page says so.
+     */
+    NOTION_API_KEY: z.string().trim().optional(),
+    NOTION_DOMAINS_DB_ID: z.string().trim().optional(),
+    NOTION_FIELDS_DB_ID: z.string().trim().optional(),
+    NOTION_EXPERTISE_DB_ID: z.string().trim().optional(),
+    NOTION_PEOPLE_DB_ID: z.string().trim().optional(),
+    NOTION_ORGANIZATIONS_DB_ID: z.string().trim().optional(),
+    /** Tests only: read the import source from a JSON file instead of Notion. */
+    IMPORT_FIXTURE_FILE: z.string().trim().optional(),
   })
   .transform((env, context) => {
     const production = env.NODE_ENV === "production";
@@ -33,6 +45,10 @@ const envSchema = z
     if (production && env.COOKIE_SECURE === false) {
       context.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "cannot be false in production" });
     }
+    if (env.IMPORT_FIXTURE_FILE && env.NODE_ENV !== "test") {
+      context.addIssue({ code: "custom", path: ["IMPORT_FIXTURE_FILE"], message: "is only allowed when NODE_ENV is test" });
+    }
+    const id = (value: string | undefined) => (value ? value : undefined);
     return {
       nodeEnv: env.NODE_ENV,
       host: env.API_HOST,
@@ -46,6 +62,17 @@ const envSchema = z
       },
       trustProxyHops: env.TRUST_PROXY_HOPS,
       cookieSecure: env.COOKIE_SECURE ?? production,
+      notion: {
+        token: id(env.NOTION_API_KEY),
+        databases: {
+          domains: id(env.NOTION_DOMAINS_DB_ID),
+          fields: id(env.NOTION_FIELDS_DB_ID),
+          expertise: id(env.NOTION_EXPERTISE_DB_ID),
+          people: id(env.NOTION_PEOPLE_DB_ID),
+          organizations: id(env.NOTION_ORGANIZATIONS_DB_ID),
+        },
+        fixtureFile: id(env.IMPORT_FIXTURE_FILE),
+      },
     };
   });
 

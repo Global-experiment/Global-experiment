@@ -14,7 +14,7 @@ function read(key: string): string | null {
 }
 
 /** Column preferences persisted per browser, read without a hydration mismatch (server snapshot = defaults). */
-export function useColumnPrefs(tableId: string, knownIds: readonly string[]) {
+export function useColumnPrefs(tableId: string, knownIds: readonly string[], defaultHidden: readonly string[] = []) {
   const key = `ge-admin-columns:${tableId}`;
   const subscribe = useCallback((onChange: () => void) => {
     window.addEventListener("storage", onChange);
@@ -26,17 +26,19 @@ export function useColumnPrefs(tableId: string, knownIds: readonly string[]) {
   }, []);
   const raw = useSyncExternalStore(subscribe, () => read(key), () => null);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- knownIds is a static column list
-  const prefs = useMemo(() => parsePrefs(raw, knownIds), [raw]);
+  const prefs = useMemo(() => parsePrefs(raw, knownIds, defaultHidden), [raw]);
 
   const setPrefs = useCallback(
     (next: ColumnPrefs) => {
       try {
-        window.localStorage.setItem(key, JSON.stringify(next));
+        // `seen`: the columns that exist now, so a later optional column still starts hidden.
+        window.localStorage.setItem(key, JSON.stringify({ ...next, seen: [...knownIds] }));
       } catch {
         // Storage unavailable (private mode / blocked): preferences just don't persist.
       }
       window.dispatchEvent(new Event(CHANGE_EVENT));
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- knownIds is a static column list
     [key],
   );
 

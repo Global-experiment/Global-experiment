@@ -1,0 +1,108 @@
+{
+  "domains": {
+    "properties": {
+      "Domain": { "id": "title", "type": "title" },
+      "Stable ID": { "id": "sid", "type": "rich_text" },
+      "Status": { "id": "st", "type": "select" }
+    },
+    "pages": [
+      {
+        "id": "f0000000-0000-4000-8000-000000000001",
+        "created_time": "2026-09-25T10:00:00.000Z",
+        "properties": {
+          "Domain": { "id": "title", "type": "title", "title": [{ "plain_text": "Fixture Government" }] },
+          "Stable ID": { "id": "sid", "type": "rich_text", "rich_text": [{ "plain_text": "domain.07.fixture_government" }] },
+          "Status": { "id": "st", "type": "select", "select": { "name": "Active" } }
+        }
+      }
+    ]
+  },
+  "fields": {
+    "properties": {
+      "Field": { "id": "title", "type": "title" },
+      "Stable ID": { "id": "sid", "type": "rich_text" },
+      "Status": { "id": "st", "type": "select" },
+      "Domain": { "id": "dom", "type": "relation" }
+    },
+    "pages": [
+      {
+        "id": "f0000000-0000-4000-8000-000000000011",
+        "created_time": "2026-09-25T10:00:00.000Z",
+        "properties": {
+          "Field": { "id": "title", "type": "title", "title": [{ "plain_text": "Fixture Participation" }] },
+          "Stable ID": { "id": "sid", "type": "rich_text", "rich_text": [{ "plain_text": "field.07.02.fixture_participation" }] },
+          "Status": { "id": "st", "type": "select", "select": { "name": "Active" } },
+          "Domain": { "id": "dom", "type": "relation", "relation": [{ "id": "f0000000-0000-4000-8000-000000000001" }] }
+        }
+      }
+    ]
+  },
+  "expertise": {
+    "properties": {
+      "Expertise": { "id": "title", "type": "title" },
+      "Stable ID": { "id": "sid", "type": "rich_text" },
+      "Status": { "id": "st", "type": "select" },
+      "Field": { "id": "fld", "type": "relation" },
+      "Domain": { "id": "dom", "type": "relation" },
+      "Team": { "id": "team", "type": "multi_select" }
+    },
+    "pages": [
+      {
+        "id": "f0000000-0000-4000-8000-000000000101",
+        "created_time": "2026-09-25T10:00:00.000Z",
+        "properties": {
+          "Expertise": { "id": "title", "type": "title", "title": [{ "plain_text": "Fixture assemblies" }] },
+          "Stable ID": { "id": "sid", "type": "rich_text", "rich_text": [{ "plain_text": "07.02.fixture" }, { "plain_text": "_assemblies" }] },
+          "Status": { "id": "st", "type": "select", "select": { "name": "Active" } },
+          "Field": { "id": "fld", "type": "relation", "relation": [{ "id": "f0000000-0000-4000-8000-000000000011" }] },
+          "Domain": { "id": "dom", "type": "relation", "relation": [] },
+          "Team": { "id": "team", "type": "multi_select", "multi_select": [{ "name": "Moderation" }] }
+        }
+      },
+      {
+        "id": "f0000000-0000-4000-8000-000000000102",
+        "created_time": "2026-09-25T10:00:01.000Z",
+        "properties": {
+          "Expertise": { "id": "title", "type": "title", "title": [{ "plain_text": "Fixture budgeting" }] },
+          "Stable ID": { "id": "sid", "type": "rich_text", "rich_text": [{ "plain_text": "07.02.fixture_budgeting" }] },
+          "Status": { "id": "st", "type": "select", "select": { "name": "Proposed" } },
+          "Field": { "id": "fld", "type": "relation", "relation": [{ "id": "f0000000-0000-4000-8000-000000000011" }] },
+          "Domain": { "id": "dom", "type": "relation", "relation": [] },
+          "Team": { "id": "team", "type": "multi_select", "multi_select": [{ "name": "Treasury" }] }
+        }
+      }
+    ]
+  },
+  "people": {
+    "properties": {
+      "Name": { "id": "title", "type": "title" },
+      "*State": { "id": "state", "type": "select" },
+      "*Source": { "id": "source", "type": "select" },
+      "*Personal note": { "id": "note", "type": "rich_text" },
+      "Do not contact": { "id": "dnc", "type": "checkbox" },
+      "Email": { "id": "email", "type": "email" },
+      "Phone": { "id": "phone", "type": "phone_number" },
+      "Website": { "id": "web", "type": "url" },
+      "LinkedIn": { "id": "li", "type": "url" },
+      "X": { "id": "x", "type": "url" },
+      "Other contact details": { "id": "other", "type": "rich_text" },
+      "Wise recipient account ID": { "id": "wise", "type": "rich_text" },
+      "Follow-up date": { "id": "fu", "type": "date" },
+      "Person ID": { "id": "pid", "type": "unique_id" },
+      "Organizations": { "id": "orgs", "type": "relation" }
+    },
+    "pages": []
+  },
+  "organizations": {
+    "properties": {
+      "*Name": { "id": "title", "type": "title" },
+      "*Description": { "id": "desc", "type": "rich_text" },
+      "*Website": { "id": "web", "type": "url" },
+      "*Email": { "id": "email", "type": "email" },
+      "*Wise recipient account ID": { "id": "wise", "type": "rich_text" },
+      "Organization ID": { "id": "oid", "type": "unique_id" },
+      "People": { "id": "people", "type": "relation" }
+    },
+    "pages": []
+  }
+}

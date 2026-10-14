@@ -1,20 +1,25 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import type { ExpertiseTree, Organization, OrganizationInput, Page, Person } from "../api/types";
+import { formatOrgNumber, type Organization, type OrganizationInput, type Page, type Person } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
-import { expertiseSearch } from "../people/PersonRecord";
+import { organizationMissing } from "../completeness";
+import { ExpertiseField } from "../expertise/ExpertiseField";
+import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import { formatDate } from "../people/peopleTable";
 import { AdminButton, StatusMessage } from "../ui/controls";
 import { PropertyRow, RecordHeader, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { CompletenessRow } from "../ui/CompletenessRow";
 import { useToast } from "../ui/Toast";
 
 interface Draft {
   name: string;
+  description: string;
   website: string;
-  note: string;
+  email: string;
+  wiseRecipientId: string;
   expertise: RelationOption[];
   people: RelationOption[];
 }
@@ -27,17 +32,20 @@ const personOption = (person: { id: string; name: string }): RelationOption => (
 
 const toDraft = (organization: Organization): Draft => ({
   name: organization.name,
+  description: organization.description ?? "",
   website: organization.website ?? "",
-  note: organization.note ?? "",
-  expertise: organization.expertise.map((item) => ({ id: item.id, label: item.name, detail: `${item.field.name} · ${item.domain.name}` })),
+  email: organization.email ?? "",
+  wiseRecipientId: organization.wiseRecipientId ?? "",
+  expertise: organization.expertise.map(linkedExpertiseOption),
   people: organization.people.map(personOption),
 });
 
 function patchFor(base: Draft, draft: Draft): OrganizationInput {
   const patch: OrganizationInput = {};
   if (draft.name.trim() !== base.name.trim()) patch.name = draft.name;
-  if (draft.website.trim() !== base.website.trim()) patch.website = draft.website.trim() || null;
-  if (draft.note.trim() !== base.note.trim()) patch.note = draft.note.trim() || null;
+  for (const field of ["description", "website", "email", "wiseRecipientId"] as const) {
+    if (draft[field].trim() !== base[field].trim()) patch[field] = draft[field].trim() || null;
+  }
   const ids = (options: RelationOption[]) => options.map((option) => option.id).sort().join(",");
   if (ids(draft.expertise) !== ids(base.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
   return patch;
@@ -70,11 +78,9 @@ async function searchPeople(text: string, signal: AbortSignal): Promise<Relation
 export function OrganizationRecord({ id }: { id: string }) {
   const toast = useToast();
   const organization = useAdminData<Organization>(`/organizations/${id}`);
-  const tree = useAdminData<ExpertiseTree>("/expertise/tree");
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const searchExpertise = useCallback((text: string) => expertiseSearch(tree.data)(text), [tree.data]);
 
   if (organization.error) {
     return (
@@ -150,17 +156,52 @@ export function OrganizationRecord({ id }: { id: string }) {
             <StatusMessage tone="error">{error}</StatusMessage>
           </div>
         ) : null}
+        <PropertyRow icon="numbers" label="Organization ID">
+          <span>{formatOrgNumber(loaded.orgNumber)}</span>
+        </PropertyRow>
+        <CompletenessRow missing={organizationMissing(draft)} />
         <PropertyRow icon="title" label="Name" htmlFor="organization-name">
           <input id="organization-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" className={recordInput} />
+        </PropertyRow>
+        <PropertyRow icon="title" label="Description" htmlFor="organization-description">
+          <textarea
+            id="organization-description"
+            value={draft.description}
+            onChange={(e) => set("description", e.target.value)}
+            maxLength={5000}
+            rows={3}
+            className={`${recordInput} h-auto resize-y py-1`}
+          />
         </PropertyRow>
         <PropertyRow icon="link" label="Website" htmlFor="organization-website">
           <input id="organization-website" inputMode="url" value={draft.website} onChange={(e) => set("website", e.target.value)} autoComplete="off" spellCheck={false} className={recordInput} />
         </PropertyRow>
-        <PropertyRow icon="title" label="Note" htmlFor="organization-note">
-          <textarea id="organization-note" value={draft.note} onChange={(e) => set("note", e.target.value)} maxLength={5000} rows={3} className={`${recordInput} h-auto resize-y py-1`} />
+        <PropertyRow icon="alternate_email" label="Email" htmlFor="organization-email">
+          <input
+            id="organization-email"
+            type="email"
+            inputMode="email"
+            value={draft.email}
+            onChange={(e) => set("email", e.target.value)}
+            maxLength={320}
+            autoComplete="off"
+            spellCheck={false}
+            className={recordInput}
+          />
+        </PropertyRow>
+        <PropertyRow icon="title" label="Wise recipient ID" htmlFor="organization-wise">
+          <input
+            id="organization-wise"
+            value={draft.wiseRecipientId}
+            onChange={(e) => set("wiseRecipientId", e.target.value)}
+            maxLength={100}
+            autoComplete="off"
+            spellCheck={false}
+            className={recordInput}
+          />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="Expertise">
-          <RelationPicker label="Expertise" selected={draft.expertise} onChange={(next) => set("expertise", next)} search={searchExpertise} />
+          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="People">
           <RelationPicker label="Person" selected={draft.people} onChange={(next) => set("people", next)} search={searchPeople} />

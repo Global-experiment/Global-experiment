@@ -37,10 +37,16 @@ export function AdminButton({ icon, leading, children, className = "", type = "b
   );
 }
 
-export function AdminButtonLink({ href, icon, children }: { href: string; icon?: AdminIconName; children: ReactNode }) {
+export function AdminButtonLink({
+  href,
+  icon,
+  leading,
+  children,
+  ...rest
+}: { href: string; icon?: AdminIconName; leading?: ReactNode; children: ReactNode } & Omit<ComponentProps<"a">, "href" | "className">) {
   return (
-    <Link href={href} className={buttonClasses}>
-      {icon ? <AdminIcon name={icon} /> : null}
+    <Link href={href} className={buttonClasses} {...rest}>
+      {leading ?? (icon ? <AdminIcon name={icon} /> : null)}
       {children}
     </Link>
   );

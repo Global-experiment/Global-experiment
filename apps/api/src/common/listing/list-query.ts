@@ -137,7 +137,12 @@ function dedupeSorts<Field extends string>(sorts: Sort<Field>[]): Sort<Field>[] 
 
 /** `%term%` for ILIKE with the term's own wildcards escaped (PostgreSQL's default escape is `\`). */
 export function containsPattern(term: string): string {
-  return `%${term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+  return `%${escapeLike(term)}%`;
+}
+
+/** The term with LIKE's own wildcards escaped, for building prefix / word patterns. */
+export function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 /**

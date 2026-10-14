@@ -182,4 +182,16 @@ describe("stored preferences", () => {
     expect(parsePrefs("not json", knownIds)).toEqual(EMPTY_PREFS);
     expect(parsePrefs(null, knownIds)).toEqual(EMPTY_PREFS);
   });
+
+  it("starts optional (default-hidden) columns hidden — even for saved prefs that predate them", () => {
+    const ids = ["name", "state", "completeness"];
+    // No saved prefs: the optional column is hidden.
+    expect(parsePrefs(null, ids, ["completeness"]).hidden).toEqual(["completeness"]);
+    // Prefs saved before the column existed (no `seen`, or `seen` without it): still hidden, the rest kept.
+    expect(parsePrefs('{"hidden":["state"],"frozen":["name"]}', ids, ["completeness"])).toMatchObject({ hidden: ["state", "completeness"], frozen: ["name"] });
+    expect(parsePrefs('{"hidden":[],"seen":["name","state"]}', ids, ["completeness"]).hidden).toEqual(["completeness"]);
+    // Once it's been seen and shown, it stays shown.
+    expect(parsePrefs('{"hidden":[],"seen":["name","state","completeness"]}', ids, ["completeness"]).hidden).toEqual([]);
+    expect(parsePrefs("not json", ids, ["completeness"]).hidden).toEqual(["completeness"]);
+  });
 });

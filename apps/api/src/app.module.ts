@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AdminSessionGuard } from "./auth/admin-session.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { CsrfOriginGuard } from "./auth/csrf-origin.guard.js";
+import { ClockModule } from "./common/clock/clock.js";
 import { ConfigModule } from "./common/config/config.module.js";
 import type { AppConfig } from "./common/config/env.js";
 import { DatabaseModule } from "./common/database/database.module.js";
@@ -11,6 +12,7 @@ import { AllExceptionsFilter } from "./common/errors/all-exceptions.filter.js";
 import { LoggingModule } from "./common/logging/logging.module.js";
 import { ExpertiseModule } from "./expertise/expertise.module.js";
 import { HealthModule } from "./health/health.module.js";
+import { ImportsModule } from "./import/imports.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
 import { PeopleModule } from "./people/people.module.js";
 
@@ -21,6 +23,7 @@ export class AppModule {
       module: AppModule,
       imports: [
         ConfigModule.forRoot(config),
+        ClockModule,
         LoggingModule,
         DatabaseModule,
         // In-memory limiter: correct for the single API instance v0.1 runs.
@@ -31,6 +34,7 @@ export class AppModule {
         PeopleModule,
         OrganizationsModule,
         ExpertiseModule,
+        ImportsModule,
       ],
       providers: [
         // Global guards run in this order.

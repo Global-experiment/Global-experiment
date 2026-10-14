@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
+import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams } from "../expertise/expertise.schema.js";
 import { organizationExpertise, organizations } from "../organizations/organizations.schema.js";
 import { signedInAdmin, type SignedInAdmin } from "../testing/admin-session.js";
 import { createTestApp, TEST_ORIGIN, type TestApp } from "../testing/test-app.js";
@@ -25,6 +25,7 @@ describe("native directory API", () => {
     await t.close();
   });
   beforeEach(async () => {
+    await t.db.delete(expertiseTeams);
     await t.db.delete(peopleExpertise);
     await t.db.delete(peopleOrganizations);
     await t.db.delete(organizationExpertise);
@@ -98,13 +99,14 @@ describe("native directory API", () => {
             stateKey: "contacted",
             phone: "+41 00 000 00 00",
             personalNote: "",
-            lastFollowupAt: "2026-09-01T10:00:00.000Z",
+            nextFollowupOn: "2026-11-02",
           })
           .expect(200)
       ).body;
       expect(updated.state).toEqual({ key: "contacted", label: "Contacted" });
       expect(updated.personalNote).toBeNull();
-      expect(updated.lastFollowupAt).toBe("2026-09-01T10:00:00.000Z");
+      expect(updated.nextFollowupOn).toBe("2026-11-02");
+      expect(updated.lastFollowupAtLegacy).toBeNull();
       expect(updated.name).toBe("Ada Example");
       expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(created.updatedAt).getTime());
     });
@@ -122,7 +124,13 @@ describe("native directory API", () => {
         [{ name: "X", email: "not-an-email" }, "email"],
         [{ name: "X", stateKey: "Not A Key" }, "stateKey"],
         [{ name: "X", unknownField: 1 }, ""],
-        [{ name: "X", lastFollowupAt: "yesterday" }, "lastFollowupAt"],
+        [{ name: "X", nextFollowupOn: "yesterday" }, "nextFollowupOn"],
+        [{ name: "X", nextFollowupOn: "2026-11-02T10:00:00Z" }, "nextFollowupOn"],
+        // Read-only: the old column's values are kept, never written through the API.
+        [{ name: "X", lastFollowupAt: "2026-09-01T10:00:00.000Z" }, ""],
+        [{ name: "X", lastFollowupAtLegacy: "2026-09-01T10:00:00.000Z" }, ""],
+        [{ name: "X", personNumber: 5 }, ""],
+        [{ name: "X", wiseRecipientId: "w".repeat(101) }, "wiseRecipientId"],
         [{ name: "X".repeat(201) }, "name"],
       ];
       for (const [body, path] of cases) {
@@ -139,8 +147,21 @@ describe("native directory API", () => {
 
     it("lists the vocabulary from the database", async () => {
       const res = await admin.get("/api/admin/people/options").expect(200);
-      expect(res.body.states.map((s: { key: string }) => s.key)).toEqual(["sourced", "contacted", "collaborating"]);
-      expect(res.body.sources.map((s: { key: string }) => s.key)).toContain("candide");
+      // The client's lifecycle, in order, and exactly the three sources (migration 0002).
+      expect(res.body.states).toEqual([
+        { key: "sourced", label: "Sourced" },
+        { key: "contacted", label: "Contacted" },
+        { key: "in_discussion", label: "In discussion" },
+        { key: "collaborating", label: "Collaborating" },
+        { key: "on_hold", label: "On hold" },
+        { key: "rejected", label: "Rejected" },
+      ]);
+      expect(res.body.sources).toEqual([
+        { key: "candide", label: "Candide" },
+        { key: "ai", label: "AI" },
+        { key: "contribution_email", label: "Contribution email" },
+        { key: "other", label: "Other" }, // migration 0004
+      ]);
     });
 
     it("keeps duplicates visible instead of merging them", async () => {
@@ -159,7 +180,14 @@ describe("native directory API", () => {
       const person = await createPerson({ name: "Grace Example", organizationIds: [lab.id], expertiseIds: [web.id] });
       expect(person.organizations).toEqual([{ id: lab.id, name: "Example Lab" }]);
       expect(person.expertise).toEqual([
-        { id: web.id, name: "Web development", field: { id: expect.any(String), name: "Software" }, domain: { id: expect.any(String), name: "Technology" } },
+        {
+          id: web.id,
+          name: "Web development",
+          stableId: null,
+          status: null,
+          field: { id: expect.any(String), name: "Software" },
+          domain: { id: expect.any(String), name: "Technology" },
+        },
       ]);
 
       await admin.put(`/api/admin/people/${person.id}/organizations/${coop.id}`).expect(204);
@@ -302,9 +330,13 @@ describe("native directory API", () => {
       await createPerson({ name: "P", expertiseIds: [web.id] });
       const tree = (await admin.get("/api/admin/expertise/tree").expect(200)).body;
       expect(tree.domains).toHaveLength(1);
+      // Rows created in the admin have no Notion attributes until the import matches them.
+      const native = { stableId: null, status: null, teams: [] };
+      expect(tree.domains[0]).toMatchObject({ stableId: null, status: null });
+      expect(tree.domains[0].fields[0]).toMatchObject({ stableId: null, status: null });
       expect(tree.domains[0].fields[0].items).toEqual([
-        { id: expect.any(String), name: "Backend development", peopleCount: 0, organizationCount: 0 },
-        { id: web.id, name: "Web development", peopleCount: 1, organizationCount: 0 },
+        { id: expect.any(String), name: "Backend development", ...native, peopleCount: 0, organizationCount: 0 },
+        { id: web.id, name: "Web development", ...native, peopleCount: 1, organizationCount: 0 },
       ]);
     });
 
@@ -362,6 +394,119 @@ describe("native directory API", () => {
       // Restore the shared vocabulary for the other tests.
       await t.db.execute(sql`update person_states set key = 'sourced' where key = 'identified'`);
       await t.db.execute(sql`delete from person_states where key = 'prospect'`);
+    });
+  });
+
+  describe("Notion-aligned fields (migration 0002)", () => {
+    it("numbers people (PER-n) automatically and sorts by number", async () => {
+      const a = await createPerson({ name: "Zed" });
+      const b = await createPerson({ name: "Amy" });
+      expect(b.personNumber).toBe(a.personNumber + 1);
+      expect(a.notionPageId).toBeNull();
+      const res = await admin.get("/api/admin/people?sort=number:desc").expect(200);
+      expect(res.body.items.map((p: { name: string }) => p.name)).toEqual(["Amy", "Zed"]);
+    });
+
+    it("stores the next follow-up as a calendar date and sorts by it, empty last", async () => {
+      await createPerson({ name: "Later", nextFollowupOn: "2026-12-01" });
+      await createPerson({ name: "Sooner", nextFollowupOn: "2026-11-01" });
+      await createPerson({ name: "None" });
+      const res = await admin.get("/api/admin/people?sort=next_followup:asc").expect(200);
+      expect(res.body.items.map((p: { name: string; nextFollowupOn: string | null }) => [p.name, p.nextFollowupOn])).toEqual([
+        ["Sooner", "2026-11-01"],
+        ["Later", "2026-12-01"],
+        ["None", null],
+      ]);
+      await admin.get("/api/admin/people?sort=last_followup:asc").expect(400);
+    });
+
+    it("shows the legacy follow-up value but never lets the API write it", async () => {
+      const person = await createPerson({ name: "Legacy" });
+      await t.db.execute(sql`update people set last_followup_at_legacy = '2026-08-15T09:00:00Z' where id = ${person.id}`);
+      const fetched = (await admin.get(`/api/admin/people/${person.id}`).expect(200)).body;
+      expect(fetched.lastFollowupAtLegacy).toBe("2026-08-15T09:00:00.000Z");
+      await admin.patch(`/api/admin/people/${person.id}`, { lastFollowupAtLegacy: null }).expect(400);
+    });
+
+    it("treats the Wise recipient ID as trimmed free text (≤ 100) and clears it with an empty string", async () => {
+      const person = await createPerson({ name: "Payee", wiseRecipientId: "  P-12 345 / EUR  " });
+      expect(person.wiseRecipientId).toBe("P-12 345 / EUR");
+      const cleared = (await admin.patch(`/api/admin/people/${person.id}`, { wiseRecipientId: "" }).expect(200)).body;
+      expect(cleared.wiseRecipientId).toBeNull();
+    });
+
+    it("never accepts the removed sources", async () => {
+      for (const sourceKey of ["waitlist", "notion_import"]) {
+        const res = await admin.post("/api/admin/people", { name: "X", sourceKey }).expect(400);
+        expect(res.body.error.details.issues).toEqual([{ path: "sourceKey", message: "Unknown source." }]);
+      }
+    });
+
+    it("organizations: ORG-n, description, email and Wise recipient ID round-trip", async () => {
+      const created = await createOrganization({
+        name: "Civic Lab",
+        description: "Builds participation tools.",
+        email: " hello@civic-lab.org ",
+        wiseRecipientId: "98765432",
+      });
+      expect(created).toMatchObject({
+        orgNumber: expect.any(Number),
+        notionPageId: null,
+        description: "Builds participation tools.",
+        email: "hello@civic-lab.org",
+        wiseRecipientId: "98765432",
+      });
+      expect(created).not.toHaveProperty("note");
+      const updated = (await admin.patch(`/api/admin/organizations/${created.id}`, { description: "", email: null }).expect(200)).body;
+      expect(updated).toMatchObject({ description: null, email: null, wiseRecipientId: "98765432" });
+
+      const second = await createOrganization({ name: "Second" });
+      expect(second.orgNumber).toBe(created.orgNumber + 1);
+    });
+
+    it("organizations: validates email, refuses the old note field, filters and searches the new fields", async () => {
+      const bad = await admin.post("/api/admin/organizations", { name: "X", email: "nope" }).expect(400);
+      expect(bad.body.error.details.issues.map((i: { path: string }) => i.path)).toContain("email");
+      await admin.post("/api/admin/organizations", { name: "X", note: "old field" }).expect(400);
+      await admin.post("/api/admin/organizations", { name: "X", wiseRecipientId: "9".repeat(101) }).expect(400);
+
+      await createOrganization({ name: "With email", email: "team@ngo.ch", description: "Water access" });
+      await createOrganization({ name: "Without email" });
+      const names = async (query: string) =>
+        (await admin.get(`/api/admin/organizations?${query}`).expect(200)).body.items.map((o: { name: string }) => o.name);
+      expect(await names("filter=email:is_not_empty")).toEqual(["With email"]);
+      expect(await names("filter=email:contains:ngo.ch")).toEqual(["With email"]);
+      expect(await names("filter=description:contains:water")).toEqual(["With email"]);
+      expect(await names("search=ngo.ch")).toEqual(["With email"]);
+      expect(await names("sort=number:desc")).toEqual(["Without email", "With email"]);
+      await admin.get("/api/admin/organizations?filter=note:is_empty").expect(400);
+    });
+
+    it("taxonomy: exposes Stable ID, Status and Teams set by the import", async () => {
+      const { domain, field, web } = await taxonomy();
+      await t.db.execute(sql`update expertise_domains set stable_id = 'domain.01.technology', status_key = 'active' where id = ${domain.id}`);
+      await t.db.execute(sql`update expertise_fields set stable_id = 'field.01.02.software', status_key = 'active' where id = ${field.id}`);
+      await t.db.execute(sql`update expertise_items set stable_id = '01.02.web_development', status_key = 'active' where id = ${web.id}`);
+      await t.db.execute(sql`insert into expertise_teams (expertise_id, team_key) values (${web.id}, 'treasury'), (${web.id}, 'tech')`);
+
+      const tree = (await admin.get("/api/admin/expertise/tree").expect(200)).body;
+      const active = { key: "active", label: "Active" };
+      expect(tree.domains[0]).toMatchObject({ stableId: "domain.01.technology", status: active });
+      expect(tree.domains[0].fields[0]).toMatchObject({ stableId: "field.01.02.software", status: active });
+      const item = tree.domains[0].fields[0].items.find((i: { id: string }) => i.id === web.id);
+      // Teams in their defined order (Tech before Treasury), whatever order they were linked in.
+      expect(item).toMatchObject({
+        stableId: "01.02.web_development",
+        status: active,
+        teams: [
+          { key: "tech", label: "Tech" },
+          { key: "treasury", label: "Treasury" },
+        ],
+      });
+
+      // An expertise with teams can still be deleted when nothing else uses it; its team links go with it.
+      await admin.delete(`/api/admin/expertise/items/${web.id}`).expect(204);
+      expect(await t.db.$count(expertiseTeams)).toBe(0);
     });
   });
 });

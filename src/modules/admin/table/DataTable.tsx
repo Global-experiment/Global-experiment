@@ -30,6 +30,8 @@ export interface TableColumn<Row> {
   width: number;
   /** `search` is the active query, for highlighting matches (inverse tokens). */
   render: (row: Row, search: string) => ReactNode;
+  /** An optional column: hidden until shown from the columns control. */
+  defaultHidden?: boolean;
 }
 
 /** Keyboard resize step (px) for the column resize handle. */

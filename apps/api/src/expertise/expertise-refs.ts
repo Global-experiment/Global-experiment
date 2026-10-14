@@ -1,11 +1,14 @@
 import { asc, eq, inArray, sql, type Column } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { Database } from "../common/database/database.module.js";
-import { expertiseDomains, expertiseFields, expertiseItems } from "./expertise.schema.js";
+import { expertiseDomains, expertiseFields, expertiseItems, taxonomyStatuses } from "./expertise.schema.js";
 
 export interface ExpertiseRefRow {
   id: string;
   name: string;
+  stableId: string | null;
+  /** Only Active expertise can be newly linked; others show greyed out. */
+  status: { key: string; label: string } | null;
   field: { id: string; name: string };
   domain: { id: string; name: string };
 }
@@ -27,6 +30,9 @@ export async function expertiseRefsByOwner(
       ownerId: sql<string>`${join.ownerId}`,
       id: expertiseItems.id,
       name: expertiseItems.name,
+      stableId: expertiseItems.stableId,
+      statusKey: expertiseItems.statusKey,
+      statusLabel: taxonomyStatuses.label,
       fieldId: expertiseFields.id,
       fieldName: expertiseFields.name,
       domainId: expertiseDomains.id,
@@ -36,6 +42,7 @@ export async function expertiseRefsByOwner(
     .innerJoin(expertiseItems, eq(expertiseItems.id, join.expertiseId))
     .innerJoin(expertiseFields, eq(expertiseFields.id, expertiseItems.fieldId))
     .innerJoin(expertiseDomains, eq(expertiseDomains.id, expertiseFields.domainId))
+    .leftJoin(taxonomyStatuses, eq(taxonomyStatuses.key, expertiseItems.statusKey))
     .where(inArray(join.ownerId, [...ownerIds]))
     .orderBy(asc(sql`lower(${expertiseDomains.name})`), asc(sql`lower(${expertiseFields.name})`), asc(sql`lower(${expertiseItems.name})`));
 
@@ -44,6 +51,8 @@ export async function expertiseRefsByOwner(
     list.push({
       id: row.id,
       name: row.name,
+      stableId: row.stableId,
+      status: row.statusKey ? { key: row.statusKey, label: row.statusLabel ?? row.statusKey } : null,
       field: { id: row.fieldId, name: row.fieldName },
       domain: { id: row.domainId, name: row.domainName },
     });

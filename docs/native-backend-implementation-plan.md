@@ -294,12 +294,13 @@ Implemented on `feature/native-admin-core` (not merged):
   `/admin/fields`, `/admin/domains`, `/admin/profile` (sign out). Desktop
   only. Glyphs extracted from figma.pdf p40–p44
   (`src/modules/admin/ui/adminIcons.tsx`).
-- **Demo data:** `npm run api:seed:demo` (`-- --reset` removes it) —
-  synthetic records with reserved `de000000-…` ids, idempotent, refuses
-  production and any database not named `*_dev` / `*_test`.
+- **No demo data (2026-10-14):** the former demo seed is removed; no
+  sample records go into any database. `npm run api:purge-demo-data`
+  lists leftover demo rows (dry run) and, with `--confirm --backup <file>`,
+  deletes them — see [data-model.md §5](./architecture/data-model.md).
 - **Admin E2E:** `e2e/admin.spec.ts` runs browser → Next → NestJS →
-  PostgreSQL 17 against `TEST_DATABASE_URL` (wiped, migrated and seeded by
-  `apps/api/src/testing/e2e-setup.ts`), API on port 4100.
+  PostgreSQL 17 against `TEST_DATABASE_URL` (wiped, migrated and loaded with
+  test-only fixtures by `apps/api/src/testing/e2e-setup.ts`), API on port 4100.
 
 ## 13. Unresolved requirements (do not decide silently)
 

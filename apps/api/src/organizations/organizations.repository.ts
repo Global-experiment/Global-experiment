@@ -8,6 +8,7 @@ import type { EntityRef } from "../people/people.contracts.js";
 import { people, peopleOrganizations } from "../people/people.schema.js";
 import type {
   CreateOrganizationRequest,
+  OrganizationCompletenessField,
   OrganizationDto,
   OrganizationSortField,
   OrganizationsListQuery,
@@ -23,9 +24,13 @@ function selectOrganizations(db: Executor) {
   return db
     .select({
       id: organizations.id,
+      orgNumber: organizations.orgNumber,
+      notionPageId: organizations.notionPageId,
       name: organizations.name,
+      description: organizations.description,
       website: organizations.website,
-      note: organizations.note,
+      email: organizations.email,
+      wiseRecipientId: organizations.wiseRecipientId,
       createdAt: organizations.createdAt,
       updatedAt: organizations.updatedAt,
     })
@@ -35,6 +40,7 @@ type OrganizationRow = Awaited<ReturnType<typeof selectOrganizations>>[number];
 
 function orderBy(sorts: readonly Sort<OrganizationSortField>[]): SQL[] {
   const expression: Record<OrganizationSortField, SQL> = {
+    number: sql`${organizations.orgNumber}`,
     name: sql`lower(${organizations.name})`,
     people: peopleCount,
     created: sql`${organizations.createdAt}`,
@@ -65,6 +71,24 @@ const hasPersonMatching = (db: Executor, condition?: SQL) =>
       .innerJoin(people, eq(people.id, peopleOrganizations.personId))
       .where(and(eq(peopleOrganizations.organizationId, organizations.id), condition)),
   );
+
+const hasAnyExpertise = sql`exists (select 1 from ${organizationExpertise} where ${organizationExpertise.organizationId} = ${organizations.id})`;
+/** Incomplete: any of ORGANIZATION_COMPLETENESS empty. */
+const incomplete = sql`(${organizations.description} is null or ${organizations.website} is null or ${organizations.email} is null or ${organizations.wiseRecipientId} is null or not ${hasAnyExpertise})`;
+
+/** The empty completeness fields of one organization (same rule as `incomplete`). */
+export function organizationMissing(
+  row: { description: string | null; website: string | null; email: string | null; wiseRecipientId: string | null },
+  hasExpertise: boolean,
+): OrganizationCompletenessField[] {
+  const missing: OrganizationCompletenessField[] = [];
+  if (!row.description) missing.push("Description");
+  if (!row.website) missing.push("Website");
+  if (!row.email) missing.push("Email");
+  if (!row.wiseRecipientId) missing.push("Wise recipient ID");
+  if (!hasExpertise) missing.push("Expertise");
+  return missing;
+}
 
 @Injectable()
 export class OrganizationsRepository {
@@ -98,7 +122,7 @@ export class OrganizationsRepository {
     return this.db.transaction(async (tx) => {
       const [created] = await tx
         .insert(organizations)
-        .values({ name: input.name, website: input.website ?? null, note: input.note ?? null })
+        .values({ ...this.columnValues(input), name: input.name })
         .returning({ id: organizations.id });
       await this.replaceExpertise(tx, created!.id, input.expertiseIds);
       return (await this.findById(created!.id, tx))!;
@@ -107,11 +131,11 @@ export class OrganizationsRepository {
 
   async update(id: string, input: UpdateOrganizationRequest): Promise<OrganizationDto | undefined> {
     return this.db.transaction(async (tx) => {
-      const values: Partial<typeof organizations.$inferInsert> = { updatedAt: new Date() };
-      if (input.name !== undefined) values.name = input.name;
-      if (input.website !== undefined) values.website = input.website;
-      if (input.note !== undefined) values.note = input.note;
-      const [updated] = await tx.update(organizations).set(values).where(eq(organizations.id, id)).returning({ id: organizations.id });
+      const [updated] = await tx
+        .update(organizations)
+        .set({ ...this.columnValues(input), updatedAt: new Date() })
+        .where(eq(organizations.id, id))
+        .returning({ id: organizations.id });
       if (!updated) return undefined;
       await this.replaceExpertise(tx, id, input.expertiseIds);
       return this.findById(id, tx);
@@ -166,6 +190,17 @@ export class OrganizationsRepository {
     });
   }
 
+  /** Only the fields present in the request; `null` clears a field. */
+  private columnValues(input: UpdateOrganizationRequest) {
+    const values: Partial<typeof organizations.$inferInsert> = {};
+    if (input.name !== undefined) values.name = input.name;
+    if (input.description !== undefined) values.description = input.description;
+    if (input.website !== undefined) values.website = input.website;
+    if (input.email !== undefined) values.email = input.email;
+    if (input.wiseRecipientId !== undefined) values.wiseRecipientId = input.wiseRecipientId;
+    return values;
+  }
+
   private async touchBoth(tx: Executor, organizationId: string, personId: string) {
     const now = new Date();
     await tx.update(organizations).set({ updatedAt: now }).where(eq(organizations.id, organizationId));
@@ -188,7 +223,8 @@ export class OrganizationsRepository {
         or(
           ilike(organizations.name, pattern),
           ilike(organizations.website, pattern),
-          ilike(organizations.note, pattern),
+          ilike(organizations.description, pattern),
+          ilike(organizations.email, pattern),
           hasExpertiseMatching(this.db, ilike(expertiseItems.name, pattern)),
           hasPersonMatching(this.db, ilike(people.name, pattern)),
         ),
@@ -199,6 +235,9 @@ export class OrganizationsRepository {
       const ids = values.map(String);
       if (field === "expertise") conditions.push(hasExpertiseMatching(this.db, inArray(organizationExpertise.expertiseId, ids)));
       if (field === "person") conditions.push(hasPersonMatching(this.db, inArray(peopleOrganizations.personId, ids)));
+      if (field === "completeness" && !(ids.includes("complete") && ids.includes("incomplete"))) {
+        conditions.push(ids.includes("incomplete") ? incomplete : sql`not ${incomplete}`);
+      }
     }
     for (const { field, operator, value } of all) {
       const text = typeof value === "string" ? value : "";
@@ -215,14 +254,23 @@ export class OrganizationsRepository {
         case "website:is_not_empty":
           conditions.push(isNotNull(organizations.website));
           break;
-        case "note:contains":
-          conditions.push(ilike(organizations.note, containsPattern(text)));
+        case "description:contains":
+          conditions.push(ilike(organizations.description, containsPattern(text)));
           break;
-        case "note:is_empty":
-          conditions.push(isNull(organizations.note));
+        case "description:is_empty":
+          conditions.push(isNull(organizations.description));
           break;
-        case "note:is_not_empty":
-          conditions.push(isNotNull(organizations.note));
+        case "description:is_not_empty":
+          conditions.push(isNotNull(organizations.description));
+          break;
+        case "email:contains":
+          conditions.push(ilike(organizations.email, containsPattern(text)));
+          break;
+        case "email:is_empty":
+          conditions.push(isNull(organizations.email));
+          break;
+        case "email:is_not_empty":
+          conditions.push(isNotNull(organizations.email));
           break;
         case "expertise:is_empty":
           conditions.push(not(hasExpertiseMatching(this.db)));
@@ -253,9 +301,14 @@ export class OrganizationsRepository {
     ]);
     return rows.map((row) => ({
       id: row.id,
+      orgNumber: row.orgNumber,
+      notionPageId: row.notionPageId,
       name: row.name,
+      description: row.description,
       website: row.website,
-      note: row.note,
+      email: row.email,
+      wiseRecipientId: row.wiseRecipientId,
+      missing: organizationMissing(row, (expertiseByOrganization.get(row.id) ?? []).length > 0),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       people: peopleByOrganization.get(row.id) ?? [],

@@ -1,4 +1,5 @@
 import type { Person, PersonInput } from "../api/types";
+import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import type { RelationOption } from "../ui/RelationPicker";
 
 /** Editable state of a person record (strings as typed; relations as picker options). */
@@ -14,8 +15,9 @@ export interface PersonDraft {
   linkedin: string;
   x: string;
   otherContact: string;
-  /** yyyy-mm-dd (UTC date) or "" */
-  lastFollowupDate: string;
+  wiseRecipientId: string;
+  /** Next planned follow-up: yyyy-mm-dd or "" */
+  nextFollowupOn: string;
   organizations: RelationOption[];
   expertise: RelationOption[];
 }
@@ -33,13 +35,14 @@ export function draftFromPerson(person: Person): PersonDraft {
     linkedin: person.linkedin ?? "",
     x: person.x ?? "",
     otherContact: person.otherContact ?? "",
-    lastFollowupDate: person.lastFollowupAt ? person.lastFollowupAt.slice(0, 10) : "",
+    wiseRecipientId: person.wiseRecipientId ?? "",
+    nextFollowupOn: person.nextFollowupOn ?? "",
     organizations: person.organizations.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` })),
-    expertise: person.expertise.map((item) => ({ id: item.id, label: item.name, detail: `${item.field.name} · ${item.domain.name}` })),
+    expertise: person.expertise.map(linkedExpertiseOption),
   };
 }
 
-const TEXT_FIELDS = ["personalNote", "email", "phone", "website", "linkedin", "x", "otherContact"] as const;
+const TEXT_FIELDS = ["personalNote", "email", "phone", "website", "linkedin", "x", "otherContact", "wiseRecipientId"] as const;
 const sameIds = (a: RelationOption[], b: RelationOption[]) =>
   a.length === b.length && a.every((option) => b.some((other) => other.id === option.id));
 
@@ -56,9 +59,7 @@ export function personPatch(original: PersonDraft, draft: PersonDraft): PersonIn
   for (const field of TEXT_FIELDS) {
     if (draft[field].trim() !== original[field].trim()) patch[field] = draft[field].trim() || null;
   }
-  if (draft.lastFollowupDate !== original.lastFollowupDate) {
-    patch.lastFollowupAt = draft.lastFollowupDate ? `${draft.lastFollowupDate}T00:00:00.000Z` : null;
-  }
+  if (draft.nextFollowupOn !== original.nextFollowupOn) patch.nextFollowupOn = draft.nextFollowupOn || null;
   if (!sameIds(draft.organizations, original.organizations)) patch.organizationIds = draft.organizations.map((option) => option.id);
   if (!sameIds(draft.expertise, original.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
   return patch;
