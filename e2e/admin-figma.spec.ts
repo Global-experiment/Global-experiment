@@ -120,8 +120,12 @@ test.describe("signed in", () => {
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
 
-    const sections = await nav(page).locator(":scope > div > p").allInnerTexts();
+    const sections = await nav(page).locator(":scope > div > p").allTextContents();
     expect(sections).toEqual(["Communication", "Admin", "Monitoring", "Other"]);
+    // Group titles stand out (client, 2026-10-14): small bold uppercase labels, a rule above each group after the first.
+    await expect(nav(page).locator(":scope > div > p").first()).toHaveCSS("text-transform", "uppercase");
+    await expect(nav(page).locator(":scope > div > p").first()).toHaveCSS("font-weight", "700");
+    await expect(nav(page).locator(":scope > div > hr")).toHaveCount(3);
     const labels = (await nav(page).locator("li").allInnerTexts()).map((text) => text.replace(/\s*\(coming soon\)$/, "").trim());
     expect(labels).toEqual([
       "Home",
@@ -165,6 +169,53 @@ test.describe("signed in", () => {
     await page.setViewportSize(TABLET);
     await noHorizontalScroll(page);
     await capture(page, "p04-people");
+  });
+
+  test("the sidebar collapses to an icon rail, remembers it, and expands again (client, 2026-10-14)", async ({ page }) => {
+    await page.goto("/admin/people");
+    await expect(rows(page).first()).toBeVisible();
+    const sidebar = page.locator("#admin-sidebar");
+    expect((await box(sidebar)).width).toBe(240);
+
+    await page.getByRole("button", { name: "Collapse menu" }).click();
+    await expect(page.getByRole("button", { name: "Expand menu" })).toHaveAttribute("aria-expanded", "false");
+    await expect.poll(async () => (await box(sidebar)).width).toBe(56);
+    // Names stay available: as tooltips and for screen readers; group titles too.
+    const people = nav(page).getByRole("link", { name: "People" });
+    await expect(people).toHaveAttribute("title", "People");
+    await expect(people).toHaveAttribute("aria-current", "page");
+    await expect(nav(page).locator(":scope > div > p").first()).toHaveClass(/sr-only/);
+    // The content column takes the freed width; nothing scrolls sideways.
+    expect((await box(page.getByRole("heading", { name: "People", level: 1 }))).x).toBe(64);
+    await noHorizontalScroll(page);
+    await capture(page, "sidebar-collapsed");
+
+    // Remembered across pages and reloads, from the first paint (server-rendered).
+    await page.reload();
+    expect((await box(sidebar)).width).toBe(56);
+    await page.getByRole("link", { name: "Organizations" }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations$/);
+    expect((await box(sidebar)).width).toBe(56);
+
+    // The search glyph re-opens the menu with the search field focused.
+    await page.getByRole("button", { name: "Search the menu" }).click();
+    await expect.poll(async () => (await box(sidebar)).width).toBe(240);
+    await expect(page.getByRole("searchbox", { name: "Search the menu" })).toBeFocused();
+    await page.reload();
+    expect((await box(sidebar)).width).toBe(240);
+  });
+
+  test("data table: header band, a rule under every row, row hover (client, 2026-10-14)", async ({ page }) => {
+    await page.goto("/admin/people");
+    await expect(rows(page).first()).toBeVisible();
+    const header = page.locator("thead th").first();
+    await expect(header).toHaveCSS("background-color", "rgb(26, 26, 26)");
+    expect((await box(header)).height).toBe(36);
+    const lastRowCell = rows(page).last().locator("td").first();
+    await expect(lastRowCell).toHaveCSS("border-bottom-width", "1px");
+    await rows(page).nth(1).hover();
+    await expect(rows(page).nth(1).locator("td").first()).toHaveCSS("background-color", "rgb(18, 18, 18)");
+    await expect(rows(page).nth(2).locator("td").first()).toHaveCSS("background-color", "rgb(0, 0, 0)");
   });
 
   test("sidebar search filters the menu; modules that don't exist are disabled, never pages", async ({ page }) => {
