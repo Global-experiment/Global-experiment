@@ -341,9 +341,9 @@ test.describe("signed in", () => {
     await page.getByRole("group", { name: "Source" }).getByRole("button", { name: "Other" }).click();
     await page.getByRole("group", { name: "Do not contact" }).getByRole("button", { name: "Do not contact" }).click();
 
-    // Follow-up date: borderless, "Empty" or "Oct 14, 2026" — never the browser's mm/dd/yyyy mask.
+    // Follow-up date: a field reading "Choose a date" or "Oct 14, 2026" — never the browser's mm/dd/yyyy mask.
     const followUp = page.locator("#person-followup");
-    await expect(followUp).toHaveText("Empty");
+    await expect(followUp).toHaveText("Choose a date");
     await page.locator("input[type=date]").fill("2026-10-14", { force: true });
     await expect(followUp).toHaveText("Oct 14, 2026");
     expect(await followUp.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
@@ -363,7 +363,7 @@ test.describe("signed in", () => {
     await expect(followUp).toHaveText("Oct 14, 2026");
     await expect(note).toHaveValue("First line.\nSecond line.\nThird line.");
     await page.getByRole("button", { name: "Clear Follow-up date" }).click();
-    await expect(followUp).toHaveText("Empty");
+    await expect(followUp).toHaveText("Choose a date");
     await page.getByRole("button", { name: "Discard changes" }).click();
     await expect(followUp).toHaveText("Oct 14, 2026");
 

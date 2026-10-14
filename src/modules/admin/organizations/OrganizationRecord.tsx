@@ -183,7 +183,16 @@ export function OrganizationRecord({ id }: { id: string }) {
       <RecordLayout backHref="/admin/organizations" backLabel="Organizations" title={draft.name} panel={panel}>
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
         <PropertyRow icon="title" label="Name" htmlFor="organization-name">
-          <input id="organization-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" className={recordInput} />
+          <input
+            id="organization-name"
+            value={draft.name}
+            onChange={(e) => set("name", e.target.value)}
+            maxLength={200}
+            required
+            autoComplete="off"
+            placeholder="Organization name"
+            className={recordInput}
+          />
         </PropertyRow>
         <PropertyRow icon="title" label="Description" htmlFor="organization-description">
           <AutoGrowTextarea
@@ -191,7 +200,7 @@ export function OrganizationRecord({ id }: { id: string }) {
             value={draft.description}
             onChange={(e) => set("description", e.target.value)}
             maxLength={5000}
-            placeholder="Empty"
+            placeholder="What the organization does…"
           />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="Expertise" hint={LIMIT_HINTS.organizationExpertise}>
@@ -208,7 +217,7 @@ export function OrganizationRecord({ id }: { id: string }) {
             onChange={(e) => set("website", e.target.value)}
             autoComplete="off"
             spellCheck={false}
-            placeholder="Empty"
+            placeholder="https://example.org"
             className={recordInput}
           />
         </PropertyRow>
@@ -222,7 +231,7 @@ export function OrganizationRecord({ id }: { id: string }) {
             maxLength={320}
             autoComplete="off"
             spellCheck={false}
-            placeholder="Empty"
+            placeholder="contact@example.org"
             className={recordInput}
           />
         </PropertyRow>
@@ -234,7 +243,7 @@ export function OrganizationRecord({ id }: { id: string }) {
             maxLength={100}
             autoComplete="off"
             spellCheck={false}
-            placeholder="Empty"
+            placeholder="Wise recipient ID"
             className={recordInput}
           />
         </PropertyRow>
