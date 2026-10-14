@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
 import { adminApi, AdminApiError } from "../api/client";
-import type { ExpertiseTree, Organization } from "../api/types";
+import { formatOrgNumber, type ExpertiseTree, type Organization } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { expertiseOptions, formatDate } from "../people/peopleTable";
 import { AdminListPage } from "../table/AdminListPage";
@@ -31,9 +31,12 @@ const COLUMNS: TableColumn<Organization>[] = [
   { id: "people", label: "People", icon: "arrow_outward", width: 220, render: (o, s) => lines(o.people.map((p) => p.name), s) },
   { id: "expertise", label: "Expertise", icon: "arrow_outward", width: 228, render: (o, s) => lines(o.expertise.map((e) => e.name), s) },
   { id: "website", label: "Website", icon: "link", width: 260, render: (o, s) => text(o.website, s) },
-  { id: "note", label: "Note", icon: "title", width: 337, render: (o, s) => text(o.note, s) },
+  { id: "email", label: "Email", icon: "alternate_email", width: 230, render: (o, s) => text(o.email, s) },
+  { id: "description", label: "Description", icon: "title", width: 337, render: (o, s) => text(o.description, s) },
+  { id: "wise_recipient_id", label: "Wise recipient ID", icon: "title", width: 160, render: (o) => o.wiseRecipientId },
   { id: "created", label: "Created", icon: "schedule", width: 120, render: (o) => formatDate(o.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, render: (o) => formatDate(o.updatedAt) },
+  { id: "number", label: "Organization ID", icon: "numbers", width: 120, render: (o) => formatOrgNumber(o.orgNumber) },
 ];
 
 function NewOrganizationControl() {
@@ -93,9 +96,11 @@ export function OrganizationsList() {
       { id: "person", label: "Has people", icon: "arrow_outward", operators: ["is_empty", "is_not_empty"] },
       { id: "expertise", label: "Expertise", icon: "arrow_outward", operators: ["is", "is_empty", "is_not_empty"], options: expertiseOptions(tree.data) },
       { id: "website", label: "Website", icon: "link", operators: ["is_empty", "is_not_empty"] },
-      { id: "note", label: "Note", icon: "title", operators: ["contains", "is_empty", "is_not_empty"] },
+      { id: "email", label: "Email", icon: "alternate_email", operators: ["contains", "is_empty", "is_not_empty"] },
+      { id: "description", label: "Description", icon: "title", operators: ["contains", "is_empty", "is_not_empty"] },
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
+      { id: "number", label: "Organization ID", icon: "numbers", operators: [], sort: "text" },
     ],
     [tree.data],
   );

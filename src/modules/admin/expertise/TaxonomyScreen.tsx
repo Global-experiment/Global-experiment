@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import type { ExpertiseTree } from "../api/types";
+import type { ExpertiseTree, TaxonomyNotionAttributes } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { AdminIcon } from "../ui/adminIcons";
 import { AdminButton, chipInput, ChipSelect, focusRing, StatusMessage } from "../ui/controls";
@@ -18,17 +18,32 @@ interface Row {
   inUse?: string;
 }
 
+// Stable ID, Status and Teams come from Notion through the import and are
+// read-only here (docs/architecture/data-model.md §4); rows created in the
+// admin show them empty.
 const CONFIG = {
-  domain: { title: "Domains", noun: "domain", path: "domains", columns: ["Fields", "Expertise"] },
-  field: { title: "Fields", noun: "field", path: "fields", columns: ["Domain", "Expertise"] },
-  expertise: { title: "Expertise", noun: "expertise", path: "items", columns: ["Field", "Domain", "People", "Organizations"] },
+  domain: { title: "Domains", noun: "domain", path: "domains", columns: ["Stable ID", "Status", "Fields", "Expertise"] },
+  field: { title: "Fields", noun: "field", path: "fields", columns: ["Stable ID", "Status", "Domain", "Expertise"] },
+  expertise: {
+    title: "Expertise",
+    noun: "expertise",
+    path: "items",
+    columns: ["Stable ID", "Status", "Field", "Domain", "Teams", "People", "Organizations"],
+  },
 } as const;
+
+const notion = (node: TaxonomyNotionAttributes) => [node.stableId ?? "", node.status?.label ?? ""];
 
 function rowsFor(level: TaxonomyLevel, tree: ExpertiseTree): Row[] {
   if (level === "domain") {
     return tree.domains.map((domain) => {
       const items = domain.fields.reduce((sum, field) => sum + field.items.length, 0);
-      return { id: domain.id, name: domain.name, cells: [domain.fields.length, items], inUse: domain.fields.length > 0 ? "Has fields" : undefined };
+      return {
+        id: domain.id,
+        name: domain.name,
+        cells: [...notion(domain), domain.fields.length, items],
+        inUse: domain.fields.length > 0 ? "Has fields" : undefined,
+      };
     });
   }
   if (level === "field") {
@@ -36,7 +51,7 @@ function rowsFor(level: TaxonomyLevel, tree: ExpertiseTree): Row[] {
       domain.fields.map((field) => ({
         id: field.id,
         name: field.name,
-        cells: [domain.name, field.items.length],
+        cells: [...notion(field), domain.name, field.items.length],
         inUse: field.items.length > 0 ? "Has expertise" : undefined,
       })),
     );
@@ -46,7 +61,14 @@ function rowsFor(level: TaxonomyLevel, tree: ExpertiseTree): Row[] {
       field.items.map((item) => ({
         id: item.id,
         name: item.name,
-        cells: [field.name, domain.name, item.peopleCount, item.organizationCount],
+        cells: [
+          ...notion(item),
+          field.name,
+          domain.name,
+          item.teams.map((team) => team.label).join(", "),
+          item.peopleCount,
+          item.organizationCount,
+        ],
         inUse: item.peopleCount + item.organizationCount > 0 ? "Assigned to people or organizations" : undefined,
       })),
     ),

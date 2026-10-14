@@ -35,6 +35,8 @@ type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
 const personColumns = {
   id: people.id,
+  personNumber: people.personNumber,
+  notionPageId: people.notionPageId,
   name: people.name,
   stateKey: people.stateKey,
   stateLabel: personStates.label,
@@ -48,7 +50,9 @@ const personColumns = {
   linkedin: people.linkedin,
   x: people.x,
   otherContact: people.otherContact,
-  lastFollowupAt: people.lastFollowupAt,
+  wiseRecipientId: people.wiseRecipientId,
+  nextFollowupOn: people.nextFollowupOn,
+  lastFollowupAtLegacy: people.lastFollowupAtLegacy,
   createdAt: people.createdAt,
   updatedAt: people.updatedAt,
 };
@@ -66,12 +70,13 @@ type PersonRow = Awaited<ReturnType<typeof selectPeople>>[number];
 /** NULLS LAST in both directions, then id as a stable tiebreaker for pagination. */
 function orderBy(sorts: readonly Sort<PeopleSortField>[]): SQL[] {
   const expression: Record<PeopleSortField, SQL> = {
+    number: sql`${people.personNumber}`,
     name: sql`lower(${people.name})`,
     state: sql`${personStates.sortOrder}`,
     source: sql`${personSources.sortOrder}`,
     created: sql`${people.createdAt}`,
     updated: sql`${people.updatedAt}`,
-    last_followup: sql`${people.lastFollowupAt}`,
+    next_followup: sql`${people.nextFollowupOn}`,
   };
   return [
     ...sorts.map(({ field, direction }) =>
@@ -212,9 +217,8 @@ export class PeopleRepository {
     if (input.linkedin !== undefined) values.linkedin = input.linkedin;
     if (input.x !== undefined) values.x = input.x;
     if (input.otherContact !== undefined) values.otherContact = input.otherContact;
-    if (input.lastFollowupAt !== undefined) {
-      values.lastFollowupAt = input.lastFollowupAt === null ? null : new Date(input.lastFollowupAt);
-    }
+    if (input.wiseRecipientId !== undefined) values.wiseRecipientId = input.wiseRecipientId;
+    if (input.nextFollowupOn !== undefined) values.nextFollowupOn = input.nextFollowupOn;
     return values;
   }
 
@@ -348,6 +352,8 @@ export class PeopleRepository {
     ]);
     return rows.map((row) => ({
       id: row.id,
+      personNumber: row.personNumber,
+      notionPageId: row.notionPageId,
       name: row.name,
       state: row.stateKey ? { key: row.stateKey, label: row.stateLabel ?? row.stateKey } : null,
       source: row.sourceKey ? { key: row.sourceKey, label: row.sourceLabel ?? row.sourceKey } : null,
@@ -359,7 +365,9 @@ export class PeopleRepository {
       linkedin: row.linkedin,
       x: row.x,
       otherContact: row.otherContact,
-      lastFollowupAt: row.lastFollowupAt?.toISOString() ?? null,
+      wiseRecipientId: row.wiseRecipientId,
+      nextFollowupOn: row.nextFollowupOn,
+      lastFollowupAtLegacy: row.lastFollowupAtLegacy?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       organizations: organizationsByPerson.get(row.id) ?? [],

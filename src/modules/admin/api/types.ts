@@ -21,6 +21,10 @@ export interface VocabularyEntry {
 
 export interface Person {
   id: string;
+  /** Person ID, shown as `PER-n` (see formatPersonNumber). */
+  personNumber: number;
+  /** Set when the person was imported from Notion (read-only). */
+  notionPageId: string | null;
   name: string;
   state: VocabularyEntry | null;
   source: VocabularyEntry | null;
@@ -32,7 +36,11 @@ export interface Person {
   linkedin: string | null;
   x: string | null;
   otherContact: string | null;
-  lastFollowupAt: string | null;
+  wiseRecipientId: string | null;
+  /** Next planned follow-up, YYYY-MM-DD. */
+  nextFollowupOn: string | null;
+  /** The former "last follow-up" value, kept as-is (read-only). */
+  lastFollowupAtLegacy: string | null;
   createdAt: string;
   updatedAt: string;
   organizations: EntityRef[];
@@ -51,16 +59,23 @@ export interface PersonInput {
   linkedin?: string | null;
   x?: string | null;
   otherContact?: string | null;
-  lastFollowupAt?: string | null;
+  wiseRecipientId?: string | null;
+  nextFollowupOn?: string | null;
   organizationIds?: string[];
   expertiseIds?: string[];
 }
 
 export interface Organization {
   id: string;
+  /** Organization ID, shown as `ORG-n` (see formatOrgNumber). */
+  orgNumber: number;
+  /** Set when the organization was imported from Notion (read-only). */
+  notionPageId: string | null;
   name: string;
+  description: string | null;
   website: string | null;
-  note: string | null;
+  email: string | null;
+  wiseRecipientId: string | null;
   createdAt: string;
   updatedAt: string;
   people: EntityRef[];
@@ -69,10 +84,15 @@ export interface Organization {
 
 export interface OrganizationInput {
   name?: string;
+  description?: string | null;
   website?: string | null;
-  note?: string | null;
+  email?: string | null;
+  wiseRecipientId?: string | null;
   expertiseIds?: string[];
 }
+
+export const formatPersonNumber = (n: number) => `PER-${n}`;
+export const formatOrgNumber = (n: number) => `ORG-${n}`;
 
 export interface PeopleOptions {
   states: VocabularyEntry[];
@@ -86,20 +106,27 @@ export interface Page<Item> {
   total: number;
 }
 
-export interface ExpertiseItemNode {
+/** Notion-side taxonomy attributes, set by the import (read-only in the admin). */
+export interface TaxonomyNotionAttributes {
+  stableId: string | null;
+  status: VocabularyEntry | null;
+}
+
+export interface ExpertiseItemNode extends TaxonomyNotionAttributes {
   id: string;
   name: string;
+  teams: VocabularyEntry[];
   peopleCount: number;
   organizationCount: number;
 }
 
-export interface ExpertiseFieldNode {
+export interface ExpertiseFieldNode extends TaxonomyNotionAttributes {
   id: string;
   name: string;
   items: ExpertiseItemNode[];
 }
 
-export interface ExpertiseDomainNode {
+export interface ExpertiseDomainNode extends TaxonomyNotionAttributes {
   id: string;
   name: string;
   fields: ExpertiseFieldNode[];

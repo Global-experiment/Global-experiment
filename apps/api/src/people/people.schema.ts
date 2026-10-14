@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { expertiseItems } from "../expertise/expertise.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
 
@@ -29,16 +29,22 @@ export const personSources = pgTable("person_sources", vocabularyColumns, (table
 ]);
 
 /**
- * People. Columns follow the Figma People table (figma.pdf p40/p44) where
- * its meaning is clear; Figma's "Number", "Access grant" and "Expenses"
- * columns are not modelled (unresolved / later modules). Names and emails
- * are NOT unique — duplicates stay visible (future import rule), never
- * merged silently. No hard delete endpoint exists yet (retention undecided).
+ * People, mapped from the Notion "0.1 native" People database
+ * (docs/architecture/data-model.md §2). Figma's "Access grant" and
+ * "Expenses" columns are later modules. Names and emails are NOT unique —
+ * duplicates stay visible (import rule), never merged silently. No hard
+ * delete endpoint exists yet (retention undecided).
+ *
+ * `person_number` is Notion's Person ID (`PER-n`, prefix added on display):
+ * assigned automatically for people created in the admin, set explicitly
+ * by the import. `notion_page_id` is the import's first match key.
  */
 export const people = pgTable(
   "people",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    personNumber: integer("person_number").notNull().generatedByDefaultAsIdentity(),
+    notionPageId: uuid("notion_page_id"),
     name: text("name").notNull(),
     stateKey: text("state_key").references(() => personStates.key, { onDelete: "restrict", onUpdate: "cascade" }),
     sourceKey: text("source_key").references(() => personSources.key, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -50,7 +56,15 @@ export const people = pgTable(
     linkedin: text("linkedin"),
     x: text("x"),
     otherContact: text("other_contact"),
-    lastFollowupAt: timestamp("last_followup_at", { withTimezone: true }),
+    wiseRecipientId: text("wise_recipient_id"),
+    /** Notion's Follow-up date: the NEXT planned follow-up. */
+    nextFollowupOn: date("next_followup_on", { mode: "string" }),
+    /**
+     * Values of the former `last_followup_at` column (0001), whose meaning
+     * was "last follow-up" — kept as they were, never converted into
+     * `next_followup_on`. Read-only.
+     */
+    lastFollowupAtLegacy: timestamp("last_followup_at_legacy", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -61,7 +75,11 @@ export const people = pgTable(
     index("people_source_key_idx").on(table.sourceKey),
     index("people_created_at_idx").on(table.createdAt),
     index("people_updated_at_idx").on(table.updatedAt),
-    index("people_last_followup_at_idx").on(table.lastFollowupAt),
+    index("people_next_followup_on_idx").on(table.nextFollowupOn),
+    uniqueIndex("people_person_number_unique").on(table.personNumber),
+    uniqueIndex("people_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
+    check("people_person_number_positive", sql`${table.personNumber} > 0`),
+    check("people_wise_recipient_id_length", sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`),
     check("people_name_present", sql`length(btrim(${table.name})) between 1 and 200`),
     check("people_email_shape", sql`${table.email} is null or ${table.email} ~ '^[^@\\s]+@[^@\\s]+$'`),
     check("people_personal_note_length", sql`${table.personalNote} is null or length(${table.personalNote}) <= 5000`),

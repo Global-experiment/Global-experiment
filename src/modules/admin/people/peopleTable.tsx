@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
 import { Icon } from "@/shared/ui/icons";
-import type { ExpertiseTree, Organization, PeopleOptions, Person } from "../api/types";
+import { formatPersonNumber, type ExpertiseTree, type Organization, type PeopleOptions, type Person } from "../api/types";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
@@ -10,6 +10,9 @@ export const PEOPLE_DEFAULT_SORT: SortRule[] = [{ field: "created", direction: "
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 export const formatDate = (iso: string | null) => (iso ? dateFormat.format(new Date(iso)) : "");
+/** A calendar date (YYYY-MM-DD) shown as that same day, whatever the viewer's time zone. */
+const calendarFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+export const formatCalendarDate = (day: string | null) => (day ? calendarFormat.format(new Date(`${day}T00:00:00Z`)) : "");
 
 const lines = (values: string[], search: string): ReactNode =>
   values.map((value, index) => (
@@ -22,9 +25,9 @@ const text = (value: string | null, search: string) => (value ? <Highlight text=
 
 /**
  * People columns in Figma's order (figma.pdf p40 + p44) with Figma's type
- * glyphs and the p40 widths for the first six. Not shown: "Access grant"
- * and "Expenses" (modules that don't exist yet) and "Number" (meaning
- * unresolved) — see docs/native-backend-implementation-plan.md §13.
+ * glyphs and the p40 widths for the first six. Figma's "Number" is the
+ * Notion Person ID (PER-n, docs/architecture/data-model.md §2). Not shown:
+ * "Access grant" and "Expenses" (modules that don't exist yet).
  */
 export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "name", label: "Name", icon: "title", width: 170, render: (p, s) => text(p.name, s) },
@@ -51,9 +54,11 @@ export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "linkedin", label: "Linkedin", icon: "link", width: 220, render: (p, s) => text(p.linkedin, s) },
   { id: "x", label: "X", icon: "link", width: 150, render: (p, s) => text(p.x, s) },
   { id: "other_contact", label: "Other contact", icon: "title", width: 160, render: (p, s) => text(p.otherContact, s) },
+  { id: "wise_recipient_id", label: "Wise recipient ID", icon: "title", width: 160, render: (p) => p.wiseRecipientId },
   { id: "created", label: "Created", icon: "schedule", width: 120, render: (p) => formatDate(p.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, render: (p) => formatDate(p.updatedAt) },
-  { id: "last_followup", label: "Last followup", icon: "schedule", width: 130, render: (p) => formatDate(p.lastFollowupAt) },
+  { id: "next_followup", label: "Follow-up date", icon: "schedule", width: 140, render: (p) => formatCalendarDate(p.nextFollowupOn) },
+  { id: "number", label: "Person ID", icon: "numbers", width: 100, render: (p) => formatPersonNumber(p.personNumber) },
 ];
 
 export function expertiseOptions(tree: ExpertiseTree | undefined) {
@@ -95,6 +100,7 @@ export function peopleFields(
     { id: "email", label: "Email", icon: "alternate_email", operators: ["contains", "is_empty", "is_not_empty"] },
     { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
     { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
-    { id: "last_followup", label: "Last followup", icon: "schedule", operators: [], sort: "dates" },
+    { id: "next_followup", label: "Follow-up date", icon: "schedule", operators: [], sort: "dates" },
+    { id: "number", label: "Person ID", icon: "numbers", operators: [], sort: "text" },
   ];
 }

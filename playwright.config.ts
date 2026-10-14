@@ -18,7 +18,7 @@ const port = Number(process.env.E2E_PORT ?? 3000);
  * Admin suite (e2e/admin.spec.ts): the real stack — Next.js → NestJS →
  * PostgreSQL 17 — on its own API port, against the *_test database
  * (TEST_DATABASE_URL from the gitignored .env.local), which the API's
- * e2e-setup wipes, migrates and seeds with demo data first. Never the
+ * e2e-setup wipes, migrates and loads with test-only fixtures first. Never the
  * development database. Skipped when TEST_DATABASE_URL isn't configured.
  *
  * The Next.js server must proxy /api/admin to this API: a Next server

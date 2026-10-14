@@ -6,12 +6,13 @@ import { AuthRepository } from "../auth/auth.repository.js";
 import { hashPassword } from "../auth/password.js";
 import type { Database } from "../common/database/database.module.js";
 import * as schema from "../common/database/schema.js";
-import { seedDemoData } from "../seed/seed-demo.js";
+import { loadDirectoryFixtures } from "./fixtures/load-directory-fixtures.js";
 
 /**
  * Prepares the database the admin Playwright suite runs against (started
  * by playwright.config.ts before the API): wipe, apply the production
- * migrations, load the demo dataset, and set the E2E owner. Refuses any
+ * migrations, load the test fixtures (testing/fixtures — test-only, never
+ * written anywhere but this database), and set the E2E owner. Refuses any
  * database whose name doesn't end in `_test` — it can never touch the
  * development or production database.
  */
@@ -28,7 +29,7 @@ async function main() {
     await client.unsafe("drop schema if exists drizzle cascade; drop schema if exists public cascade; create schema public;");
     const db = drizzle(client, { schema }) as unknown as Database;
     await migrate(db as never, { migrationsFolder: fileURLToPath(new URL("../../drizzle", import.meta.url)) });
-    await seedDemoData(db);
+    await loadDirectoryFixtures(db);
     await new AuthRepository(db).upsertOwner(email, await hashPassword(password));
     console.log(`E2E database "${name}" reset, migrated and seeded.`);
   } finally {

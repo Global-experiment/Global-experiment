@@ -15,6 +15,13 @@
       "when": 1790982919223,
       "tag": "0001_native_core_directory",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791914573793,
+      "tag": "0002_directory_notion_alignment",
+      "breakpoints": true
     }
   ]
 }

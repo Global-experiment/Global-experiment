@@ -5,9 +5,9 @@ import { E2E_ADMIN } from "./admin-credentials";
 /**
  * Native admin, end to end through the real stack: browser → Next.js →
  * (same-origin /api/admin proxy) → NestJS → PostgreSQL 17 test database,
- * seeded with the demo dataset by the API's e2e-setup (see
+ * loaded with test-only fixtures by the API's e2e-setup (see
  * playwright.config.ts). Serial: the tests share one owner session (login
- * is rate-limited) and edit the same seeded records.
+ * is rate-limited) and edit the same fixture records.
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the admin stack isn't running.");
 test.describe.configure({ mode: "serial" });

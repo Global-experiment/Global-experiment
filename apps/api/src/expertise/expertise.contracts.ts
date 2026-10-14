@@ -15,20 +15,37 @@ export type RenameRequest = z.output<typeof RenameRequest>;
 
 export type ExpertiseLevel = "domain" | "field" | "expertise";
 
-export interface ExpertiseItemDto {
+export interface TaxonomyVocabularyEntry {
+  key: string;
+  label: string;
+}
+
+/**
+ * Notion-side attributes every level carries. Read-only here: the import
+ * sets them (docs/architecture/data-model.md §4–5); rows created in the
+ * admin have none.
+ */
+export interface TaxonomyNotionAttributes {
+  stableId: string | null;
+  status: TaxonomyVocabularyEntry | null;
+}
+
+export interface ExpertiseItemDto extends TaxonomyNotionAttributes {
   id: string;
   name: string;
+  /** Teams this expertise belongs to (recorded only). */
+  teams: TaxonomyVocabularyEntry[];
   peopleCount: number;
   organizationCount: number;
 }
 
-export interface ExpertiseFieldDto {
+export interface ExpertiseFieldDto extends TaxonomyNotionAttributes {
   id: string;
   name: string;
   items: ExpertiseItemDto[];
 }
 
-export interface ExpertiseDomainDto {
+export interface ExpertiseDomainDto extends TaxonomyNotionAttributes {
   id: string;
   name: string;
   fields: ExpertiseFieldDto[];

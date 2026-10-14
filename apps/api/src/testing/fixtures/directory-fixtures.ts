@@ -1,9 +1,15 @@
 /**
- * DEMO DEVELOPMENT DATA — synthetic, non-sensitive records for showing the
- * native admin locally. No real client or person data: names are invented
- * combinations, emails use the reserved `example.org` domain, and every
- * note is generic. Every id lives in the reserved `de000000-…` range, which
- * is how the seed recognises (and only ever touches) its own rows.
+ * TEST FIXTURES — synthetic records for the admin Playwright suite only.
+ *
+ * Project rule (docs/architecture/data-model.md §5, "No demo data,
+ * anywhere"): fixtures exist only for automated tests and are only ever
+ * written to a `*_test` database (by e2e-setup.ts, which refuses any other
+ * database). This folder is excluded from the API build
+ * (tsconfig.build.json), so no deployed command can load it.
+ *
+ * Names are invented combinations, emails/websites use the reserved
+ * `example.org` domain, and every id lives in the reserved `de000000-…`
+ * range — the same markers the purge command recognises.
  */
 
 const KIND = { a: 1, b: 2, c: 3, d: 4, e: 5 } as const;
@@ -12,9 +18,7 @@ const KIND = { a: 1, b: 2, c: 3, d: 4, e: 5 } as const;
 const id = (kind: keyof typeof KIND, n: number) =>
   `de000000-${KIND[kind]}000-4000-8000-${n.toString(16).padStart(12, "0")}`;
 
-export const DEMO_ID_PREFIX = "de000000-";
-
-export interface DemoTaxonomy {
+export interface FixtureTaxonomy {
   domains: { id: string; name: string; fields: { id: string; name: string; items: { id: string; name: string }[] }[] }[];
 }
 
@@ -53,7 +57,7 @@ const taxonomySource: [string, [string, string[]][]][] = [
 let domainN = 0;
 let fieldN = 0;
 let itemN = 0;
-export const DEMO_TAXONOMY: DemoTaxonomy = {
+export const FIXTURE_TAXONOMY: FixtureTaxonomy = {
   domains: taxonomySource.map(([domainName, fields]) => ({
     id: id("c", ++domainN),
     name: domainName,
@@ -65,19 +69,20 @@ export const DEMO_TAXONOMY: DemoTaxonomy = {
   })),
 };
 
-const allItems = DEMO_TAXONOMY.domains.flatMap((domain) => domain.fields.flatMap((field) => field.items));
+const allItems = FIXTURE_TAXONOMY.domains.flatMap((domain) => domain.fields.flatMap((field) => field.items));
 const itemByName = new Map(allItems.map((item) => [item.name, item.id]));
 const expertise = (...names: string[]) => names.map((name) => itemByName.get(name)!);
 
-export interface DemoOrganization {
+export interface FixtureOrganization {
   id: string;
   name: string;
+  description: string | null;
   website: string | null;
-  note: string | null;
+  email: string | null;
   expertiseIds: string[];
 }
 
-export const DEMO_ORGANIZATIONS: DemoOrganization[] = [
+export const FIXTURE_ORGANIZATIONS: FixtureOrganization[] = [
   ["Northwind Civic Lab", "Research lab prototyping participation tools.", ["Participatory budgeting", "UX research"]],
   ["Open Commons Cooperative", "Worker cooperative maintaining open-source civic software.", ["Full-stack development", "DevOps"]],
   ["Meridian Data Studio", "Small studio for public-interest data projects.", ["Data engineering", "Data visualisation"]],
@@ -90,15 +95,19 @@ export const DEMO_ORGANIZATIONS: DemoOrganization[] = [
   ["Signal Policy Forum", null, ["Public policy", "Digital rights"]],
   ["Brightline Media", "Editorial and illustration studio.", ["Copywriting", "Illustration"]],
   ["Quarry Mobile", null, ["Mobile development", "Frontend development"]],
-].map(([name, note, tags], index) => ({
-  id: id("b", index + 1),
-  name: name as string,
-  website: `https://${(name as string).toLowerCase().replace(/[^a-z]+/g, "-")}.example.org`,
-  note: note as string | null,
-  expertiseIds: expertise(...(tags as string[])),
-}));
+].map(([name, description, tags], index) => {
+  const slug = (name as string).toLowerCase().replace(/[^a-z]+/g, "-");
+  return {
+    id: id("b", index + 1),
+    name: name as string,
+    description: description as string | null,
+    website: `https://${slug}.example.org`,
+    email: index % 3 === 0 ? `hello@${slug}.example.org` : null,
+    expertiseIds: expertise(...(tags as string[])),
+  };
+});
 
-export interface DemoPerson {
+export interface FixturePerson {
   id: string;
   name: string;
   stateKey: string | null;
@@ -111,7 +120,7 @@ export interface DemoPerson {
   linkedin: string | null;
   x: string | null;
   otherContact: string | null;
-  lastFollowupAt: Date | null;
+  nextFollowupOn: string | null;
   createdAt: Date;
   organizationIds: string[];
   expertiseIds: string[];
@@ -119,8 +128,9 @@ export interface DemoPerson {
 
 const FIRST = ["Alex", "Bea", "Cyril", "Dina", "Emil", "Farah", "Gus", "Hana", "Ivo", "Juno", "Kai", "Lena", "Milo", "Nora", "Otto", "Pia"];
 const LAST = ["Demo", "Sample", "Example", "Placeholder"];
+// The admin suite counts on this cycle (e.g. 12 of 48 are "Sourced").
 const STATES = ["sourced", "contacted", "collaborating", null] as const;
-const SOURCES = ["candide", "ai", "contribution_email", "waitlist", "notion_import", null] as const;
+const SOURCES = ["candide", "ai", "contribution_email", null] as const;
 const NOTES = [
   "Introduced through a partner organisation; interested in v0.1 testing.",
   "Asked to be contacted after the next release.",
@@ -132,18 +142,19 @@ const NOTES = [
 ];
 
 /**
- * 48 people: every state (and none), every source, 0–3 organizations,
- * 1–4 expertise tags, a few do-not-contact flags, and creation dates spread
- * over the past year — enough to exercise search, filters, sort and paging.
+ * 48 people: several states (and none), every source (and none), 0–3
+ * organizations, 1–4 expertise tags, a few do-not-contact flags, and
+ * creation dates spread over the past year — enough to exercise search,
+ * filters, sort and paging.
  */
-export const DEMO_PEOPLE: DemoPerson[] = Array.from({ length: 48 }, (_, index) => {
+export const FIXTURE_PEOPLE: FixturePerson[] = Array.from({ length: 48 }, (_, index) => {
   const first = FIRST[index % FIRST.length]!;
   const last = LAST[Math.floor(index / FIRST.length) % LAST.length]!;
   const slug = `${first}.${last}`.toLowerCase();
   const day = 24 * 60 * 60 * 1000;
   const base = Date.UTC(2026, 8, 30, 9, 0);
   const organizationCount = index % 4 === 0 ? 0 : (index % 3) + 1;
-  const organizationIds = Array.from({ length: organizationCount }, (_, k) => DEMO_ORGANIZATIONS[(index + k * 5) % DEMO_ORGANIZATIONS.length]!.id);
+  const organizationIds = Array.from({ length: organizationCount }, (_, k) => FIXTURE_ORGANIZATIONS[(index + k * 5) % FIXTURE_ORGANIZATIONS.length]!.id);
   const tagCount = (index % 4) + 1;
   const expertiseIds = [...new Set(Array.from({ length: tagCount }, (_, k) => allItems[(index * 7 + k * 3) % allItems.length]!.id))];
   return {
@@ -159,7 +170,7 @@ export const DEMO_PEOPLE: DemoPerson[] = Array.from({ length: 48 }, (_, index) =
     linkedin: index % 4 === 2 ? `https://www.linkedin.com/in/${slug.replace(".", "-")}-example` : null,
     x: index % 7 === 3 ? `@${slug.replace(".", "_")}_example` : null,
     otherContact: index % 9 === 8 ? "Signal on request" : null,
-    lastFollowupAt: index % 3 === 1 ? new Date(base - (index % 20) * day) : null,
+    nextFollowupOn: index % 3 === 1 ? new Date(base + (index % 20) * day).toISOString().slice(0, 10) : null,
     createdAt: new Date(base - index * 7 * day - (index % 5) * 3_600_000),
     organizationIds,
     expertiseIds,

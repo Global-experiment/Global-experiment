@@ -37,7 +37,10 @@ const personFields = {
   linkedin: optionalText(2048),
   x: optionalText(2048),
   otherContact: optionalText(500),
-  lastFollowupAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  /** Free text: no Wise ID format is assumed (data-model.md §2). */
+  wiseRecipientId: optionalText(100),
+  /** Next planned follow-up, a calendar date (YYYY-MM-DD). */
+  nextFollowupOn: z.iso.date().nullable().optional(),
   organizationIds: uniqueIds.optional(),
   expertiseIds: uniqueIds.optional(),
 };
@@ -50,7 +53,7 @@ export const UpdatePersonRequest = z
   .refine((body) => Object.keys(body).length > 0, "Nothing to update.");
 export type UpdatePersonRequest = z.output<typeof UpdatePersonRequest>;
 
-export const PEOPLE_SORT_FIELDS = ["name", "state", "source", "created", "updated", "last_followup"] as const;
+export const PEOPLE_SORT_FIELDS = ["number", "name", "state", "source", "created", "updated", "next_followup"] as const;
 export type PeopleSortField = (typeof PEOPLE_SORT_FIELDS)[number];
 
 export const PeopleListQuery = listQuerySchema({
@@ -90,6 +93,10 @@ export interface ExpertiseRef extends EntityRef {
 
 export interface PersonDto {
   id: string;
+  /** Person ID: shown as `PER-${personNumber}`. */
+  personNumber: number;
+  /** The Notion page this person was imported from (read-only). */
+  notionPageId: string | null;
   name: string;
   state: VocabularyEntry | null;
   source: VocabularyEntry | null;
@@ -101,7 +108,10 @@ export interface PersonDto {
   linkedin: string | null;
   x: string | null;
   otherContact: string | null;
-  lastFollowupAt: string | null;
+  wiseRecipientId: string | null;
+  nextFollowupOn: string | null;
+  /** The former "last follow-up" value, kept as-is (read-only). */
+  lastFollowupAtLegacy: string | null;
   createdAt: string;
   updatedAt: string;
   organizations: EntityRef[];

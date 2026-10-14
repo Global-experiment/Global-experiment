@@ -1,30 +1,48 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { expertiseItems } from "../expertise/expertise.schema.js";
 
 /**
- * Organizations. Names are deliberately NOT unique: the future Notion
- * import keeps duplicates visible instead of merging them silently.
- * `website` and `note` are the minimal directory fields; Figma has no
- * Organizations frame yet, so nothing beyond them is assumed.
+ * Organizations, mapped from the Notion "0.1 native" Organizations database
+ * (docs/architecture/data-model.md §3). Names and emails are deliberately
+ * NOT unique: the import keeps duplicates visible instead of merging them
+ * silently. `org_number` is Notion's Organization ID (`ORG-n`, prefix added
+ * on display); `notion_page_id` is the import's first match key.
  */
 export const organizations = pgTable(
   "organizations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    orgNumber: integer("org_number").notNull().generatedByDefaultAsIdentity(),
+    notionPageId: uuid("notion_page_id"),
     name: text("name").notNull(),
+    description: text("description"),
     website: text("website"),
-    note: text("note"),
+    email: text("email"),
+    wiseRecipientId: text("wise_recipient_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("organizations_name_idx").on(sql`lower(${table.name})`),
+    index("organizations_email_idx").on(sql`lower(${table.email})`),
     index("organizations_created_at_idx").on(table.createdAt),
     index("organizations_updated_at_idx").on(table.updatedAt),
+    uniqueIndex("organizations_org_number_unique").on(table.orgNumber),
+    uniqueIndex("organizations_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
+    check("organizations_org_number_positive", sql`${table.orgNumber} > 0`),
     check("organizations_name_present", sql`length(btrim(${table.name})) between 1 and 200`),
     check("organizations_website_length", sql`${table.website} is null or length(${table.website}) <= 2048`),
-    check("organizations_note_length", sql`${table.note} is null or length(${table.note}) <= 5000`),
+    check("organizations_description_length", sql`${table.description} is null or length(${table.description}) <= 5000`),
+    // Same rule as people.email.
+    check(
+      "organizations_email_shape",
+      sql`${table.email} is null or (${table.email} ~ '^[^@\\s]+@[^@\\s]+$' and length(${table.email}) <= 320)`,
+    ),
+    check(
+      "organizations_wise_recipient_id_length",
+      sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`,
+    ),
   ],
 );
 
