@@ -20,8 +20,19 @@ export interface DonateNoticeContent {
  *
  * Announced when it appears (alert for warnings, status for info); the ✕
  * keeps a 32px hit area centred on the 16px glyph without growing the box.
+ * Without `onDismiss` (a state of the page, e.g. "Donations open soon") there
+ * is no ✕.
  */
-export function DonateNotice({ notice, onDismiss, ref }: { notice: DonateNoticeContent; onDismiss: () => void; ref?: Ref<HTMLDivElement> }) {
+export function DonateNotice({
+  notice,
+  onDismiss,
+  ref,
+}: {
+  notice: DonateNoticeContent;
+  onDismiss?: () => void;
+  ref?: Ref<HTMLDivElement>;
+}) {
+  const room = onDismiss ? "pr-6" : "";
   return (
     <div
       ref={ref}
@@ -29,19 +40,23 @@ export function DonateNotice({ notice, onDismiss, ref }: { notice: DonateNoticeC
       data-notice={notice.tone}
       className="relative mt-2 rounded-control bg-surface-raised px-2 pt-2 pb-2.5 text-text-primary"
     >
-      <p className="flex min-h-4 items-center gap-1 pr-6 text-meta font-bold">
+      <p
+        className={`flex min-h-4 items-center gap-1 text-meta font-bold ${room}`}
+      >
         {notice.tone === "warning" ? <Icon name="warning" /> : null}
         {notice.title}
       </p>
-      <p className="mt-1 pr-6 text-meta">{notice.message}</p>
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={DONATE_COPY.notices.close}
-        className="absolute top-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text-primary"
-      >
-        <Icon name="close" />
-      </button>
+      <p className={`mt-1 text-meta ${room}`}>{notice.message}</p>
+      {onDismiss ? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label={DONATE_COPY.notices.close}
+          className="absolute top-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-text-primary"
+        >
+          <Icon name="close" />
+        </button>
+      ) : null}
     </div>
   );
 }

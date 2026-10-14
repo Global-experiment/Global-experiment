@@ -41,6 +41,9 @@ const DECIMAL_INPUT = /^[0-9]*[.,]?[0-9]*$/;
 
 const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
+/** Amount and frequency controls while donations are closed or unavailable: visibly inert, never "selected". */
+const inertControl = "cursor-not-allowed border-line text-content-50";
+
 type Selection = { kind: "preset"; major: number } | { kind: "other"; text: string; editing: boolean } | null;
 
 interface DonateFormProps {
@@ -73,13 +76,15 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
   const available = config?.available === true;
   // Closed until donations open; a valid preview token opens it for this visitor only.
   const open = config?.enabled === true;
+  // Amounts and frequency can be chosen only when a payment can follow.
+  const interactive = available && open;
   const preview = initial.preview;
   const presets = config?.presets ?? FALLBACK_PRESETS;
   const monthlyEnabled = config?.monthly === true;
 
   const [currency, setCurrency] = useState<DonationCurrency>(initial.currency);
   const [frequency, setFrequency] = useState<DonationFrequency>(initial.frequency);
-  const [selection, setSelection] = useState<Selection>(() => initialSelection(initial, presets));
+  const [selection, setSelection] = useState<Selection>(() => (interactive ? initialSelection(initial, presets) : null));
   const [notice, setNotice] = useState<DonateNoticeContent | null>(() =>
     !config || !available
       ? { tone: "warning", ...copy.notices.donationsUnavailable }
@@ -312,10 +317,15 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
                   key={value}
                   type="button"
                   onClick={() => chooseFrequency(value)}
-                  aria-pressed={frequency === value}
-                  className={`h-10 flex-1 cursor-pointer border text-body ${focusRing} ${
-                    index === 0 ? "rounded-l-full" : "-ml-px rounded-r-full"
-                  } ${frequency === value ? "relative z-10 border-text-primary text-text-primary" : "border-line-strong text-text-muted hover:border-content-50"}`}
+                  disabled={!interactive}
+                  aria-pressed={interactive ? frequency === value : undefined}
+                  className={`h-10 flex-1 border text-body ${focusRing} ${index === 0 ? "rounded-l-full" : "-ml-px rounded-r-full"} ${
+                    !interactive
+                      ? inertControl
+                      : frequency === value
+                        ? "relative z-10 cursor-pointer border-text-primary text-text-primary"
+                        : "cursor-pointer border-line-strong text-text-muted hover:border-content-50"
+                  }`}
                 >
                   {copy.frequency[value]}
                 </button>
@@ -331,9 +341,14 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
                   key={major}
                   type="button"
                   onClick={() => choosePreset(major)}
-                  aria-pressed={selected}
-                  className={`h-10 cursor-pointer rounded-control border text-body ${focusRing} ${
-                    selected ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line-strong text-text-muted hover:border-content-50"
+                  disabled={!interactive}
+                  aria-pressed={interactive ? selected : undefined}
+                  className={`h-10 rounded-control border text-body ${focusRing} ${
+                    !interactive
+                      ? inertControl
+                      : selected
+                        ? "cursor-pointer border-inverse-surface bg-inverse-surface text-inverse-content"
+                        : "cursor-pointer border-line-strong text-text-muted hover:border-content-50"
                   }`}
                 >
                   {formatWhole(major, currency)}
@@ -375,10 +390,15 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
               <button
                 type="button"
                 onClick={startOther}
-                aria-pressed={selection?.kind === "other"}
+                disabled={!interactive}
+                aria-pressed={interactive ? selection?.kind === "other" : undefined}
                 aria-label={selection?.kind === "other" && amountMinor !== null ? `${copy.amount.otherLabel}: ${formatExact(amountMinor, currency)}` : undefined}
-                className={`h-10 cursor-pointer rounded-control border text-body ${focusRing} ${
-                  selection?.kind === "other" ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line-strong text-text-muted hover:border-content-50"
+                className={`h-10 rounded-control border text-body ${focusRing} ${
+                  !interactive
+                    ? inertControl
+                    : selection?.kind === "other"
+                      ? "cursor-pointer border-inverse-surface bg-inverse-surface text-inverse-content"
+                      : "cursor-pointer border-line-strong text-text-muted hover:border-content-50"
                 }`}
               >
                 {selection?.kind === "other" && amountMinor !== null ? formatExact(amountMinor, currency) : copy.amount.other}
@@ -389,7 +409,8 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
 
         {notice ? (
           <div id="donate-notice">
-            <DonateNotice ref={noticeRef} notice={notice} onDismiss={() => setNotice(null)} />
+            {/* "Donations open soon" / "unavailable" describe the page itself: they stay. */}
+            <DonateNotice ref={noticeRef} notice={notice} onDismiss={interactive ? () => setNotice(null) : undefined} />
           </div>
         ) : null}
 

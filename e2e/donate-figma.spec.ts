@@ -236,9 +236,16 @@ test("closed: 'Donations open soon', no payment rows; the private preview link o
     const soon = page.locator("[data-notice=info][role=status]");
     await expect(soon).toContainText("Donations open soon");
     await expect(methods(page).getByRole("button")).toHaveCount(0);
-    // The figures and amounts stay visible.
+    // The figures and amounts stay visible, but nothing can be chosen and the message stays.
     await expect(amounts(page).getByRole("button").first()).toHaveText("€2");
+    for (const control of await page.getByRole("group", { name: "Frequency" }).or(amounts(page)).getByRole("button").all()) await expect(control).toBeDisabled();
+    await expect(soon.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
+    await expect(amounts(page).getByRole("button").first()).toHaveCSS("cursor", "not-allowed");
     await capture(page, "closed-open-soon");
+
+    // An amount in the URL (e.g. a shared link) isn't shown as chosen while closed.
+    await page.goto("/donate?currency=EUR&amount=50");
+    await expect(amounts(page).getByRole("button", { name: "€50", exact: true })).not.toHaveAttribute("aria-pressed", "true");
 
     // A wrong token changes nothing.
     await page.goto("/donate?currency=EUR&preview=not-the-token");
@@ -247,6 +254,7 @@ test("closed: 'Donations open soon', no payment rows; the private preview link o
     await page.route(/^https:\/\/checkout\.stripe\.com\//, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>stub</title>" }));
     await page.goto(`/donate?currency=EUR&preview=${E2E_DONATIONS_PREVIEW}`);
     await expect(page.locator("[data-notice]")).toHaveCount(0);
+    await expect(amounts(page).getByRole("button", { name: "€10", exact: true })).toBeEnabled();
     await amounts(page).getByRole("button", { name: "€10", exact: true }).click();
     // The token stays in the address bar through choices (and is never in the share link).
     await expect(page).toHaveURL(new RegExp(`preview=${E2E_DONATIONS_PREVIEW}`));
