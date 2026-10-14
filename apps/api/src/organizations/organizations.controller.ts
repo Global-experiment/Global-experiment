@@ -37,6 +37,12 @@ export class OrganizationsController {
     return this.organizations.get(id);
   }
 
+  /** POST /api/admin/organizations/:id/duplicate — the new copy (201). */
+  @Post(":id/duplicate")
+  duplicate(@Param("id", IdParam) id: string) {
+    return this.organizations.duplicate(id);
+  }
+
   @Patch(":id")
   update(
     @Param("id", IdParam) id: string,

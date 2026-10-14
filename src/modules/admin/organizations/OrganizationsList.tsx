@@ -9,10 +9,11 @@ import { completenessLabel } from "../completeness";
 import { useAdminData } from "../api/useAdminData";
 import { expertiseOptions, formatDate } from "../people/peopleTable";
 import { AdminListPage } from "../table/AdminListPage";
+import { NotionImportControl } from "../people/NotionImportControl";
+import { ViewTabs } from "../table/ViewTabs";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
-import { AdminIcon } from "../ui/adminIcons";
 import { AdminButton, chipInput, Popover } from "../ui/controls";
 import { useToast } from "../ui/Toast";
 
@@ -135,13 +136,13 @@ export function OrganizationsList() {
         fields,
         columns: COLUMNS,
         recordHref: (organization) => `/admin/organizations/${organization.id}`,
-        views: (
-          <span aria-current="true" className="flex items-center gap-1 text-body">
-            <AdminIcon name="view_all" />
-            All
-          </span>
+        views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
+        actions: (
+          <>
+            <NotionImportControl />
+            <NewOrganizationControl />
+          </>
         ),
-        actions: <NewOrganizationControl />,
       }}
     />
   );

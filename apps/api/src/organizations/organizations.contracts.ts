@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { listQuerySchema } from "../common/listing/list-query.js";
+import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import type { EntityRef, ExpertiseRef } from "../people/people.contracts.js";
 
 const optionalText = (max: number) =>
@@ -25,7 +26,7 @@ const organizationFields = {
   wiseRecipientId: optionalText(100),
   expertiseIds: z
     .array(z.uuid())
-    .max(100)
+    .max(RELATION_LIMITS.expertise, LIMIT_MESSAGES.organizationExpertise)
     .refine((ids) => new Set(ids).size === ids.length, "Duplicate ids.")
     .optional(),
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { adminApi, AdminApiError } from "../api/client";
 import type { Page } from "../api/types";
 import { AdminIcon } from "../ui/adminIcons";
@@ -36,11 +36,17 @@ export interface AdminListConfig<Row extends { id: string }> {
   /** Plural noun for status text ("people", "organizations"). */
   noun: string;
   tableId: string;
-  endpoint: string;
+  /** The API collection (`/people`), queried with the list contract… */
+  endpoint?: string;
+  /** …or the rows computed in the browser (small read-only collections; see localList.ts). */
+  load?: (state: ListState, pageSize: number) => Page<Row> | undefined;
   defaultSort: SortRule[];
   fields: readonly ListField[];
   columns: readonly TableColumn<Row>[];
-  recordHref: (row: Row) => string;
+  /** Each row's record page; omitted for read-only collections without one. */
+  recordHref?: (row: Row) => string;
+  /** Muted note after the title (e.g. "Managed in Notion – updated by the importer."). */
+  subtitle?: ReactNode;
   /** Right side of the title row (Notion import control, "New …"). */
   actions?: ReactNode;
   /** Left side of the toolbar row (Figma's saved-view tabs). */
@@ -110,7 +116,12 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate is rebuilt every render
   }, [searchDraft, state.search]);
 
+  const { load } = config;
+  // Local collections are computed during render (undefined while their data is still loading).
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `state` is derived from the URL, which apiQuery tracks
+  const localPage = useMemo(() => load?.(state, PAGE_SIZE), [load, apiQuery]);
   useEffect(() => {
+    if (load) return;
     const controller = new AbortController();
     adminApi<Page<Row>>(`${config.endpoint}${apiQuery}`, { signal: controller.signal }).then(
       (page) => setResult({ key: requestKey, status: "ok", page }),
@@ -124,10 +135,10 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
       },
     );
     return () => controller.abort();
-  }, [config.endpoint, apiQuery, requestKey]);
+  }, [config.endpoint, load, apiQuery, requestKey]);
 
-  const loading = result?.key !== requestKey;
-  const page = result?.status === "ok" ? result.page : undefined;
+  const loading = load ? !localPage : result?.key !== requestKey;
+  const page = load ? localPage : result?.status === "ok" ? result.page : undefined;
   const activeFilters = state.filters.filter(isCompleteFilter);
 
   const closePopover = () => {
@@ -143,7 +154,9 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
   return (
     <main className="flex h-full min-h-0 flex-col">
       <header className="flex h-10 shrink-0 items-center gap-2 px-2">
-        <h1 className="mr-auto text-body font-bold">{config.title}</h1>
+        <h1 className="text-body font-bold">{config.title}</h1>
+        {config.subtitle ? <p className="min-w-0 truncate text-meta text-text-muted">{config.subtitle}</p> : null}
+        <span className="mr-auto" />
         {config.actions}
       </header>
 
@@ -188,7 +201,7 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
             className={`${toolbarBox} w-40 cursor-pointer justify-between pr-1 pl-2 text-body ${openPopover === "sort" ? "ring-text-primary" : ""}`}
           >
             <span className="truncate">{sortButtonLabel(config.fields, state.sort)}</span>
-            <AdminIcon name="arrow_downward" className="text-text-muted" />
+            <AdminIcon name="arrow_drop_down" />
           </button>
           <SortPopover
             open={openPopover === "sort"}

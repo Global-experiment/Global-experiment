@@ -102,6 +102,15 @@ describe("expertise search API", () => {
     await admin.get("/api/admin/expertise/search?pageSize=500").expect(400);
   });
 
+  it("lists Active expertise by name when there's no query (the picker opened before typing)", async () => {
+    const first = await search("pageSize=10");
+    expect(first.items).toHaveLength(10);
+    const names = first.items.map((item: { name: string }) => item.name);
+    expect([...names].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))).toEqual(names);
+    expect(first.items.every((item: { selectable: boolean }) => item.selectable)).toBe(true);
+    expect((await search("q=%20%20&pageSize=10")).items.map((item: { name: string }) => item.name)).toEqual(names);
+  });
+
   it("escapes LIKE wildcards in the query", async () => {
     // Unescaped, "%" would match everything and "skill_1_" every skill_1x.
     expect(await names("q=%25")).toEqual([]);

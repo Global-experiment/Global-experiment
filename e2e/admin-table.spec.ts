@@ -20,8 +20,8 @@ test.beforeAll(async ({ browser }) => {
   // Explicitly empty: this page creates the stored session the tests then use.
   const page = await browser.newPage({ storageState: { cookies: [], origins: [] } });
   await page.goto("/admin/login");
-  await page.getByLabel("Email").fill(E2E_ADMIN.email);
-  await page.getByLabel("Password").fill(E2E_ADMIN.password);
+  await page.getByLabel("Email address").fill(E2E_ADMIN.email);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_ADMIN.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(/\/admin\/people/, { timeout: 15_000 });
   mkdirSync("test-results/.auth", { recursive: true });
@@ -84,7 +84,8 @@ test("only the table scrolls sideways; the page never does and the nav stays ful
 
   const nav = await page.getByRole("navigation", { name: "Admin" }).boundingBox();
   expect(nav).toMatchObject({ x: 0, width: 240 });
-  await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Profile" })).toBeInViewport();
+  // The user card (last element of the sidebar) is always on screen.
+  await expect(page.locator("a[href=\"/admin/profile\"]")).toBeInViewport();
 });
 
 test("admin pages opt out of overscroll history swipes; the public site doesn't", async ({ page }) => {
@@ -223,11 +224,10 @@ test("an organization links and unlinks people; the link shows on both records",
   await expect(page).toHaveURL(/\/admin\/organizations\/de000000-/);
   await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Quarry Mobile");
 
-  await page.getByRole("button", { name: "Add person" }).click();
-  await page.getByLabel("Search person").fill("Juno Demo");
-  await page.getByRole("dialog", { name: "Add person" }).getByRole("button", { name: "Juno Demo" }).click();
+  await page.getByLabel("Search people").fill("Juno Demo");
+  await page.getByRole("list", { name: "People results" }).getByRole("button", { name: "Juno Demo" }).click();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Organization updated" })).toBeVisible();
 
   await page.reload();
@@ -240,7 +240,7 @@ test("an organization links and unlinks people; the link shows on both records",
   // Back on the organization: unlink, and it's gone from the person too.
   await page.getByRole("link", { name: "Quarry Mobile" }).click();
   await page.getByRole("button", { name: "Remove Juno Demo" }).click();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Organization updated" })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("link", { name: "Juno Demo" })).toHaveCount(0);

@@ -45,6 +45,8 @@
   --color-inverse-content: #000000;
   /* Raised surface for admin toasts (figma.pdf p40–p43: #1f1f1f pill). */
   --color-surface-raised: #1f1f1f;
+  /* Admin user-card avatar placeholder (admin-desktop.pdf p2: 24px #d9d9d9 disc). */
+  --color-avatar: #d9d9d9;
 
   /* Geometry */
   --radius-control: 0.25rem; /* 4px — buttons, inputs, tags, search */
@@ -91,6 +93,7 @@
   --color-inverse-surface: #000000;
   --color-inverse-content: #ffffff;
   --color-surface-raised: #ebebeb;
+  --color-avatar: #8a8a8a;
 }
 
 body {

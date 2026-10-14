@@ -1,0 +1,2 @@
+ALTER TABLE "admin_users" ADD COLUMN "display_name" text;--> statement-breakpoint
+ALTER TABLE "admin_users" ADD CONSTRAINT "admin_users_display_name_shape" CHECK ("admin_users"."display_name" is null or (char_length("admin_users"."display_name") between 1 and 80 and "admin_users"."display_name" = btrim("admin_users"."display_name")));

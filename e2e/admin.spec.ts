@@ -16,8 +16,8 @@ const STATE_DIR = "test-results/.auth";
 const STATE = `${STATE_DIR}/admin.json`;
 
 async function signIn(page: Page, password = E2E_ADMIN.password) {
-  await page.getByLabel("Email").fill(E2E_ADMIN.email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Email address").fill(E2E_ADMIN.email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
@@ -28,7 +28,7 @@ test.describe("admin access", () => {
   test("unauthenticated visits to /admin go to login, and the API itself refuses them", async ({ page }) => {
     await page.goto("/admin/people?q=demo");
     await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fpeople%3Fq%3Ddemo$/);
-    await expect(page.getByRole("heading", { name: "Global Experiment admin" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in to the Global experiment" })).toBeVisible();
 
     const api = await page.request.get("/api/admin/people");
     expect(api.status()).toBe(401);
@@ -65,13 +65,13 @@ test.describe("people administration", () => {
     for (const column of ["Name", "State", "Source", "Expertise", "Personal note", "Organization"]) {
       await expect(page.getByRole("columnheader", { name: column, exact: true })).toBeVisible();
     }
-    // The Notion import control opens the import page.
-    await expect(page.getByRole("link", { name: "Notion import" })).toHaveAttribute("href", "/admin/imports");
+    // The Import Notion control opens the import page.
+    await expect(page.getByRole("link", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
   });
 
   test("search runs in the API and highlights matches", async ({ page }) => {
     await page.goto("/admin/people");
-    await page.getByPlaceholder("Search").fill("farah");
+    await page.getByRole("searchbox", { name: "Search people" }).fill("farah");
     await expect(page).toHaveURL(/q=farah/);
     await expect(rows(page)).toHaveCount(3);
     expect((await firstCellTexts(page)).every((name) => name.startsWith("Farah"))).toBe(true);
@@ -129,24 +129,22 @@ test.describe("people administration", () => {
     await expect(name).toHaveValue("Bea Demo");
 
     await page.getByLabel("Personal note").fill("Edited during the E2E run.");
-    await page.getByLabel("State").selectOption("collaborating");
+    await page.getByRole("group", { name: "State" }).getByRole("button", { name: "Collaborating" }).click();
 
-    await page.getByRole("button", { name: "Add organization" }).click();
     await page.getByLabel("Search organization").fill("Harbor");
-    await page.getByRole("dialog", { name: "Add organization" }).getByRole("button", { name: "Harbor Legal Collective" }).click();
+    await page.getByRole("list", { name: "Organization results" }).getByRole("button", { name: "Harbor Legal Collective" }).click();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: "Add expertise" }).click();
     await page.getByLabel("Search expertise").fill("digital rights");
-    await page.getByRole("dialog", { name: "Add expertise" }).getByRole("button", { name: /Digital rights/ }).click();
+    await page.getByRole("list", { name: "Expertise results" }).getByRole("button", { name: /Digital rights/ }).click();
     await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Submit changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
 
     await page.reload();
     await expect(page.getByLabel("Personal note")).toHaveValue("Edited during the E2E run.");
-    await expect(page.getByLabel("State")).toHaveValue("collaborating");
+    await expect(page.getByRole("group", { name: "State" }).getByRole("button", { name: "Collaborating" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Remove Harbor Legal Collective" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Remove Digital rights" })).toBeVisible();
 
@@ -161,11 +159,11 @@ test.describe("people administration", () => {
     await page.goto("/admin/people?q=cyril%20demo");
     await rows(page).first().getByRole("link").click();
     await expect(page).toHaveURL(/\/admin\/people\/de000000-/);
-    await page.getByLabel("Email").fill("not-an-email");
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByLabel("Email", { exact: true }).fill("not-an-email");
+    await page.getByRole("button", { name: "Submit changes" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Invalid email address." })).toBeVisible();
     await page.getByRole("button", { name: "Discard changes" }).click();
-    await expect(page.getByLabel("Email")).toHaveValue("cyril.demo@example.org");
+    await expect(page.getByLabel("Email", { exact: true })).toHaveValue("cyril.demo@example.org");
   });
 
   test("organizations and the expertise taxonomy are native screens too", async ({ page }) => {
@@ -180,8 +178,8 @@ test.describe("people administration", () => {
 
   test("sign out revokes the session", async ({ page }) => {
     await page.goto("/admin/profile");
-    await expect(page.getByText(E2E_ADMIN.email)).toBeVisible();
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page.getByRole("main").getByText(E2E_ADMIN.email)).toBeVisible();
+    await page.getByRole("main").getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/admin\/login$/);
     await page.goto("/admin/people");
     await expect(page).toHaveURL(/\/admin\/login\?next=/);

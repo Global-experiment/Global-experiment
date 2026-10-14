@@ -10,6 +10,8 @@ export interface AdminPrincipal {
   id: string;
   email: string;
   role: string;
+  /** Null until the admin sets one (the UI then shows the email's local part). */
+  displayName: string | null;
   sessionId: string;
 }
 
@@ -51,6 +53,10 @@ export class AuthService {
       await this.repository.touchSession(session.sessionId, now);
     }
     return { ...session.admin, sessionId: session.sessionId };
+  }
+
+  async setDisplayName(adminUserId: string, displayName: string | null): Promise<void> {
+    await this.repository.setDisplayName(adminUserId, displayName);
   }
 
   async logout(sessionId: string): Promise<void> {

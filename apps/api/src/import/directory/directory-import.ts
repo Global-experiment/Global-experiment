@@ -56,7 +56,10 @@ export async function loadDirectorySnapshot(db: Executor): Promise<DirectorySnap
     db.select({ personId: peopleOrganizations.personId, organizationId: peopleOrganizations.organizationId }).from(peopleOrganizations),
     db.select({ personId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId }).from(peopleExpertise),
     db.select({ organizationId: organizationExpertise.organizationId, expertiseId: organizationExpertise.expertiseId }).from(organizationExpertise),
-    db.select({ id: expertiseItems.id, notionPageId: expertiseItems.notionPageId }).from(expertiseItems).where(isNotNull(expertiseItems.notionPageId)),
+    db
+      .select({ id: expertiseItems.id, notionPageId: expertiseItems.notionPageId, name: expertiseItems.name })
+      .from(expertiseItems)
+      .where(isNotNull(expertiseItems.notionPageId)),
     db.select({ key: personStates.key, label: personStates.label }).from(personStates),
     db.select({ key: personSources.key, label: personSources.label }).from(personSources),
   ]);
@@ -67,6 +70,7 @@ export async function loadDirectorySnapshot(db: Executor): Promise<DirectorySnap
     personExpertise,
     organizationExpertise: organizationTags,
     expertiseByPage: new Map(items.map((item) => [item.notionPageId!, item.id])),
+    expertiseNames: new Map(items.map((item) => [item.id, item.name])),
     states,
     sources,
   };

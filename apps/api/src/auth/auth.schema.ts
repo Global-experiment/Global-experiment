@@ -13,6 +13,8 @@ export const adminUsers = pgTable(
     email: text("email").notNull(),
     role: text("role").notNull().default("owner"),
     passwordHash: text("password_hash").notNull(),
+    /** Shown on the admin's user card; null = the part of the email before "@". */
+    displayName: text("display_name"),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -22,6 +24,10 @@ export const adminUsers = pgTable(
     uniqueIndex("admin_users_single_owner").on(table.role).where(sql`${table.role} = 'owner'`),
     check("admin_users_role_known", sql`${table.role} in ('owner')`),
     check("admin_users_email_shape", sql`${table.email} ~ '^[^@\\s]+@[^@\\s]+$'`),
+    check(
+      "admin_users_display_name_shape",
+      sql`${table.displayName} is null or (char_length(${table.displayName}) between 1 and 80 and ${table.displayName} = btrim(${table.displayName}))`,
+    ),
   ],
 );
 

@@ -45,13 +45,15 @@ export function ImportsScreen() {
           if (next.status !== "running") {
             reloadRuns();
             reloadStatus();
+            // Figma's confirmation toast — only for a successful apply (a dry run writes nothing).
+            if (next.mode === "apply" && next.status === "succeeded") toast("Notion imported");
           }
         },
         () => undefined, // a missed poll is retried on the next tick
       );
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [jobId, reloadRuns, reloadStatus]);
+  }, [jobId, reloadRuns, reloadStatus, toast]);
 
   useEffect(() => {
     const element = dialog.current;

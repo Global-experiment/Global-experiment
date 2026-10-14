@@ -17,6 +17,7 @@ import {
 } from "drizzle-orm";
 import { CLOCK, zurichDate, type Clock } from "../common/clock/clock.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
+import { assertBelowLimit, LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
 import { expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
@@ -209,12 +210,57 @@ export class PeopleRepository {
     });
   }
 
-  /** Idempotent: linking twice is a no-op. Callers check that both sides exist first. */
+  /**
+   * A new person with the same values and links, but no Notion page id
+   * (it isn't that Notion page) and a fresh Person ID. The legacy
+   * follow-up value stays with the original. Undefined if `id` is unknown.
+   */
+  async duplicate(id: string): Promise<PersonDto | undefined> {
+    return this.db.transaction(async (tx) => {
+      const [source] = await tx.select().from(people).where(eq(people.id, id)).limit(1);
+      if (!source) return undefined;
+      const { name, stateKey, sourceKey, personalNote, doNotContact, email, phone, website, linkedin, x, otherContact, wiseRecipientId, nextFollowupOn } =
+        source;
+      const [created] = await tx
+        .insert(people)
+        .values({ name, stateKey, sourceKey, personalNote, doNotContact, email, phone, website, linkedin, x, otherContact, wiseRecipientId, nextFollowupOn })
+        .returning({ id: people.id });
+      const copyId = created!.id;
+      const organizationLinks = await tx.select({ organizationId: peopleOrganizations.organizationId }).from(peopleOrganizations).where(eq(peopleOrganizations.personId, id));
+      if (organizationLinks.length > 0) await tx.insert(peopleOrganizations).values(organizationLinks.map((link) => ({ personId: copyId, ...link })));
+      const expertiseLinks = await tx.select({ expertiseId: peopleExpertise.expertiseId }).from(peopleExpertise).where(eq(peopleExpertise.personId, id));
+      if (expertiseLinks.length > 0) await tx.insert(peopleExpertise).values(expertiseLinks.map((link) => ({ personId: copyId, ...link })));
+      return (await this.findById(copyId, tx))!;
+    });
+  }
+
+  /**
+   * Idempotent: linking twice is a no-op. Callers check that both sides
+   * exist first. A new link past the person's cap is refused (400).
+   */
   async link(kind: "organization" | "expertise", personId: string, targetId: string): Promise<void> {
     await this.db.transaction(async (tx) => {
       if (kind === "organization") {
+        await assertBelowLimit(
+          tx,
+          peopleOrganizations,
+          peopleOrganizations.personId,
+          personId,
+          and(eq(peopleOrganizations.personId, personId), eq(peopleOrganizations.organizationId, targetId))!,
+          RELATION_LIMITS.organizationsPerPerson,
+          { path: "organizationIds", message: LIMIT_MESSAGES.personOrganizations },
+        );
         await tx.insert(peopleOrganizations).values({ personId, organizationId: targetId }).onConflictDoNothing();
       } else {
+        await assertBelowLimit(
+          tx,
+          peopleExpertise,
+          peopleExpertise.personId,
+          personId,
+          and(eq(peopleExpertise.personId, personId), eq(peopleExpertise.expertiseId, targetId))!,
+          RELATION_LIMITS.expertise,
+          { path: "expertiseIds", message: LIMIT_MESSAGES.personExpertise },
+        );
         await tx.insert(peopleExpertise).values({ personId, expertiseId: targetId }).onConflictDoNothing();
       }
       await tx.update(people).set({ updatedAt: new Date() }).where(eq(people.id, personId));

@@ -110,8 +110,45 @@ describe("owner admin authentication", () => {
     it("authenticates the session and never exposes secrets", async () => {
       const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
       const res = await http().get("/api/admin/auth/session").set("cookie", cookie).expect(200);
-      expect(res.body).toEqual({ admin: { id: expect.any(String), email: OWNER_EMAIL, role: "owner" } });
+      expect(res.body).toEqual({ admin: { id: expect.any(String), email: OWNER_EMAIL, role: "owner", displayName: null } });
       expect(JSON.stringify(res.body)).not.toMatch(/scrypt|password|token/i);
+    });
+  });
+
+  describe("display name", () => {
+    const profile = (cookie: string, body: object) =>
+      http().patch("/api/admin/auth/profile").set("cookie", cookie).set("origin", TEST_ORIGIN).send(body);
+
+    it("is set, trimmed, returned by the session, and cleared by a blank value", async () => {
+      const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
+      let res = await profile(cookie, { displayName: "  Candide  " }).expect(200);
+      expect(res.body.admin.displayName).toBe("Candide");
+      res = await http().get("/api/admin/auth/session").set("cookie", cookie).expect(200);
+      expect(res.body.admin.displayName).toBe("Candide");
+
+      await profile(cookie, { displayName: "   " }).expect(200);
+      res = await http().get("/api/admin/auth/session").set("cookie", cookie).expect(200);
+      expect(res.body.admin.displayName).toBeNull();
+      await profile(cookie, { displayName: null }).expect(200);
+    });
+
+    it("refuses more than 80 characters, a wrong type, and an anonymous or cross-site request", async () => {
+      const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
+      let res = await profile(cookie, { displayName: "x".repeat(81) }).expect(400);
+      expect(res.body.error.details.issues[0]).toEqual({ path: "displayName", message: "Display name must be 80 characters or fewer." });
+      await profile(cookie, { displayName: "y".repeat(80) }).expect(200);
+      await profile(cookie, { displayName: 5 }).expect(400);
+      res = await http().patch("/api/admin/auth/profile").set("origin", TEST_ORIGIN).send({ displayName: "Mallory" }).expect(401);
+      await http().patch("/api/admin/auth/profile").set("cookie", cookie).set("origin", "https://evil.example").send({ displayName: "Mallory" }).expect(403);
+      const [owner] = await t.db.select().from(adminUsers);
+      expect(owner!.displayName).toBe("y".repeat(80));
+    });
+
+    it("is enforced by the database too (1–80 characters, no outer spaces)", async () => {
+      const [owner] = await t.db.select().from(adminUsers);
+      await expect(t.db.update(adminUsers).set({ displayName: "" }).where(eq(adminUsers.id, owner!.id))).rejects.toThrow();
+      await expect(t.db.update(adminUsers).set({ displayName: " Candide" }).where(eq(adminUsers.id, owner!.id))).rejects.toThrow();
+      await expect(t.db.update(adminUsers).set({ displayName: "z".repeat(81) }).where(eq(adminUsers.id, owner!.id))).rejects.toThrow();
     });
   });
 

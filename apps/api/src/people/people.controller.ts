@@ -40,6 +40,12 @@ export class PeopleController {
     return this.people.get(id);
   }
 
+  /** POST /api/admin/people/:id/duplicate — the new copy (201). */
+  @Post(":id/duplicate")
+  duplicate(@Param("id", IdParam) id: string) {
+    return this.people.duplicate(id);
+  }
+
   @Patch(":id")
   update(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(UpdatePersonRequest)) body: UpdatePersonRequest) {
     return this.people.update(id, body);

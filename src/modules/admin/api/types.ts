@@ -197,4 +197,10 @@ export interface AdminPrincipal {
   id: string;
   email: string;
   role: string;
+  /** Null until set on /admin/profile. */
+  displayName: string | null;
 }
+
+/** The user card's name: the display name, else the part of the email before "@". */
+export const adminDisplayName = (admin: Pick<AdminPrincipal, "email" | "displayName">) =>
+  admin.displayName?.trim() || admin.email.split("@")[0] || admin.email;

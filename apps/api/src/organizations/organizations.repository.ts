@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, eq, exists, ilike, inArray, isNotNull, isNull, not, notIlike, or, sql, type SQL } from "drizzle-orm";
 import { DATABASE, type Database } from "../common/database/database.module.js";
+import { assertBelowLimit, LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
 import { expertiseItems } from "../expertise/expertise.schema.js";
@@ -142,8 +143,42 @@ export class OrganizationsRepository {
     });
   }
 
+  /**
+   * A new organization with the same values and expertise, but no Notion
+   * page id and a fresh Organization ID. People aren't copied: each link
+   * counts toward that person's 5-organization limit, so it's a choice to
+   * make on the copy. Undefined if `id` is unknown.
+   */
+  async duplicate(id: string): Promise<OrganizationDto | undefined> {
+    return this.db.transaction(async (tx) => {
+      const [source] = await tx.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+      if (!source) return undefined;
+      const { name, description, website, email, wiseRecipientId } = source;
+      const [created] = await tx
+        .insert(organizations)
+        .values({ name, description, website, email, wiseRecipientId })
+        .returning({ id: organizations.id });
+      const copyId = created!.id;
+      const expertiseLinks = await tx
+        .select({ expertiseId: organizationExpertise.expertiseId })
+        .from(organizationExpertise)
+        .where(eq(organizationExpertise.organizationId, id));
+      if (expertiseLinks.length > 0) await tx.insert(organizationExpertise).values(expertiseLinks.map((link) => ({ organizationId: copyId, ...link })));
+      return (await this.findById(copyId, tx))!;
+    });
+  }
+
   async linkExpertise(organizationId: string, expertiseId: string): Promise<void> {
     await this.db.transaction(async (tx) => {
+      await assertBelowLimit(
+        tx,
+        organizationExpertise,
+        organizationExpertise.organizationId,
+        organizationId,
+        and(eq(organizationExpertise.organizationId, organizationId), eq(organizationExpertise.expertiseId, expertiseId))!,
+        RELATION_LIMITS.expertise,
+        { path: "expertiseIds", message: LIMIT_MESSAGES.organizationExpertise },
+      );
       await tx.insert(organizationExpertise).values({ organizationId, expertiseId }).onConflictDoNothing();
       await tx.update(organizations).set({ updatedAt: new Date() }).where(eq(organizations.id, organizationId));
     });
@@ -171,6 +206,16 @@ export class OrganizationsRepository {
    */
   async linkPerson(organizationId: string, personId: string): Promise<void> {
     await this.db.transaction(async (tx) => {
+      // The cap belongs to the person: at most 5 organizations, whichever side links.
+      await assertBelowLimit(
+        tx,
+        peopleOrganizations,
+        peopleOrganizations.personId,
+        personId,
+        and(eq(peopleOrganizations.personId, personId), eq(peopleOrganizations.organizationId, organizationId))!,
+        RELATION_LIMITS.organizationsPerPerson,
+        { path: "personIds", message: `This person already has ${RELATION_LIMITS.organizationsPerPerson} organizations (the maximum).` },
+      );
       const added = await tx
         .insert(peopleOrganizations)
         .values({ personId, organizationId })
