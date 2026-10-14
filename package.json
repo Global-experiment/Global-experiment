@@ -23,6 +23,7 @@
     "api:test:pg": "npm run test:pg -w @global-experiment/api",
     "api:typecheck": "npm run typecheck -w @global-experiment/api",
     "api:purge-demo-data": "npm run api:build && npm run purge-demo-data -w @global-experiment/api --",
+    "api:purge-test-donations": "npm run api:build && npm run purge-test-donations -w @global-experiment/api --",
     "api:import:taxonomy": "npm run api:build && npm run import:taxonomy -w @global-experiment/api --",
     "api:import:directory": "npm run api:build && npm run import:directory -w @global-experiment/api --"
   },
@@ -37,6 +38,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.4",

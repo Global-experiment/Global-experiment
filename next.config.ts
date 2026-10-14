@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { adminApiOrigin } from "./src/shared/config/adminApi";
+import { PUBLIC_API_PREFIXES } from "./src/shared/config/publicApi";
 import { getSecurityHeaders } from "./src/shared/security/headers";
 
 const nextConfig: NextConfig = {
@@ -9,10 +10,14 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   async rewrites() {
     const origin = adminApiOrigin();
-    // Same-origin proxy for the native admin API (see src/shared/config/adminApi.ts).
-    // beforeFiles: nothing in the Next.js app may shadow /api/admin/*.
+    // Same-origin proxy for the native API (see src/shared/config/adminApi.ts):
+    // the admin routes, and the public donation routes — Checkout, Stripe's
+    // webhook (the raw body passes through untouched, as its signature needs)
+    // and the Treasury figures. beforeFiles: nothing in the Next.js app may
+    // shadow them. /api/revalidate is the Next.js app's own route.
+    const prefixes = ["admin", ...PUBLIC_API_PREFIXES];
     return {
-      beforeFiles: origin ? [{ source: "/api/admin/:path*", destination: `${origin}/api/admin/:path*` }] : [],
+      beforeFiles: origin ? prefixes.map((prefix) => ({ source: `/api/${prefix}/:path*`, destination: `${origin}/api/${prefix}/:path*` })) : [],
       afterFiles: [],
       fallback: [],
     };

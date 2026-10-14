@@ -7,6 +7,7 @@ import { hashPassword } from "../auth/password.js";
 import type { Database } from "../common/database/database.module.js";
 import * as schema from "../common/database/schema.js";
 import { loadDirectoryFixtures } from "./fixtures/load-directory-fixtures.js";
+import { loadTreasuryFixtures } from "./fixtures/load-treasury-fixtures.js";
 
 /**
  * Prepares the database the admin Playwright suite runs against (started
@@ -30,6 +31,7 @@ async function main() {
     const db = drizzle(client, { schema }) as unknown as Database;
     await migrate(db as never, { migrationsFolder: fileURLToPath(new URL("../../drizzle", import.meta.url)) });
     await loadDirectoryFixtures(db);
+    await loadTreasuryFixtures(db);
     await new AuthRepository(db).upsertOwner(email, await hashPassword(password));
     console.log(`E2E database "${name}" reset, migrated and seeded.`);
   } finally {

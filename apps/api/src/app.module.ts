@@ -8,6 +8,7 @@ import { ClockModule } from "./common/clock/clock.js";
 import { ConfigModule } from "./common/config/config.module.js";
 import type { AppConfig } from "./common/config/env.js";
 import { DatabaseModule } from "./common/database/database.module.js";
+import { DonationsModule } from "./donations/donations.module.js";
 import { AllExceptionsFilter } from "./common/errors/all-exceptions.filter.js";
 import { LoggingModule } from "./common/logging/logging.module.js";
 import { ExpertiseModule } from "./expertise/expertise.module.js";
@@ -15,6 +16,10 @@ import { HealthModule } from "./health/health.module.js";
 import { ImportsModule } from "./import/imports.module.js";
 import { OrganizationsModule } from "./organizations/organizations.module.js";
 import { PeopleModule } from "./people/people.module.js";
+import { RevalidationModule } from "./revalidation/revalidation.service.js";
+import { SettingsModule } from "./settings/settings.service.js";
+import { StripeModule } from "./stripe/stripe.module.js";
+import { TreasuryModule } from "./treasury/treasury.module.js";
 
 @Module({})
 export class AppModule {
@@ -26,6 +31,8 @@ export class AppModule {
         ClockModule,
         LoggingModule,
         DatabaseModule,
+        SettingsModule,
+        RevalidationModule,
         // In-memory limiter: correct for the single API instance v0.1 runs.
         // Per-route limits (login) are tighter; see AuthController.
         ThrottlerModule.forRoot({ throttlers: [{ name: "default", ttl: 60_000, limit: 300 }] }),
@@ -35,6 +42,9 @@ export class AppModule {
         OrganizationsModule,
         ExpertiseModule,
         ImportsModule,
+        TreasuryModule,
+        StripeModule,
+        DonationsModule,
       ],
       providers: [
         // Global guards run in this order.

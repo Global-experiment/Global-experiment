@@ -36,6 +36,33 @@ const envSchema = z
     NOTION_ORGANIZATIONS_DB_ID: z.string().trim().optional(),
     /** Tests only: read the import source from a JSON file instead of Notion. */
     IMPORT_FIXTURE_FILE: z.string().trim().optional(),
+
+    /**
+     * Stripe (donations). Server-side only. Test keys (sk_test_/rk_test_) are
+     * the default; a live key is refused unless STRIPE_LIVE_ENABLED=true.
+     */
+    STRIPE_SECRET_KEY: z.string().trim().regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe secret or restricted key").optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9]+$/, "must be a Stripe webhook signing secret").optional(),
+    STRIPE_LIVE_ENABLED: booleanFromString.default(false),
+    /** NODE_ENV=test only: the Playwright API answers from scripted Checkout sessions instead of Stripe (stripe-fixture.gateway.ts). */
+    STRIPE_FIXTURE: booleanFromString.default(false),
+    /** Stripe's no-code customer-portal login link (monthly donors manage their donation there). */
+    STRIPE_CUSTOMER_PORTAL_URL: z.url({ protocol: /^https$/ }).optional(),
+    /** Minutes between fee fill-in runs for Stripe entries whose fee wasn't known yet (0 = off). */
+    STRIPE_FEE_RECONCILE_MINUTES: z.coerce.number().int().min(0).max(24 * 60).default(15),
+    /** The public site, for Checkout success/cancel URLs and the donation Origin check. */
+    PUBLIC_SITE_URL: z.url({ protocol: /^https?$/ }).optional(),
+    /** The Next.js server the API asks to revalidate public pages (internal address). */
+    WEB_INTERNAL_URL: z.url({ protocol: /^https?$/ }).optional(),
+    REVALIDATE_SECRET: z.string().min(32, "must be at least 32 characters").optional(),
+    /** Environment defaults of the donation settings (data-model.md §1.1). */
+    /** Default of the donations.enabled setting: Checkout is refused until donations open. */
+    DONATIONS_ENABLED: booleanFromString.default(false),
+    /** Private preview link (/donate?preview=<token>): a test checkout while donations are closed. */
+    DONATIONS_PREVIEW_TOKEN: z.string().trim().regex(/^[A-Za-z0-9_-]{32,128}$/, "must be 32–128 letters, digits, - or _").optional(),
+    DONATIONS_MONTHLY: booleanFromString.default(false),
+    DONATIONS_EXTRA_METHODS: booleanFromString.default(false),
+    DONATIONS_DEFAULT_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
   })
   .transform((env, context) => {
     const production = env.NODE_ENV === "production";
@@ -47,6 +74,18 @@ const envSchema = z
     }
     if (env.IMPORT_FIXTURE_FILE && env.NODE_ENV !== "test") {
       context.addIssue({ code: "custom", path: ["IMPORT_FIXTURE_FILE"], message: "is only allowed when NODE_ENV is test" });
+    }
+    if (env.STRIPE_FIXTURE && env.NODE_ENV !== "test") {
+      context.addIssue({ code: "custom", path: ["STRIPE_FIXTURE"], message: "is only allowed when NODE_ENV is test" });
+    }
+    const stripeLive = Boolean(env.STRIPE_SECRET_KEY && /_live_/.test(env.STRIPE_SECRET_KEY));
+    if (stripeLive && !env.STRIPE_LIVE_ENABLED) {
+      context.addIssue({ code: "custom", path: ["STRIPE_SECRET_KEY"], message: "is a live key; set STRIPE_LIVE_ENABLED=true to allow it" });
+    }
+    if (production && env.STRIPE_SECRET_KEY) {
+      for (const key of ["STRIPE_WEBHOOK_SECRET", "PUBLIC_SITE_URL", "WEB_INTERNAL_URL", "REVALIDATE_SECRET"] as const) {
+        if (!env[key]) context.addIssue({ code: "custom", path: [key], message: "is required in production when Stripe is configured" });
+      }
     }
     const id = (value: string | undefined) => (value ? value : undefined);
     return {
@@ -72,6 +111,27 @@ const envSchema = z
           organizations: id(env.NOTION_ORGANIZATIONS_DB_ID),
         },
         fixtureFile: id(env.IMPORT_FIXTURE_FILE),
+      },
+      stripe: {
+        secretKey: id(env.STRIPE_SECRET_KEY),
+        webhookSecret: id(env.STRIPE_WEBHOOK_SECRET),
+        /** Events from the other mode (live vs test) are ignored. */
+        livemode: stripeLive,
+        customerPortalUrl: id(env.STRIPE_CUSTOMER_PORTAL_URL),
+        feeReconcileMinutes: env.STRIPE_FEE_RECONCILE_MINUTES,
+        fixture: env.STRIPE_FIXTURE,
+      },
+      publicSiteUrl: new URL(env.PUBLIC_SITE_URL ?? "http://localhost:3000").origin,
+      revalidation: {
+        webUrl: new URL(env.WEB_INTERNAL_URL ?? "http://127.0.0.1:3000").origin,
+        secret: id(env.REVALIDATE_SECRET),
+      },
+      donationPreviewToken: id(env.DONATIONS_PREVIEW_TOKEN),
+      donationDefaults: {
+        enabled: env.DONATIONS_ENABLED,
+        monthly: env.DONATIONS_MONTHLY,
+        extraMethods: env.DONATIONS_EXTRA_METHODS,
+        defaultCurrency: env.DONATIONS_DEFAULT_CURRENCY,
       },
     };
   });

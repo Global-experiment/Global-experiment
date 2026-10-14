@@ -87,13 +87,19 @@ Every change writes an audit event. Declared keys in v0.1:
 |---|---|---|---|
 | `module.<key>.mode` | `notion` \| `native` | `notion` for Notion-backed modules | Overview §2.1 |
 | `imports.<key>.schedule` | interval or `off` | `off` | Scheduled import per module |
+| `donations.enabled` | boolean | `DONATIONS_ENABLED` = false | Donations open: until then `/donate` says "Donations open soon" and Checkout is refused (403 `donations_closed`), except through the private preview link `?preview=<DONATIONS_PREVIEW_TOKEN>` |
 | `donations.monthly` | boolean | `DONATIONS_MONTHLY` = false | Monthly donations (Stripe subscriptions) |
 | `donations.extra_methods` | boolean | `DONATIONS_EXTRA_METHODS` = false | PayPal and SEPA rows (Q19) |
 | `donations.default_currency` | `EUR` \| `USD` \| `CHF` | `DONATIONS_DEFAULT_CURRENCY` = USD | Donate page's initial currency |
 | `treasury.wise_connected` | boolean | false | Shows Balance and Sustainability (hidden until Wise) |
 
-Until the `settings` table exists (module 2, migration 0008), these keys
-read their environment defaults.
+The table is created by **migration 0006** (module 1, which is the first
+to need flags) with the `donations.*` keys declared
+(`apps/api/src/settings/settings.registry.ts`); the other keys are declared
+with their modules. A stored value that doesn't match its key's type is
+ignored (the environment default applies) and logged by key only. Until
+module 2 adds the admin page and audit events, rows are changed only by
+SQL in a release runbook.
 
 ## 2. Overview
 
@@ -234,17 +240,18 @@ Wise later. Notion "Treasury" (24 properties, 40 demo rows).
 | `id` | uuid PK | | |
 | `entry_number` | integer identity | Unique, > 0; displayed `EXP-n` (Notion's prefix for every entry) | Transaction ID |
 | `notion_page_id` | uuid | Unique when present | *(page id)* |
-| `entry_type` | text | `donation`, `expense`, `refund` (CHECK) | Entry type (Donation / Expense) |
+| `entry_type` | text | `donation`, `expense`, `refund`, `dispute` (CHECK). `dispute` = a Stripe dispute adjustment of a donation (module 1, decided 2026-10-15) | Entry type (Donation / Expense) |
 | `name` | text | 1–200; internal label ("Anonymous donation" for Stripe) | *Name |
 | `currency` | char(3) | `EUR`, `USD`, `CHF` (CHECK) | Currency |
 | `gross_amount` | bigint | Minor units. **donation > 0; expense < 0; refund < 0** (CHECK). Donate form: 1 … 10,000 in the chosen currency (API validation, decided) | — (Notion has net only: imported as gross = net, decided) |
 | `fee_amount` | bigint null | ≥ 0 (CHECK); null until known | — |
 | `net_amount` | bigint null | `fee null ⇔ net null`; else `net = gross − fee` (CHECK, Q28) | Net amount |
 | `settlement_currency` | char(3) null | Stripe settlement when it differs (Q18) | — |
-| `settlement_gross_amount`, `settlement_fee_amount`, `settlement_net_amount` | bigint null | All four settlement columns set together or none (CHECK) | — |
+| `settlement_gross_amount`, `settlement_fee_amount`, `settlement_net_amount` | bigint null | All four settlement columns and `exchange_rate` set together or none (CHECK, each tested `is not null` explicitly — a CHECK that evaluates to NULL passes); settlement currency ≠ `currency`; fee ≥ 0; net = gross − fee | — |
 | `exchange_rate` | numeric(18,8) null | Provider's rate, only with settlement columns | — |
 | `cadence` | text | `one_off`, `monthly`, `yearly` (CHECK), default `one_off`. **No yearly donations** (decided): CHECK `entry_type <> 'donation' or cadence <> 'yearly'`; yearly stays for Notion expenses (e.g. annual subscriptions) | *Cadence |
 | `source` | text | `stripe`, `wise`, `manual` (CHECK) | Source |
+| `livemode` | boolean | Default true. Stripe rows: the event's mode (test `false` / live `true`); every other source is real money, so `source = 'stripe' or livemode` (CHECK). Public figures show only the public mode (below) | — |
 | `external_transaction_id` | text null | Unique per `source` when present (Stripe charge `ch_…` / refund `re_…`; Wise transfer id) | External transaction ID; *Wise transaction number for Wise rows |
 | `recurrence_id` | text null → `stripe_subscriptions` | Subscription id grouping a monthly donation's charges (no personal data); only with the `donations.monthly` flag | — |
 | `managed_by` | text | `notion` (Notion expenses) or `native` (Stripe donations and refunds, admin-made entries); §1 | — |
@@ -267,9 +274,13 @@ Wise later. Notion "Treasury" (24 properties, 40 demo rows).
 
 **Business rules (CHECK unless noted):**
 
-1. Signs: `donation` gross > 0; `expense` gross < 0; `refund` gross < 0
-   and `adjusts_entry_id` not null; `fee ≥ 0`; `net = gross − fee`.
-2. Recipient: donations and refunds have **no recipient** (both null);
+1. Signs: `donation` gross > 0; `expense` gross < 0; `refund` gross < 0;
+   `dispute` gross ≠ 0 (negative when Stripe withdraws the funds, positive
+   when it reinstates them); `refund` and `dispute` ⇔ `adjusts_entry_id`
+   not null; `fee ≥ 0` (on disputes it may be negative: Stripe can give the
+   dispute fee back when a dispute is won; same for the settlement fee);
+   `net = gross − fee`.
+2. Recipient: donations, refunds and disputes have **no recipient** (both null);
    an expense has **at most one** (`not (person and organization)`); a
    **qualified or not-required expense has exactly one**. (Donor identity
    is never stored — v1.0 extension in overview §7.)
@@ -282,17 +293,48 @@ Wise later. Notion "Treasury" (24 properties, 40 demo rows).
    If the client chooses "qualified only", one more CHECK is added.
 4. Uniqueness: `(source, external_transaction_id)` unique where not null —
    Stripe and Wise syncs are idempotent.
-5. Refunds: a trigger checks that `adjusts_entry_id` points to a
-   `donation` of the same currency and that refunds never exceed it.
+5. Adjustments: a trigger checks that `adjusts_entry_id` points to a
+   `donation` of the same currency **and Stripe mode**; that refunds and
+   disputes together never take more than the donation; and that a
+   dispute never gives back more than it withdrew.
 
-Indexes: `(publication_status, occurred_on desc)` partial on published;
-`entry_type`; `currency`; `recipient_person_id`; `recipient_organization_id`;
-`adjusts_entry_id`; `recurrence_id`.
+Also enforced by the same trigger: a donation that has adjustments keeps
+its type, currency, amount and mode; an expense with expense types can't change
+type. A second trigger allows expense types on expenses only.
+
+Indexes: unique `entry_number`; unique `notion_page_id` (partial); unique
+`(source, external_transaction_id)` (partial); `occurred_on desc` partial
+on published; `entry_type`; `currency`; `recipient_person_id`;
+`recipient_organization_id`; `adjusts_entry_id`; `recurrence_id`;
+`created_at` partial on Stripe entries still awaiting their fee (the late-fee
+fill-in job, §4.4); and `created_at` partial on test-mode rows (the purge).
 
 Public reads go through a view **`treasury_public_entries`** (id, number,
-type, currency, gross / net, cadence, occurred_on/at, published_at, expense
-types, and the public description only when qualified) — the public API
-cannot select a private column by mistake.
+type, currency, gross, net, cadence, occurred_on/at, published_at,
+review_status_key, recurrence_id, adjusts_entry_id, source, livemode, and
+the public description only when `qualified` or `not_required`) — the
+public API cannot select a private column by mistake.
+
+**Test vs live:** the public API shows Stripe rows of one mode only —
+`livemode = true` in production (`NODE_ENV=production`, whatever key is
+configured), elsewhere the configured key's mode — and every non-Stripe
+row. The same rule applies to Monthly donors (`stripe_subscriptions.livemode`).
+Test-mode rows are removed with `npm run api:purge-test-donations`
+(dry run by default; `--confirm --backup <file>` deletes them in one
+transaction, only with a backup from the last 24 hours). Expense types are public facts of a published expense
+and are read from `treasury_entry_expense_types` by entry id (module 1b).
+
+Native Stripe entries (module 1): `managed_by = 'native'`, `source =
+'stripe'`, review `not_required`, published at once; name / public
+description "Anonymous donation", "Donation refund" / "Refunded donation",
+and for disputes "Payment disputed" (withdrawn) and "Dispute won"
+(reinstated). The donate page's figures come from the view through
+`GET /api/treasury/summary?currency=`, per currency, never converted: each
+donation counts at what remains after its refunds and dispute adjustments;
+the **total** is the sum of what remains; the **count** and the **median**
+leave out donations with nothing left (fully refunded, or disputed and
+lost) and use the net remaining amount of partly refunded ones (decided);
+Monthly donors = active subscriptions of the public mode.
 
 ### 4.2 Lookups and links
 
@@ -336,17 +378,32 @@ files may ever be deleted (accounting retention) is Q5/Q11.
 | `entry_id` | uuid null → treasury_entries `set null` | The entry it produced, if any |
 
 Processing: insert the event row (`on conflict do nothing`); if already
-`processed`, return 200; otherwise process **in the same transaction** as
-the entry insert and mark `processed`. Combined with the unique
-`(source, external_transaction_id)`, a redelivered or out-of-order event can
-never create a second entry.
+`processed` or `ignored`, answer 200 "duplicate"; otherwise read the
+current objects from Stripe (never the payload), then **one transaction**
+locks the event row (`for update`, so concurrent deliveries wait), writes
+the ledger and marks it `processed` (or `ignored` with a reason: another
+mode, not a donation, payment still pending, unhandled type). Combined with
+the unique `(source, external_transaction_id)`, a redelivered or
+out-of-order event can never create a second entry. When Stripe isn't
+ready (charge not settled, refund before its donation is known) or a
+currency isn't EUR/USD/CHF, the delivery answers 409 and the event is
+`failed` with a short code in `last_error` (`retry:charge_not_ready`,
+`retry:donation_not_recorded`, `retry:unsupported_currency`) — Stripe
+retries it. Fees Stripe reports later are filled in, once, by a job every
+`STRIPE_FEE_RECONCILE_MINUTES` (default 15); known amounts are never
+overwritten.
 
 Events handled: `checkout.session.completed` (one-off, paid),
 `checkout.session.async_payment_succeeded` (delayed methods),
 `invoice.paid` (each monthly charge, first included — monthly flag only),
 `charge.refunded` (one **negative refund entry** per Stripe refund, linked
 to the donation — decided), and `customer.subscription.created / updated /
-deleted` (keeps `stripe_subscriptions` current). Every new or changed entry
+deleted` (keeps `stripe_subscriptions` current), and
+`charge.dispute.funds_withdrawn` / `charge.dispute.funds_reinstated` (one
+**dispute adjustment** per dispute balance transaction `txn_…`, negative
+then positive, linked to the donation; gross in the donation's currency,
+Stripe's figures — dispute fee included — as fee or settlement columns).
+Every entry carries the event's `livemode`. Every new or changed entry
 triggers the public pages' on-demand revalidation (overview §3.7).
 
 ### 4.4b `stripe_subscriptions` (monthly donations, behind `donations.monthly`)
@@ -354,12 +411,13 @@ triggers the public pages' on-demand revalidation (overview §3.7).
 | Column | Type | Rules |
 |---|---|---|
 | `id` | text PK | Stripe subscription id `sub_…` |
+| `livemode` | boolean | Test or live mode (from the event) |
 | `status` | text | Stripe's status (`active`, `past_due`, `canceled`, …) |
 | `currency` | char(3) | EUR, USD, CHF |
 | `amount` | bigint | Monthly amount, minor units, > 0 |
 | `started_at` | timestamptz | |
 | `canceled_at` | timestamptz null | |
-| `updated_at` | timestamptz | |
+| `created_at`, `updated_at` | timestamptz | |
 
 No customer id, email or name — only what the public "**Monthly donors**"
 stat needs (count of `active` subscriptions, decided) and what groups a
@@ -762,9 +820,9 @@ files; data steps and triggers are added to the generated file by hand.
 | # | Name | Module | Contents |
 |---|---|---|---|
 | 0000–0005 | built | Auth, Directory, Taxonomy, Imports | — |
-| **0006** | `treasury_donations` | Treasury (module 1, **24 Oct**) | `treasury_review_statuses`, `treasury_expense_types` (seeded), `treasury_entries` (with `managed_by`; view `treasury_public_entries`; refund trigger), `treasury_entry_expense_types`, `stripe_events`, `stripe_subscriptions` |
+| **0006** | `treasury_donations` | Treasury (module 1, **24 Oct**) | `settings` (moved here from 0008: module 1 needs its flags); `treasury_review_statuses`, `treasury_expense_types` (seeded); `treasury_entries` (with `managed_by`; view `treasury_public_entries`; integrity trigger); `treasury_entry_expense_types` (expenses-only trigger); `stripe_events`; `stripe_subscriptions` |
 | **0007** | `treasury_documents` | Treasury (module 1b) | `treasury_documents`; `import_runs.kind` += treasury |
-| **0008** | `platform` | Platform (module 2) | `audit_events`; `settings`; `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
+| **0008** | `platform` | Platform (module 2) | `audit_events`; `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
 | **0009** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
 | **0010** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
 | **0011** | `waitlist` | Waitlist | `waitlist_entries` |

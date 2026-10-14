@@ -4,7 +4,19 @@ import { useState } from "react";
 import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
 import { Button } from "@/shared/ui/Button";
 import { Sheet } from "@/shared/ui/Sheet";
-import type { TreasuryStat } from "./presentationData";
+
+/** One stat with its detail sheet (Treasury and Donate). */
+export interface StatItem {
+  id: string;
+  value: string;
+  label: string;
+  detail: {
+    title: string;
+    value: string;
+    caption: string;
+    paragraphs: Array<{ heading?: string; body: string }>;
+  };
+}
 
 /**
  * The four Treasury/Donate stats, every one clickable (client, Review #3
@@ -13,14 +25,24 @@ import type { TreasuryStat } from "./presentationData";
  * Report issue rows close it and open the report qualification over the
  * same page.
  */
-export function ClickableStatsRow({ stats, className = "" }: { stats: TreasuryStat[]; className?: string }) {
-  const [openId, setOpenId] = useState<TreasuryStat["id"] | null>(null);
+export function ClickableStatsRow({ stats, className = "" }: { stats: StatItem[]; className?: string }) {
+  const [openId, setOpenId] = useState<string | null>(null);
   const open = stats.find((stat) => stat.id === openId);
 
   return (
     <>
-      {/* figma.pdf p2/p9: four equal columns on a 100pt pitch centered at 55.5/155.5/255/355.5 — i.e. 400px spanning 2px into each gutter. */}
-      <dl className={`-mx-0.5 grid grid-cols-4 text-center ${className}`}>
+      {/*
+        figma.pdf p2/p9: four equal columns on a 100pt pitch centered at
+        55.5/155.5/255/355.5 — i.e. 400px spanning 2px into each gutter.
+        Fewer stats (Donate hides Donors, and Monthly donors while monthly
+        donations are off) share the same 400px in equal columns.
+        Each stat is a button (it opens its sheet), so the value and label are
+        plain spans: a <dl> cannot hold buttons (axe: definition-list).
+      */}
+      <div
+        className={`-mx-0.5 grid text-center ${className}`}
+        style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
+      >
         {stats.map((stat) => (
           <button
             key={stat.id}
@@ -28,11 +50,15 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: TreasurySt
             onClick={() => setOpenId(stat.id)}
             className="cursor-pointer rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
           >
-            <dd className="text-body text-text-primary">{stat.value}</dd>
-            <dt className="mt-[0.3125rem] text-meta text-text-muted">{stat.label}</dt>
+            <span data-stat-value className="block text-body text-text-primary">
+              {stat.value}
+            </span>
+            <span data-stat-label className="mt-[0.3125rem] block text-meta text-text-muted">
+              {stat.label}
+            </span>
           </button>
         ))}
-      </dl>
+      </div>
 
       <Sheet open={open !== undefined} onClose={() => setOpenId(null)} title={open?.detail.title ?? ""}>
         {open ? (

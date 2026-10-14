@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 import { E2E_ADMIN } from "./e2e/admin-credentials";
+import { E2E_DONATIONS_PREVIEW } from "./e2e/donations-preview";
 
 /**
  * Minimal E2E config for browser-level behaviors unit tests can't cover
@@ -58,6 +59,13 @@ export default defineConfig({
               // The admin import page reads this Notion-shaped fixture instead of
               // Notion (accepted by the API only under NODE_ENV=test).
               IMPORT_FIXTURE_FILE: resolve("e2e/fixtures/notion-import.json"),
+              // Donate: scripted Checkout sessions instead of Stripe (also NODE_ENV=test only),
+              // and this Next server as the public site (Checkout return links, origin check).
+              STRIPE_FIXTURE: "1",
+              // Open for the suites; donate-figma.spec closes them with the setting and uses the preview link.
+              DONATIONS_ENABLED: "true",
+              DONATIONS_PREVIEW_TOKEN: E2E_DONATIONS_PREVIEW,
+              PUBLIC_SITE_URL: `http://localhost:${port}`,
             },
           },
         ]
@@ -81,7 +89,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /admin-figma.spec.ts/,
+      testIgnore: /(admin|donate)-figma.spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -92,12 +100,13 @@ export default defineConfig({
         permissions: ["clipboard-read", "clipboard-write"],
       },
     },
-    // The Figma conformance suite duplicates a record, which would change the
-    // fixture counts the other admin specs assert: it runs after them.
+    // The Figma conformance suites run after the others: the admin one
+    // duplicates a record (other specs assert fixture counts), the donate one
+    // switches donation settings in the test database.
     {
       name: "chromium-figma",
       dependencies: ["chromium"],
-      testMatch: /admin-figma.spec.ts/,
+      testMatch: /(admin|donate)-figma.spec.ts/,
       use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine
