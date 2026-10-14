@@ -1,4 +1,4 @@
-import { plainText, type NotionClient, type NotionDatabase, type NotionPage, type NotionProperty } from "../notion/notion-client.js";
+import { plainText, type NotionDatabase, type NotionPage, type NotionProperty, type NotionReader } from "../notion/notion-client.js";
 
 /**
  * Reads the Notion "0.1 native" People and Organizations databases into
@@ -239,7 +239,7 @@ export interface DirectoryDatabaseIds {
   organizations: string;
 }
 
-export async function readDirectory(client: NotionClient, ids: DirectoryDatabaseIds): Promise<DirectorySource> {
+export async function readDirectory(client: NotionReader, ids: DirectoryDatabaseIds): Promise<DirectorySource> {
   const relations: RelationReader = async (pageId, property) =>
     property.has_more && property.id ? client.relationIds(pageId, property.id) : (property.relation ?? []).map((relation) => relation.id);
   const layouts = {

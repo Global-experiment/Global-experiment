@@ -1,9 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { DATABASE, type Database } from "../common/database/database.module.js";
+import { containsPattern, escapeLike, type Page } from "../common/listing/list-query.js";
 import { organizationExpertise } from "../organizations/organizations.schema.js";
 import { peopleExpertise } from "../people/people.schema.js";
-import type { ExpertiseLevel, ExpertiseTreeDto } from "./expertise.contracts.js";
+import type { ExpertiseLevel, ExpertiseSearchItemDto, ExpertiseSearchQuery, ExpertiseTreeDto } from "./expertise.contracts.js";
 import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams, taxonomyStatuses, teams } from "./expertise.schema.js";
 
 const TABLE = { domain: expertiseDomains, field: expertiseFields, expertise: expertiseItems } as const;
@@ -92,6 +93,95 @@ export class ExpertiseRepository {
               })),
           })),
       })),
+    };
+  }
+
+  /**
+   * Ranked, paginated search over expertise items. One indexed scan of
+   * ~1,100 rows joined to their field and domain; the rank puts exact and
+   * prefix name matches first, then Stable ID, then field/domain matches.
+   */
+  async search(query: ExpertiseSearchQuery): Promise<Page<ExpertiseSearchItemDto>> {
+    const q = query.q?.toLowerCase();
+    const contains = q ? containsPattern(q) : undefined;
+    const name = sql`lower(${expertiseItems.name})`;
+    const stable = sql`coalesce(${expertiseItems.stableId}, '')`;
+    const where = and(
+      query.includeInactive ? undefined : eq(expertiseItems.statusKey, "active"),
+      contains
+        ? or(
+            ilike(expertiseItems.name, contains),
+            ilike(expertiseItems.stableId, contains),
+            ilike(expertiseFields.name, contains),
+            ilike(expertiseDomains.name, contains),
+          )
+        : undefined,
+    );
+    const rank = q
+      ? sql<number>`case
+          when ${name} = ${q} then 0
+          when lower(${stable}) = ${q} then 1
+          when ${name} like ${`${escapeLike(q)}%`} then 2
+          when ${name} like ${`% ${escapeLike(q)}%`} then 3
+          when ${name} like ${contains} then 4
+          when lower(${stable}) like ${contains} then 5
+          when lower(${expertiseFields.name}) like ${contains} then 6
+          else 7 end`
+      : sql<number>`0`;
+
+    const base = this.db
+      .select({
+        id: expertiseItems.id,
+        name: expertiseItems.name,
+        stableId: expertiseItems.stableId,
+        statusKey: expertiseItems.statusKey,
+        statusLabel: taxonomyStatuses.label,
+        fieldId: expertiseFields.id,
+        fieldName: expertiseFields.name,
+        domainId: expertiseDomains.id,
+        domainName: expertiseDomains.name,
+      })
+      .from(expertiseItems)
+      .innerJoin(expertiseFields, eq(expertiseFields.id, expertiseItems.fieldId))
+      .innerJoin(expertiseDomains, eq(expertiseDomains.id, expertiseFields.domainId))
+      .leftJoin(taxonomyStatuses, eq(taxonomyStatuses.key, expertiseItems.statusKey));
+    const [rows, [count]] = await Promise.all([
+      base
+        .where(where)
+        .orderBy(asc(rank), asc(name), asc(sql`lower(${expertiseFields.name})`), asc(expertiseItems.id))
+        .limit(query.pageSize)
+        .offset((query.page - 1) * query.pageSize),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(expertiseItems)
+        .innerJoin(expertiseFields, eq(expertiseFields.id, expertiseItems.fieldId))
+        .innerJoin(expertiseDomains, eq(expertiseDomains.id, expertiseFields.domainId))
+        .where(where),
+    ]);
+
+    const teamRows = rows.length
+      ? await this.db
+          .select({ expertiseId: expertiseTeams.expertiseId, key: teams.key, label: teams.label })
+          .from(expertiseTeams)
+          .innerJoin(teams, eq(teams.key, expertiseTeams.teamKey))
+          .where(inArray(expertiseTeams.expertiseId, rows.map((row) => row.id)))
+          .orderBy(asc(teams.sortOrder))
+      : [];
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        stableId: row.stableId,
+        status: row.statusKey ? { key: row.statusKey, label: row.statusLabel ?? row.statusKey } : null,
+        field: { id: row.fieldId, name: row.fieldName },
+        domain: { id: row.domainId, name: row.domainName },
+        path: `${row.domainName} > ${row.fieldName} > ${row.name}`,
+        teams: teamRows.filter((team) => team.expertiseId === row.id).map(({ key, label }) => ({ key, label })),
+        selectable: row.statusKey === "active",
+      })),
+      page: query.page,
+      pageSize: query.pageSize,
+      total: count?.total ?? 0,
     };
   }
 

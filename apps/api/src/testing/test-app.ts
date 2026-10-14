@@ -70,14 +70,19 @@ export interface TestApp {
   close: () => Promise<void>;
 }
 
-/** Boots the full application (guards, filters, middleware) against a fresh database. */
-export async function createTestApp(env: NodeJS.ProcessEnv = {}): Promise<TestApp> {
+/**
+ * Boots the full application (guards, filters, middleware) against a fresh
+ * database. `providers` replaces injected services (e.g. the import source,
+ * so no test ever calls Notion).
+ */
+export async function createTestApp(env: NodeJS.ProcessEnv = {}, providers: { provide: unknown; useValue: unknown }[] = []): Promise<TestApp> {
   const config = testConfig(env);
   const database = await createTestDatabase();
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule.forRoot(config)] })
+  let builder = Test.createTestingModule({ imports: [AppModule.forRoot(config)] })
     .overrideProvider(DATABASE)
-    .useValue(database.db)
-    .compile();
+    .useValue(database.db);
+  for (const { provide, useValue } of providers) builder = builder.overrideProvider(provide).useValue(useValue);
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication(createHttpAdapter(), { bodyParser: false, logger: false });
   configureApp(app, config);
   await app.init();

@@ -18,9 +18,23 @@ const KIND = { a: 1, b: 2, c: 3, d: 4, e: 5 } as const;
 const id = (kind: keyof typeof KIND, n: number) =>
   `de000000-${KIND[kind]}000-4000-8000-${n.toString(16).padStart(12, "0")}`;
 
-export interface FixtureTaxonomy {
-  domains: { id: string; name: string; fields: { id: string; name: string; items: { id: string; name: string }[] }[] }[];
+export interface FixtureItem {
+  id: string;
+  name: string;
+  stableId: string;
+  statusKey: "active" | "deprecated";
+  teams: string[];
 }
+
+export interface FixtureTaxonomy {
+  domains: { id: string; name: string; stableId: string; fields: { id: string; name: string; stableId: string; items: FixtureItem[] }[] }[];
+}
+
+const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+const two = (n: number) => String(n).padStart(2, "0");
+const TEAM_CYCLE = [["tech"], ["communication", "moderation"], [], ["treasury"], ["compliance"], ["operations", "tech"]];
+/** One deprecated item, to exercise "greyed out, not selectable". */
+const DEPRECATED = new Set(["Copywriting"]);
 
 const taxonomySource: [string, [string, string[]][]][] = [
   [
@@ -58,13 +72,21 @@ let domainN = 0;
 let fieldN = 0;
 let itemN = 0;
 export const FIXTURE_TAXONOMY: FixtureTaxonomy = {
-  domains: taxonomySource.map(([domainName, fields]) => ({
+  domains: taxonomySource.map(([domainName, fields], domainIndex) => ({
     id: id("c", ++domainN),
     name: domainName,
-    fields: fields.map(([fieldName, items]) => ({
+    stableId: `domain.${two(domainIndex + 1)}.${slug(domainName)}`,
+    fields: fields.map(([fieldName, items], fieldIndex) => ({
       id: id("d", ++fieldN),
       name: fieldName,
-      items: items.map((itemName) => ({ id: id("e", ++itemN), name: itemName })),
+      stableId: `field.${two(domainIndex + 1)}.${two(fieldIndex + 1)}.${slug(fieldName)}`,
+      items: items.map((itemName) => ({
+        id: id("e", ++itemN),
+        name: itemName,
+        stableId: `${two(domainIndex + 1)}.${two(fieldIndex + 1)}.${slug(itemName)}`,
+        statusKey: DEPRECATED.has(itemName) ? ("deprecated" as const) : ("active" as const),
+        teams: TEAM_CYCLE[itemN % TEAM_CYCLE.length]!,
+      })),
     })),
   })),
 };
@@ -120,7 +142,8 @@ export interface FixturePerson {
   linkedin: string | null;
   x: string | null;
   otherContact: string | null;
-  nextFollowupOn: string | null;
+  /** Days from the day the fixtures are loaded (negative = overdue), so "overdue" doesn't depend on the run date. */
+  followUpInDays: number | null;
   createdAt: Date;
   organizationIds: string[];
   expertiseIds: string[];
@@ -170,7 +193,7 @@ export const FIXTURE_PEOPLE: FixturePerson[] = Array.from({ length: 48 }, (_, in
     linkedin: index % 4 === 2 ? `https://www.linkedin.com/in/${slug.replace(".", "-")}-example` : null,
     x: index % 7 === 3 ? `@${slug.replace(".", "_")}_example` : null,
     otherContact: index % 9 === 8 ? "Signal on request" : null,
-    nextFollowupOn: index % 3 === 1 ? new Date(base + (index % 20) * day).toISOString().slice(0, 10) : null,
+    followUpInDays: index % 3 === 1 ? (index % 20) - 10 : null,
     createdAt: new Date(base - index * 7 * day - (index % 5) * 3_600_000),
     organizationIds,
     expertiseIds,

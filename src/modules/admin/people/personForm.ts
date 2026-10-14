@@ -1,4 +1,5 @@
 import type { Person, PersonInput } from "../api/types";
+import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import type { RelationOption } from "../ui/RelationPicker";
 
 /** Editable state of a person record (strings as typed; relations as picker options). */
@@ -37,7 +38,7 @@ export function draftFromPerson(person: Person): PersonDraft {
     wiseRecipientId: person.wiseRecipientId ?? "",
     nextFollowupOn: person.nextFollowupOn ?? "",
     organizations: person.organizations.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` })),
-    expertise: person.expertise.map((item) => ({ id: item.id, label: item.name, detail: `${item.field.name} · ${item.domain.name}` })),
+    expertise: person.expertise.map(linkedExpertiseOption),
   };
 }
 

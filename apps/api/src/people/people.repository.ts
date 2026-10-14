@@ -15,10 +15,11 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+import { CLOCK, zurichDate, type Clock } from "../common/clock/clock.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
-import { expertiseItems } from "../expertise/expertise.schema.js";
+import { expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
 import type {
   CreatePersonRequest,
@@ -26,6 +27,7 @@ import type {
   PeopleListQuery,
   PeopleOptionsDto,
   PeopleSortField,
+  PersonCompletenessField,
   PersonDto,
   UpdatePersonRequest,
 } from "./people.contracts.js";
@@ -33,7 +35,19 @@ import { people, peopleExpertise, peopleOrganizations, personSources, personStat
 
 type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
-const personColumns = {
+/**
+ * Overdue follow-up: the next follow-up date is before today in Zurich
+ * (`today` = zurichDate(clock()), not the server's UTC date), and the
+ * person is neither Rejected nor Do not contact.
+ */
+const overdue = (today: string) =>
+  sql`coalesce(${people.nextFollowupOn} < ${today}::date and ${people.stateKey} is distinct from 'rejected' and not ${people.doNotContact}, false)`;
+
+const hasAnyExpertise = sql`exists (select 1 from ${peopleExpertise} where ${peopleExpertise.personId} = ${people.id})`;
+/** Incomplete: any of PERSON_COMPLETENESS empty. */
+const incomplete = sql`(${people.stateKey} is null or ${people.sourceKey} is null or ${people.personalNote} is null or not ${hasAnyExpertise})`;
+
+const personColumns = (today: string) => ({
   id: people.id,
   personNumber: people.personNumber,
   notionPageId: people.notionPageId,
@@ -53,13 +67,14 @@ const personColumns = {
   wiseRecipientId: people.wiseRecipientId,
   nextFollowupOn: people.nextFollowupOn,
   lastFollowupAtLegacy: people.lastFollowupAtLegacy,
+  followUpOverdue: sql<boolean>`${overdue(today)}`,
   createdAt: people.createdAt,
   updatedAt: people.updatedAt,
-};
+});
 
-function selectPeople(db: Executor) {
+function selectPeople(db: Executor, today: string) {
   return db
-    .select(personColumns)
+    .select(personColumns(today))
     .from(people)
     .leftJoin(personStates, eq(personStates.key, people.stateKey))
     .leftJoin(personSources, eq(personSources.key, people.sourceKey));
@@ -104,14 +119,32 @@ const hasExpertiseMatching = (db: Executor, condition?: SQL) =>
       .where(and(eq(peopleExpertise.personId, people.id), condition)),
   );
 
+/** The empty completeness fields of one person (same rule as `incomplete` above). */
+export function personMissing(
+  row: { stateKey: string | null; sourceKey: string | null; personalNote: string | null },
+  hasExpertise: boolean,
+): PersonCompletenessField[] {
+  const missing: PersonCompletenessField[] = [];
+  if (!row.stateKey) missing.push("State");
+  if (!row.sourceKey) missing.push("Source");
+  if (!row.personalNote) missing.push("Personal note");
+  if (!hasExpertise) missing.push("Expertise");
+  return missing;
+}
+
 @Injectable()
 export class PeopleRepository {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(@Inject(DATABASE) private readonly db: Database, @Inject(CLOCK) private readonly clock: Clock) {}
+
+  /** Today in Zurich (YYYY-MM-DD), for the overdue rule. */
+  private today(): string {
+    return zurichDate(this.clock());
+  }
 
   async list(query: PeopleListQuery): Promise<Page<PersonDto>> {
     const where = this.whereClause(query);
     const [rows, [count]] = await Promise.all([
-      selectPeople(this.db)
+      selectPeople(this.db, this.today())
         .where(where)
         .orderBy(...orderBy(query.sort))
         .limit(query.pageSize)
@@ -127,7 +160,7 @@ export class PeopleRepository {
   }
 
   async findById(id: string, db: Executor = this.db): Promise<PersonDto | undefined> {
-    const rows = await selectPeople(db).where(eq(people.id, id)).limit(1);
+    const rows = await selectPeople(db, this.today()).where(eq(people.id, id)).limit(1);
     const [person] = await this.hydrate(rows, db);
     return person;
   }
@@ -272,6 +305,20 @@ export class PeopleRepository {
         conditions.push(hasExpertiseMatching(this.db, inArray(peopleExpertise.expertiseId, strings)));
       } else if (field === "do_not_contact") {
         conditions.push(or(...values.map((value) => eq(people.doNotContact, value === true))));
+      } else if (field === "expertise_field") {
+        conditions.push(hasExpertiseMatching(this.db, inArray(expertiseItems.fieldId, strings)));
+      } else if (field === "expertise_domain") {
+        conditions.push(
+          hasExpertiseMatching(
+            this.db,
+            sql`${expertiseItems.fieldId} in (select ${expertiseFields.id} from ${expertiseFields} where ${inArray(expertiseFields.domainId, strings)})`,
+          ),
+        );
+      } else if (field === "follow_up") {
+        conditions.push(overdue(this.today()));
+      } else if (field === "completeness") {
+        const wanted = new Set(strings);
+        if (!(wanted.has("complete") && wanted.has("incomplete"))) conditions.push(wanted.has("incomplete") ? incomplete : sql`not ${incomplete}`);
       }
     }
 
@@ -368,6 +415,8 @@ export class PeopleRepository {
       wiseRecipientId: row.wiseRecipientId,
       nextFollowupOn: row.nextFollowupOn,
       lastFollowupAtLegacy: row.lastFollowupAtLegacy?.toISOString() ?? null,
+      followUpOverdue: row.followUpOverdue === true,
+      missing: personMissing(row, (expertiseByPerson.get(row.id) ?? []).length > 0),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       organizations: organizationsByPerson.get(row.id) ?? [],

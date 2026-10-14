@@ -62,6 +62,9 @@ export class NotionApiError extends Error {
 
 const shortId = (id: string) => `${id.replace(/-/g, "").slice(0, 8)}…`;
 
+/** What the importers read through: the Notion client, or a test fixture with the same shape. */
+export type NotionReader = Pick<NotionClient, "database" | "allPages" | "relationIds">;
+
 export class NotionClient {
   private readonly fetch: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;

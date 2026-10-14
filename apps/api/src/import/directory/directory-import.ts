@@ -3,7 +3,7 @@ import type { Database } from "../../common/database/database.module.js";
 import { expertiseItems } from "../../expertise/expertise.schema.js";
 import { organizationExpertise, organizations } from "../../organizations/organizations.schema.js";
 import { people, peopleExpertise, peopleOrganizations, personSources, personStates } from "../../people/people.schema.js";
-import { runImport } from "../import-run.js";
+import { countsChangedRefusal, runImport } from "../import-run.js";
 import {
   countDirectoryPlan,
   onlyDemoRefusal,
@@ -180,6 +180,8 @@ export interface DirectoryImportOptions {
   apply: boolean;
   triggeredBy: string;
   beforeCommit?: () => Promise<void>;
+  /** Apply only if the plan's counts equal these (a reviewed dry run's). */
+  expectCounts?: unknown;
 }
 
 export interface DirectoryImportResult {
@@ -198,7 +200,7 @@ export async function runDirectoryImport(db: Database, source: DirectorySource, 
     write: (tx, plan) => applyDirectoryPlan(tx as Executor, plan),
     counts: countDirectoryPlan,
     issues: (plan) => plan.issues,
-    refuseApply: onlyDemoRefusal,
+    refuseApply: (plan) => onlyDemoRefusal(plan) ?? countsChangedRefusal(options.expectCounts, countDirectoryPlan(plan)),
     beforeCommit: options.beforeCommit,
   });
   return { ...result, counts: countDirectoryPlan(result.plan) };

@@ -51,11 +51,18 @@ export const OrganizationsListQuery = listQuerySchema({
     email: { operators: ["contains", "is_empty", "is_not_empty"] },
     expertise: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
     person: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
+    completeness: { operators: ["is"], value: z.enum(["complete", "incomplete"]) },
   },
 });
 export type OrganizationsListQuery = z.output<typeof OrganizationsListQuery>;
 
+/** What an organization needs to be complete (the client's required-for-completeness fields). */
+export const ORGANIZATION_COMPLETENESS = ["Description", "Website", "Email", "Wise recipient ID", "Expertise"] as const;
+export type OrganizationCompletenessField = (typeof ORGANIZATION_COMPLETENESS)[number];
+
 export interface OrganizationDto {
+  /** Completeness fields that are empty (see ORGANIZATION_COMPLETENESS). */
+  missing: OrganizationCompletenessField[];
   id: string;
   /** Organization ID: shown as `ORG-${orgNumber}`. */
   orgNumber: number;

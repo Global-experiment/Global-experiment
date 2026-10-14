@@ -20,10 +20,12 @@ const person: Person = {
   wiseRecipientId: null,
   nextFollowupOn: "2026-09-01",
   lastFollowupAtLegacy: "2026-08-15T09:00:00.000Z",
+  followUpOverdue: false,
+  missing: ["Source"],
   createdAt: "2026-08-01T09:00:00.000Z",
   updatedAt: "2026-08-01T09:00:00.000Z",
   organizations: [{ id: "o1", name: "Lab" }],
-  expertise: [{ id: "e1", name: "Web", field: { id: "f1", name: "Software" }, domain: { id: "d1", name: "Tech" } }],
+  expertise: [{ id: "e1", name: "Web", stableId: "03.01.web", status: { key: "active", label: "Active" }, field: { id: "f1", name: "Software" }, domain: { id: "d1", name: "Tech" } }],
 };
 
 describe("person record form", () => {

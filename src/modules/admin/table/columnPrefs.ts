@@ -15,6 +15,12 @@ export interface ColumnPrefs {
   widths: Record<string, number>;
   /** Column ids in the user's order; absent ids keep their default place at the end. */
   order: string[];
+  /**
+   * The column ids that existed when these prefs were saved. A column added
+   * later that's hidden by default (an optional column) starts hidden even
+   * for someone with saved prefs; once they show it, it stays shown.
+   */
+  seen?: string[];
 }
 
 export const EMPTY_PREFS: ColumnPrefs = { hidden: [], frozen: [], widths: {}, order: [] };
@@ -137,8 +143,9 @@ export function stickyOffsets(widths: readonly number[], frozenCount: number): n
   return offsets;
 }
 
-export function parsePrefs(raw: string | null, knownIds: readonly string[]): ColumnPrefs {
-  if (!raw) return EMPTY_PREFS;
+export function parsePrefs(raw: string | null, knownIds: readonly string[], defaultHidden: readonly string[] = []): ColumnPrefs {
+  const defaults = defaultHidden.length > 0 ? { ...EMPTY_PREFS, hidden: [...defaultHidden] } : EMPTY_PREFS;
+  if (!raw) return defaults;
   try {
     const value = JSON.parse(raw) as Partial<Record<keyof ColumnPrefs, unknown>>;
     const clean = (list: unknown) =>
@@ -149,8 +156,10 @@ export function parsePrefs(raw: string | null, knownIds: readonly string[]): Col
         if (knownIds.includes(id) && typeof width === "number" && Number.isFinite(width)) widths[id] = clampWidth(width);
       }
     }
-    return { hidden: clean(value.hidden), frozen: clean(value.frozen), widths, order: clean(value.order) };
+    const seen = clean(value.seen);
+    const hidden = [...new Set([...clean(value.hidden), ...defaultHidden.filter((id) => !seen.includes(id))])];
+    return { hidden, frozen: clean(value.frozen), widths, order: clean(value.order) };
   } catch {
-    return EMPTY_PREFS;
+    return defaults;
   }
 }

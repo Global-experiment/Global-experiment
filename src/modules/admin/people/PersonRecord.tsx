@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@/shared/ui/icons";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatPersonNumber, type ExpertiseTree, type Organization, type Page, type PeopleOptions, type Person } from "../api/types";
+import { formatPersonNumber, type Organization, type Page, type PeopleOptions, type Person } from "../api/types";
+import { personMissing } from "../completeness";
+import { ExpertiseField } from "../expertise/ExpertiseField";
 import { useAdminData } from "../api/useAdminData";
 import { AdminButton, StatusMessage } from "../ui/controls";
 import { PropertyRow, RecordHeader, recordInput, RecordSelect } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { CompletenessRow } from "../ui/CompletenessRow";
 import { useToast } from "../ui/Toast";
 import { formatDate } from "./peopleTable";
 import { draftFromPerson, hasChanges, personPatch, type PersonDraft } from "./personForm";
@@ -23,19 +26,6 @@ const CONTACT_FIELDS: { field: TextField; label: string; icon: "alternate_email"
   { field: "otherContact", label: "Other contact", icon: "title" },
   { field: "wiseRecipientId", label: "Wise recipient ID", icon: "title" },
 ];
-
-export function expertiseSearch(tree: ExpertiseTree | undefined) {
-  return async (text: string): Promise<RelationOption[]> => {
-    const needle = text.trim().toLowerCase();
-    return (tree?.domains ?? []).flatMap((domain) =>
-      domain.fields.flatMap((field) =>
-        field.items
-          .filter((item) => !needle || `${item.name} ${field.name} ${domain.name}`.toLowerCase().includes(needle))
-          .map((item) => ({ id: item.id, label: item.name, detail: `${field.name} · ${domain.name}` })),
-      ),
-    );
-  };
-}
 
 export async function searchOrganizations(text: string, signal: AbortSignal): Promise<RelationOption[]> {
   const query = new URLSearchParams({ pageSize: "20", sort: "name:asc" });
@@ -53,12 +43,10 @@ export function PersonRecord({ id }: { id: string }) {
   const toast = useToast();
   const person = useAdminData<Person>(`/people/${id}`);
   const options = useAdminData<PeopleOptions>("/people/options");
-  const tree = useAdminData<ExpertiseTree>("/expertise/tree");
   const [edit, setEdit] = useState<{ baseId: string; base: PersonDraft; draft: PersonDraft } | null>(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const searchExpertise = useCallback((text: string) => expertiseSearch(tree.data)(text), [tree.data]);
 
   if (person.error) {
     return (
@@ -157,6 +145,7 @@ export function PersonRecord({ id }: { id: string }) {
         <PropertyRow icon="numbers" label="Person ID">
           <span>{formatPersonNumber(loaded.personNumber)}</span>
         </PropertyRow>
+        <CompletenessRow missing={personMissing(draft)} />
         <PropertyRow icon="title" label="Name" htmlFor="person-name" error={errors.name}>
           <input id="person-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" className={recordInput} />
         </PropertyRow>
@@ -181,7 +170,7 @@ export function PersonRecord({ id }: { id: string }) {
           </RecordSelect>
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="Expertise" error={errors.expertise}>
-          <RelationPicker label="Expertise" selected={draft.expertise} onChange={(next) => set("expertise", next)} search={searchExpertise} />
+          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} />
         </PropertyRow>
         <PropertyRow icon="title" label="Personal note" htmlFor="person-note" error={errors.personalNote}>
           <textarea

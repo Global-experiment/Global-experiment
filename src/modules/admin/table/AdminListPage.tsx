@@ -61,7 +61,11 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
   const state = readListState(new URLSearchParams(params.toString()), config.defaultSort);
   const apiQuery = listStateToApiQuery(state, PAGE_SIZE);
 
-  const [prefs, setPrefs] = useColumnPrefs(config.tableId, config.columns.map((column) => column.id));
+  const [prefs, setPrefs] = useColumnPrefs(
+    config.tableId,
+    config.columns.map((column) => column.id),
+    config.columns.filter((column) => column.defaultHidden).map((column) => column.id),
+  );
   const [searchDraft, setSearchDraft] = useState(state.search);
   const [result, setResult] = useState<Result<Row> | null>(null);
   const [reloadToken, setReloadToken] = useState(0);

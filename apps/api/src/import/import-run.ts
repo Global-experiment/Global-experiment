@@ -29,6 +29,27 @@ export interface ImportRunResult<Plan> {
   plan: Plan;
 }
 
+/**
+ * Refusal for an apply that must match a reviewed dry run: the fresh plan's
+ * counts must equal the dry run's, or something changed in between (in
+ * Notion or the database) and the dry run no longer describes the write.
+ */
+export function countsChangedRefusal(expected: unknown, actual: unknown): string | undefined {
+  if (expected === undefined) return undefined;
+  return canonicalJson(expected) === canonicalJson(actual)
+    ? undefined
+    : "Notion or the database changed since the dry run: run a new dry run and review it before applying.";
+}
+
+/** JSON with object keys sorted — jsonb doesn't keep key order, so stored counts compare by content. */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) =>
+    inner && typeof inner === "object" && !Array.isArray(inner)
+      ? Object.fromEntries(Object.entries(inner as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : inner,
+  );
+}
+
 export class ImportRefusedError extends Error {
   constructor(message: string) {
     super(message);

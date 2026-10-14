@@ -10,9 +10,23 @@ export interface EntityRef {
 }
 
 export interface ExpertiseRef extends EntityRef {
+  stableId: string | null;
+  /** Only Active expertise can be newly linked; others show greyed out. */
+  status: VocabularyEntry | null;
   field: EntityRef;
   domain: EntityRef;
 }
+
+/** GET /expertise/search result. */
+export interface ExpertiseSearchItem extends ExpertiseRef {
+  /** "Domain > Field > Expertise". */
+  path: string;
+  teams: VocabularyEntry[];
+  selectable: boolean;
+}
+
+export type PersonCompletenessField = "State" | "Source" | "Personal note" | "Expertise";
+export type OrganizationCompletenessField = "Description" | "Website" | "Email" | "Wise recipient ID" | "Expertise";
 
 export interface VocabularyEntry {
   key: string;
@@ -41,6 +55,9 @@ export interface Person {
   nextFollowupOn: string | null;
   /** The former "last follow-up" value, kept as-is (read-only). */
   lastFollowupAtLegacy: string | null;
+  /** Next follow-up before today, and neither Rejected nor Do not contact. */
+  followUpOverdue: boolean;
+  missing: PersonCompletenessField[];
   createdAt: string;
   updatedAt: string;
   organizations: EntityRef[];
@@ -76,6 +93,7 @@ export interface Organization {
   website: string | null;
   email: string | null;
   wiseRecipientId: string | null;
+  missing: OrganizationCompletenessField[];
   createdAt: string;
   updatedAt: string;
   people: EntityRef[];
@@ -134,6 +152,45 @@ export interface ExpertiseDomainNode extends TaxonomyNotionAttributes {
 
 export interface ExpertiseTree {
   domains: ExpertiseDomainNode[];
+}
+
+export type ImportKind = "taxonomy" | "directory";
+
+/** An import_runs row (GET /imports/runs). */
+export interface ImportRun {
+  id: string;
+  kind: string;
+  mode: "dry_run" | "apply" | "failed";
+  startedAt: string;
+  finishedAt: string | null;
+  triggeredBy: string;
+  counts: { changes?: number } & Record<string, unknown>;
+  issues: { kind?: string; code?: string; detail?: string; name?: string }[];
+}
+
+/** A background import job (POST /imports/:kind/dry-run|apply, GET /imports/jobs/:id). */
+export interface ImportJob {
+  id: string;
+  kind: ImportKind;
+  mode: "dry_run" | "apply";
+  status: "running" | "succeeded" | "failed" | "refused";
+  phase: "queued" | "reading_notion" | "planning" | "applying" | "done";
+  startedAt: string;
+  finishedAt: string | null;
+  triggeredBy: string;
+  runId: string | null;
+  dryRunId: string | null;
+  changes: number | null;
+  /** A finished dry run with something to write, not refused: it can be applied. */
+  applicable: boolean;
+  report: string | null;
+  error: string | null;
+}
+
+export interface ImportStatus {
+  taxonomy: { available: boolean; reason: string | null };
+  directory: { available: boolean; reason: string | null };
+  activeJob: ImportJob | null;
 }
 
 export interface AdminPrincipal {

@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatOrgNumber, type ExpertiseTree, type Organization, type OrganizationInput, type Page, type Person } from "../api/types";
+import { formatOrgNumber, type Organization, type OrganizationInput, type Page, type Person } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
-import { expertiseSearch } from "../people/PersonRecord";
+import { organizationMissing } from "../completeness";
+import { ExpertiseField } from "../expertise/ExpertiseField";
+import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import { formatDate } from "../people/peopleTable";
 import { AdminButton, StatusMessage } from "../ui/controls";
 import { PropertyRow, RecordHeader, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { CompletenessRow } from "../ui/CompletenessRow";
 import { useToast } from "../ui/Toast";
 
 interface Draft {
@@ -33,7 +36,7 @@ const toDraft = (organization: Organization): Draft => ({
   website: organization.website ?? "",
   email: organization.email ?? "",
   wiseRecipientId: organization.wiseRecipientId ?? "",
-  expertise: organization.expertise.map((item) => ({ id: item.id, label: item.name, detail: `${item.field.name} · ${item.domain.name}` })),
+  expertise: organization.expertise.map(linkedExpertiseOption),
   people: organization.people.map(personOption),
 });
 
@@ -75,11 +78,9 @@ async function searchPeople(text: string, signal: AbortSignal): Promise<Relation
 export function OrganizationRecord({ id }: { id: string }) {
   const toast = useToast();
   const organization = useAdminData<Organization>(`/organizations/${id}`);
-  const tree = useAdminData<ExpertiseTree>("/expertise/tree");
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const searchExpertise = useCallback((text: string) => expertiseSearch(tree.data)(text), [tree.data]);
 
   if (organization.error) {
     return (
@@ -158,6 +159,7 @@ export function OrganizationRecord({ id }: { id: string }) {
         <PropertyRow icon="numbers" label="Organization ID">
           <span>{formatOrgNumber(loaded.orgNumber)}</span>
         </PropertyRow>
+        <CompletenessRow missing={organizationMissing(draft)} />
         <PropertyRow icon="title" label="Name" htmlFor="organization-name">
           <input id="organization-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" className={recordInput} />
         </PropertyRow>
@@ -199,7 +201,7 @@ export function OrganizationRecord({ id }: { id: string }) {
           />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="Expertise">
-          <RelationPicker label="Expertise" selected={draft.expertise} onChange={(next) => set("expertise", next)} search={searchExpertise} />
+          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} />
         </PropertyRow>
         <PropertyRow icon="arrow_outward" label="People">
           <RelationPicker label="Person" selected={draft.people} onChange={(next) => set("people", next)} search={searchPeople} />

@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "../../common/database/database.module.js";
 import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams, taxonomyStatuses, teams } from "../../expertise/expertise.schema.js";
-import { runImport } from "../import-run.js";
+import { countsChangedRefusal, runImport } from "../import-run.js";
 import { countPlan, DEPRECATED, planTaxonomyImport, type DbSnapshot, type Issue, type PlanCounts, type TaxonomyPlan } from "./taxonomy-plan.js";
 import { LEVELS, type TaxonomyLevel, type TaxonomySource } from "./taxonomy-source.js";
 
@@ -107,6 +107,8 @@ export interface TaxonomyImportOptions {
   triggeredBy: string;
   /** Test seam: runs inside the transaction just before it commits. */
   beforeCommit?: () => Promise<void>;
+  /** Apply only if the plan's counts equal these (a reviewed dry run's). */
+  expectCounts?: unknown;
 }
 
 export interface TaxonomyImportResult {
@@ -130,6 +132,7 @@ export async function runTaxonomyImport(db: Database, source: TaxonomySource, op
     write: applyTaxonomyPlan,
     counts: (plan) => ({ ...countPlan(plan), deprecateMissing: plan.deprecateMissing }),
     issues: (plan) => plan.issues,
+    refuseApply: (plan) => countsChangedRefusal(options.expectCounts, { ...countPlan(plan), deprecateMissing: plan.deprecateMissing }),
     beforeCommit: options.beforeCommit,
   });
   return { ...result, counts: countPlan(result.plan) };

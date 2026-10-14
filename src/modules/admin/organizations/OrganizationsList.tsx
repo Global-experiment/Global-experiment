@@ -5,6 +5,7 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
 import { adminApi, AdminApiError } from "../api/client";
 import { formatOrgNumber, type ExpertiseTree, type Organization } from "../api/types";
+import { completenessLabel } from "../completeness";
 import { useAdminData } from "../api/useAdminData";
 import { expertiseOptions, formatDate } from "../people/peopleTable";
 import { AdminListPage } from "../table/AdminListPage";
@@ -37,6 +38,14 @@ const COLUMNS: TableColumn<Organization>[] = [
   { id: "created", label: "Created", icon: "schedule", width: 120, render: (o) => formatDate(o.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, render: (o) => formatDate(o.updatedAt) },
   { id: "number", label: "Organization ID", icon: "numbers", width: 120, render: (o) => formatOrgNumber(o.orgNumber) },
+  {
+    id: "completeness",
+    label: "Completeness",
+    icon: "check_box",
+    width: 300,
+    defaultHidden: true,
+    render: (o) => <span className={o.missing.length === 0 ? "" : "text-text-muted"}>{completenessLabel(o.missing)}</span>,
+  },
 ];
 
 function NewOrganizationControl() {
@@ -101,6 +110,16 @@ export function OrganizationsList() {
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
       { id: "number", label: "Organization ID", icon: "numbers", operators: [], sort: "text" },
+      {
+        id: "completeness",
+        label: "Completeness",
+        icon: "check_box",
+        operators: ["is"],
+        options: [
+          { value: "incomplete", label: "Incomplete" },
+          { value: "complete", label: "Complete" },
+        ],
+      },
     ],
     [tree.data],
   );

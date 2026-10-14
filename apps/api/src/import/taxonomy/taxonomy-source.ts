@@ -1,4 +1,4 @@
-import { plainText, type NotionClient, type NotionDatabase, type NotionPage } from "../notion/notion-client.js";
+import { plainText, type NotionDatabase, type NotionPage, type NotionReader } from "../notion/notion-client.js";
 
 export type TaxonomyLevel = "domain" | "field" | "expertise";
 export const LEVELS: readonly TaxonomyLevel[] = ["domain", "field", "expertise"];
@@ -68,7 +68,7 @@ export function toSourceRow(level: TaxonomyLevel, page: NotionPage): SourceRow {
 }
 
 /** Reads the three databases (schema check first). Archived / trashed pages are not returned by Notion's query. */
-export async function readTaxonomy(client: NotionClient, ids: TaxonomyDatabaseIds): Promise<TaxonomySource> {
+export async function readTaxonomy(client: NotionReader, ids: TaxonomyDatabaseIds): Promise<TaxonomySource> {
   const read = async (level: TaxonomyLevel, databaseId: string) => {
     assertSchema(level, await client.database(databaseId));
     const pages = await client.allPages(databaseId);

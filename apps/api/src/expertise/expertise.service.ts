@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConflictError, NotFoundError } from "../common/errors/api-error.js";
-import type { ExpertiseLevel, ExpertiseTreeDto } from "./expertise.contracts.js";
+import type { ExpertiseLevel, ExpertiseSearchQuery, ExpertiseTreeDto } from "./expertise.contracts.js";
 import { ExpertiseRepository } from "./expertise.repository.js";
 
 const LABEL: Record<ExpertiseLevel, string> = { domain: "Domain", field: "Field", expertise: "Expertise" };
@@ -16,6 +16,10 @@ export class ExpertiseService {
 
   tree(): Promise<ExpertiseTreeDto> {
     return this.repository.tree();
+  }
+
+  search(query: ExpertiseSearchQuery) {
+    return this.repository.search(query);
   }
 
   createDomain(name: string) {

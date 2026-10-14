@@ -67,6 +67,12 @@ export const PeopleListQuery = listQuerySchema({
     email: { operators: ["contains", "is_empty", "is_not_empty"] },
     organization: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
     expertise: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
+    /** Expertise rollup: people with any expertise in this field / domain. */
+    expertise_field: { operators: ["is"], value: z.uuid() },
+    expertise_domain: { operators: ["is"], value: z.uuid() },
+    /** Overdue: next follow-up before today, not Rejected, not Do not contact. */
+    follow_up: { operators: ["is"], value: z.enum(["overdue"]) },
+    completeness: { operators: ["is"], value: z.enum(["complete", "incomplete"]) },
     do_not_contact: {
       operators: ["is"],
       value: z.enum(["true", "false"]).transform((value) => value === "true"),
@@ -75,6 +81,10 @@ export const PeopleListQuery = listQuerySchema({
 });
 export type PeopleListQuery = z.output<typeof PeopleListQuery>;
 export type PeopleFilterField = PeopleListQuery["filters"][number]["field"];
+
+/** What a person needs to be complete (the client's required-for-completeness fields). */
+export const PERSON_COMPLETENESS = ["State", "Source", "Personal note", "Expertise"] as const;
+export type PersonCompletenessField = (typeof PERSON_COMPLETENESS)[number];
 
 export interface VocabularyEntry {
   key: string;
@@ -87,6 +97,8 @@ export interface EntityRef {
 }
 
 export interface ExpertiseRef extends EntityRef {
+  stableId: string | null;
+  status: VocabularyEntry | null;
   field: EntityRef;
   domain: EntityRef;
 }
@@ -112,6 +124,10 @@ export interface PersonDto {
   nextFollowupOn: string | null;
   /** The former "last follow-up" value, kept as-is (read-only). */
   lastFollowupAtLegacy: string | null;
+  /** next_followup_on is before today, and the person is neither Rejected nor Do not contact. */
+  followUpOverdue: boolean;
+  /** Completeness fields that are empty (see PERSON_COMPLETENESS). */
+  missing: PersonCompletenessField[];
   createdAt: string;
   updatedAt: string;
   organizations: EntityRef[];

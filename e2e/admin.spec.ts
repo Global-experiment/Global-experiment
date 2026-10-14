@@ -65,10 +65,8 @@ test.describe("people administration", () => {
     for (const column of ["Name", "State", "Source", "Expertise", "Personal note", "Organization"]) {
       await expect(page.getByRole("columnheader", { name: column, exact: true })).toBeVisible();
     }
-    // The Notion import control is honest: nothing is imported.
-    await page.getByRole("button", { name: "Notion import" }).click();
-    await expect(page.getByRole("dialog", { name: "Notion import" })).toContainText("Nothing has been imported");
-    await page.keyboard.press("Escape");
+    // The Notion import control opens the import page.
+    await expect(page.getByRole("link", { name: "Notion import" })).toHaveAttribute("href", "/admin/imports");
   });
 
   test("search runs in the API and highlights matches", async ({ page }) => {
@@ -175,9 +173,9 @@ test.describe("people administration", () => {
     await expect(page.getByRole("heading", { name: "Organizations", level: 1 })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: /of 12$/ })).toBeVisible();
     await page.goto("/admin/expertise");
-    await expect(page.getByRole("cell", { name: "Full-stack development" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Full-stack development", exact: true })).toBeVisible();
     await page.goto("/admin/domains");
-    await expect(page.getByRole("cell", { name: "Governance" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Governance", exact: true })).toBeVisible();
   });
 
   test("sign out revokes the session", async ({ page }) => {

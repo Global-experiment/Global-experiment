@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { completenessLabel } from "../completeness";
 import { Highlight } from "@/shared/ui/Highlight";
 import { Icon } from "@/shared/ui/icons";
 import { formatPersonNumber, type ExpertiseTree, type Organization, type PeopleOptions, type Person } from "../api/types";
@@ -58,13 +59,39 @@ export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "created", label: "Created", icon: "schedule", width: 120, render: (p) => formatDate(p.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, render: (p) => formatDate(p.updatedAt) },
   { id: "next_followup", label: "Follow-up date", icon: "schedule", width: 140, render: (p) => formatCalendarDate(p.nextFollowupOn) },
+  {
+    id: "overdue",
+    label: "Overdue",
+    icon: "schedule",
+    width: 110,
+    // Next follow-up before today, not Rejected, not Do not contact (computed by the API).
+    render: (p) => (p.followUpOverdue ? <span data-overdue="true" className="font-bold">Overdue</span> : null),
+  },
+  {
+    id: "completeness",
+    label: "Completeness",
+    icon: "check_box",
+    width: 260,
+    defaultHidden: true,
+    render: (p) => <span className={p.missing.length === 0 ? "" : "text-text-muted"}>{completenessLabel(p.missing)}</span>,
+  },
   { id: "number", label: "Person ID", icon: "numbers", width: 100, render: (p) => formatPersonNumber(p.personNumber) },
 ];
 
+const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);
+
 export function expertiseOptions(tree: ExpertiseTree | undefined) {
-  return (tree?.domains ?? []).flatMap((domain) =>
-    domain.fields.flatMap((field) => field.items.map((item) => ({ value: item.id, label: `${item.name} · ${field.name}` }))),
-  );
+  return (tree?.domains ?? [])
+    .flatMap((domain) => domain.fields.flatMap((field) => field.items.map((item) => ({ value: item.id, label: `${item.name} · ${field.name}` }))))
+    .sort(byLabel);
+}
+
+export function fieldOptions(tree: ExpertiseTree | undefined) {
+  return (tree?.domains ?? []).flatMap((domain) => domain.fields.map((field) => ({ value: field.id, label: `${field.name} · ${domain.name}` }))).sort(byLabel);
+}
+
+export function domainOptions(tree: ExpertiseTree | undefined) {
+  return (tree?.domains ?? []).map((domain) => ({ value: domain.id, label: domain.name })).sort(byLabel);
 }
 
 /** Filterable/sortable fields — exactly what the API's People list contract accepts. */
@@ -79,6 +106,20 @@ export function peopleFields(
     { id: "state", label: "State", icon: "select", operators: ["is", "is_not", "is_empty", "is_not_empty"], options: vocabulary(options?.states), sort: "text" },
     { id: "source", label: "Source", icon: "select", operators: ["is", "is_not", "is_empty", "is_not_empty"], options: vocabulary(options?.sources), sort: "text" },
     { id: "expertise", label: "Expertise", icon: "arrow_outward", operators: ["is", "is_empty", "is_not_empty"], options: expertiseOptions(tree) },
+    // The expertise rollup: any expertise in this field / domain.
+    { id: "expertise_field", label: "Expertise field", icon: "arrow_outward", operators: ["is"], options: fieldOptions(tree) },
+    { id: "expertise_domain", label: "Expertise domain", icon: "arrow_outward", operators: ["is"], options: domainOptions(tree) },
+    { id: "follow_up", label: "Follow-up", icon: "schedule", operators: ["is"], options: [{ value: "overdue", label: "Overdue" }] },
+    {
+      id: "completeness",
+      label: "Completeness",
+      icon: "check_box",
+      operators: ["is"],
+      options: [
+        { value: "incomplete", label: "Incomplete" },
+        { value: "complete", label: "Complete" },
+      ],
+    },
     { id: "personal_note", label: "Personal note", icon: "title", operators: ["contains", "not_contains", "is_empty", "is_not_empty"] },
     {
       id: "organization",

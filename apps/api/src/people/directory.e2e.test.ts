@@ -180,7 +180,14 @@ describe("native directory API", () => {
       const person = await createPerson({ name: "Grace Example", organizationIds: [lab.id], expertiseIds: [web.id] });
       expect(person.organizations).toEqual([{ id: lab.id, name: "Example Lab" }]);
       expect(person.expertise).toEqual([
-        { id: web.id, name: "Web development", field: { id: expect.any(String), name: "Software" }, domain: { id: expect.any(String), name: "Technology" } },
+        {
+          id: web.id,
+          name: "Web development",
+          stableId: null,
+          status: null,
+          field: { id: expect.any(String), name: "Software" },
+          domain: { id: expect.any(String), name: "Technology" },
+        },
       ]);
 
       await admin.put(`/api/admin/people/${person.id}/organizations/${coop.id}`).expect(204);

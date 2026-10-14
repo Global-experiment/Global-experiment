@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 import { E2E_ADMIN } from "./e2e/admin-credentials";
 
@@ -54,6 +55,9 @@ export default defineConfig({
               COOKIE_SECURE: "false",
               E2E_ADMIN_EMAIL: E2E_ADMIN.email,
               E2E_ADMIN_PASSWORD: E2E_ADMIN.password,
+              // The admin import page reads this Notion-shaped fixture instead of
+              // Notion (accepted by the API only under NODE_ENV=test).
+              IMPORT_FIXTURE_FILE: resolve("e2e/fixtures/notion-import.json"),
             },
           },
         ]

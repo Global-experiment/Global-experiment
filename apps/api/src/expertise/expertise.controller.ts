@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import {
   CreateDomainRequest,
   CreateExpertiseRequest,
   CreateFieldRequest,
+  ExpertiseSearchQuery,
   RenameRequest,
 } from "./expertise.contracts.js";
 import { ExpertiseService } from "./expertise.service.js";
@@ -22,6 +23,12 @@ export class ExpertiseController {
   @Get("tree")
   tree() {
     return this.expertise.tree();
+  }
+
+  /** Picker search: ranked, paginated, Active items unless `includeInactive=true`. */
+  @Get("search")
+  search(@Query(new ZodValidationPipe(ExpertiseSearchQuery)) query: ExpertiseSearchQuery) {
+    return this.expertise.search(query);
   }
 
   @Post("domains")

@@ -8,6 +8,7 @@ import type { EntityRef } from "../people/people.contracts.js";
 import { people, peopleOrganizations } from "../people/people.schema.js";
 import type {
   CreateOrganizationRequest,
+  OrganizationCompletenessField,
   OrganizationDto,
   OrganizationSortField,
   OrganizationsListQuery,
@@ -70,6 +71,24 @@ const hasPersonMatching = (db: Executor, condition?: SQL) =>
       .innerJoin(people, eq(people.id, peopleOrganizations.personId))
       .where(and(eq(peopleOrganizations.organizationId, organizations.id), condition)),
   );
+
+const hasAnyExpertise = sql`exists (select 1 from ${organizationExpertise} where ${organizationExpertise.organizationId} = ${organizations.id})`;
+/** Incomplete: any of ORGANIZATION_COMPLETENESS empty. */
+const incomplete = sql`(${organizations.description} is null or ${organizations.website} is null or ${organizations.email} is null or ${organizations.wiseRecipientId} is null or not ${hasAnyExpertise})`;
+
+/** The empty completeness fields of one organization (same rule as `incomplete`). */
+export function organizationMissing(
+  row: { description: string | null; website: string | null; email: string | null; wiseRecipientId: string | null },
+  hasExpertise: boolean,
+): OrganizationCompletenessField[] {
+  const missing: OrganizationCompletenessField[] = [];
+  if (!row.description) missing.push("Description");
+  if (!row.website) missing.push("Website");
+  if (!row.email) missing.push("Email");
+  if (!row.wiseRecipientId) missing.push("Wise recipient ID");
+  if (!hasExpertise) missing.push("Expertise");
+  return missing;
+}
 
 @Injectable()
 export class OrganizationsRepository {
@@ -216,6 +235,9 @@ export class OrganizationsRepository {
       const ids = values.map(String);
       if (field === "expertise") conditions.push(hasExpertiseMatching(this.db, inArray(organizationExpertise.expertiseId, ids)));
       if (field === "person") conditions.push(hasPersonMatching(this.db, inArray(peopleOrganizations.personId, ids)));
+      if (field === "completeness" && !(ids.includes("complete") && ids.includes("incomplete"))) {
+        conditions.push(ids.includes("incomplete") ? incomplete : sql`not ${incomplete}`);
+      }
     }
     for (const { field, operator, value } of all) {
       const text = typeof value === "string" ? value : "";
@@ -286,6 +308,7 @@ export class OrganizationsRepository {
       website: row.website,
       email: row.email,
       wiseRecipientId: row.wiseRecipientId,
+      missing: organizationMissing(row, (expertiseByOrganization.get(row.id) ?? []).length > 0),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       people: peopleByOrganization.get(row.id) ?? [],
