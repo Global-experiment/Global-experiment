@@ -77,6 +77,7 @@ tables.
 | **Services and access grants** | Which person holds which access to which tool | `services`, `access_grants`, `access_grant_statuses` | `/api/admin/services`, `/api/admin/access-grants` | Monitoring → Services, Access grants; People "Access grant" column | none | People, Audit, Imports |
 | **Accounts and roles** | Admin identities, sessions, roles, permissions | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_password_resets` | `/api/admin/auth/*`, `/api/admin/accounts` | Monitoring → Accounts; user card; Profile | `/admin/login` | People (optional link), Email, Audit |
 | **Audit / History** | Who changed what, when; before/after | `audit_events` | written by every module's service; `/api/admin/history` (read) | Monitoring → History; History panel on record pages | none | — (used by all) |
+| **Settings and module registry** | Module modes (notion / native), feature flags, import schedules; which modules are enabled | `settings` | `/api/admin/modules`, `/api/admin/settings` (owner), public `/api/config` (public flags only) | Settings (owner, from the user card); drives the sidebar | Donate page reads public flags | Audit |
 | **Analytics** | Visitor statistics | none in PostgreSQL (lives in the analytics tool) | `/api/admin/analytics` (proxy of the tool's stats API) | Monitoring → Analytics | none (v1.0: Statistics page) | Analytics integration |
 | **Technical dashboard** | Health of the stack, jobs, backups, integrations | none (reads health, `job` tables, `import_runs`) | `/api/admin/system` | Monitoring → Technical dashboard | none | all integrations, Jobs |
 | **Imports** | Notion → PostgreSQL copies (dry run, apply, report) | `import_runs` | `/api/admin/imports/*` | People → Import Notion; Imports page | none | the modules it writes into |
@@ -88,15 +89,110 @@ Module notes:
   / "Expenses" rows, come from Services and Treasury once those exist —
   read through those modules' services, not stored on `people`.
 - **Treasury** is first in the build order (roadmap, due 24 October).
-- **CMS** replaces the live Notion read of Home and Documentation. Notion's
-  Documentation database has 10 real, published articles; they move over
-  through an importer, after which the admin editor is the editing tool
-  (open question Q1 decides whether Notion stays an editing tool at all).
+- **CMS** replaces the live Notion read of Home and Documentation: Notion's
+  10 real articles and the Home page are imported into revisions and the
+  public site reads the database. In v0.1 Notion stays their editing tool
+  (§2.1); the admin editor is enabled at the module's v1.0 cut-over.
 - **Messages and Emails** are one integration (Stalwart) with two admin
   views: inbound conversations, and the outbound delivery log.
 - **Analytics and the Technical dashboard** have no tables of their own:
   they show data that lives elsewhere. Building storage for them would be
   speculative.
+- **Platform** (settings, module registry, audit) is not a sidebar module:
+  it owns `settings` and `audit_events` and serves every other module
+  (§2.1, §2.2, §3.2).
+
+### 2.1 Data ownership: Notion in v0.1, native in v1.0
+
+Decided by the client on 2026-10-15 (answers Q1).
+
+- **v0.1:** Notion is the **editing tool** for the Notion-backed modules —
+  Directory (People, Organizations), Taxonomy, CMS Documentation and Home,
+  Treasury **expenses**, Feedback and issues, Services and access grants.
+  Their importers run **on demand** (admin, CLI) and **on a schedule**
+  (a job per module, interval in settings).
+- **v1.0:** the database and the admin are the **only** source; every
+  importer is switched off.
+- **Record-level origin.** Every importable table has
+  `managed_by text not null` = `notion` | `native` (data-model §1), next to
+  `notion_page_id`:
+  - `notion` records are created and updated **only by their importer**.
+    In the admin their **synced fields are read-only**, shown with a
+    "Managed in Notion" badge and a link to the Notion page; fields Notion
+    doesn't have (e.g. admin-only links, review metadata the module defines
+    as native) stay editable. The API refuses writes to synced fields of a
+    `notion` record (409 `managed_in_notion`), whatever the UI shows.
+  - `native` records (created in the admin, Stripe donations and refunds,
+    website submissions, waitlist entries, messages, audit events) are
+    editable and **never touched by an importer** — an importer only reads
+    and writes `notion` records and links between them.
+- **Module mode.** Each Notion-backed module has a mode `notion` | `native`
+  in the `settings` table (`module.<key>.mode`), shown and changed by the
+  **owner** in the admin, audited. In `native` mode its importer refuses to
+  run (on demand and scheduled) and every one of its records is `native`.
+
+**v1.0 cut-over procedure** (per module, owner only, one at a time):
+
+1. Announce a freeze: nobody edits the module's Notion database.
+2. Run a **final import** (dry run, review, apply) and a second dry run
+   that must report **0 changes**.
+3. Take a database backup (as for a release).
+4. **Switch the mode** in the admin: in one transaction the API sets
+   `module.<key>.mode = native`, sets `managed_by = 'native'` on all the
+   module's records, and moves each record-number identity past the highest
+   number Notion used (`setval`) so new records never collide; one audit
+   event records the switch.
+5. Verify in the admin: the badge is gone and the records are editable;
+   the importer button and schedule show "Native — import off".
+6. Make the Notion database read-only (Notion permissions), as an archive.
+
+Module specifics:
+
+| Module | Cut-over notes |
+|---|---|
+| Directory | People and Organizations switch together (shared links); `person_number` / `org_number` identities moved past Notion's highest PER-n / ORG-n. |
+| Taxonomy | Switch after Directory (links point to items); new items get Stable IDs in the admin (format checks already in the database). |
+| CMS | Enables the admin editor (toolbar, revisions on Submit); the last imported revision becomes the current one. Home and Documentation can switch separately (`module.cms_home.mode`, `module.cms_documentation.mode`). |
+| Treasury | Expenses switch; donations and refunds are always native (Stripe). Later, Wise sync writes native expense entries directly. |
+| Feedback and issues | Notion-made submissions become native; website submissions were native from the start. |
+| Services and access grants | Switch together (grants point to services). |
+
+### 2.2 Flexible admin framework
+
+So that a module or a field is added by configuration, not by a new screen:
+
+- **Module registry.** Each module declares, in one registry entry: its
+  sidebar entry (group, order, icon, label), its routes, the permissions
+  each route needs, its mode setting (if Notion-backed) and its feature
+  flags. The admin shell builds the sidebar from the registry plus
+  `GET /api/admin/modules` (enabled state, mode, the user's permissions);
+  a module that isn't enabled shows as **"Coming soon"** (today's
+  behaviour, now data-driven).
+- **Config-driven list pages.** Per module: columns (type — text, select,
+  relation, date, number, money, boolean, tags; width; icon; default
+  visibility), filters with their operators and option sources, sorts,
+  saved views, the toolbar actions (New, Import Notion). The existing list
+  engine (search, filter and sort popovers, column menu, freeze, resize,
+  reorder, toasts) renders any config.
+- **Config-driven record pages.** Per module: property rows (text,
+  textarea, pills, pickers with limits and hints, dates, chips, read-only
+  values), which fields are synced from Notion (read-only when
+  `managed_by = notion`), the right panel (meta rows; Discard / Duplicate /
+  Submit actions; custom actions such as Publish) and the History panel.
+- **Adding a field** = a migration + an API contract field + one config
+  entry. No new page code.
+- **Settings and feature flags.** One `settings` table (key → JSON value,
+  updated by, updated at; audited). Keys are declared in code with a type
+  and an **environment default**, so a fresh install works without rows
+  (e.g. `donations.monthly` = `DONATIONS_MONTHLY`, default off;
+  `donations.extra_methods` (PayPal, SEPA) default off;
+  `donations.default_currency` default USD; `module.<key>.mode`;
+  `imports.<key>.schedule`). Public flags are exposed read-only to the
+  public site; the owner edits them in the admin.
+- **When:** built with module 2 (Audit/History, roadmap), which also
+  refactors the existing People, Organizations and Taxonomy pages onto it.
+  Until then Treasury uses the existing list/record components, and its
+  flags read their environment defaults.
 
 ## 3. Cross-cutting concerns
 
@@ -179,7 +275,7 @@ without code changes). Jobs:
 
 | Job | Trigger | Notes |
 |---|---|---|
-| Notion import (each kind) | Admin action / CLI | Replaces the in-memory runner; result still in `import_runs`. |
+| Notion import (each kind) | Admin action / CLI / **schedule** (`imports.<key>.schedule`) | Replaces the in-memory runner; result still in `import_runs`; refused when the module is `native` (§2.1). |
 | Stripe event processing | Webhook stores the event, job processes it | The webhook answers Stripe fast; processing is idempotent (`stripe_events`). |
 | Stripe fee reconciliation | Every 15 min | Fills fee/net when Stripe's balance transaction wasn't ready. |
 | AI triage of a submission | On submission | Translation, significance score, note, bot score (§4.5). |
@@ -231,7 +327,7 @@ are sent by Stripe, not by us (no donor email stored, §3.8).
 | Page | Data | Freshness |
 |---|---|---|
 | Home, Documentation, articles | CMS (published revisions) | Cached; revalidated **on publish** (the API calls a Next.js revalidation route with a shared secret, `revalidateTag`). |
-| Treasury, Donate stats | Treasury summary and entries | Cached 5 minutes (Figma says "updated every 4 hours" — **Q4**). |
+| Treasury, Donate stats | Treasury summary and entries | Revalidated **on demand** whenever an entry is created, changed or published (the API calls the Next.js revalidation route), with a **5-minute** time-based fallback (decided, Q4). |
 | Expense / donation detail | One published entry | Cached 5 minutes; 404 when unpublished. |
 | Waitlist, feedback composers | — | Not cached (forms). |
 
@@ -268,8 +364,8 @@ only, validated at startup).
 
 | Integration | Used by | Direction | Notes |
 |---|---|---|---|
-| **Notion** | Imports (Directory, Taxonomy, Treasury, CMS, Feedback, Services) | read-only | Dry run → report → apply; demo records skipped; idempotent. Home and Documentation are read live until the CMS module ships. |
-| **Stripe** | Treasury (donations) | both | Hosted Checkout (one-off; monthly if **Q2**), webhooks with signature check, exactly-once processing, fees from balance transactions. Test mode until the client says otherwise. |
+| **Notion** | Imports (Directory, Taxonomy, Treasury expenses, CMS, Feedback, Services) | read-only | The **editing tool in v0.1** (§2.1): importers on demand and on a schedule, writing only `managed_by = notion` records; switched off per module at the v1.0 cut-over. Dry run → report → apply; demo records skipped; idempotent. Home and Documentation are read live until the CMS module ships. |
+| **Stripe** | Treasury (donations) | both | Hosted Checkout, one-off; **monthly behind the `donations.monthly` flag (off)**, no yearly; webhooks with signature check, exactly-once processing, refunds as negative entries, fees from balance transactions; Stripe sends the email receipts. Test mode until the client says otherwise. |
 | **Wise** | Treasury (later) | read | Balance and statement sync into `treasury_entries` (`source = wise`), then payouts in v1.0. Not in v0.1 unless asked. |
 | **Stalwart** | Messages, Emails, Waitlist | both | JMAP inbound, SMTP outbound. |
 | **AI provider** | Feedback and issues | out | Translation and assessment, behind `AiProvider`. |

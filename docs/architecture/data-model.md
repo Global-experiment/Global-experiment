@@ -56,6 +56,44 @@ Kept from the built schema, for every table below:
   across rows), never only UI logic.
 - Personal data columns are marked *private*: served only by the
   authenticated admin API, never in a public endpoint, export or log.
+- **Record origin** (decided 2026-10-15, overview §2.1): every importable
+  table has `managed_by text not null default 'native'`, CHECK in
+  (`notion`, `native`), and CHECK `managed_by = 'native' or notion_page_id
+  is not null`. Importers insert and update **only** `notion` rows (and
+  links between them); the API refuses writes to a `notion` row's synced
+  fields (409 `managed_in_notion`). Tables: `people`, `organizations`,
+  `expertise_domains`, `expertise_fields`, `expertise_items`,
+  `treasury_entries`, `documents`, `submissions`, `services`,
+  `access_grants`. Existing rows that came from an import (non-null
+  `notion_page_id`) get `notion` when the column is added; all others
+  `native`. Never importable (always native): `stripe_events`,
+  `stripe_subscriptions`, `waitlist_entries`, mail tables, `audit_events`,
+  `settings`.
+
+### 1.1 `settings` (module modes, feature flags)
+
+| Column | Type | Rules |
+|---|---|---|
+| `key` | text PK | `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`, e.g. `module.directory.mode`, `donations.monthly` |
+| `value` | jsonb | Validated in code against the key's declared type |
+| `updated_by_admin_id` | uuid null → admin_users `set null` | |
+| `updated_at` | timestamptz | |
+
+Keys are declared in code with a type and an **environment default**; a
+missing row means "use the default", so a fresh database needs no seed.
+Every change writes an audit event. Declared keys in v0.1:
+
+| Key | Type | Default (env) | Meaning |
+|---|---|---|---|
+| `module.<key>.mode` | `notion` \| `native` | `notion` for Notion-backed modules | Overview §2.1 |
+| `imports.<key>.schedule` | interval or `off` | `off` | Scheduled import per module |
+| `donations.monthly` | boolean | `DONATIONS_MONTHLY` = false | Monthly donations (Stripe subscriptions) |
+| `donations.extra_methods` | boolean | `DONATIONS_EXTRA_METHODS` = false | PayPal and SEPA rows (Q19) |
+| `donations.default_currency` | `EUR` \| `USD` \| `CHF` | `DONATIONS_DEFAULT_CURRENCY` = USD | Donate page's initial currency |
+| `treasury.wise_connected` | boolean | false | Shows Balance and Sustainability (hidden until Wise) |
+
+Until the `settings` table exists (module 2, migration 0008), these keys
+read their environment defaults.
 
 ## 2. Overview
 
@@ -74,6 +112,7 @@ erDiagram
   treasury_entries }o--o{ treasury_expense_types : "categorised"
   treasury_entries |o--o{ treasury_entries : "refund adjusts"
   stripe_events }o--o| treasury_entries : "produced"
+  stripe_subscriptions |o--o{ treasury_entries : "groups monthly charges"
 
   documents ||--|{ content_revisions : "revisions"
   documents }o--o{ expertise_items : "document_expertise (≤10)"
@@ -163,11 +202,11 @@ Every module's own diagram and columns follow.
 | Team (items) | — | — | `expertise_teams` → `teams` | |
 | Full path (items) | — | — | — (computed) | Domain > Field > Item, from the joins. |
 
-### 3.5 Relationship limits as database rules (new in 0006)
+### 3.5 Relationship limits as database rules (new in 0008)
 
 Today the 10 expertise / 5 organizations limits are enforced by the API
-and the importer (contracts, link endpoints, importer cap). Migration 0006
-adds a **deferrable constraint trigger** per link table so no code path —
+and the importer (contracts, link endpoints, importer cap). Migration 0008
+(module 2) adds a **deferrable constraint trigger** per link table so no code path —
 present or future, including a manual SQL fix — can exceed them:
 
 | Link table | Owner column | Limit |
@@ -198,16 +237,17 @@ Wise later. Notion "Treasury" (24 properties, 40 demo rows).
 | `entry_type` | text | `donation`, `expense`, `refund` (CHECK) | Entry type (Donation / Expense) |
 | `name` | text | 1–200; internal label ("Anonymous donation" for Stripe) | *Name |
 | `currency` | char(3) | `EUR`, `USD`, `CHF` (CHECK) | Currency |
-| `gross_amount` | bigint | Minor units. **donation > 0; expense < 0; refund < 0** (CHECK) | — (Notion has net only; Q23) |
+| `gross_amount` | bigint | Minor units. **donation > 0; expense < 0; refund < 0** (CHECK). Donate form: 1 … 10,000 in the chosen currency (API validation, decided) | — (Notion has net only: imported as gross = net, decided) |
 | `fee_amount` | bigint null | ≥ 0 (CHECK); null until known | — |
 | `net_amount` | bigint null | `fee null ⇔ net null`; else `net = gross − fee` (CHECK, Q28) | Net amount |
 | `settlement_currency` | char(3) null | Stripe settlement when it differs (Q18) | — |
 | `settlement_gross_amount`, `settlement_fee_amount`, `settlement_net_amount` | bigint null | All four settlement columns set together or none (CHECK) | — |
 | `exchange_rate` | numeric(18,8) null | Provider's rate, only with settlement columns | — |
-| `cadence` | text | `one_off`, `monthly`, `yearly` (CHECK), default `one_off` | *Cadence |
+| `cadence` | text | `one_off`, `monthly`, `yearly` (CHECK), default `one_off`. **No yearly donations** (decided): CHECK `entry_type <> 'donation' or cadence <> 'yearly'`; yearly stays for Notion expenses (e.g. annual subscriptions) | *Cadence |
 | `source` | text | `stripe`, `wise`, `manual` (CHECK) | Source |
 | `external_transaction_id` | text null | Unique per `source` when present (Stripe charge `ch_…` / refund `re_…`; Wise transfer id) | External transaction ID; *Wise transaction number for Wise rows |
-| `recurrence_id` | text null | Stripe subscription id grouping a monthly donation's charges (no personal data) | — |
+| `recurrence_id` | text null → `stripe_subscriptions` | Subscription id grouping a monthly donation's charges (no personal data); only with the `donations.monthly` flag | — |
+| `managed_by` | text | `notion` (Notion expenses) or `native` (Stripe donations and refunds, admin-made entries); §1 | — |
 | `source_account_id` | text null | *private* | Source account ID |
 | `occurred_on` | date | Booking date | Transaction date |
 | `occurred_at` | timestamptz null | Exact time when the source gives one (Stripe, Wise) | — |
@@ -259,7 +299,7 @@ cannot select a private column by mistake.
 | Table | Columns | Seeded |
 |---|---|---|
 | `treasury_review_statuses` | key, label, sort_order | `unqualified` Unqualified (public tag "Not qualified yet"), `pending_documents` Pending documents, `qualified` Qualified, `not_required` Not required |
-| `treasury_expense_types` | key, label, sort_order | Notion "*Expense type": Legal and compliance, Accounting and administration, Banking and payment processing, Software and subscriptions, Hosting and infrastructure, Development and engineering, Design and product, Research and consulting, Communication and content, General operations (Q24) |
+| `treasury_expense_types` | key, label, sort_order | Notion "*Expense type": Legal and compliance, Accounting and administration, Banking and payment processing, Software and subscriptions, Hosting and infrastructure, Development and engineering, Design and product, Research and consulting, Communication and content, General operations (decided: Notion's 10 types) |
 | `treasury_entry_expense_types` | entry_id → entries `cascade`, type_key → types `restrict`, PK both | Only on expenses (trigger) |
 
 ### 4.3 `treasury_documents` (supporting documents)
@@ -301,15 +341,44 @@ the entry insert and mark `processed`. Combined with the unique
 `(source, external_transaction_id)`, a redelivered or out-of-order event can
 never create a second entry.
 
+Events handled: `checkout.session.completed` (one-off, paid),
+`checkout.session.async_payment_succeeded` (delayed methods),
+`invoice.paid` (each monthly charge, first included — monthly flag only),
+`charge.refunded` (one **negative refund entry** per Stripe refund, linked
+to the donation — decided), and `customer.subscription.created / updated /
+deleted` (keeps `stripe_subscriptions` current). Every new or changed entry
+triggers the public pages' on-demand revalidation (overview §3.7).
+
+### 4.4b `stripe_subscriptions` (monthly donations, behind `donations.monthly`)
+
+| Column | Type | Rules |
+|---|---|---|
+| `id` | text PK | Stripe subscription id `sub_…` |
+| `status` | text | Stripe's status (`active`, `past_due`, `canceled`, …) |
+| `currency` | char(3) | EUR, USD, CHF |
+| `amount` | bigint | Monthly amount, minor units, > 0 |
+| `started_at` | timestamptz | |
+| `canceled_at` | timestamptz null | |
+| `updated_at` | timestamptz | |
+
+No customer id, email or name — only what the public "**Monthly donors**"
+stat needs (count of `active` subscriptions, decided) and what groups a
+subscription's charges. Donors manage their donation through Stripe's
+customer-portal login link (Stripe emails them), so nothing personal is
+stored. The "Donors" stat is **hidden** (anonymous donors only, decided).
+
 ### 4.5 Notion "Treasury" → native
 
 Every property maps in §4.1 except: *Expense type → `treasury_entry_expense_types`;
 Reviewed by → reported only (it relates to People, the native reviewer is
 an admin); *Wise transaction number → `external_transaction_id` for
-`source = wise` (empty in all rows). Net amount × 100 → minor units, with
-gross = net and fee = 0 for imported rows until the client says otherwise
-(Q23). Review status empty → `unqualified`. The 40 rows today are demo
-(`DEMO-` ids, "demo" notes): a dry run skips and lists all 40.
+`source = wise` (empty in all rows). Notion amounts are **whole currency
+units** (decided): Net amount × 100 → minor units, imported as **gross =
+net, fee = 0**, and each such row is **flagged** in the run report
+(`fee_unknown`). Review status empty → `unqualified`. Imported rows are
+`managed_by = notion` (read-only in the admin for synced fields). The 40
+rows today are demo (`DEMO-` ids, "demo" notes): a dry run skips and lists
+all 40.
 
 ```mermaid
 erDiagram
@@ -321,6 +390,7 @@ erDiagram
   treasury_expense_types ||--o{ treasury_entry_expense_types : ""
   treasury_entries ||--o{ treasury_documents : ""
   stripe_events }o--o| treasury_entries : "produced"
+  stripe_subscriptions |o--o{ treasury_entries : "groups monthly charges"
   admin_users |o--o{ treasury_entries : "reviewed / created"
 
   treasury_entries {
@@ -676,9 +746,12 @@ Unchanged from the built importers, and applied to every new one:
 9. **Order:** taxonomy → organizations → people → links → services →
    access grants → treasury → documents → submissions; each run is one
    transaction.
-10. **Notion after import (Q1):** recommended — once a module is imported,
-    the admin is the editing tool and Notion is no longer re-imported for
-    it (re-imports would overwrite admin edits).
+10. **Ownership (decided, Q1):** in v0.1 Notion is the editing tool and
+    importers run on demand and on a schedule, writing only
+    `managed_by = notion` records (§1); `native` records are never
+    touched. An importer refuses to run when its module is in `native`
+    mode. At the v1.0 cut-over each module switches to `native` (overview
+    §2.1) and its importer stops for good.
 
 ## 14. Migration plan
 
@@ -689,14 +762,15 @@ files; data steps and triggers are added to the generated file by hand.
 | # | Name | Module | Contents |
 |---|---|---|---|
 | 0000–0005 | built | Auth, Directory, Taxonomy, Imports | — |
-| **0006** | `audit_and_limits` | Cross-cutting | `audit_events`; relationship-limit constraint triggers on `people_expertise`, `organization_expertise`, `people_organizations` (§3.5) |
-| **0007** | `treasury` | Treasury | `treasury_review_statuses`, `treasury_expense_types` (seeded), `treasury_entries` (+ view `treasury_public_entries`, refund trigger), `treasury_entry_expense_types`, `treasury_documents`, `stripe_events`; `import_runs.kind` += treasury |
-| **0008** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
-| **0009** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
-| **0010** | `waitlist` | Waitlist | `waitlist_entries` |
-| **0011** | `services_access` | Services | `services`, `access_grant_statuses`, `access_grants` |
-| **0012** | `admin_roles` | Accounts and roles | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_users` changes, invitations and password resets (per Q8) |
-| **0013** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| **0006** | `treasury_donations` | Treasury (module 1, **24 Oct**) | `treasury_review_statuses`, `treasury_expense_types` (seeded), `treasury_entries` (with `managed_by`; view `treasury_public_entries`; refund trigger), `treasury_entry_expense_types`, `stripe_events`, `stripe_subscriptions` |
+| **0007** | `treasury_documents` | Treasury (module 1b) | `treasury_documents`; `import_runs.kind` += treasury |
+| **0008** | `platform` | Platform (module 2) | `audit_events`; `settings`; `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
+| **0009** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
+| **0010** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
+| **0011** | `waitlist` | Waitlist | `waitlist_entries` |
+| **0012** | `services_access` | Services | `services`, `access_grant_statuses`, `access_grants` |
+| **0013** | `admin_roles` | Accounts and roles | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_users` changes, invitations and password resets (per Q8) |
+| **0014** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
 
 Numbers follow the build order (roadmap §2); if a module moves, its
 migration takes the next free number at that time — numbers are never
