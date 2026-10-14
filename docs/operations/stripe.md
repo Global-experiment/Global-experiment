@@ -94,7 +94,7 @@ named e.g. "global-experiment-api", with only:
 | Resource | Permission |
 |---|---|
 | Checkout Sessions | Write |
-| PaymentIntents, Charges, Refunds, Invoices, Invoice Payments, Subscriptions, Balance transactions | Read |
+| PaymentIntents, Charges, Refunds, Disputes, Invoices, Invoice Payments, Subscriptions, Balance transactions | Read |
 | Webhook endpoints, everything else | None |
 
 Put it in `/etc/global-experiment/api.env` as `STRIPE_SECRET_KEY` with
