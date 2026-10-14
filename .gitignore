@@ -57,3 +57,6 @@ next-env.d.ts
 # client design reference (local only — never commit design exports without approval)
 /figma.pdf
 /design.pdf
+
+# local file storage (FILE_STORAGE_DIR default outside production: Treasury supporting documents)
+.data/

@@ -237,7 +237,7 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(/\/admin\/people$/);
     // Only the existing modules link anywhere.
     const links = await nav(page).getByRole("link").evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
-    expect(links).toEqual(["/admin/people", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
+    expect(links).toEqual(["/admin/treasury", "/admin/people", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
   });
 
   test("filter popover (p2): add, duplicate, reorder, remove; 'Filters applied' toast", async ({ page }) => {

@@ -89,7 +89,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(admin|donate)-figma.spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -106,7 +106,15 @@ export default defineConfig({
     {
       name: "chromium-figma",
       dependencies: ["chromium"],
-      testMatch: /(admin|donate)-figma.spec.ts/,
+      testMatch: /(admin|donate|treasury)-figma.spec.ts/,
+      use: { browserName: "chromium" },
+    },
+    // Last: the admin Treasury suite publishes, unpublishes and reviews entries
+    // the public suites read (each change is undone before it ends).
+    {
+      name: "chromium-admin-treasury",
+      dependencies: ["chromium-figma"],
+      testMatch: /admin-treasury.spec.ts/,
       use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine

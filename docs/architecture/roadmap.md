@@ -116,6 +116,21 @@ than one module worth delegating; until then the owner is the only admin
   reconciliation, the import runner moved off memory.
 - **Breakdown:** public pages 12 · importer 6 · admin list/record 10 ·
   documents + storage 6 · jobs 6.
+- **Built (2026-10-15, branch `feat/treasury`, not yet released):** all of
+  the above. The currency switch drives the stats and the history
+  (`?currency=`, default USD), with an "All currencies" choice that lists
+  every currency (stats then stay in the default currency; amounts are
+  never converted). Pending client answers are settings, off by default:
+  `treasury.public_recipient_names` (Q3), `treasury.publish_unqualified`
+  (Q25), `treasury.wise_connected` (Q22) and `treasury.donation_appeal`
+  (the "Cry for donation" banner, switched by hand until Wise gives a
+  Sustainability score — new, to confirm). Left out of the frames for lack
+  of data: the "+2.1%" trends, the public search field, the Amount,
+  Location and Expertise filters, the expense's roadmap link, reactions and
+  timeline (p22), and p23's Roadmap action. Supporting documents: owner
+  only, PDF / PNG / JPEG ≤ 20 MB, private local disk (Q5 open). No admin
+  create or delete of entries (expenses come from Notion, donations from
+  Stripe).
 
 ### 2. Platform + Audit/History (62 h)
 

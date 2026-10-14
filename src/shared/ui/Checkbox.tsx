@@ -7,6 +7,8 @@ interface CheckboxProps {
   onChange: () => void;
   label: string;
   description?: string;
+  /** Shown but not changeable (e.g. the last type left checked in a filter). */
+  disabled?: boolean;
   /** Row padding/borders come from the list it sits in. */
   className?: string;
 }
@@ -17,10 +19,10 @@ interface CheckboxProps {
  * `check_box_outline_blank` glyphs (client feedback item 8) instead of the
  * browser's own checkbox rendering.
  */
-export function Checkbox({ checked, onChange, label, description, className = "py-2.5" }: CheckboxProps) {
+export function Checkbox({ checked, onChange, label, description, disabled = false, className = "py-2.5" }: CheckboxProps) {
   return (
-    <label className={`flex cursor-pointer items-start gap-1 ${className}`}>
-      <input type="checkbox" checked={checked} onChange={onChange} className="peer sr-only" />
+    <label className={`flex items-start gap-1 ${disabled ? "cursor-default" : "cursor-pointer"} ${className}`}>
+      <input type="checkbox" checked={checked} onChange={onChange} disabled={disabled} className="peer sr-only" />
       <Icon
         name={checked ? "check_box" : "check_box_outline_blank"}
         // figma.pdf p23: unchecked boxes are drawn in the line color, checked ones in white.

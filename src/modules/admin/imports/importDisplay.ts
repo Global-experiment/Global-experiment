@@ -1,6 +1,6 @@
 import type { ImportJob, ImportKind, ImportRun } from "../api/types";
 
-export const KIND_LABEL: Record<ImportKind, string> = { taxonomy: "Taxonomy", directory: "People & organizations" };
+export const KIND_LABEL: Record<ImportKind, string> = { taxonomy: "Taxonomy", directory: "People & organizations", treasury: "Treasury expenses" };
 
 const PHASE: Record<ImportJob["phase"], string> = {
   queued: "Starting…",
@@ -25,7 +25,7 @@ export const canApply = (job: ImportJob | null): job is ImportJob & { runId: str
 
 export const MODE_LABEL: Record<ImportRun["mode"], string> = { dry_run: "Dry run", apply: "Applied", failed: "Failed / refused" };
 
-const KNOWN_KINDS = new Set<string>(["taxonomy", "directory"]);
+const KNOWN_KINDS = new Set<string>(["taxonomy", "directory", "treasury"]);
 export const runKindLabel = (kind: string) => (KNOWN_KINDS.has(kind) ? KIND_LABEL[kind as ImportKind] : kind);
 
 /** "12 changes" / "—" for a run's counts. */

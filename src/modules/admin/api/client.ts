@@ -22,6 +22,8 @@ export class AdminApiError extends Error {
     readonly code: string,
     message: string,
     readonly issues: ValidationIssue[] = [],
+    /** A refusal's stable reason (409 `managed_in_notion`, `cannot_publish`…). */
+    readonly reason?: string,
   ) {
     super(message);
     this.name = "AdminApiError";
@@ -31,16 +33,18 @@ export class AdminApiError extends Error {
 
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
+/** `body`: JSON, or FormData for an upload (the browser sets its multipart Content-Type). */
 export async function adminApi<T>(
   path: string,
   options: { method?: Method; body?: unknown; signal?: AbortSignal } = {},
 ): Promise<T> {
+  const form = typeof FormData !== "undefined" && options.body instanceof FormData;
   let response: Response;
   try {
     response = await fetch(`/api/admin${path}`, {
       method: options.method ?? "GET",
-      headers: options.body === undefined ? { accept: "application/json" } : { accept: "application/json", "content-type": "application/json" },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      headers: options.body === undefined || form ? { accept: "application/json" } : { accept: "application/json", "content-type": "application/json" },
+      body: options.body === undefined ? undefined : form ? (options.body as FormData) : JSON.stringify(options.body),
       credentials: "same-origin",
       cache: "no-store",
       signal: options.signal,
@@ -57,7 +61,7 @@ export async function adminApi<T>(
 
   if (response.status === 204) return undefined as T;
   const body = (await response.json().catch(() => undefined)) as
-    | { error?: { code?: string; message?: string; details?: { issues?: ValidationIssue[] } } }
+    | { error?: { code?: string; message?: string; details?: { issues?: ValidationIssue[]; reason?: string } } }
     | undefined;
 
   if (!response.ok) {
@@ -67,6 +71,7 @@ export async function adminApi<T>(
       error?.code ?? (response.status >= 500 ? "internal" : "unknown"),
       error?.message ?? (response.status === 502 || response.status === 504 ? "The admin API can't be reached." : "Request failed."),
       error?.details?.issues ?? [],
+      error?.details?.reason,
     );
   }
   return body as T;

@@ -154,7 +154,7 @@ export interface ExpertiseTree {
   domains: ExpertiseDomainNode[];
 }
 
-export type ImportKind = "taxonomy" | "directory";
+export type ImportKind = "taxonomy" | "directory" | "treasury";
 
 /** An import_runs row (GET /imports/runs). */
 export interface ImportRun {
@@ -190,6 +190,7 @@ export interface ImportJob {
 export interface ImportStatus {
   taxonomy: { available: boolean; reason: string | null };
   directory: { available: boolean; reason: string | null };
+  treasury: { available: boolean; reason: string | null };
   activeJob: ImportJob | null;
 }
 
@@ -204,3 +205,79 @@ export interface AdminPrincipal {
 /** The user card's name: the display name, else the part of the email before "@". */
 export const adminDisplayName = (admin: Pick<AdminPrincipal, "email" | "displayName">) =>
   admin.displayName?.trim() || admin.email.split("@")[0] || admin.email;
+
+// ---- Treasury (mirrors apps/api/src/treasury/treasury-admin.contracts.ts) ----
+
+export type TreasuryEntryType = "donation" | "expense" | "refund" | "dispute";
+
+export interface TreasuryEntryRow {
+  id: string;
+  /** Shown as `EXP-n` (see formatEntryNumber). */
+  number: number;
+  type: TreasuryEntryType;
+  name: string;
+  occurredOn: string;
+  occurredAt: string | null;
+  currency: string;
+  /** Minor units, signed (expenses and refunds are negative). */
+  grossAmount: number;
+  feeAmount: number | null;
+  netAmount: number | null;
+  settlement: { currency: string; grossAmount: number; feeAmount: number; netAmount: number; exchangeRate: string } | null;
+  cadence: string;
+  recipient: { kind: "person" | "organization"; id: string; name: string } | null;
+  expenseTypes: VocabularyEntry[];
+  review: VocabularyEntry;
+  publication: "published" | "unpublished";
+  publishedAt: string | null;
+  source: "stripe" | "wise" | "manual";
+  livemode: boolean;
+  managedBy: "notion" | "native";
+  documents: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TreasuryDocument {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  uploadedBy: string | null;
+}
+
+export interface TreasuryRule {
+  allowed: boolean;
+  reason: string | null;
+}
+
+export interface TreasuryEntry extends TreasuryEntryRow {
+  notionPageId: string | null;
+  notionUrl: string | null;
+  externalTransactionId: string | null;
+  sourceAccountId: string | null;
+  reviewedAt: string | null;
+  publicDescription: string | null;
+  internalNote: string | null;
+  importedAt: string | null;
+  adjusts: { id: string; number: number } | null;
+  adjustments: { id: string; number: number; type: string; grossAmount: number }[];
+  documentsList: TreasuryDocument[];
+  permissions: {
+    editInternalNote: boolean;
+    publish: TreasuryRule;
+    unpublish: TreasuryRule;
+    review: TreasuryRule & { options: VocabularyEntry[] };
+    documents: boolean;
+  };
+}
+
+export interface TreasuryOptions {
+  expenseTypes: VocabularyEntry[];
+  reviewStatuses: VocabularyEntry[];
+  currencies: string[];
+  settings: { publishUnqualified: boolean; publicRecipientNames: boolean; wiseConnected: boolean };
+}
+
+export const formatEntryNumber = (number: number) => `EXP-${number}`;

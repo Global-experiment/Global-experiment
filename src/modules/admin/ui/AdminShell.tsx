@@ -34,7 +34,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "Admin",
     items: [
-      { label: "Treasury", icon: "toll" },
+      { label: "Treasury", icon: "toll", href: "/admin/treasury" },
       { label: "Feedbacks and issues", icon: "lightbulb" },
       { label: "People", icon: "group", href: "/admin/people", alsoActiveOn: ["/admin/imports"] },
       { label: "Messages", icon: "forum" },

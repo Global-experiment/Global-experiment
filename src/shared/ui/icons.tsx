@@ -78,6 +78,8 @@ export const iconPaths = {
   // Common pages.pdf p28 (Donate header, Treasury link), frame (364, 116) 16px
   leaderboard:
     "M16 11L16 3L8 3L8 9L2 9L2 21L22 21L22 11ZM10 5L14 5L14 19L10 19ZM4 11L8 11L8 19L4 19ZM20 19L16 19L16 13L20 13Z",
+  // Common pages.pdf p11 (Treasury sort, "Date, Latest first"), frame (202, 156) 16px; same glyph on p13
+  arrow_downward: "M19.998 12L18.592 10.588L13.002 16.172L13.002 4.002L10.998 4.002L10.998 16.172L5.42 10.582L4.002 12L12 19.998Z",
   // not in Figma — Material Symbols Sharp (Document history menu entry)
   history:
     "M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.25 2.52.77-1.29-3.52-2.09V8H12z",

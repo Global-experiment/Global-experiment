@@ -52,14 +52,17 @@ export function TransactionTags({ tags }: { tags: string[] }) {
       ref={boxRef}
       className={`relative flex min-w-0 flex-1 gap-2 overflow-hidden whitespace-nowrap ${measured ? "" : "h-6 flex-wrap"}`}
     >
+      {/* Screen readers hear every tag, whatever fits on screen; the chips are the visual. */}
+      {tags.length > 0 ? <span className="sr-only">{tags.join(", ")}</span> : null}
       {shown.map((tag) => (
-        <Tag key={tag}>{tag}</Tag>
+        <span key={tag} aria-hidden="true" className="inline-flex">
+          <Tag>{tag}</Tag>
+        </span>
       ))}
       {hidden > 0 ? (
-        <Tag>
-          <span aria-hidden>{`+${hidden}`}</span>
-          <span className="sr-only">{`${hidden} more ${hidden === 1 ? "tag" : "tags"}`}</span>
-        </Tag>
+        <span aria-hidden="true" className="inline-flex" data-more-tags>
+          <Tag>{`+${hidden}`}</Tag>
+        </span>
       ) : null}
 
       <div ref={measureRef} aria-hidden className="invisible absolute top-0 left-0 flex w-max gap-2">

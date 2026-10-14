@@ -444,3 +444,49 @@ describe("0006 dispute adjustments and Stripe mode", () => {
     );
   });
 });
+
+describe("migration 0007 — treasury documents", () => {
+  const AT_0006 = journal.entries.findIndex((entry) => entry.tag.startsWith("0007_"));
+  const SHA = "a".repeat(64);
+  const insertDocument = (client: PGlite, entry: string, values: Record<string, unknown> = {}) => {
+    const row: Record<string, unknown> = {
+      entry_id: entry,
+      file_name: "invoice.pdf",
+      content_type: "application/pdf",
+      size_bytes: 1024,
+      sha256: SHA,
+      storage_key: `sha256/aa/${SHA}`,
+      ...values,
+    };
+    const columns = Object.keys(row);
+    return client.query(`insert into treasury_documents (${columns.join(", ")}) values (${columns.map((_, i) => `$${i + 1}`).join(", ")})`, Object.values(row));
+  };
+
+  it("carries a database at 0006 with ledger rows over untouched, with no document", async () => {
+    const client = await databaseAt(AT_0006);
+    await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500 });
+    const before = await rows(client, "select * from treasury_entries");
+    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    expect(await rows(client, "select * from treasury_entries")).toEqual(before);
+    expect(await count(client, "treasury_documents")).toBe(0);
+  });
+
+  it("checks type, size, hash, key and name; one document per file per entry", async () => {
+    const client = await latest();
+    const entry = await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500 });
+    await insertDocument(client, entry);
+    await expect(insertDocument(client, entry)).rejects.toThrow(/treasury_documents_entry_sha256_unique/);
+    // The same file on another entry shares the stored file (same key).
+    const other = await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -700 });
+    await insertDocument(client, other);
+    await expect(insertDocument(client, entry, { sha256: "b".repeat(64), content_type: "text/html" })).rejects.toThrow(/treasury_documents_content_type_known/);
+    await expect(insertDocument(client, entry, { sha256: "c".repeat(64), size_bytes: 0 })).rejects.toThrow(/treasury_documents_size_range/);
+    await expect(insertDocument(client, entry, { sha256: "d".repeat(64), size_bytes: 20 * 1024 * 1024 + 1 })).rejects.toThrow(/treasury_documents_size_range/);
+    await insertDocument(client, entry, { sha256: "e".repeat(64), size_bytes: 20 * 1024 * 1024 });
+    await expect(insertDocument(client, entry, { sha256: "F".repeat(64) })).rejects.toThrow(/treasury_documents_sha256_hex/);
+    await expect(insertDocument(client, entry, { sha256: "1".repeat(64), storage_key: "../etc/passwd" })).rejects.toThrow(/treasury_documents_storage_key_shape/);
+    await expect(insertDocument(client, entry, { sha256: "2".repeat(64), file_name: "  " })).rejects.toThrow(/treasury_documents_file_name_present/);
+    // An entry with documents can't be deleted; an admin can (the uploader link clears).
+    await expect(client.query("delete from treasury_entries where id = $1", [entry])).rejects.toThrow(/treasury_documents_entry_id/);
+  });
+});

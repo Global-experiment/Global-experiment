@@ -7,6 +7,7 @@ import type { DirectorySource } from "./directory/directory-source.js";
 import { IMPORT_SOURCE, type ImportKind, type ImportSource } from "./import-source.js";
 import { importRuns } from "./import.schema.js";
 import type { SourceRow, TaxonomySource } from "./taxonomy/taxonomy-source.js";
+import type { SourceTreasuryEntry, TreasurySource } from "./treasury/treasury-source.js";
 
 // Test fixtures only — no Notion call: the import source is replaced.
 const row = (level: SourceRow["level"], pageId: string, name: string, rawStableId: string, parent?: string): SourceRow => ({
@@ -40,6 +41,10 @@ class FakeSource implements ImportSource {
   async taxonomy() {
     if (this.gate) await this.gate;
     return structuredClone(this.data);
+  }
+  treasuryRows: SourceTreasuryEntry[] = [];
+  async treasury(): Promise<TreasurySource> {
+    return { entries: structuredClone(this.treasuryRows), layout: { names: {}, unread: [], absent: [] } };
   }
   async directory(): Promise<DirectorySource> {
     return { organizations: [], people: [], layouts: { people: { names: {}, required: [], unread: [], absent: [] }, organizations: { names: {}, required: [], unread: [], absent: [] } } };

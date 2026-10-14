@@ -39,7 +39,8 @@ describe("import page display", () => {
 
   it("summarises history rows", () => {
     expect(runKindLabel("directory")).toBe("People & organizations");
-    expect(runKindLabel("treasury")).toBe("treasury");
+    expect(runKindLabel("treasury")).toBe("Treasury expenses");
+    expect(runKindLabel("cms")).toBe("cms");
     expect(runChanges({ counts: { changes: 12 } } as never)).toBe("12");
     expect(runChanges({ counts: {} } as never)).toBe("—");
   });
