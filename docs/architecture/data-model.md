@@ -47,7 +47,7 @@ Legend: ✅ exists · ➕ missing · ✏️ needs a change.
 | Name | `people.name` | ✅ | 1–200 chars. Not unique (duplicates are flagged, see §5). |
 | Expertise | `people_expertise` → `expertise_items` | ✅ | Expertise level only. Field and Domain are derived through joins (§4), never stored on the person. |
 | Personal note | `people.personal_note` | ✅ | Private, admin-only: served only by the authenticated admin API; must never appear in any public endpoint, export or log. ≤ 5000 chars. |
-| Source | `people.source_key` → `person_sources` | ✏️ | Exactly **AI, Candide, Contribution email**. The seeded extras `waitlist` and `notion_import` are removed; people still using them get no source (listed by the migration, §8.1). Provenance of imported records is tracked by the import itself (§5), not by Source. |
+| Source | `people.source_key` → `person_sources` | ✏️ | **AI, Candide, Contribution email**, plus **Other** (a Notion option, migration 0004). The seeded extras `waitlist` and `notion_import` are removed; people still using them get no source (listed by the migration, §8.1). Provenance of imported records is tracked by the import itself (§5), not by Source. |
 | State | `people.state_key` → `person_states` | ✏️ | **Sourced, Contacted, In discussion, Collaborating, On hold, Rejected**, in that lifecycle order (`sort_order`, used by "State ascending"). |
 | Organizations | `people_organizations` | ✅ | Many-to-many; same link the Organization's "People" property reads. |
 | Do not contact | `people.do_not_contact` | ✅ | `boolean not null default false`. |
@@ -141,8 +141,25 @@ links. Parents come from the Notion relation (Field → Domain,
 Expertise → Field); a row whose parent isn't imported is skipped, and so
 are its children. Unknown Status/Team values are left out and reported.
 Only changed rows are written: a second run reports 0 changes. The Notion
-client paginates and retries 429/5xx with backoff. People and
-Organizations importers come next, with the same rules.
+client paginates and retries 429/5xx with backoff.
+
+**Built: the directory importer** (`npm run api:import:directory`,
+`apps/api/src/import/directory`), on the same framework: Organizations →
+People → person ↔ organization links → Expertise links. Matching by Notion
+page id only. Person ID / Organization ID set PER-n / ORG-n (a number
+another row holds is flagged and left to the database). State/Source by
+label (unknown → empty, reported; Notion's Source option "Other" was
+added to the vocabulary by migration 0004). Required-for-completeness = the properties starred in
+Notion's own schema (read each run). Demo records are skipped and listed,
+and `--apply` refuses a run made only of demo records. Links Notion no
+longer has are removed only between two records of the import; manual
+links to admin-made records are never touched. Expenses / Access grants
+relations are counted, not stored.
+
+The Notion People / Organizations databases (inspected 2026-10-14) hold
+20 + 20 demo records only (all on example.org; organizations also with
+`DEMO-RECIPIENT-…` Wise IDs) and have **no Expertise property** yet, so
+expertise links are left untouched until one is added.
 
 1. **Matching.** A Notion page is matched to an existing row by
    `notion_page_id` first, then — for taxonomy rows — by `stable_id`. No

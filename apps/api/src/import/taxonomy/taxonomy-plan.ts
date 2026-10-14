@@ -159,7 +159,8 @@ const byCreation = (a: SourceRow, b: SourceRow) => a.createdTime.localeCompare(b
 const nameKey = (name: string) => name.trim().toLowerCase();
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((value) => b.includes(value));
 
-function vocabularyMatcher(entries: Vocabulary[]) {
+/** Matches a Notion option name to a lookup row by label or key (case-insensitive); undefined when unknown. */
+export function vocabularyMatcher(entries: Vocabulary[]) {
   const map = new Map<string, string>();
   for (const { key, label } of entries) {
     map.set(key.toLowerCase(), key);

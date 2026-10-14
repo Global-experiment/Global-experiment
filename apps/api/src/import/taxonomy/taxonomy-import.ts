@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "../../common/database/database.module.js";
 import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams, taxonomyStatuses, teams } from "../../expertise/expertise.schema.js";
-import { importRuns } from "../import.schema.js";
+import { runImport } from "../import-run.js";
 import { countPlan, DEPRECATED, planTaxonomyImport, type DbSnapshot, type Issue, type PlanCounts, type TaxonomyPlan } from "./taxonomy-plan.js";
 import { LEVELS, type TaxonomyLevel, type TaxonomySource } from "./taxonomy-source.js";
 
@@ -116,51 +116,23 @@ export interface TaxonomyImportResult {
   counts: PlanCounts;
 }
 
-const runCounts = (counts: PlanCounts, plan: TaxonomyPlan) => ({ ...counts, deprecateMissing: plan.deprecateMissing });
-
 /**
  * Plans the import against the current database and, with `apply`, writes
  * it in ONE transaction (all or nothing). Every run — dry, applied or
- * failed — is recorded in import_runs.
+ * failed — is recorded in import_runs (see import-run.ts).
  */
 export async function runTaxonomyImport(db: Database, source: TaxonomySource, options: TaxonomyImportOptions): Promise<TaxonomyImportResult> {
-  const startedAt = new Date();
-  const record = async (executor: Executor, mode: "dry_run" | "apply" | "failed", counts: object, issues: unknown[]) => {
-    const [run] = await executor
-      .insert(importRuns)
-      .values({ kind: "taxonomy", mode, startedAt, finishedAt: new Date(), counts, issues, triggeredBy: options.triggeredBy })
-      .returning({ id: importRuns.id });
-    return run!.id;
-  };
-
-  if (!options.apply) {
-    const plan = planTaxonomyImport(source, await loadTaxonomySnapshot(db), { deprecateMissing: options.deprecateMissing });
-    const counts = countPlan(plan);
-    const runId = await record(db, "dry_run", runCounts(counts, plan), plan.issues);
-    return { runId, mode: "dry_run", plan, counts };
-  }
-
-  let planned: TaxonomyPlan | undefined;
-  try {
-    return await db.transaction(async (tx) => {
-      // Planned inside the transaction: it writes exactly what it reports.
-      const plan = planTaxonomyImport(source, await loadTaxonomySnapshot(tx), { deprecateMissing: options.deprecateMissing });
-      planned = plan;
-      await applyTaxonomyPlan(tx, plan);
-      const counts = countPlan(plan);
-      const runId = await record(tx, "apply", runCounts(counts, plan), plan.issues);
-      await options.beforeCommit?.();
-      return { runId, mode: "apply" as const, plan, counts };
-    });
-  } catch (error) {
-    // Rolled back: nothing was written. Record the failure on its own.
-    const message = error instanceof Error ? error.message : String(error);
-    await record(db, "failed", planned ? runCounts(countPlan(planned), planned) : {}, [
-      { kind: "error", code: "run_failed", detail: `Rolled back, nothing written: ${message}` },
-      ...(planned?.issues ?? []),
-    ]);
-    throw error;
-  }
+  const result = await runImport(db, {
+    kind: "taxonomy",
+    apply: options.apply,
+    triggeredBy: options.triggeredBy,
+    plan: async (executor) => planTaxonomyImport(source, await loadTaxonomySnapshot(executor), { deprecateMissing: options.deprecateMissing }),
+    write: applyTaxonomyPlan,
+    counts: (plan) => ({ ...countPlan(plan), deprecateMissing: plan.deprecateMissing }),
+    issues: (plan) => plan.issues,
+    beforeCommit: options.beforeCommit,
+  });
+  return { ...result, counts: countPlan(result.plan) };
 }
 
 const LABEL: Record<TaxonomyLevel, string> = { domain: "Domains", field: "Fields", expertise: "Expertise" };

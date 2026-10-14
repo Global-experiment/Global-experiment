@@ -83,6 +83,7 @@ describe("migration 0002 — directory aligned with Notion", () => {
       { key: "candide", label: "Candide" },
       { key: "ai", label: "AI" },
       { key: "contribution_email", label: "Contribution email" },
+      { key: "other", label: "Other" }, // migration 0004, after Contribution email
     ]);
     expect(await rows(client, "select key from teams order by sort_order")).toEqual(
       ["communication", "compliance", "moderation", "operations", "tech", "treasury"].map((key) => ({ key })),

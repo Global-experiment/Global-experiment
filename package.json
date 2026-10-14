@@ -23,7 +23,8 @@
     "api:test:pg": "npm run test:pg -w @global-experiment/api",
     "api:typecheck": "npm run typecheck -w @global-experiment/api",
     "api:purge-demo-data": "npm run api:build && npm run purge-demo-data -w @global-experiment/api --",
-    "api:import:taxonomy": "npm run api:build && npm run import:taxonomy -w @global-experiment/api --"
+    "api:import:taxonomy": "npm run api:build && npm run import:taxonomy -w @global-experiment/api --",
+    "api:import:directory": "npm run api:build && npm run import:directory -w @global-experiment/api --"
   },
   "dependencies": {
     "@next/env": "^16.3.5",

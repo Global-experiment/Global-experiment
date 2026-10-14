@@ -160,6 +160,7 @@ describe("native directory API", () => {
         { key: "candide", label: "Candide" },
         { key: "ai", label: "AI" },
         { key: "contribution_email", label: "Contribution email" },
+        { key: "other", label: "Other" }, // migration 0004
       ]);
     });
 

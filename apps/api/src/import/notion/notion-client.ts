@@ -18,12 +18,21 @@ export interface NotionClientOptions {
 
 /** A Notion property value as the API returns it (only the shapes the importers read). */
 export interface NotionProperty {
+  id?: string;
   type: string;
   title?: { plain_text: string }[];
   rich_text?: { plain_text: string }[];
   select?: { name: string } | null;
   multi_select?: { name: string }[];
   relation?: { id: string }[];
+  /** True when Notion truncated a relation (more than 25 linked pages): read the page property to get them all. */
+  has_more?: boolean;
+  email?: string | null;
+  url?: string | null;
+  phone_number?: string | null;
+  checkbox?: boolean;
+  date?: { start: string; end?: string | null } | null;
+  unique_id?: { prefix: string | null; number: number | null };
 }
 
 export interface NotionPage {
@@ -88,6 +97,28 @@ export class NotionClient {
       cursor = result.has_more && result.next_cursor ? result.next_cursor : undefined;
     } while (cursor);
     return pages;
+  }
+
+  /**
+   * Every page id of one relation property. A database query returns at
+   * most 25 related pages per relation (`has_more`); this pages through the
+   * property endpoint to get them all.
+   */
+  async relationIds(pageId: string, propertyId: string): Promise<string[]> {
+    const ids: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const query = cursor ? `?start_cursor=${encodeURIComponent(cursor)}` : "";
+      const result = await this.request<{ results: { relation?: { id: string } }[]; has_more: boolean; next_cursor: string | null }>(
+        "GET",
+        `/pages/${pageId}/properties/${encodeURIComponent(propertyId)}${query}`,
+        undefined,
+        `relation of page ${shortId(pageId)}`,
+      );
+      for (const item of result.results) if (item.relation) ids.push(item.relation.id);
+      cursor = result.has_more && result.next_cursor ? result.next_cursor : undefined;
+    } while (cursor);
+    return ids;
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body: unknown, what: string): Promise<T> {
