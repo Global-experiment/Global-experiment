@@ -14,6 +14,7 @@
     "test:pg": "vitest run --config vitest.pg.config.mts",
     "admin:set-owner": "node dist/auth/cli/set-owner.js",
     "purge-demo-data": "node dist/scripts/purge-demo-data.js",
+    "purge-test-donations": "node dist/scripts/purge-test-donations.js",
     "import:taxonomy": "node dist/scripts/import-taxonomy.js",
     "import:directory": "node dist/scripts/import-directory.js"
   },
@@ -32,6 +33,7 @@
     "postgres": "^3.4.9",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "stripe": "22.6.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {

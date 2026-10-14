@@ -84,6 +84,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   secondary: "border-line bg-transparent text-text-primary hover:border-content-50",
 };
 
+/** The same geometry for controls Button doesn't model (e.g. Donate's payment rows with a busy state). */
+export const buttonClasses = { base: baseClasses, size: sizeClasses, variant: variantClasses } as const;
+
 export function Button(props: ButtonProps) {
   const { variant = "secondary", size = "control", children, className = "", fullWidth } = props;
   const icon = props.icon ? (

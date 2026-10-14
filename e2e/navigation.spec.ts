@@ -559,7 +559,7 @@ test.describe("Treasury", () => {
     await page.goto("/treasury");
     const stat = page.getByRole("button", { name: /Balance/ });
     await expect(stat).toHaveCSS("cursor", "pointer");
-    await expect(stat.locator("dd")).toHaveCSS("text-decoration-line", "none");
+    await expect(stat.locator("[data-stat-value]")).toHaveCSS("text-decoration-line", "none");
   });
 });
 
@@ -672,18 +672,16 @@ test.describe("Mobile sheet drag-to-close", () => {
 });
 
 test.describe("Donate", () => {
-  test("stats are clickable, the same way as Treasury", async ({ page }) => {
-    await page.goto("/donate");
-    await page.getByRole("button", { name: /Sustainability/ }).click();
-    await expect(page.getByRole("dialog", { name: "Sustainability" })).toBeVisible();
-  });
+  // Stats, payments and states (real data, through the API): donate.spec.ts.
 
-  test("the overflow menu shows the real Figma copy with no visible title", async ({ page }) => {
+  test("the overflow menu shows the Figma copy (Common pages p32) with no visible title", async ({ page }) => {
     await page.goto("/donate");
     await page.getByRole("button", { name: "Page actions" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading")).toHaveCount(0);
-    await expect(dialog.getByText("Wise Belgian banking account")).toBeVisible();
+    await expect(dialog.getByText("are the banking partners of the experiment.")).toBeVisible();
+    await expect(dialog.getByRole("link", { name: "Stripe" })).toHaveAttribute("href", "https://stripe.com");
+    await expect(dialog.getByRole("link", { name: "Wise" })).toHaveAttribute("href", "https://wise.com");
   });
 
   test("the Other amount field accepts only numeric input and has no native step spinner", async ({ page }) => {

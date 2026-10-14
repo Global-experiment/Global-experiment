@@ -72,6 +72,12 @@ export const iconPaths = {
   // figma.pdf p23, frame (8, 53) 16px
   check_box_outline_blank:
     "M19 5L19 19L5 19L5 5L19 5ZM19 3L5 3C3.9 3 3 3.9 3 5L3 19C3 20.1 3.9 21 5 21L19 21C20.1 21 21 20.1 21 19L21 5C21 3.9 20.1 3 19 3Z",
+  // Common pages.pdf p28 (Donate, "Direct debit SEPA" row), frame (16, 614) 16px
+  account_balance:
+    "M7 11L5 11L5 18L7 18ZM13 11L11 11L11 18L13 18ZM21.5 20L2.5 20L2.5 22L21.5 22ZM19 11L17 11L17 18L19 18ZM12 4.26L17.21 7L6.79 7ZM12 2L2.5 7L2.5 9L21.5 9L21.5 7Z",
+  // Common pages.pdf p28 (Donate header, Treasury link), frame (364, 116) 16px
+  leaderboard:
+    "M16 11L16 3L8 3L8 9L2 9L2 21L22 21L22 11ZM10 5L14 5L14 19L10 19ZM4 11L8 11L8 19L4 19ZM20 19L16 19L16 13L20 13Z",
   // not in Figma — Material Symbols Sharp (Document history menu entry)
   history:
     "M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.25 2.52.77-1.29-3.52-2.09V8H12z",

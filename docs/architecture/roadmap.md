@@ -32,7 +32,7 @@ framework, Treasury answers).
 |---|---|---|---|---|
 | 1 | **Donations end-to-end** — migration 0006 (`treasury_entries`, `stripe_events`, `stripe_subscriptions`), Stripe Checkout, webhooks, `/donate` and `/donate/thank-you` | **24 Oct** | 40 | — |
 | 1b | **Treasury** — public Treasury page and entry details from native data, Notion Treasury importer (expenses), admin Treasury list and record, supporting documents (0007), background jobs (pg-boss: scheduled imports, fee reconciliation) | after 24 Oct | 40 | 1 |
-| 2 | **Platform + Audit/History** — migration 0008 (`audit_events`, `settings`, `managed_by`, limit triggers); History panel and Monitoring → History; **settings and feature flags, module modes and the cut-over action; module registry; config-driven list and record pages; People, Organizations and Taxonomy refactored onto them** | | 62 | 1b (jobs) |
+| 2 | **Platform + Audit/History** — migration 0008 (`audit_events`, `managed_by`, limit triggers; `settings` already in 0006); History panel and Monitoring → History; **settings and feature flags, module modes and the cut-over action; module registry; config-driven list and record pages; People, Organizations and Taxonomy refactored onto them** | | 62 | 1b (jobs) |
 | 3 | **CMS** — Home and Documentation imported into revisions (Notion-edited in v0.1), public site reads the database, admin list and read-only records with History | | 30 | 2 |
 | 4 | **Feedback and issues** (+ AI triage) | | 32 | 2 |
 | 5 | **Email foundation + Messages + Emails** | | 42 | 1b (jobs), Stalwart running |
@@ -77,8 +77,9 @@ than one module worth delegating; until then the owner is the only admin
   Stripe if not ready yet); refunds as **negative refund entries** linked to
   the donation; on-demand revalidation of the public pages on every new
   entry (5-minute fallback); Stripe email receipts on; PayPal / SEPA rows
-  behind `donations.extra_methods` (off, Q19). Flags read their environment
-  defaults until the settings table (module 2).
+  behind `donations.extra_methods` (off, Q19). The `settings` table comes
+  with migration 0006 (flags: a row overrides the environment default);
+  its admin page and audit come with module 2.
 - **Public pages:** `/donate` (Common pages p28–31: currency switch,
   Donations / Med. donation / Monthly donors stats — "Donors" hidden,
   "Monthly donors" = active subscriptions, shown only with the flag;
@@ -118,7 +119,7 @@ than one module worth delegating; until then the owner is the only admin
 
 ### 2. Platform + Audit/History (62 h)
 
-- **Migration 0008:** `audit_events`, `settings`, `managed_by` on the built
+- **Migration 0008:** `audit_events`, `managed_by` on the built
   directory and taxonomy tables (backfilled from `notion_page_id`),
   relationship-limit constraint triggers.
 - **Audit/History (10 h):** audit writes for every module built so far;
