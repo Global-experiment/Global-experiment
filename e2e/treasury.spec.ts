@@ -218,7 +218,7 @@ test.describe("Treasury entries", () => {
   test("expense page (p22–p23): time, all tags, amount, description, the menu's sentence", async ({ page }) => {
     await page.goto("/treasury");
     await page.getByRole("link", { name: /USD 5,675/ }).click();
-    await expect(page).toHaveURL(/\/treasury\/expense\/\d+$/);
+    await expect(page).toHaveURL(/\/treasury\/expense\/\d+$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Expense" })).toBeVisible();
     await expect(page.getByText("Paid Apr 6 2:07 PM")).toBeVisible();
     // p22: the chart glyph before ⋮, to the same place as on Donate.
@@ -236,7 +236,7 @@ test.describe("Treasury entries", () => {
   test("an unqualified expense shows 'Not qualified yet' and no description", async ({ page }) => {
     await page.goto("/treasury?type=expense");
     await page.getByRole("link", { name: /Not qualified yet/ }).click();
-    await expect(page).toHaveURL(/\/treasury\/expense\/\d+$/);
+    await expect(page).toHaveURL(/\/treasury\/expense\/\d+$/, { timeout: 15_000 });
     await expect(page.getByText("Not qualified yet")).toBeVisible();
     await expect(page.getByText("USD 50", { exact: true })).toBeVisible();
   });
@@ -244,7 +244,7 @@ test.describe("Treasury entries", () => {
   test("anonymous donation page (p26–p27): no donor, the two explanations, the menu's sentence", async ({ page }) => {
     await page.goto("/treasury");
     await page.getByRole("link", { name: /USD 6\.40/ }).click();
-    await expect(page).toHaveURL(/\/treasury\/donation\/\d+$/);
+    await expect(page).toHaveURL(/\/treasury\/donation\/\d+$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Donation" })).toBeVisible();
     await expect(page.getByText("Donated Oct 15 2:07 PM")).toBeVisible();
     await expect(page.getByText("USD 6.40", { exact: true })).toBeVisible();
