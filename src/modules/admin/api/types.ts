@@ -230,8 +230,12 @@ export interface TreasuryEntryRow {
   review: VocabularyEntry;
   publication: "published" | "unpublished";
   publishedAt: string | null;
+  /** Visible on the public Treasury now (published, a public Stripe mode, reviewed unless unqualified ones may be public). */
+  publicNow: boolean;
   source: "stripe" | "wise" | "manual";
   livemode: boolean;
+  /** Sample data before go-live (marked Test publicly; purge-sample-treasury removes it). */
+  sample: boolean;
   managedBy: "notion" | "native";
   documents: number;
   createdAt: string;

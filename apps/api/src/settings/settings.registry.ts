@@ -19,6 +19,14 @@ interface SettingDefinition<Value> {
 
 const define = <Value>(definition: SettingDefinition<Value>) => definition;
 
+/** Sample Balance and Sustainability (treasury.sample_figures): trends in percent. */
+export const SampleFiguresSchema = z.object({
+  balance: z.object({ USD: z.number().int().optional(), EUR: z.number().int().optional(), CHF: z.number().int().optional() }),
+  sustainability: z.number().min(0).max(10),
+  trends: z.object({ balance: z.number().optional(), sustainability: z.number().optional() }),
+});
+export type SampleFigures = z.infer<typeof SampleFiguresSchema>;
+
 export const SETTINGS = {
   "donations.enabled": define({
     schema: z.boolean(),
@@ -68,6 +76,20 @@ export const SETTINGS = {
     envDefault: (config) => config.treasuryDefaults.donationAppeal,
     public: true,
     description: "The Treasury page shows the \"Cry for donation\" banner. Turned on by hand until Wise gives a Sustainability score to trigger it.",
+  }),
+  "treasury.show_test_donations": define({
+    schema: z.boolean(),
+    envDefault: (config) => config.treasuryDefaults.showTestDonations,
+    public: true,
+    description:
+      "Before go-live, production shows Stripe test-mode (sandbox) donations on the public Treasury, marked Test. Ignored with a live Stripe key: then only live donations are public.",
+  }),
+  "treasury.sample_figures": define({
+    schema: SampleFiguresSchema.nullable(),
+    envDefault: () => null,
+    public: true,
+    description:
+      "Before Wise is connected: sample Balance (per currency, minor units) and Sustainability figures, with their trends, shown on the Treasury page and marked as samples. Set and removed by the sample-treasury commands; ignored once Wise is connected.",
   }),
   // Scheduled Notion imports (overview §3.3): cron in UTC, or "off". Read when the API starts.
   "imports.taxonomy.schedule": define({

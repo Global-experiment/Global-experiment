@@ -1,9 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { zurichDate } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
 import type { AppConfig } from "../common/config/env.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
+import { SettingsService } from "../settings/settings.service.js";
 import type { BalanceInfo, ChargeInfo, RefundInfo, SubscriptionInfo } from "../stripe/stripe.gateway.js";
 import { stripeSubscriptions } from "../stripe/stripe.schema.js";
 import { treasuryEntries, treasuryPublicEntries, type TreasuryCurrency } from "./treasury.schema.js";
@@ -23,12 +24,22 @@ export const STRIPE_ENTRY_TEXT = {
 } as const;
 
 /**
- * Which Stripe mode the public sees (data-model §4.1): production shows live
- * entries only, whatever key is configured; elsewhere the configured key's
- * mode (test keys → test entries). Non-Stripe entries are always real and
- * always shown.
+ * Which Stripe modes the public sees (data-model §4.1), as `livemode` values.
+ * Production: live entries; also test-mode (sandbox) ones, marked Test, while
+ * `treasury.show_test_donations` is on and the Stripe key is a test key
+ * (before go-live). With a live key, only live entries, whatever the setting.
+ * Elsewhere: the configured key's mode (test keys → test entries).
+ * Non-Stripe entries are always real and always shown.
  */
-export const publicStripeLivemode = (config: AppConfig): boolean => config.nodeEnv === "production" || config.stripe.livemode;
+export function publicStripeModes(config: AppConfig, showTestDonations: boolean): boolean[] {
+  if (config.nodeEnv !== "production") return [config.stripe.livemode];
+  return !config.stripe.livemode && showTestDonations ? [true, false] : [true];
+}
+
+/** The same rule for a setting read from the database. */
+export async function readPublicStripeModes(config: AppConfig, settings: SettingsService): Promise<boolean[]> {
+  return publicStripeModes(config, await settings.get("treasury.show_test_donations"));
+}
 
 export interface LedgerAmounts {
   feeAmount: number | null;
@@ -103,6 +114,7 @@ export class TreasuryLedgerRepository {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly settings: SettingsService,
   ) {}
 
   async findStripeEntry(executor: Executor, externalId: string): Promise<string | null> {
@@ -250,19 +262,22 @@ export class TreasuryLedgerRepository {
   }
 
   /** Published entries of one currency that the public may see (Stripe rows of the public mode only). */
-  private publicRows(currency: TreasuryCurrency): SQL {
+  private publicRows(currency: TreasuryCurrency, modes: boolean[]): SQL {
     const view = treasuryPublicEntries;
-    return and(eq(view.currency, currency), or(ne(view.source, "stripe"), eq(view.livemode, publicStripeLivemode(this.config))))!;
+    return and(eq(view.currency, currency), or(ne(view.source, "stripe"), inArray(view.livemode, modes)))!;
   }
 
   /**
    * The donate page's figures, from the public view: each donation counts at
    * what remains after its refunds and dispute adjustments; one with nothing
    * left (fully refunded, or disputed and lost) isn't counted at all.
+   * `asOf` ("YYYY-MM-DD"): the figures as they stood that day (entries that
+   * occurred up to it), for the Treasury's trends.
    */
-  async donationSummary(currency: TreasuryCurrency): Promise<DonationSummary> {
+  async donationSummary(currency: TreasuryCurrency, asOf?: string): Promise<DonationSummary> {
     const view = treasuryPublicEntries;
-    const visible = this.publicRows(currency);
+    const modes = await readPublicStripeModes(this.config, this.settings);
+    const visible = and(this.publicRows(currency, modes), asOf ? lte(view.occurredOn, asOf) : undefined)!;
     const adjustments = this.db
       .select({ donationId: view.adjustsEntryId, adjusted: sql<string>`sum(${view.grossAmount})`.as("adjusted") })
       .from(view)
@@ -293,7 +308,7 @@ export class TreasuryLedgerRepository {
         and(
           eq(stripeSubscriptions.status, "active"),
           eq(stripeSubscriptions.currency, currency),
-          eq(stripeSubscriptions.livemode, publicStripeLivemode(this.config)),
+          inArray(stripeSubscriptions.livemode, modes),
         ),
       );
     const lastEntry = latest?.at ?? null;

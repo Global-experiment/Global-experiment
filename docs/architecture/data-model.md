@@ -95,6 +95,8 @@ Every change writes an audit event. Declared keys in v0.1:
 | `treasury.public_recipient_names` | boolean | `TREASURY_PUBLIC_RECIPIENT_NAMES` = false | Public pages show an expense's recipient name; off: only the public description (pending client answer) |
 | `treasury.publish_unqualified` | boolean | `TREASURY_PUBLISH_UNQUALIFIED` = false | Unqualified expenses may be published ("Not qualified yet"); off: only Qualified / Not required entries can be published or are public (Q25, pending) |
 | `treasury.donation_appeal` | boolean | `TREASURY_DONATION_APPEAL` = false | The Treasury page's "Cry for donation" banner (set by hand until Wise gives a Sustainability score) |
+| `treasury.sample_figures` | object or null | null (no environment variable) | Before Wise: sample Balance (per currency, minor units), Sustainability and their trends, shown with a "sample figures" note. Set and removed by the sample-treasury commands; ignored once Wise is connected |
+| `treasury.show_test_donations` | boolean | `TREASURY_SHOW_TEST_DONATIONS` = false | Production before go-live: Stripe test-mode donations on the public Treasury and donate figures, marked Test. Ignored with a live Stripe key |
 
 The table is created by **migration 0006** (module 1, which is the first
 to need flags) with the `donations.*` keys declared
@@ -318,10 +320,26 @@ review_status_key, recurrence_id, adjusts_entry_id, source, livemode, and
 the public description only when `qualified` or `not_required`) — the
 public API cannot select a private column by mistake.
 
-**Test vs live:** the public API shows Stripe rows of one mode only —
-`livemode = true` in production (`NODE_ENV=production`, whatever key is
-configured), elsewhere the configured key's mode — and every non-Stripe
-row. The same rule applies to Monthly donors (`stripe_subscriptions.livemode`).
+**Sample entries (`sample`, migration 0008):** before go-live, production
+carries sample expenses (manual source only, CHECK), published and "Not
+required", with one shared sample recipient organization; the public API
+marks them `test` ("Test" on the page) and the admin shows Mode "Sample".
+`npm run api:seed-sample-treasury -- --confirm` adds them with the sample
+figures (refused with a live Stripe key or when samples exist);
+`npm run api:purge-sample-treasury -- --confirm` removes every sample
+entry, the sample recipient and the figures in one transaction (refused
+while a sample has documents). Both are dry runs by default.
+
+**Test vs live:** the public API shows every non-Stripe row and the Stripe
+rows of the public modes: in production (`NODE_ENV=production`) live rows,
+plus test-mode (sandbox) rows while `treasury.show_test_donations` is on
+and the configured key is a test key (before go-live), each marked `test`
+("Test" on the page); with a live key, live rows only, whatever the
+setting. Elsewhere the configured key's mode, unmarked. The same rule
+applies to the donate page's figures and to Monthly donors
+(`stripe_subscriptions.livemode`). The admin list shows, per entry,
+whether visitors see it now (`publicNow`: "Published, not public"
+otherwise).
 Test-mode rows are removed with `npm run api:purge-test-donations`
 (dry run by default; `--confirm --backup <file>` deletes them in one
 transaction, only with a backup from the last 24 hours). Expense types are public facts of a published expense
@@ -331,9 +349,11 @@ and are read from `treasury_entry_expense_types` by entry id (module 1b).
 (Med. donation, Expenses total and count per currency, the banner flag,
 the last visible change, and the filter values that have data — currencies,
 expense types, first and last date; Balance and Sustainability are `null`
-until Wise), `GET /api/treasury/entries?type&currency&from&to&expenseType&sort&page&pageSize`
+until Wise, or the sample figures (`sampleFigures`); `trends`: each stat's
+percent change from 30 days earlier, null without a base), `GET /api/treasury/entries?type&currency&from&to&expenseType&q&sort&page&pageSize`
 (type `expense` or `donation` — donations with their refunds and disputes;
-sorts by date or absolute amount) and `GET /api/treasury/entries/:number`.
+`q` searches public text only: the description, expense type labels, the
+entry number; sorts by date or absolute amount) and `GET /api/treasury/entries/:number`.
 On top of the view and the mode rule: while `treasury.publish_unqualified`
 is off only Qualified / Not required entries are public, even one published
 while it was on; a recipient's name is selected only while
@@ -345,7 +365,8 @@ imports — and a 5-minute fallback).
 **Admin rules (module 1b, `/api/admin/treasury`):** Notion-managed entries
 are read-only (409 `managed_in_notion`) — edit in Notion, then import;
 native Stripe entries change only their internal note and publication;
-publishing needs the public mode (never a test-mode entry in production),
+publishing needs a public mode (a test-mode entry in production only while
+`treasury.show_test_donations` is on before go-live),
 a public description once reviewed, and `treasury.publish_unqualified` for
 an unqualified one; review statuses apply to native expenses only, and
 Qualified / Not required are offered only with a recipient. The record's

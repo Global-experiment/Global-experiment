@@ -13,10 +13,16 @@ export const SOURCE_LABEL: Record<TreasuryEntryRow["source"], string> = { stripe
 
 export const PUBLICATION_LABEL: Record<TreasuryEntryRow["publication"], string> = { published: "Published", unpublished: "Unpublished" };
 
+/** Published but not shown to visitors (a hidden Stripe mode, or unreviewed while unqualified entries stay private). */
+export const NOT_PUBLIC_LABEL = "Published, not public";
+
+export const publicationLabel = (row: Pick<TreasuryEntryRow, "publication" | "publicNow">) =>
+  row.publication !== "published" ? PUBLICATION_LABEL.unpublished : row.publicNow ? PUBLICATION_LABEL.published : NOT_PUBLIC_LABEL;
+
 export const CADENCE_LABEL: Record<string, string> = { one_off: "One-off", monthly: "Monthly", yearly: "Yearly" };
 
-/** Live = real money; Test = Stripe test mode (never public in production). */
-export const modeLabel = (row: Pick<TreasuryEntryRow, "livemode">) => (row.livemode ? "Live" : "Test");
+/** Live = real money; Test = Stripe test mode (public in production only before go-live, with treasury.show_test_donations). */
+export const modeLabel = (row: Pick<TreasuryEntryRow, "livemode" | "sample">) => (row.sample ? "Sample" : row.livemode ? "Live" : "Test");
 
 export const managedLabel = (row: Pick<TreasuryEntryRow, "managedBy" | "source">) =>
   row.managedBy === "notion" ? "Notion" : row.source === "stripe" ? "Stripe" : "Native";

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { zurichDate } from "../common/clock/clock.js";
 import { FILE_STORAGE, LocalDiskStorage } from "../files/file-storage.js";
 import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
@@ -12,7 +13,9 @@ import { RevalidationService } from "../revalidation/revalidation.service.js";
 import { settings } from "../settings/settings.schema.js";
 import { signedInAdmin, type SignedInAdmin } from "../testing/admin-session.js";
 import { createTestApp, TEST_ORIGIN, type TestApp } from "../testing/test-app.js";
+import { TreasuryListQuery } from "./treasury-admin.contracts.js";
 import { TreasuryAdminService } from "./treasury-admin.service.js";
+import { publicStripeModes } from "./treasury-ledger.repository.js";
 import { treasuryDocuments } from "./treasury-documents.schema.js";
 import { treasuryEntries, treasuryEntryExpenseTypes } from "./treasury.schema.js";
 
@@ -136,6 +139,8 @@ describe("Treasury API", () => {
         ["donation", 500],
         ["expense", -5000],
       ]);
+      // Outside production every Stripe entry is a test one: no Test mark.
+      expect(res.body.items[0].test).toBe(false);
       const [, spent] = res.body.items;
       expect(spent).toMatchObject({
         currency: "USD",
@@ -146,7 +151,7 @@ describe("Treasury API", () => {
       });
       // Nothing private ever leaves: no ids, notes, names, Notion or Stripe references.
       expect(Object.keys(spent).sort()).toEqual(
-        ["adjustsNumber", "amount", "cadence", "currency", "description", "expenseTypes", "number", "occurredAt", "occurredOn", "publishedAt", "qualified", "recipient", "type"].sort(),
+        ["adjustsNumber", "amount", "cadence", "currency", "description", "expenseTypes", "number", "occurredAt", "occurredOn", "publishedAt", "qualified", "recipient", "test", "type"].sort(),
       );
     });
 
@@ -251,6 +256,50 @@ describe("Treasury API", () => {
       const hidden = await insert(expense({ occurredOn: "2026-10-02", grossAmount: -1200, publicationStatus: "unpublished", publishedAt: null }));
       await anonymous().get(`/api/treasury/entries/${hidden.entryNumber}`).expect(404);
       await anonymous().get("/api/treasury/entries/999999").expect(404);
+    });
+
+    it("searches public text only: the description, an expense type, the entry number; wildcards are literal", async () => {
+      const hosting = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, publicDescription: "Server hosting for the platform" }), ["hosting_and_infrastructure"]);
+      const legal = await insert(expense({ occurredOn: "2026-10-02", grossAmount: -2000, publicDescription: "Advice on the statutes", name: "Secret internal name" }), ["legal_and_compliance"]);
+      const search = async (q: string) =>
+        (await anonymous().get("/api/treasury/entries").query({ q }).expect(200)).body.items.map((entry: { number: number }) => entry.number);
+
+      expect(await search("HOSTING")).toEqual([hosting.entryNumber]);
+      expect(await search("legal and")).toEqual([legal.entryNumber]);
+      expect(await search(`EXP-${legal.entryNumber}`)).toEqual([legal.entryNumber]);
+      expect(await search(String(hosting.entryNumber))).toEqual([hosting.entryNumber]);
+      // The entry's name is private; LIKE wildcards match only themselves.
+      expect(await search("Secret")).toEqual([]);
+      expect(await search("%")).toEqual([]);
+      expect(await search("_")).toEqual([]);
+      await anonymous().get("/api/treasury/entries").query({ q: "x".repeat(101) }).expect(400);
+    });
+
+    it("sample data (before go-live): sample entries are marked Test; sample Balance and Sustainability; trends from 30 days earlier", async () => {
+      const daysAgo = (days: number) => zurichDate(new Date(Date.now() - days * 86_400_000));
+      await insert(expense({ occurredOn: daysAgo(60), grossAmount: -10_000 }));
+      await insert(expense({ occurredOn: daysAgo(5), grossAmount: -2_500, managedBy: "native", notionPageId: null, source: "manual", sample: true }));
+      await insert(donation({ occurredOn: daysAgo(40), grossAmount: 400 }));
+      await insert(donation({ occurredOn: daysAgo(3), grossAmount: 1_000 }));
+
+      const before = (await anonymous().get("/api/treasury/overview?currency=USD").expect(200)).body;
+      expect(before).toMatchObject({ sampleFigures: false, balance: null, sustainability: null, trends: { balance: null, sustainability: null } });
+      // Expenses 100 → 125: +25%; median donation 4 → 7: +75%.
+      expect(before.trends).toMatchObject({ expenses: 25, medianDonation: 75 });
+
+      await setting("treasury.sample_figures", { balance: { USD: 9_130_000 }, sustainability: 1.4, trends: { balance: 2.1, sustainability: 2.1 } });
+      const usd = (await anonymous().get("/api/treasury/overview?currency=USD").expect(200)).body;
+      expect(usd).toMatchObject({ wiseConnected: false, sampleFigures: true, balance: 9_130_000, sustainability: 1.4, trends: { balance: 2.1, sustainability: 2.1 } });
+      expect((await anonymous().get("/api/treasury/overview?currency=EUR").expect(200)).body).toMatchObject({ sampleFigures: true, balance: null, sustainability: 1.4 });
+      // Once Wise is connected, samples are ignored.
+      await setting("treasury.wise_connected", true);
+      expect((await anonymous().get("/api/treasury/overview?currency=USD").expect(200)).body).toMatchObject({ sampleFigures: false, balance: null, sustainability: null });
+
+      const entries = (await anonymous().get("/api/treasury/entries?type=expense").expect(200)).body.items;
+      expect(entries.map((entry: { amount: number; test: boolean }) => [entry.amount, entry.test])).toEqual([
+        [-2_500, true],
+        [-10_000, false],
+      ]);
     });
   });
 
@@ -455,7 +504,10 @@ describe("Treasury API in production", () => {
   });
   beforeEach(async () => {
     await production.db.delete(treasuryEntries);
+    await production.db.delete(settings);
   });
+  const owner = { id: "00000000-0000-4000-8000-000000000001", email: "o@example.org", role: "owner", displayName: null, sessionId: "s" } as const;
+  const showTestDonations = () => production.db.insert(settings).values({ key: "treasury.show_test_donations", value: true });
 
   it("hides Stripe test-mode entries", async () => {
     await production.db.insert(treasuryEntries).values([donation({ occurredOn: "2026-10-03", grossAmount: 500 }), donation({ occurredOn: "2026-10-04", grossAmount: 700, livemode: true })]);
@@ -469,7 +521,44 @@ describe("Treasury API in production", () => {
       .values(donation({ occurredOn: "2026-10-03", grossAmount: 500, publicationStatus: "unpublished", publishedAt: null }))
       .returning();
     const service = production.app.get(TreasuryAdminService);
-    const owner = { id: "00000000-0000-4000-8000-000000000001", email: "o@example.org", role: "owner", displayName: null, sessionId: "s" };
     await expect(service.publish(gift!.id, true, owner)).rejects.toMatchObject({ code: "conflict", details: { reason: "cannot_publish" } });
+  });
+
+  it("before go-live, with treasury.show_test_donations on, shows test-mode donations marked Test (list, entry, figures, admin)", async () => {
+    const [gift] = await production.db
+      .insert(treasuryEntries)
+      .values([donation({ occurredOn: "2026-10-03", grossAmount: 500 }), donation({ occurredOn: "2026-10-04", grossAmount: 700, livemode: true })])
+      .returning();
+    const service = production.app.get(TreasuryAdminService);
+    const server = production.app.getHttpServer();
+
+    // Off (the default): hidden, and the admin says it isn't public.
+    expect((await service.list(TreasuryListQuery.parse({}))).items.find((row) => row.id === gift!.id)).toMatchObject({ publication: "published", publicNow: false });
+    await request(server).get(`/api/treasury/entries/${gift!.entryNumber}`).expect(404);
+
+    await showTestDonations();
+    const res = await request(server).get("/api/treasury/entries").expect(200);
+    expect(res.body.items.map((entry: { amount: number; test: boolean }) => [entry.amount, entry.test])).toEqual([
+      [700, false],
+      [500, true],
+    ]);
+    expect((await request(server).get(`/api/treasury/entries/${gift!.entryNumber}`).expect(200)).body).toMatchObject({ amount: 500, test: true });
+    const overview = await request(server).get("/api/treasury/overview?currency=USD").expect(200);
+    expect(overview.body).toMatchObject({ donationCount: 2, medianDonation: 600 });
+    expect(await service.get(gift!.id)).toMatchObject({ publicNow: true, permissions: { unpublish: { allowed: true } } });
+  });
+});
+
+describe("which Stripe modes the public sees", () => {
+  const config = (nodeEnv: string, livemode: boolean) => ({ nodeEnv, stripe: { livemode } }) as never;
+  it("production: live only, plus test mode before go-live while the setting is on; a live key ignores the setting", () => {
+    expect(publicStripeModes(config("production", false), false)).toEqual([true]);
+    expect(publicStripeModes(config("production", false), true)).toEqual([true, false]);
+    expect(publicStripeModes(config("production", true), true)).toEqual([true]);
+    expect(publicStripeModes(config("production", true), false)).toEqual([true]);
+  });
+  it("elsewhere: the configured key's mode", () => {
+    expect(publicStripeModes(config("development", false), false)).toEqual([false]);
+    expect(publicStripeModes(config("development", true), true)).toEqual([true]);
   });
 });

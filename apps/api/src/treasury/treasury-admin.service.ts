@@ -15,12 +15,13 @@ import type {
   ReviewTreasuryEntryRequest,
   TreasuryDocumentDto,
   TreasuryEntryDto,
+  TreasuryEntryRowDto,
   TreasuryListQuery,
   TreasuryOptionsDto,
   UpdateTreasuryEntryRequest,
 } from "./treasury-admin.contracts.js";
 import { TreasuryAdminRepository } from "./treasury-admin.repository.js";
-import { publicStripeLivemode } from "./treasury-ledger.repository.js";
+import { readPublicStripeModes } from "./treasury-ledger.repository.js";
 import { DOCUMENT_MAX_BYTES, treasuryDocuments } from "./treasury-documents.schema.js";
 import { TREASURY_CURRENCIES, treasuryEntries } from "./treasury.schema.js";
 
@@ -91,8 +92,21 @@ export class TreasuryAdminService {
     };
   }
 
-  list(query: TreasuryListQuery) {
-    return this.repository.list(query);
+  async list(query: TreasuryListQuery) {
+    const page = await this.repository.list(query);
+    return { ...page, items: await this.withPublicNow(page.items) };
+  }
+
+  /** Whether visitors see each entry now: the public Treasury's rule (TreasuryPublicRepository.visible). */
+  private async withPublicNow<Row extends TreasuryEntryRowDto>(rows: Row[]): Promise<Row[]> {
+    const [modes, publishUnqualified] = await Promise.all([readPublicStripeModes(this.config, this.settings), this.settings.get("treasury.publish_unqualified")]);
+    return rows.map((row) => ({
+      ...row,
+      publicNow:
+        row.publication === "published" &&
+        (row.source !== "stripe" || modes.includes(row.livemode)) &&
+        (publishUnqualified || REVIEWED.has(row.review.key)),
+    }));
   }
 
   private async load(id: string): Promise<Entry> {
@@ -110,10 +124,10 @@ export class TreasuryAdminService {
       ? "Managed in Notion: publish it there."
       : entry.publicationStatus === "published"
         ? "Already published."
-        : entry.source === "stripe" && entry.livemode !== publicStripeLivemode(this.config)
+        : entry.source === "stripe" && !(await readPublicStripeModes(this.config, this.settings)).includes(entry.livemode)
           ? entry.livemode
             ? "Live Stripe entries aren't public on this test server."
-            : "Stripe test-mode entries are never public in production."
+            : "Stripe test-mode entries are public in production only before go-live, while treasury.show_test_donations is on."
           : !REVIEWED.has(entry.reviewStatusKey) && !publishUnqualified
             ? "Only Qualified or Not required entries can be published (treasury.publish_unqualified is off)."
             : REVIEWED.has(entry.reviewStatusKey) && !entry.publicDescription?.trim()
@@ -144,8 +158,9 @@ export class TreasuryAdminService {
     const [row, details] = await Promise.all([this.repository.row(id), this.repository.details(id)]);
     if (!row || !details) throw new NotFoundError("Treasury entry not found.");
     const { entry } = details;
+    const [withPublic] = await this.withPublicNow([row]);
     return {
-      ...row,
+      ...withPublic!,
       notionPageId: entry.notionPageId,
       notionUrl: entry.notionPageId ? `https://www.notion.so/${entry.notionPageId.replace(/-/g, "")}` : null,
       externalTransactionId: entry.externalTransactionId,

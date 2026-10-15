@@ -19,7 +19,7 @@ import {
   formatOccurred,
   managedLabel,
   modeLabel,
-  PUBLICATION_LABEL,
+  publicationLabel,
   SOURCE_LABEL,
   TYPE_LABEL,
 } from "./treasuryDisplay";
@@ -168,7 +168,18 @@ export function TreasuryRecord({ id }: { id: string }) {
             <span className="text-text-muted">Amounts and dates come from Stripe; only the internal note and the publication change here.</span>
           </div>
         ) : null}
-        {!loaded.livemode ? <StatusMessage>Stripe test mode: this entry is never public in production.</StatusMessage> : null}
+        {!loaded.livemode ? (
+          <StatusMessage>
+            {loaded.publicNow
+              ? "Stripe test mode: a sandbox payment, shown on the public Treasury (marked Test in production, until go-live)."
+              : loaded.publication === "published"
+                ? "Stripe test mode: a sandbox payment, not on the public Treasury (shown only before go-live, with treasury.show_test_donations on)."
+                : "Stripe test mode: a sandbox payment, not real money."}
+          </StatusMessage>
+        ) : null}
+        {loaded.sample ? (
+          <StatusMessage>Sample entry: shown on the public Treasury marked Test until go-live; npm run api:purge-sample-treasury removes every sample.</StatusMessage>
+        ) : null}
         {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
 
         <PropertyRow icon="title" label="Name">
@@ -269,7 +280,7 @@ export function TreasuryRecord({ id }: { id: string }) {
           )}
         </PropertyRow>
         <PropertyRow icon="visibility" label="Publication">
-          <ReadOnly>{`${PUBLICATION_LABEL[loaded.publication]}${loaded.publishedAt ? ` · ${formatPanelDate(loaded.publishedAt)}` : ""}`}</ReadOnly>
+          <ReadOnly>{`${publicationLabel(loaded)}${loaded.publishedAt ? ` · ${formatPanelDate(loaded.publishedAt)}` : ""}`}</ReadOnly>
         </PropertyRow>
         <PropertyRow icon="title" label="Public description" hint="Shown on the public Treasury page once the entry is qualified.">
           <ReadOnly>{loaded.publicDescription}</ReadOnly>

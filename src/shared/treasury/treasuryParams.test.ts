@@ -28,6 +28,7 @@ describe("Treasury URL state", () => {
       types: "hosting_and_infrastructure,legal_and_compliance",
       sort: "amount_asc",
       page: "3",
+      q: "hosting",
     });
     expect(state).toEqual({
       currency: "EUR",
@@ -37,9 +38,10 @@ describe("Treasury URL state", () => {
       expenseTypes: ["hosting_and_infrastructure", "legal_and_compliance"],
       sort: "amount_asc",
       page: 3,
+      q: "hosting",
     });
     expect(treasuryHref(state)).toBe(
-      "/treasury?currency=EUR&type=expense&from=2026-01-01&to=2026-06-30&types=hosting_and_infrastructure,legal_and_compliance&sort=amount_asc&page=3",
+      "/treasury?currency=EUR&type=expense&from=2026-01-01&to=2026-06-30&types=hosting_and_infrastructure,legal_and_compliance&sort=amount_asc&q=hosting&page=3",
     );
     expect(parseTreasuryParams(Object.fromEntries(new URL(`http://x${treasuryHref(state)}`).searchParams))).toEqual(state);
   });
@@ -102,5 +104,19 @@ describe("date presets (p16)", () => {
     expect(matchingPreset("2026-10-01", today, today)).toBe("this_month");
     expect(matchingPreset(null, null, today)).toBe("all");
     expect(matchingPreset("2026-03-02", "2026-05-01", today)).toBeNull();
+  });
+});
+
+describe("search (p11)", () => {
+  it("keeps the search in the URL, trimmed and at most 100 characters; a new search starts on page 1", async () => {
+    const { parseTreasuryParams, treasuryHref, withFilters, clearFilters } = await import("./treasuryParams");
+    const state = parseTreasuryParams({ q: "  hosting ", page: "3" });
+    expect(state.q).toBe("hosting");
+    expect(treasuryHref(state)).toBe("/treasury?q=hosting&page=3");
+    expect(parseTreasuryParams({ q: "x".repeat(150) }).q).toHaveLength(100);
+    expect(parseTreasuryParams({ q: "   " }).q).toBeNull();
+    expect(treasuryHref(withFilters(state, { q: "legal advice" }))).toBe("/treasury?q=legal+advice");
+    // Erasing filters keeps the search (the empty state's Erase clears both itself).
+    expect(clearFilters(state).q).toBe("hosting");
   });
 });

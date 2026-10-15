@@ -22,6 +22,14 @@ export function formatSignedAmount(minor: number, currency: string): string {
   return `${minor < 0 ? "-" : "+"} ${formatCodeAmount(minor, currency)}`;
 }
 
+/** A stat's trend (p11): "+2.1%", "-0.4%", "0%"; nothing without a base to compare with. */
+export function formatTrend(percent: number | null): string | undefined {
+  if (percent === null) return undefined;
+  if (percent === 0) return "0%";
+  const text = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(Math.abs(percent));
+  return `${percent > 0 ? "+" : "-"}${text}%`;
+}
+
 /** Stats row "39.8K" (p11, Expenses — the header shows the currency). */
 export function formatCompact(minor: number): string {
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.max(0, minor) / 100);

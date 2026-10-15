@@ -74,6 +74,8 @@ export const treasuryEntries = pgTable(
     source: text("source").notNull(),
     /** Stripe test vs live mode, from the event (data-model §4.1). Non-Stripe entries are always real (true). */
     livemode: boolean("livemode").notNull().default(true),
+    /** Sample data shown before go-live, marked Test; removed by the purge-sample-treasury command (never Stripe). */
+    sample: boolean("sample").notNull().default(false),
     externalTransactionId: text("external_transaction_id"),
     recurrenceId: text("recurrence_id").references(() => stripeSubscriptions.id, { onDelete: "restrict" }),
     sourceAccountId: text("source_account_id"),
@@ -113,6 +115,8 @@ export const treasuryEntries = pgTable(
     index("treasury_entries_recurrence_idx").on(table.recurrenceId),
     // Test-mode Stripe rows: hidden from the public, purged by the purge-test-donations command.
     index("treasury_entries_test_mode_idx").on(table.createdAt).where(sql`not ${table.livemode}`),
+    // Sample entries (before go-live): removed by the purge-sample-treasury command.
+    index("treasury_entries_sample_idx").on(table.createdAt).where(sql`${table.sample}`),
     // Fee reconciliation: Stripe entries whose fee isn't known yet.
     index("treasury_entries_fee_pending_idx")
       .on(table.createdAt)
@@ -149,6 +153,8 @@ export const treasuryEntries = pgTable(
     check("treasury_entries_source_known", sql`${table.source} in ('stripe', 'wise', 'manual')`),
     // Only Stripe has a test mode; everything else is real money.
     check("treasury_entries_livemode_stripe_only", sql`${table.source} = 'stripe' or ${table.livemode}`),
+    // Stripe entries are always real payments (test mode is `livemode`); only manual entries can be samples.
+    check("treasury_entries_sample_manual_only", sql`not ${table.sample} or ${table.source} = 'manual'`),
     check("treasury_entries_external_id_length", sql`${table.externalTransactionId} is null or length(${table.externalTransactionId}) between 1 and 255`),
     check("treasury_entries_source_account_length", sql`${table.sourceAccountId} is null or length(${table.sourceAccountId}) <= 255`),
     check("treasury_entries_recurrence_monthly", sql`${table.recurrenceId} is null or (${table.entryType} = 'donation' and ${table.cadence} = 'monthly')`),
@@ -189,7 +195,8 @@ export const treasuryEntryExpenseTypes = pgTable(
 );
 
 /**
- * The only shape the public API reads (created by migration 0006, not managed
+ * The only shape the public API reads (created by migration 0006, `sample`
+ * added by 0008; not managed
  * by drizzle-kit): published entries, public columns, and the description
  * only once the entry is qualified or needs no review.
  */
@@ -210,4 +217,5 @@ export const treasuryPublicEntries = pgView("treasury_public_entries", {
   source: text("source").notNull(),
   livemode: boolean("livemode").notNull(),
   publicDescription: text("public_description"),
+  sample: boolean("sample").notNull(),
 }).existing();

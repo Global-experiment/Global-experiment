@@ -76,8 +76,15 @@ export interface TreasuryEntryRowDto {
   review: VocabularyEntry;
   publication: "published" | "unpublished";
   publishedAt: string | null;
+  /**
+   * Visible on the public Treasury right now: published, of a public Stripe
+   * mode, and reviewed unless treasury.publish_unqualified is on.
+   */
+  publicNow: boolean;
   source: "stripe" | "wise" | "manual";
   livemode: boolean;
+  /** Sample data before go-live (marked Test publicly; purge-sample-treasury removes it). */
+  sample: boolean;
   managedBy: "notion" | "native";
   documents: number;
   createdAt: string;

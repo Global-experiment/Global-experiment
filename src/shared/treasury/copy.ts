@@ -29,6 +29,10 @@ export const TREASURY_COPY = {
     filter: "Filter",
     filterActive: (count: number) => `Filter (${count})`,
     filterLabel: (count: number) => (count === 0 ? "Filter the history" : `Filter the history, ${count} active`),
+    search: "Search the history",
+    searchPlaceholder: "Search",
+    searchField: "Search descriptions, expense types and entry numbers",
+    closeSearch: "Close the search",
   },
   pills: { label: "Show", expenses: "Expenses", donations: "Donations" },
   sort: {
@@ -77,6 +81,9 @@ export const TREASURY_COPY = {
     median: "Med. donation",
     expenses: "Expenses",
     noValue: "–",
+    /** Under the stats while Balance and Sustainability are samples (treasury.sample_figures, before Wise). */
+    sampleNote: "Balance and Sustainability are sample figures until the Wise account is connected.",
+    sampleCaption: "Sample figure, until the Wise account is connected",
     balanceDetail: {
       title: "Balance",
       caption: "Treasury balance",
@@ -125,8 +132,11 @@ export const TREASURY_COPY = {
     heading: "History",
     empty: "No entries yet. Donations and expenses appear here as soon as they’re published.",
     noMatch: "No entries match these filters.",
+    noSearchMatch: (q: string) => `No entries match “${q}”.`,
     unavailable: "The Treasury history is unavailable right now. Please try again in a few minutes.",
     notQualified: "Not qualified yet",
+    /** A Stripe sandbox donation, public only before go-live (treasury.show_test_donations). */
+    test: "Test",
     moreTags: (count: number) => `${count} more ${count === 1 ? "tag" : "tags"}`,
     kinds: { expense: "Expense", donation: "Donation", refund: "Refund", dispute: "Dispute adjustment" } as Record<string, string>,
     pagination: "History pages",

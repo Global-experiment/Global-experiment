@@ -13,6 +13,7 @@ import { isDonationCurrency, type DonationCurrency } from "@/shared/donate/money
  *   currency in the history (amounts are never converted), with the stats of
  *   the default currency.
  * - `type`: expense | donation (donations with their refunds and disputes); absent = both.
+ * - `q`: the search field (p11): public descriptions, expense types, entry numbers.
  */
 export const TREASURY_SORTS = ["date_desc", "date_asc", "amount_desc", "amount_asc"] as const;
 export type TreasurySort = (typeof TREASURY_SORTS)[number];
@@ -31,6 +32,8 @@ export interface TreasuryState {
   expenseTypes: string[];
   sort: TreasurySort;
   page: number;
+  /** The search text, or null. */
+  q: string | null;
 }
 
 export const DEFAULT_TREASURY_STATE: TreasuryState = {
@@ -41,6 +44,7 @@ export const DEFAULT_TREASURY_STATE: TreasuryState = {
   expenseTypes: [],
   sort: "date_desc",
   page: 1,
+  q: null,
 };
 
 type Params = Record<string, string | string[] | undefined>;
@@ -69,6 +73,7 @@ export function parseTreasuryParams(params: Params, defaultCurrency: DonationCur
     expenseTypes: listOf(params.types).filter((key) => /^[a-z][a-z0-9_]{0,39}$/.test(key)).slice(0, 20),
     sort: (TREASURY_SORTS as readonly string[]).includes(sort) ? (sort as TreasurySort) : "date_desc",
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
+    q: first(params.q).slice(0, 100) || null,
   };
 }
 
@@ -81,6 +86,7 @@ export function treasuryHref(state: TreasuryState, defaultCurrency: DonationCurr
   if (state.to) params.set("to", state.to);
   if (state.expenseTypes.length > 0) params.set("types", state.expenseTypes.join(","));
   if (state.sort !== "date_desc") params.set("sort", state.sort);
+  if (state.q) params.set("q", state.q);
   if (state.page > 1) params.set("page", String(state.page));
   const search = params.toString().replace(/%2C/g, ",");
   return search ? `/treasury?${search}` : "/treasury";

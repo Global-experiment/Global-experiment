@@ -9,6 +9,8 @@ import { Sheet } from "@/shared/ui/Sheet";
 export interface StatItem {
   id: string;
   value: string;
+  /** "+2.1%" after the value (Common pages p11), muted; none without a base to compare with. */
+  trend?: string;
   label: string;
   detail: {
     title: string;
@@ -50,8 +52,16 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: StatItem[]
             onClick={() => setOpenId(stat.id)}
             className="cursor-pointer rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
           >
-            <span data-stat-value className="block text-body text-text-primary">
-              {stat.value}
+            {/* p11: "$ 91.3K +2.1%" — the trend in 12px muted on the value's baseline; on a narrow screen it wraps under it. */}
+            <span className="flex flex-wrap items-baseline justify-center gap-x-1">
+              <span data-stat-value className="text-body text-text-primary">
+                {stat.value}
+              </span>
+              {stat.trend ? (
+                <span data-stat-trend className="text-meta text-text-muted">
+                  {stat.trend}
+                </span>
+              ) : null}
             </span>
             <span data-stat-label className="mt-[0.3125rem] block text-meta text-text-muted">
               {stat.label}

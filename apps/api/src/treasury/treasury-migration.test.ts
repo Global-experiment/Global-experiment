@@ -388,6 +388,7 @@ describe("0006 stripe tables, settings and the public view", () => {
         "source",
         "livemode",
         "review_status_key",
+        "sample",
       ].sort(),
     );
   });
@@ -467,7 +468,8 @@ describe("migration 0007 — treasury documents", () => {
     await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500 });
     const before = await rows(client, "select * from treasury_entries");
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
-    expect(await rows(client, "select * from treasury_entries")).toEqual(before);
+    // Untouched (0008 then adds `sample`, false for every existing row).
+    expect(await rows(client, "select * from treasury_entries")).toEqual(before.map((row) => ({ ...row, sample: false })));
     expect(await count(client, "treasury_documents")).toBe(0);
   });
 
@@ -488,5 +490,24 @@ describe("migration 0007 — treasury documents", () => {
     await expect(insertDocument(client, entry, { sha256: "2".repeat(64), file_name: "  " })).rejects.toThrow(/treasury_documents_file_name_present/);
     // An entry with documents can't be deleted; an admin can (the uploader link clears).
     await expect(client.query("delete from treasury_entries where id = $1", [entry])).rejects.toThrow(/treasury_documents_entry_id/);
+  });
+});
+
+describe("migration 0008 — sample entries", () => {
+  const AT_0007 = journal.entries.findIndex((entry) => entry.tag.startsWith("0008_"));
+
+  it("carries a database at 0007 over: every existing entry is real (sample false), and the view shows the column", async () => {
+    const client = await databaseAt(AT_0007);
+    await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500, publication_status: "published", published_at: new Date().toISOString() });
+    const before = await rows(client, "select * from treasury_entries");
+    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    expect(await rows(client, "select * from treasury_entries")).toEqual(before.map((row) => ({ ...row, sample: false })));
+    expect((await rows(client, "select sample from treasury_public_entries")).map((row) => row.sample)).toEqual([false]);
+  });
+
+  it("only a manual entry can be a sample", async () => {
+    const client = await latest();
+    await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500, sample: true });
+    await expect(insertEntry(client, { entry_type: "expense", source: "wise", gross_amount: -500, sample: true })).rejects.toThrow(/treasury_entries_sample_manual_only/);
   });
 });

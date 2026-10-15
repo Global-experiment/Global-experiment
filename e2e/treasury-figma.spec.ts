@@ -47,12 +47,17 @@ test("p11 list: header, sort and filter fields, pills, stats, banner, rows", asy
   await expect(page.locator("[data-amount]").first()).toBeVisible();
   await capture(page, "p11-list");
 
-  // Sort and Filter fields: 32px tall at y 148 (Figma), 8px apart, inside the 8px gutters.
+  // The 32px search button at x 8, then the Sort and Filter fields: 32px tall at y 148 (Figma), 8px apart, inside the 8px gutters.
+  const searchButton = await box(page.getByRole("button", { name: "Search the history" }));
+  near(searchButton.x, 8, "search x");
+  near(searchButton.y, fy(148), "search y");
+  near(searchButton.width, 32, "search width");
+  near(searchButton.height, 32, "search height");
   const sort = await box(page.getByRole("button", { name: /^Sort:/ }));
   const filter = await box(page.getByRole("button", { name: /^Filter the history/ }));
   near(sort.y, fy(148), "sort y");
   near(sort.height, 32, "sort height");
-  near(sort.x, 8, "sort x");
+  near(sort.x, 48, "sort x");
   near(filter.x + filter.width, 404, "filter right edge");
   near(filter.x - (sort.x + sort.width), 8, "gap");
   // Pills: 32px at y 188.
