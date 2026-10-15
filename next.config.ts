@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   // dev`, never in production) — hidden for cleaner screenshots/review.
   // Next.js still surfaces compile/runtime errors regardless.
   devIndicators: false,
+  experimental: {
+    // The API proxy (rewrites below) buffers request bodies up to this size
+    // and cuts the rest (default 10 MB): Treasury documents go up to 20 MB
+    // plus the multipart envelope. nginx keeps every other route at 1 MB and
+    // allows 21 MB on the upload route only.
+    proxyClientMaxBodySize: "21mb",
+  },
   async rewrites() {
     const origin = adminApiOrigin();
     // Same-origin proxy for the native API (see src/shared/config/adminApi.ts):
