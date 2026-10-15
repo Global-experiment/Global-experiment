@@ -1,6 +1,6 @@
 # Release plan — Treasury as in Figma, with sample data (October 2026)
 
-**Status: prepared, not run.** Each production step needs the owner's
+**Status: run on 2026-10-15** (record at the end). Each production step needs the owner's
 go-ahead.
 
 **What ships:** the p11 search button (public text and entry numbers,
@@ -61,3 +61,16 @@ values are never printed.
 `purge-sample-treasury --confirm`; stop both services; restore the dump
 (directory runbook §10); `git checkout` the previous commit, `npm ci`,
 rebuild, `chown`, remove `TREASURY_SHOW_TEST_DONATIONS`, start.
+
+## Record of the run — 2026-10-15
+
+| Step | Result |
+|---|---|
+| Backup | `ge-prod-20261015-055905.dump`, 237,427 bytes, SHA-256 `eb2b236f9ad01f01e876cc7db86b5636bb0f19ed4c7cae650107699347f9d2a1`; copied to `ge-db-backups`, hash identical. `api.env` copied. Before: taxonomy 14/120/1105/1400, people 1, organizations 0, Treasury entries 2 (the $5 and $50 sandbox donations), 8 migrations. |
+| Update and build | Services stopped 05:59:06 UTC; `d7dc0e1..07cf94f`; `npm ci`, web and API builds OK; `chown`. |
+| Migration | 9 migrations; no sample rows before the seed. |
+| Environment | `TREASURY_SHOW_TEST_DONATIONS=true`; Stripe key `sk_test`. |
+| Start | Up 05:59:38 UTC (**32 seconds** offline), both services active. |
+| Samples | `seed-sample-treasury --confirm`: 12 USD, 2 EUR, 2 CHF sample expenses and the sample figures. After: taxonomy unchanged, people 1, organizations 1 (the sample recipient), entries 18 (16 samples). |
+| Incident | The first `/treasury` request (06:00:02) answered 500: the website's data cache, which survives a build, served the previous API's overview (no `trends`). Cleared `.next/cache/fetch-cache`; every page 200 since. Fixed in `31b503b` (the page tolerates an older overview; deploys clear the data cache), released at once: backup `ge-prod-20261015-060648.dump` (SHA-256 `22fc4f5af8e9bd5f509f57a51671e40eecbb504b3beaa1fe998e57f777196731`, copied, identical), website stopped 06:06:49, up 06:06:59 (**10 seconds**), `07cf94f..639dbd9`. |
+| Checks | `/treasury` (USD, EUR, CHF, All), search `?q=hosting`, `?type=expense`, `/donate`: 200, three times each. An expense page and a donation page 200; unknown entry 404; `/admin/treasury` 200. USD overview: Balance $ 91.3K +2.1%, Sustainability 1.4 +2.1%, Med. donation $27.5, Expenses 39.8K +32.9%, the sample note; history 14, every entry tagged "Test". Web and API logs: 0 errors after the fix. |
