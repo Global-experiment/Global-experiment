@@ -1,8 +1,7 @@
 # Release plan — Treasury (roadmap module 1b)
 
-**Status: run on 2026-10-14 (UTC)**: see the
-[record of the run](#record-of-the-run--2026-10-14) at the end. One open
-item: documents over 10 MB (see *Differed from Expected*).
+**Status: run on 2026-10-14 (UTC), fix shipped 2026-10-15**: see the
+[record of the run](#record-of-the-run--2026-10-14) at the end.
 
 **What ships:** migration **0007** (`treasury_documents`, `import_runs.kind`
 += `treasury`), the public Treasury from the ledger (`/treasury`, the
@@ -141,7 +140,7 @@ October), 36 seconds, website and admin.
   buffers request bodies up to `experimental.proxyClientMaxBodySize`,
   10 MB by default, and cuts the rest; the API then waits for the missing
   bytes and the request ends in a 500 after 30 seconds. Documents up to
-  10 MB work. Fix ready (not yet shipped): `proxyClientMaxBodySize: "21mb"`
+  10 MB work. Fixed on 2026-10-15 (below): `proxyClientMaxBodySize: "21mb"`
   in `next.config.ts`, with an end-to-end test that uploads 15 MB through
   the website; shipping it is a web rebuild and restart, no migration.
 - The 2 empty shard folders from the test upload stay in the files
@@ -152,3 +151,18 @@ October), 36 seconds, website and admin.
 directory runbook); `git checkout bd5b5cc`, `npm ci`, rebuild,
 `chown -R globalexp:globalexp .next`, start. Restore the nginx site from
 `/root/backups/nginx-global-experiment.20261014-230926`, then `nginx -t` and reload.
+
+## Fix — documents up to 20 MB (2026-10-15)
+
+`develop` at `d7dc0e1` (`aebbe5f` *fix(treasury): documents up to 20 MB pass
+the website's API proxy*). Website only: no API, package or migration change
+(the script stops otherwise).
+
+| Step | Result |
+|---|---|
+| Backup | `ge-prod-20261015-042808.dump`, 236,468 bytes, SHA-256 `314e8ef37b378900e28a779ebf4a6e40c5bd25da58c539c9dbb957947680e82c`; copied to `ge-db-backups`, hash identical. |
+| Release | Website stopped 04:28:09 UTC, `a66f04c..d7dc0e1`, web build OK, `chown -R globalexp:globalexp .next`, up 04:28:17 UTC. The API kept running. |
+| Health | API 200, home 200, `/treasury` 200, unknown entry 404, `/admin/treasury` 200; both services active. |
+| Documents | Through nginx with a temporary owner session (deleted afterwards): 15 MB **201**, 20.9 MB **201**, both downloaded byte-for-byte and deleted (204); 25 MB **413** (nginx); 2 MB to another admin route **413** (1 MB limit kept). Left: 0 rows, 0 files. Web log: 0 errors. |
+
+**Downtime:** 04:28:09 → 04:28:17 UTC, 8 seconds, website only.
