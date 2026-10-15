@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import type { TreasuryEntriesPage, TreasuryOverview } from "@/shared/config/publicApi";
-import { DONATION_CURRENCIES, formatExact, formatMedian } from "@/shared/donate/money";
+import { DONATION_CURRENCIES, formatExact, formatMedian, formatStatAmount } from "@/shared/donate/money";
 import { ClickableStatsRow, type StatItem } from "@/shared/treasury/ClickableStatsRow";
 import { TREASURY_COPY } from "@/shared/treasury/copy";
-import { formatCodeAmount, formatCompact, formatLastUpdated, zurichToday } from "@/shared/treasury/format";
+import { formatCodeAmount, formatCompact, formatLastUpdated, formatTrend, zurichToday } from "@/shared/treasury/format";
 import { HistoryList } from "@/shared/treasury/HistoryList";
 import { TreasuryFilterSheet } from "@/shared/treasury/TreasuryFilterSheet";
 import { TreasurySortSheet } from "@/shared/treasury/TreasurySortSheet";
@@ -57,6 +57,10 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  // The search field (p11's search button opens it); open whenever the URL carries a search.
+  const [searchOpen, setSearchOpen] = useState(state.q !== null);
+  const [query, setQuery] = useState(state.q ?? "");
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const now = new Date(nowIso);
 
   const go = (next: TreasuryState) => startTransition(() => router.push(treasuryHref(next), { scroll: false }));
@@ -65,6 +69,19 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
     if (currency !== state.currency) go(withFilters(state, { currency }));
   };
   const filters = activeFilterCount(state);
+  /** Searches after `delay` ms (typing), or at once (Enter); the same text twice does nothing. */
+  const search = (text: string, delay: number) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const q = text.trim() || null;
+    if (q === state.q) return;
+    searchTimer.current = setTimeout(() => go(withFilters(state, { q })), delay);
+  };
+  const closeSearch = () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    setSearchOpen(false);
+    setQuery("");
+    if (state.q) go(withFilters(state, { q: null }));
+  };
   const lastUpdated = overview?.lastUpdatedAt ? formatLastUpdated(overview.lastUpdatedAt, now) : null;
 
   return (
@@ -122,28 +139,77 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
       </Sheet>
 
       <Container className="pt-1">
-        {/* Common pages p11: 32px sort and filter fields, 8px apart (Figma's search field has no public search yet). */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setSortOpen(true)}
-            aria-haspopup="dialog"
-            aria-label={copy.toolbar.sortLabel(sortField(state), copy.sort.directions[state.sort])}
-            className={`flex h-8 min-w-0 cursor-pointer items-center justify-between gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] text-body text-text-primary ${focusRing}`}
+        {/*
+          Common pages p11: a 32px search button, then the sort and filter fields, 8px apart.
+          The search button opens a field in their place (typing searches after a pause, Enter
+          at once); × closes it and clears the search.
+        */}
+        {searchOpen ? (
+          <form
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              search(query, 0);
+            }}
+            className="flex gap-2"
           >
-            <span className="truncate">{copy.toolbar.sortButton(sortField(state), copy.sort.directions[state.sort])}</span>
-            <Icon name="arrow_downward" className={`shrink-0 ${state.sort.endsWith("_asc") ? "rotate-180" : ""}`} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterOpen(true)}
-            aria-haspopup="dialog"
-            aria-label={copy.toolbar.filterLabel(filters)}
-            className={`flex h-8 min-w-0 cursor-pointer items-center rounded-control border px-[calc(0.5rem-1px)] text-body ${filters > 0 ? "border-text-primary font-bold" : "border-line"} text-text-primary ${focusRing}`}
-          >
-            <span className="truncate">{filters > 0 ? copy.toolbar.filterActive(filters) : copy.toolbar.filter}</span>
-          </button>
-        </div>
+            <label className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text-primary">
+              <Icon name="search" className="shrink-0 text-text-muted" />
+              <span className="sr-only">{copy.toolbar.searchField}</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  search(event.target.value, 350);
+                }}
+                placeholder={copy.toolbar.searchPlaceholder}
+                maxLength={100}
+                autoFocus={state.q === null}
+                enterKeyHint="search"
+                className="h-full min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={closeSearch}
+              aria-label={copy.toolbar.closeSearch}
+              className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-line text-text-primary ${focusRing}`}
+            >
+              <Icon name="close" />
+            </button>
+          </form>
+        ) : (
+          <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label={copy.toolbar.search}
+              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-control border border-line text-text-primary ${focusRing}`}
+            >
+              <Icon name="search" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={copy.toolbar.sortLabel(sortField(state), copy.sort.directions[state.sort])}
+              className={`flex h-8 min-w-0 cursor-pointer items-center justify-between gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] text-body text-text-primary ${focusRing}`}
+            >
+              <span className="truncate">{copy.toolbar.sortButton(sortField(state), copy.sort.directions[state.sort])}</span>
+              <Icon name="arrow_downward" className={`shrink-0 ${state.sort.endsWith("_asc") ? "rotate-180" : ""}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={copy.toolbar.filterLabel(filters)}
+              className={`flex h-8 min-w-0 cursor-pointer items-center rounded-control border px-[calc(0.5rem-1px)] text-body ${filters > 0 ? "border-text-primary font-bold" : "border-line"} text-text-primary ${focusRing}`}
+            >
+              <span className="truncate">{filters > 0 ? copy.toolbar.filterActive(filters) : copy.toolbar.filter}</span>
+            </button>
+          </div>
+        )}
 
         <div role="group" aria-label={copy.pills.label} className="mt-2 flex gap-2">
           {(["expense", "donation"] as const satisfies HistoryType[]).map((type) => (
@@ -162,6 +228,7 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
         </div>
 
         {overview ? <ClickableStatsRow stats={buildStats(overview)} className="mt-4" /> : null}
+        {overview?.sampleFigures && !overview.wiseConnected ? <p className="mt-2 text-center text-meta text-text-muted">{copy.stats.sampleNote}</p> : null}
         {overview?.donationAppeal ? <DonationAppeal /> : null}
 
         {/* Common pages p11: 14px bold heading, 12px muted count on the same baseline. */}
@@ -170,7 +237,17 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
           {history ? <span className="text-meta text-text-muted">{new Intl.NumberFormat("en-US").format(history.total)}</span> : null}
         </h2>
         <div aria-busy={pending} aria-live="polite" className={pending ? "opacity-60 transition-opacity" : undefined}>
-          <History history={history} filters={filters} now={now} onErase={() => go(clearFilters(state))} state={state} />
+          <History
+            history={history}
+            filters={filters}
+            now={now}
+            onErase={() => {
+              setQuery("");
+              setSearchOpen(false);
+              go(withFilters(clearFilters(state), { q: null }));
+            }}
+            state={state}
+          />
         </div>
       </Container>
 
@@ -202,9 +279,9 @@ const sortField = (state: TreasuryState) => (state.sort.startsWith("amount") ? c
 function History({ history, filters, now, onErase, state }: { history: TreasuryEntriesPage | null; filters: number; now: Date; onErase: () => void; state: TreasuryState }) {
   if (!history) return <p className="mt-3 text-body text-text-muted">{copy.history.unavailable}</p>;
   if (history.total === 0) {
-    return filters > 0 ? (
+    return filters > 0 || state.q ? (
       <div className="mt-3">
-        <p className="text-body text-text-muted">{copy.history.noMatch}</p>
+        <p className="text-body text-text-muted">{state.q && filters === 0 ? copy.history.noSearchMatch(state.q) : copy.history.noMatch}</p>
         <Button onClick={onErase} className="mt-3">
           {copy.filter.erase}
         </Button>
@@ -237,27 +314,32 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
   const { currency } = overview;
   const stats = copy.stats;
   const items: StatItem[] = [];
-  if (overview.wiseConnected) {
+  const { trends } = overview;
+  // Sample figures (before Wise) say so in the sheet's caption and under the row.
+  const sample = overview.sampleFigures && !overview.wiseConnected;
+  if (overview.wiseConnected || sample) {
     items.push(
       {
         id: "balance",
-        value: overview.balance === null ? stats.noValue : `${currency} ${formatCompact(overview.balance)}`,
+        value: overview.balance === null ? stats.noValue : formatStatAmount(overview.balance, currency),
+        trend: formatTrend(trends.balance),
         label: stats.balance,
         detail: {
           title: stats.balanceDetail.title,
           value: overview.balance === null ? stats.noValue : formatCodeAmount(overview.balance, currency),
-          caption: stats.balanceDetail.caption,
+          caption: sample ? stats.sampleCaption : stats.balanceDetail.caption,
           paragraphs: stats.balanceDetail.paragraphs.map((body) => ({ body })),
         },
       },
       {
         id: "sustainability",
         value: overview.sustainability === null ? stats.noValue : String(overview.sustainability),
+        trend: formatTrend(trends.sustainability),
         label: stats.sustainability,
         detail: {
           title: stats.sustainabilityDetail.title,
           value: overview.sustainability === null ? stats.noValue : String(overview.sustainability),
-          caption: stats.sustainabilityDetail.caption,
+          caption: sample ? stats.sampleCaption : stats.sustainabilityDetail.caption,
           paragraphs: [...stats.sustainabilityDetail.paragraphs],
         },
       },
@@ -267,6 +349,7 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
     {
       id: "median-donation",
       value: overview.medianDonation === null ? stats.noValue : formatMedian(overview.medianDonation, currency),
+      trend: formatTrend(trends.medianDonation),
       label: stats.median,
       detail: {
         title: stats.medianDetail.title,
@@ -278,6 +361,7 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
     {
       id: "expenses",
       value: formatCompact(overview.expensesTotal),
+      trend: formatTrend(trends.expenses),
       label: stats.expenses,
       detail: {
         title: stats.expensesDetail.title,

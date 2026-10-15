@@ -101,13 +101,19 @@ export interface PublicTreasuryEntry {
   /** Only while recipient names are public (treasury.public_recipient_names). */
   recipient: { kind: "person" | "organization"; name: string } | null;
   adjustsNumber: number | null;
+  /** A Stripe test-mode (sandbox) donation shown in production before go-live (treasury.show_test_donations): marked Test. */
+  test: boolean;
 }
 
 export interface TreasuryOverview {
   currency: DonationCurrency;
   wiseConnected: boolean;
+  /** Balance and Sustainability are sample figures (before Wise): the page says so. */
+  sampleFigures: boolean;
   balance: number | null;
   sustainability: number | null;
+  /** Percent change from 30 days earlier, one decimal; null without a base. */
+  trends: { balance: number | null; sustainability: number | null; medianDonation: number | null; expenses: number | null };
   medianDonation: number | null;
   donationCount: number;
   expensesTotal: number;
@@ -123,6 +129,7 @@ export interface TreasuryEntriesQuery {
   from?: string;
   to?: string;
   expenseType?: readonly string[];
+  q?: string;
   sort?: string;
   page?: number;
   pageSize?: number;
@@ -148,6 +155,7 @@ export function fetchTreasuryEntries(query: TreasuryEntriesQuery): Promise<ApiRe
   if (query.from) params.set("from", query.from);
   if (query.to) params.set("to", query.to);
   if (query.expenseType?.length) params.set("expenseType", query.expenseType.join(","));
+  if (query.q) params.set("q", query.q);
   if (query.sort) params.set("sort", query.sort);
   if (query.page) params.set("page", String(query.page));
   if (query.pageSize) params.set("pageSize", String(query.pageSize));

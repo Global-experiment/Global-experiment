@@ -205,6 +205,31 @@ test.describe("Treasury list", () => {
     expect((await row.boundingBox())!.height).toBeLessThanOrEqual(41);
   });
 
+  test("the search button (p11) opens a field: public text and entry numbers, in the URL; × closes it", async ({ page }) => {
+    await page.goto("/treasury");
+    await page.getByRole("button", { name: "Search the history" }).click();
+    const field = page.getByRole("searchbox", { name: "Search descriptions, expense types and entry numbers" });
+    await expect(field).toBeFocused();
+    await field.fill("contribution flow");
+    await expect(page).toHaveURL(/\/treasury\?q=contribution\+flow$/);
+    await expect.poll(() => amountsShown(page)).toEqual(["- USD 5,675"]);
+    await axe(page);
+
+    // An expense type's label matches too; a search with no result says so and can be erased.
+    await field.fill("General operations");
+    await expect.poll(() => amountsShown(page)).toEqual(["- USD 5,675"]);
+    await field.fill("nothing like this");
+    await expect(page.getByText("No entries match “nothing like this”.")).toBeVisible();
+
+    // A reload keeps the search; × clears it and brings Sort and Filter back.
+    await page.reload();
+    await expect(field).toHaveValue("nothing like this");
+    await page.getByRole("button", { name: "Close the search" }).click();
+    await expect(page).toHaveURL(/\/treasury$/);
+    await expect(page.getByRole("button", { name: /^Sort:/ })).toBeVisible();
+    await expect.poll(() => amountsShown(page)).toHaveLength(8);
+  });
+
   test("no horizontal scroll from 320px to desktop", async ({ page }) => {
     for (const width of [320, 375, 412, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });

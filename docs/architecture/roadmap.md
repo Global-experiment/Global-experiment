@@ -124,10 +124,18 @@ than one module worth delegating; until then the owner is the only admin
   `treasury.public_recipient_names` (Q3), `treasury.publish_unqualified`
   (Q25), `treasury.wise_connected` (Q22) and `treasury.donation_appeal`
   (the "Cry for donation" banner, switched by hand until Wise gives a
-  Sustainability score — new, to confirm). Left out of the frames for lack
-  of data: the "+2.1%" trends, the public search field, the Amount,
-  Location and Expertise filters, the expense's roadmap link, reactions and
-  timeline (p22), and p23's Roadmap action. Supporting documents: owner
+  Sustainability score — new, to confirm). The p11 search button opens a
+  search of public text (descriptions, expense types, entry numbers;
+  `?q=`), and each stat shows its "+2.1%" trend: the change from the same
+  figure 30 days earlier. **Before go-live (owner, 2026-10-15):** production
+  shows sample data marked as such — sample expenses tagged "Test", sample
+  Balance and Sustainability figures with a note under the stats
+  (`treasury.sample_figures`, until Wise), and Stripe sandbox donations
+  tagged "Test" (`treasury.show_test_donations`, ignored with a live key);
+  `api:seed-sample-treasury` adds the samples, `api:purge-sample-treasury`
+  removes them all (run it at go-live). Left out of the frames for lack of
+  data: the Amount, Location and Expertise filters, the expense's roadmap
+  link, reactions and timeline (p22), and p23's Roadmap action. Supporting documents: owner
   only, PDF / PNG / JPEG ≤ 20 MB, private local disk (Q5 open). No admin
   create or delete of entries (expenses come from Notion, donations from
   Stripe).

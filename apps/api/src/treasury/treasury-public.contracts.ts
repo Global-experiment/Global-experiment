@@ -20,6 +20,8 @@ export const PublicEntriesQuery = z.strictObject({
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   expenseType: list(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, "Unknown expense type.")),
+  /** Search (p11's search field): the public description, an expense type, or the entry number ("12", "EXP-12"). */
+  q: z.string().trim().max(100).optional(),
   sort: z.enum(PUBLIC_SORTS).default("date_desc"),
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -49,14 +51,20 @@ export interface PublicTreasuryEntry {
   recipient: { kind: "person" | "organization"; name: string } | null;
   /** The donation a refund or dispute adjusts. */
   adjustsNumber: number | null;
+  /** A Stripe test-mode (sandbox) donation shown in production before go-live (treasury.show_test_donations): marked Test. */
+  test: boolean;
 }
 
 export interface PublicTreasuryOverview {
   currency: string;
   wiseConnected: boolean;
-  /** Null until Wise is connected (never estimated). */
+  /** Balance and Sustainability are sample figures (treasury.sample_figures, before Wise): the page says so. */
+  sampleFigures: boolean;
+  /** Null until Wise is connected (never estimated), unless sample figures are set. */
   balance: number | null;
   sustainability: number | null;
+  /** Percent change from 30 days earlier, one decimal (Balance and Sustainability: the samples'); null without a base. */
+  trends: { balance: number | null; sustainability: number | null; medianDonation: number | null; expenses: number | null };
   medianDonation: number | null;
   donationCount: number;
   /** Positive minor units: what the published expenses in this currency add up to. */

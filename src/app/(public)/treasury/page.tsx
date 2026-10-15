@@ -27,6 +27,7 @@ export default async function TreasuryPage(props: PageProps<"/treasury">) {
       from: state.from ?? undefined,
       to: state.to ?? undefined,
       expenseType: state.expenseTypes,
+      q: state.q ?? undefined,
       sort: state.sort,
       page: state.page,
       pageSize: HISTORY_PAGE_SIZE,

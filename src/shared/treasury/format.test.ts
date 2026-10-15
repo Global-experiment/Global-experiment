@@ -66,3 +66,20 @@ describe("Treasury times (Europe/Zurich)", () => {
     expect(zurichToday(new Date("2026-10-15T22:30:00Z"))).toBe("2026-10-16");
   });
 });
+
+describe("stat trends (p11)", () => {
+  it("writes a signed percent with one decimal at most; nothing without a base", async () => {
+    const { formatTrend } = await import("./format");
+    expect(formatTrend(2.1)).toBe("+2.1%");
+    expect(formatTrend(-0.4)).toBe("-0.4%");
+    expect(formatTrend(25)).toBe("+25%");
+    expect(formatTrend(0)).toBe("0%");
+    expect(formatTrend(null)).toBeUndefined();
+  });
+  it("the Balance stat: the symbol always spaced (\"$ 91.3K\")", async () => {
+    const { formatStatAmount } = await import("@/shared/donate/money");
+    expect(formatStatAmount(9_130_000, "USD")).toBe("$ 91.3K");
+    expect(formatStatAmount(2_450_000, "EUR")).toBe("€ 24.5K");
+    expect(formatStatAmount(1_180_000, "CHF")).toBe("CHF 11.8K");
+  });
+});

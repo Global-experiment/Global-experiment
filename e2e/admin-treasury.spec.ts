@@ -138,7 +138,7 @@ test("a document over 10 MB reaches the API whole through the website's proxy (u
 test("a Stripe donation: only the internal note and the publication change", async () => {
   await openRecord("EXP-1");
   await expect(page.locator("[data-managed=stripe]")).toContainText("From Stripe");
-  await expect(page.getByText("Stripe test mode: this entry is never public in production.")).toBeVisible();
+  await expect(page.getByText("Stripe test mode: a sandbox payment, shown on the public Treasury (marked Test in production, until go-live).")).toBeVisible();
   await expect(page.getByText("Donations, refunds and disputes need no review.")).toBeVisible();
 
   await page.getByLabel("Internal note").fill("Thank-you email sent");
@@ -149,6 +149,7 @@ test("a Stripe donation: only the internal note and the publication change", asy
 
   await page.getByRole("button", { name: "Unpublish" }).click();
   await expect(page.getByRole("button", { name: "Publish" })).toBeEnabled();
+  await expect(page.getByText("Stripe test mode: a sandbox payment, not real money.")).toBeVisible();
   expect((await page.request.get("/api/treasury/entries/1")).status()).toBe(404);
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByRole("button", { name: "Unpublish" })).toBeEnabled();

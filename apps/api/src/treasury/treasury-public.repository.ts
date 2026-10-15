@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, gte, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { CLOCK, zurichDate, type Clock } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
 import type { AppConfig } from "../common/config/env.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
@@ -8,7 +9,7 @@ import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
 import { SettingsService } from "../settings/settings.service.js";
 import type { PublicEntriesQuery, PublicTreasuryEntry, PublicTreasuryOverview } from "./treasury-public.contracts.js";
-import { publicStripeLivemode, TreasuryLedgerRepository } from "./treasury-ledger.repository.js";
+import { publicStripeModes, TreasuryLedgerRepository } from "./treasury-ledger.repository.js";
 import {
   treasuryEntries,
   treasuryEntryExpenseTypes,
@@ -24,13 +25,16 @@ const DONATION_TYPES = ["donation", "refund", "dispute"];
 interface Visibility {
   publishUnqualified: boolean;
   publicRecipientNames: boolean;
+  /** The Stripe modes shown (`livemode` values). */
+  stripeModes: boolean[];
 }
 
 /**
  * The public Treasury (roadmap 1b): only the `treasury_public_entries` view
  * (published entries, public columns), and on top of it:
  *
- * - Stripe entries of the public mode only (production: live only);
+ * - Stripe entries of the public modes only (production: live, plus test
+ *   ones marked Test while `treasury.show_test_donations` is on before go-live);
  * - while `treasury.publish_unqualified` is off, only Qualified / Not
  *   required entries — even one published while the setting was on;
  * - a recipient's name only while `treasury.public_recipient_names` is on.
@@ -42,20 +46,25 @@ export class TreasuryPublicRepository {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(CLOCK) private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly ledger: TreasuryLedgerRepository,
   ) {}
 
   private async visibility(): Promise<Visibility> {
-    const values = await this.settings.getMany(["treasury.publish_unqualified", "treasury.public_recipient_names"]);
-    return { publishUnqualified: values["treasury.publish_unqualified"], publicRecipientNames: values["treasury.public_recipient_names"] };
+    const values = await this.settings.getMany(["treasury.publish_unqualified", "treasury.public_recipient_names", "treasury.show_test_donations"]);
+    return {
+      publishUnqualified: values["treasury.publish_unqualified"],
+      publicRecipientNames: values["treasury.public_recipient_names"],
+      stripeModes: publicStripeModes(this.config, values["treasury.show_test_donations"]),
+    };
   }
 
   /** The one rule for what the public sees (list, detail, totals). */
   private visible(visibility: Visibility): SQL {
     const view = treasuryPublicEntries;
     return and(
-      or(ne(view.source, "stripe"), eq(view.livemode, publicStripeLivemode(this.config))),
+      or(ne(view.source, "stripe"), inArray(view.livemode, visibility.stripeModes)),
       visibility.publishUnqualified ? undefined : inArray(view.reviewStatusKey, REVIEWED),
     )!;
   }
@@ -70,7 +79,21 @@ export class TreasuryPublicRepository {
       query.expenseType.length > 0
         ? sql`exists (select 1 from ${treasuryEntryExpenseTypes} where ${treasuryEntryExpenseTypes.entryId} = ${view.id} and ${inArray(treasuryEntryExpenseTypes.typeKey, query.expenseType)})`
         : undefined,
+      query.q ? this.search(query.q) : undefined,
     ];
+  }
+
+  /** Public text only: the description (null until reviewed, by the view), the expense types' labels, the number. */
+  private search(q: string): SQL {
+    const view = treasuryPublicEntries;
+    // LIKE wildcards in the text are literal (default escape character: backslash).
+    const pattern = `%${q.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+    const number = /^(?:exp-?)?(\d{1,9})$/i.exec(q);
+    return or(
+      ilike(view.publicDescription, pattern),
+      sql`exists (select 1 from ${treasuryEntryExpenseTypes} join ${treasuryExpenseTypes} on ${treasuryExpenseTypes.key} = ${treasuryEntryExpenseTypes.typeKey} where ${treasuryEntryExpenseTypes.entryId} = ${view.id} and ${ilike(treasuryExpenseTypes.label, pattern)})`,
+      number ? eq(view.entryNumber, Number(number[1])) : undefined,
+    )!;
   }
 
   private order(sort: PublicEntriesQuery["sort"]): SQL[] {
@@ -105,6 +128,9 @@ export class TreasuryPublicRepository {
         publishedAt: view.publishedAt,
         reviewStatusKey: view.reviewStatusKey,
         description: view.publicDescription,
+        source: view.source,
+        livemode: view.livemode,
+        sample: view.sample,
         adjustsNumber: adjusted.entryNumber,
         // Names are read only while the setting allows them (else not even selected).
         personName: visibility.publicRecipientNames ? people.name : sql<null>`null`,
@@ -117,7 +143,10 @@ export class TreasuryPublicRepository {
       .leftJoin(adjusted, eq(adjusted.id, view.adjustsEntryId));
   }
 
-  private async withExpenseTypes(rows: Awaited<ReturnType<ReturnType<TreasuryPublicRepository["selectEntries"]>["execute"]>>): Promise<PublicTreasuryEntry[]> {
+  private async withExpenseTypes(
+    rows: Awaited<ReturnType<ReturnType<TreasuryPublicRepository["selectEntries"]>["execute"]>>,
+    visibility: Visibility,
+  ): Promise<PublicTreasuryEntry[]> {
     const ids = rows.filter((row) => row.type === "expense").map((row) => row.id);
     const links =
       ids.length === 0
@@ -146,6 +175,9 @@ export class TreasuryPublicRepository {
           ? { kind: "person", name: row.personName }
           : null,
       adjustsNumber: row.adjustsNumber ?? null,
+      // Sample entries (before go-live), and Stripe sandbox donations where real ones can be public too (production
+      // before go-live; elsewhere every Stripe entry is a test one, unmarked).
+      test: row.sample || (row.source === "stripe" && !row.livemode && visibility.stripeModes.includes(true)),
     }));
   }
 
@@ -161,7 +193,7 @@ export class TreasuryPublicRepository {
         .offset((query.page - 1) * query.pageSize),
       this.db.select({ n: sql<number>`count(*)::int` }).from(view).where(where),
     ]);
-    return { items: await this.withExpenseTypes(rows), total: count?.n ?? 0, page: query.page, pageSize: query.pageSize };
+    return { items: await this.withExpenseTypes(rows, visibility), total: count?.n ?? 0, page: query.page, pageSize: query.pageSize };
   }
 
   async entry(number: number): Promise<PublicTreasuryEntry | null> {
@@ -170,20 +202,26 @@ export class TreasuryPublicRepository {
       .where(and(this.visible(visibility), eq(treasuryPublicEntries.entryNumber, number)))
       .limit(1);
     if (rows.length === 0) return null;
-    return (await this.withExpenseTypes(rows))[0]!;
+    return (await this.withExpenseTypes(rows, visibility))[0]!;
   }
 
   async overview(currency: TreasuryCurrency): Promise<PublicTreasuryOverview> {
     const visibility = await this.visibility();
     const view = treasuryPublicEntries;
     const visible = this.visible(visibility);
-    const [settings, donations, [expenses], [range], expenseTypes, [updated]] = await Promise.all([
-      this.settings.getMany(["treasury.wise_connected", "treasury.donation_appeal"]),
-      this.ledger.donationSummary(currency),
+    // Trends compare each figure with the same figure 30 days earlier (entries that occurred up to then).
+    const monthAgo = zurichDate(new Date(this.clock().getTime() - 30 * 24 * 60 * 60 * 1000));
+    const expensesOf = (asOf?: string) =>
       this.db
         .select({ total: sql<string>`coalesce(sum(-${view.grossAmount}), 0)`, count: sql<number>`count(*)::int` })
         .from(view)
-        .where(and(visible, eq(view.entryType, "expense"), eq(view.currency, currency))),
+        .where(and(visible, eq(view.entryType, "expense"), eq(view.currency, currency), asOf ? lte(view.occurredOn, asOf) : undefined));
+    const [settings, donations, donationsBefore, [expenses], [expensesBefore], [range], expenseTypes, [updated]] = await Promise.all([
+      this.settings.getMany(["treasury.wise_connected", "treasury.donation_appeal", "treasury.sample_figures"]),
+      this.ledger.donationSummary(currency),
+      this.ledger.donationSummary(currency, monthAgo),
+      expensesOf(),
+      expensesOf(monthAgo),
       this.db
         .select({
           first: sql<string | null>`min(${view.occurredOn})::text`,
@@ -207,16 +245,26 @@ export class TreasuryPublicRepository {
         .where(visible),
     ]);
     const wiseConnected = settings["treasury.wise_connected"];
+    // Before Wise: sample figures, when set (marked as samples on the page).
+    const sample = wiseConnected ? null : settings["treasury.sample_figures"];
     const lastUpdated = updated?.at ?? null;
+    const expensesTotal = Number(expenses?.total ?? 0);
     return {
       currency,
-      // Hidden until Wise is connected (Q22): no figure is invented before then.
+      // Hidden until Wise is connected (Q22), unless sample figures are set: no real figure is invented.
       wiseConnected,
-      balance: null,
-      sustainability: null,
+      sampleFigures: sample !== null,
+      balance: sample ? (sample.balance[currency] ?? null) : null,
+      sustainability: sample ? sample.sustainability : null,
+      trends: {
+        balance: sample?.trends.balance ?? null,
+        sustainability: sample?.trends.sustainability ?? null,
+        medianDonation: percentChange(donationsBefore.medianDonation, donations.medianDonation),
+        expenses: percentChange(Number(expensesBefore?.total ?? 0), expensesTotal),
+      },
       medianDonation: donations.medianDonation,
       donationCount: donations.donationCount,
-      expensesTotal: Number(expenses?.total ?? 0),
+      expensesTotal,
       expenseCount: expenses?.count ?? 0,
       donationAppeal: settings["treasury.donation_appeal"],
       lastUpdatedAt: lastUpdated === null ? null : new Date(lastUpdated).toISOString(),
@@ -228,4 +276,10 @@ export class TreasuryPublicRepository {
       },
     };
   }
+}
+
+/** The change from `before` to `now` in percent, one decimal; null without a base to compare with. */
+export function percentChange(before: number | null, now: number | null): number | null {
+  if (before === null || now === null || before <= 0) return null;
+  return Math.round(((now - before) / before) * 1000) / 10;
 }

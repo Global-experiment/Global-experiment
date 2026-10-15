@@ -39,6 +39,10 @@ export default defineConfig({
   // every request (client feedback items 15–16, no cache); a cold/slow
   // live fetch can occasionally take longer than Playwright's 30s default.
   timeout: 60_000,
+  // `next dev` compiles a route on its first visit, which on a loaded machine
+  // can exceed the 5s default of a navigation assertion (toHaveURL after a
+  // click), so a cold route made a different test fail on each run.
+  expect: { timeout: 10_000 },
   webServer: [
     ...(testDatabaseUrl
       ? [

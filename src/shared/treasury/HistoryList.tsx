@@ -8,9 +8,13 @@ import { TransactionTags } from "./TransactionTags";
 export const entryHref = (entry: Pick<PublicTreasuryEntry, "type" | "number">) =>
   entry.type === "expense" ? `/treasury/expense/${entry.number}` : `/treasury/donation/${entry.number}`;
 
-/** A row's tags (p11): "Not qualified yet" first, then the expense types. */
+/** A row's tags (p11): "Test" for a sandbox donation, "Not qualified yet", then the expense types. */
 export function entryTags(entry: PublicTreasuryEntry): string[] {
-  return [...(entry.qualified ? [] : [TREASURY_COPY.history.notQualified]), ...entry.expenseTypes.map((type) => type.label)];
+  return [
+    ...(entry.test ? [TREASURY_COPY.history.test] : []),
+    ...(entry.qualified ? [] : [TREASURY_COPY.history.notQualified]),
+    ...entry.expenseTypes.map((type) => type.label),
+  ];
 }
 
 /**

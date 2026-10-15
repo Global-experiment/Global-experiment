@@ -24,6 +24,8 @@
     "api:typecheck": "npm run typecheck -w @global-experiment/api",
     "api:purge-demo-data": "npm run api:build && npm run purge-demo-data -w @global-experiment/api --",
     "api:purge-test-donations": "npm run api:build && npm run purge-test-donations -w @global-experiment/api --",
+    "api:seed-sample-treasury": "npm run api:build && npm run seed-sample-treasury -w @global-experiment/api --",
+    "api:purge-sample-treasury": "npm run api:build && npm run purge-sample-treasury -w @global-experiment/api --",
     "api:import:taxonomy": "npm run api:build && npm run import:taxonomy -w @global-experiment/api --",
     "api:import:directory": "npm run api:build && npm run import:directory -w @global-experiment/api --",
     "api:import:treasury": "npm run api:build && npm run import:treasury -w @global-experiment/api --"

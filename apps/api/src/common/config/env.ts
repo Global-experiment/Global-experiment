@@ -69,6 +69,7 @@ const envSchema = z
     TREASURY_PUBLISH_UNQUALIFIED: booleanFromString.default(false),
     TREASURY_WISE_CONNECTED: booleanFromString.default(false),
     TREASURY_DONATION_APPEAL: booleanFromString.default(false),
+    TREASURY_SHOW_TEST_DONATIONS: booleanFromString.default(false),
     /** Default schedules of the Notion imports: a 5-field cron expression (server time zone: UTC), or "off". */
     IMPORT_SCHEDULE_TAXONOMY: cronOrOff.default("off"),
     IMPORT_SCHEDULE_DIRECTORY: cronOrOff.default("off"),
@@ -160,6 +161,7 @@ const envSchema = z
         publishUnqualified: env.TREASURY_PUBLISH_UNQUALIFIED,
         wiseConnected: env.TREASURY_WISE_CONNECTED,
         donationAppeal: env.TREASURY_DONATION_APPEAL,
+        showTestDonations: env.TREASURY_SHOW_TEST_DONATIONS,
       },
       importSchedules: {
         taxonomy: env.IMPORT_SCHEDULE_TAXONOMY,

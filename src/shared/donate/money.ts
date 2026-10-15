@@ -65,5 +65,10 @@ export function formatMedian(minor: number, currency: DonationCurrency): string 
   return `${symbol}${spaced ? " " : ""}${compact(minor / 100)}`;
 }
 
+/** Treasury Balance stat (p11): "$ 91.3K", "€ 12K", "CHF 2.5K" — the symbol always spaced. */
+export function formatStatAmount(minor: number, currency: DonationCurrency): string {
+  return `${PREFIX[currency].symbol} ${compact(minor / 100)}`;
+}
+
 /** Stats row: "321", "1.2K". */
 export const formatCount = (count: number) => compact(count);

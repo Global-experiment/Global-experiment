@@ -12,7 +12,7 @@ import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import { parseFilter, serializeFilter, type FilterRule, type SortRule } from "../table/listState";
 import { ViewTabs } from "../table/ViewTabs";
-import { formatBreakdown, formatMoney, formatOccurred, managedLabel, modeLabel, PUBLICATION_LABEL, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
+import { formatBreakdown, formatMoney, formatOccurred, managedLabel, modeLabel, PUBLICATION_LABEL, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
 
 const DEFAULT_SORT: SortRule[] = [
   { field: "occurred", direction: "desc" },
@@ -61,9 +61,9 @@ const COLUMNS: TableColumn<TreasuryEntryRow>[] = [
       )),
   },
   { id: "review", label: "Review status", icon: "select", width: 160, render: (row) => row.review.label },
-  { id: "publication", label: "Publication", icon: "select", width: 120, render: (row) => (row.publication === "published" ? PUBLICATION_LABEL.published : muted(PUBLICATION_LABEL.unpublished)) },
+  { id: "publication", label: "Publication", icon: "select", width: 170, render: (row) => (row.publicNow ? publicationLabel(row) : muted(publicationLabel(row))) },
   { id: "source", label: "Source", icon: "select", width: 100, render: (row) => SOURCE_LABEL[row.source] },
-  { id: "mode", label: "Mode", icon: "select", width: 80, render: (row) => (row.livemode ? modeLabel(row) : muted(modeLabel(row))) },
+  { id: "mode", label: "Mode", icon: "select", width: 80, render: (row) => (row.livemode && !row.sample ? modeLabel(row) : muted(modeLabel(row))) },
   { id: "managed_by", label: "Managed by", icon: "lock", width: 120, render: (row) => managedLabel(row) },
   { id: "documents", label: "Documents", icon: "insert_drive_file", width: 110, render: (row) => (row.documents > 0 ? String(row.documents) : muted("0")) },
   { id: "created", label: "Created", icon: "schedule", width: 120, defaultHidden: true, render: (row) => formatDate(row.createdAt) },

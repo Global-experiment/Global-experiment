@@ -15,6 +15,8 @@
     "admin:set-owner": "node dist/auth/cli/set-owner.js",
     "purge-demo-data": "node dist/scripts/purge-demo-data.js",
     "purge-test-donations": "node dist/scripts/purge-test-donations.js",
+    "seed-sample-treasury": "node dist/scripts/seed-sample-treasury.js",
+    "purge-sample-treasury": "node dist/scripts/purge-sample-treasury.js",
     "import:taxonomy": "node dist/scripts/import-taxonomy.js",
     "import:directory": "node dist/scripts/import-directory.js",
     "import:treasury": "node dist/scripts/import-treasury.js"
