@@ -28,7 +28,10 @@ values are never printed.
    owner's computer (identical), `api.env` copied.
 2. **Update and build** (website and admin offline from here): stop both
    services, `git pull --ff-only origin develop`, `npm ci`, web and API
-   builds, `chown -R globalexp:globalexp .next`.
+   builds, `chown -R globalexp:globalexp .next`, and `rm -rf .next/cache/fetch-cache`:
+   the website's data cache survives a build, and a response cached from the
+   previous API could reach the new pages (it made the first `/treasury`
+   request of this release fail once; the page now tolerates it too).
 3. **Migration 0008.** Expected: 9 migrations; `treasury_entries.sample`
    false on every existing row.
 4. **Environment:** `TREASURY_SHOW_TEST_DONATIONS=true` in `api.env`.

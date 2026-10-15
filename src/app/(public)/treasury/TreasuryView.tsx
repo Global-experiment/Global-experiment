@@ -314,15 +314,15 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
   const { currency } = overview;
   const stats = copy.stats;
   const items: StatItem[] = [];
-  const { trends } = overview;
+  const trends = overview.trends;
   // Sample figures (before Wise) say so in the sheet's caption and under the row.
-  const sample = overview.sampleFigures && !overview.wiseConnected;
+  const sample = overview.sampleFigures === true && !overview.wiseConnected;
   if (overview.wiseConnected || sample) {
     items.push(
       {
         id: "balance",
         value: overview.balance === null ? stats.noValue : formatStatAmount(overview.balance, currency),
-        trend: formatTrend(trends.balance),
+        trend: formatTrend(trends?.balance ?? null),
         label: stats.balance,
         detail: {
           title: stats.balanceDetail.title,
@@ -334,7 +334,7 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
       {
         id: "sustainability",
         value: overview.sustainability === null ? stats.noValue : String(overview.sustainability),
-        trend: formatTrend(trends.sustainability),
+        trend: formatTrend(trends?.sustainability ?? null),
         label: stats.sustainability,
         detail: {
           title: stats.sustainabilityDetail.title,
@@ -349,7 +349,7 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
     {
       id: "median-donation",
       value: overview.medianDonation === null ? stats.noValue : formatMedian(overview.medianDonation, currency),
-      trend: formatTrend(trends.medianDonation),
+      trend: formatTrend(trends?.medianDonation ?? null),
       label: stats.median,
       detail: {
         title: stats.medianDetail.title,
@@ -361,7 +361,7 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
     {
       id: "expenses",
       value: formatCompact(overview.expensesTotal),
-      trend: formatTrend(trends.expenses),
+      trend: formatTrend(trends?.expenses ?? null),
       label: stats.expenses,
       detail: {
         title: stats.expensesDetail.title,

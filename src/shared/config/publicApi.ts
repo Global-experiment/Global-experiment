@@ -108,12 +108,16 @@ export interface PublicTreasuryEntry {
 export interface TreasuryOverview {
   currency: DonationCurrency;
   wiseConnected: boolean;
-  /** Balance and Sustainability are sample figures (before Wise): the page says so. */
-  sampleFigures: boolean;
+  /** Balance and Sustainability are sample figures (before Wise): the page says so. Absent from an older API. */
+  sampleFigures?: boolean;
   balance: number | null;
   sustainability: number | null;
-  /** Percent change from 30 days earlier, one decimal; null without a base. */
-  trends: { balance: number | null; sustainability: number | null; medianDonation: number | null; expenses: number | null };
+  /**
+   * Percent change from 30 days earlier, one decimal; null without a base.
+   * Absent from an older API: a response cached before a deploy can reach a
+   * newer page, which then shows no trends rather than failing.
+   */
+  trends?: { balance: number | null; sustainability: number | null; medianDonation: number | null; expenses: number | null };
   medianDonation: number | null;
   donationCount: number;
   expensesTotal: number;
