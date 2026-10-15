@@ -41,7 +41,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
     page = await context.newPage();
     await page.goto("/admin/treasury");
     // An expired session is sent to the login page by the client after the first load.
-    await expect(signIn().or(page.locator("tbody tr").first())).toBeVisible();
+    await expect(signIn().or(page.locator("tbody tr").first())).toBeVisible({ timeout: 30_000 });
     if (!(await signIn().isVisible()) || state === undefined) break;
     await context.close();
   }
@@ -122,6 +122,17 @@ test("supporting documents: upload, list, download and delete (private, admins o
   const anonymous = await page.context().browser()!.newContext();
   expect((await anonymous.request.get("/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000", { headers: { origin: "http://localhost" } })).status()).toBe(401);
   await anonymous.close();
+});
+
+test("a document over 10 MB reaches the API whole through the website's proxy (up to 20 MB)", async () => {
+  await openRecord("Platform development");
+  const big = Buffer.concat([PDF, Buffer.alloc(15 * 1024 * 1024, 0x20)]);
+  await page.locator("input[type=file]").setInputFiles({ name: "scan-15mb.pdf", mimeType: "application/pdf", buffer: big });
+  const documents = page.getByRole("list", { name: "Supporting documents" });
+  await expect(documents.getByRole("link", { name: "scan-15mb.pdf" })).toBeVisible({ timeout: 30_000 });
+  await documents.getByRole("button", { name: "Delete scan-15mb.pdf" }).click();
+  await documents.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("No documents yet.")).toBeVisible();
 });
 
 test("a Stripe donation: only the internal note and the publication change", async () => {
