@@ -74,3 +74,22 @@ rebuild, `chown`, remove `TREASURY_SHOW_TEST_DONATIONS`, start.
 | Samples | `seed-sample-treasury --confirm`: 12 USD, 2 EUR, 2 CHF sample expenses and the sample figures. After: taxonomy unchanged, people 1, organizations 1 (the sample recipient), entries 18 (16 samples). |
 | Incident | The first `/treasury` request (06:00:02) answered 500: the website's data cache, which survives a build, served the previous API's overview (no `trends`). Cleared `.next/cache/fetch-cache`; every page 200 since. Fixed in `31b503b` (the page tolerates an older overview; deploys clear the data cache), released at once: backup `ge-prod-20261015-060648.dump` (SHA-256 `22fc4f5af8e9bd5f509f57a51671e40eecbb504b3beaa1fe998e57f777196731`, copied, identical), website stopped 06:06:49, up 06:06:59 (**10 seconds**), `07cf94f..639dbd9`. |
 | Checks | `/treasury` (USD, EUR, CHF, All), search `?q=hosting`, `?type=expense`, `/donate`: 200, three times each. An expense page and a donation page 200; unknown entry 404; `/admin/treasury` 200. USD overview: Balance $ 91.3K +2.1%, Sustainability 1.4 +2.1%, Med. donation $27.5, Expenses 39.8K +32.9%, the sample note; history 14, every entry tagged "Test". Web and API logs: 0 errors after the fix. |
+
+## Follow-up — Donate payment methods as in Figma p28 (2026-10-15)
+
+Owner's request: the Donate page as in Common pages p28. Configuration
+only, no code: `DONATIONS_EXTRA_METHODS=true` (PayPal in USD, EUR and CHF,
+one-off; Direct debit SEPA in EUR) and `DONATIONS_MONTHLY=true` (the Once /
+Monthly switch and the Monthly donors stat) in `api.env` (copied first:
+`api.env.20261015-092915`). The website's data cache cleared; services
+restarted 09:29:15 → 09:29:17 UTC (2 seconds).
+
+Checked first in the Stripe sandbox, with the checkout's own settings
+(Managed Payments and Adaptive Pricing off): PayPal USD / EUR / CHF, SEPA
+one-off and monthly, monthly card — all accepted. The webhook endpoint has
+the nine events of [stripe.md](stripe.md). After the change:
+`/api/donations/config` lists them; checkouts through the public API open
+Stripe Checkout for PayPal (USD, EUR, CHF), SEPA (EUR, once and monthly)
+and monthly card; monthly PayPal and SEPA in USD are refused (400), as the
+rules say. At go-live the live Stripe account needs PayPal and SEPA
+activated in its payment methods before the live key goes in.
