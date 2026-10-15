@@ -1,6 +1,8 @@
 # Native backend implementation plan
 
-Status: living document, started 2026-10-03. Owner: lead engineer.
+Status: historical, started 2026-10-03; superseded by
+`docs/architecture/overview.md`, `data-model.md` and `roadmap.md`, which
+describe the current design. Kept as the record of the first plan.
 Scope: evolve Global Experiment v0.1 from "Next.js + live Notion" into
 "Next.js frontend + NestJS native API + PostgreSQL", without breaking the
 deployed public site at any point.
@@ -15,7 +17,7 @@ deployed public site at any point.
   `src/integrations/notion` behind `HomeRepository` /
   `DocumentationRepository`; Documentation dataset cached 60 s
   (`unstable_cache`). This stays the production source until Phase 5/11.
-- Treasury and Donate render clearly-labelled illustrative data
+- Treasury and Donate render labeled illustrative data
   (`src/shared/treasury/presentationData.ts`). Waitlist, Feedback, Issue and
   Contribute are UI shells that persist nothing.
 - PostgreSQL/Drizzle: dependencies and `drizzle.config.ts` exist, but no

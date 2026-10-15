@@ -43,7 +43,7 @@ in them.
   rewriting v0.1 for v1 (by ignoring future shape), and speculative v1
   scaffolding that never gets validated against real requirements (by
   building it early).
-- Keeps the repository's structure an honest reflection of what's actually
+- Keeps the repository's structure an honest reflection of what's
   implemented, which matters for a public, transparency-oriented project.
 
 ## Alternatives Considered
@@ -51,9 +51,9 @@ in them.
 - **Scaffold all future modules/tables now as empty stubs** — rejected:
   creates unused code and schema that will likely need revision once v1
   requirements (voting rules, quorum rules, coefficient formulas) are
-  actually defined; contradicts the project's own "don't create unused
+  defined; contradicts the project's own "don't create unused
   architecture" guidance.
-- **Design v0.1 without regard for v1 shape** — rejected: would very likely
+- **Design v0.1 without regard for v1 shape** — rejected: would likely
   force a rewrite of the Documentation/Notion boundary and database access
   patterns once governance/participant features arrive.
 

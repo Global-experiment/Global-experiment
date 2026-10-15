@@ -7,8 +7,8 @@ Accepted
 ## Context
 
 While verifying the Documentation feature's behavior against a production
-build (`next start`, the self-hosted mode this project will actually run
-in on Hetzner), two related bugs were found by direct, isolated testing
+build (`next start`, the self-hosted mode this project will run in on
+Hetzner), two related bugs were found by direct, isolated testing
 (not assumed from documentation):
 
 1. A request to a nonexistent article slug (`/documentation/[slug]`)
@@ -75,7 +75,7 @@ status for a Notion/config failure the same way).
   real way to error too. Generalizing the rule to "no Suspense on any
   route that can produce a non-200 status" avoids re-litigating this per
   future route.
-- **Remove error.tsx entirely** — rejected: loses a genuinely useful
+- **Remove error.tsx entirely** — rejected: loses a useful
   friendly message for provider errors, for a problem that has a targeted
   fix.
 

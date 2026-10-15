@@ -167,7 +167,7 @@ So that a module or a field is added by configuration, not by a new screen:
   flags. The admin shell builds the sidebar from the registry plus
   `GET /api/admin/modules` (enabled state, mode, the user's permissions);
   a module that isn't enabled shows as **"Coming soon"** (today's
-  behaviour, now data-driven).
+  behavior, now data-driven).
 - **Config-driven list pages.** Per module: columns (type — text, select,
   relation, date, number, money, boolean, tags; width; icon; default
   visibility), filters with their operators and option sources, sorts,
