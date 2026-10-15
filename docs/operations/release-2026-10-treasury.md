@@ -1,7 +1,8 @@
 # Release plan — Treasury (roadmap module 1b)
 
-**Status: prepared, not run.** Nothing here has touched production; each
-step needs the owner's go-ahead.
+**Status: run on 2026-10-14 (UTC)**: see the
+[record of the run](#record-of-the-run--2026-10-14) at the end. One open
+item: documents over 10 MB (see *Differed from Expected*).
 
 **What ships:** migration **0007** (`treasury_documents`, `import_runs.kind`
 += `treasury`), the public Treasury from the ledger (`/treasury`, the
@@ -106,3 +107,48 @@ Stop both services; restore the dump (directory runbook §10); `git checkout`
 the previous commit, `npm ci`, rebuild, `chown`, start. The `pgboss` schema
 and the files directory can stay (unused by the previous version) or be
 dropped: `DROP SCHEMA pgboss CASCADE`.
+
+## Record of the run — 2026-10-14
+
+**What shipped:** `develop` at `a66f04c` (*Merge branch 'feat/treasury' into
+develop*). **Before:** `bd5b5cc`. The phases ran as root from scripts copied
+to `/root/deploy-1b/` (same commands as above; values never printed).
+
+| Step | Result |
+|---|---|
+| Pre-flight | Server on `bd5b5cc`, both services active, 7 migrations, 68 GB free. domains 14, fields 120, expertise 1105, team links 1400, people 1, organizations 0, treasury entries 1 (a sandbox donation), import runs 4, settings 0. |
+| Backup | `STAMP=20261014-230926`, services running (pg_dump snapshot). `ge-prod-20261014-230926.dump`, 189,420 bytes, 24 TABLE DATA, SHA-256 `2b14a0f28c5a104d544a4022ed316e9ef64ebfe474224b72ced649a5c7a7e03c`; copied to `ge-db-backups`, hash identical. `api.env`, web `.env.local`, the nginx site and both systemd units copied. |
+| pg-boss privilege | Database owner `ge_app` = the API's user: `CREATE` on `global_experiment` is `t`, no grant needed. |
+| Files directory | `/var/lib/global-experiment` (root, 755), `files` (`globalexp`, 700), outside the web root. Backed up as `ge-files-20261014-230926.tar.gz`, SHA-256 `7eb05bbe45b95547f21cfcaa5bf271538f505216c2c4742efbeebf58b2f7e508`; copied to `ge-db-backups`, hash identical. Later backups: dump plus a tar of this directory. |
+| nginx | `location ~ ^/api/admin/treasury/[0-9a-f-]+/documents$` with `client_max_body_size 21m`, before `location /` (which keeps the 1 MB default). `nginx -t` OK, reloaded. |
+| Environment | `NOTION_TREASURY_DB_ID` (from stdin) and `FILE_STORAGE_DIR=/var/lib/global-experiment/files` appended to `api.env` (root, 600). The Treasury settings keep their defaults. |
+| Update and build | Services stopped 23:10:31 UTC. `bd5b5cc..a66f04c` (fast-forward), `npm ci` (662 packages), web build OK (`/treasury`, both detail routes, `/admin/treasury`, `/admin/treasury/[id]`), `api/admin` in routes manifest (3), API build OK, `chown -R globalexp:globalexp .next`. |
+| Migration | Applied: 8 migrations, `treasury_documents` empty. |
+| Restart and health | Services started, up 23:11:07 UTC, both active. API log: *Job queue started (pg-boss, 2 queues)*. API health 200, home 200, `/donate` 200, `/admin/treasury` and `/admin/imports` 200, `/api/admin/treasury` without login 401. |
+| Public Treasury | `/treasury`, `?currency=all`, `?currency=EUR` 200: "No entries yet…" empty state, no Balance or Sustainability (Wise not connected), no banner, the header chart link to `/treasury`. Overview USD: 0 donations, 0 expenses, no filters. The sandbox donation stays hidden (live only in production). Unknown entries `/treasury/expense/999999`, `/treasury/donation/999999`, `/treasury/expense/abc` 404. Web log: 0 errors. |
+| Admin | With a temporary owner session (10 minutes, deleted afterwards): `/api/admin/treasury` 200, total 1 (the sandbox donation); options 200; Imports status 200 with the Treasury card available. |
+| Importer dry run | `import:treasury --dry-run`: 40 rows (20 expenses, 20 donations), 40 demo skipped, 0 created / updated / flagged, 0 missing, apply refused (all demo). Import runs 4 → 5 (the dry-run record). |
+| Documents | Small PDF through nginx: upload 201, stored as `globalexp` 600, download byte-identical, delete 204, 0 rows and 0 files left. **15 MB: 500** (see below); nothing stored. |
+| pg-boss | Schema `pgboss`; queues `import.run`, `stripe.fee-reconcile` (schedule `*/15 * * * *`); by 03:45 UTC, 19 fee-reconcile runs, all completed. |
+| Verify | domains 14, fields 120, expertise 1105, team links 1400, people 1, organizations 0, treasury entries 1, settings 0, treasury documents 0 — unchanged. |
+
+**Downtime:** 23:10:31 → 23:11:07 UTC (01:10:31 → 01:11:07 Zurich, 15
+October), 36 seconds, website and admin.
+
+**Differed from Expected:**
+
+- **Documents over 10 MB fail.** The website's API proxy (Next.js rewrites)
+  buffers request bodies up to `experimental.proxyClientMaxBodySize`,
+  10 MB by default, and cuts the rest; the API then waits for the missing
+  bytes and the request ends in a 500 after 30 seconds. Documents up to
+  10 MB work. Fix ready (not yet shipped): `proxyClientMaxBodySize: "21mb"`
+  in `next.config.ts`, with an end-to-end test that uploads 15 MB through
+  the website; shipping it is a web rebuild and restart, no migration.
+- The 2 empty shard folders from the test upload stay in the files
+  directory (harmless).
+
+**Rollback (not needed):** stop both services; restore
+`ge-prod-20261014-230926.dump` into `global_experiment` (§10 of the
+directory runbook); `git checkout bd5b5cc`, `npm ci`, rebuild,
+`chown -R globalexp:globalexp .next`, start. Restore the nginx site from
+`/root/backups/nginx-global-experiment.20261014-230926`, then `nginx -t` and reload.
