@@ -7,14 +7,14 @@ Accepted
 ## Context
 
 The client needs to navigate the full Home information architecture during
-visual review — every button Figma shows as a destination should actually
-go somewhere — without that being mistaken for M2/M3 backend features
+visual review — every button Figma shows as a destination should go
+somewhere — without that being mistaken for M2/M3 backend features
 (Waitlist persistence, Donations via Stripe, Treasury sync, Feedback/Issue
 processing) being implemented early.
 
 ## Decision
 
-Two distinct, clearly labeled concepts, referenced by this ADR number in
+Two distinct, labeled concepts, referenced by this ADR number in
 code comments wherever they apply:
 
 - **M1 navigation scaffold**: the route exists, is reachable via a real
@@ -28,17 +28,17 @@ Concretely, for each route shell (`/waitlist`, `/donate`, `/treasury`,
 `/feedback`, `/issue`):
 - Navigation into and out of the page is real (`Link`, back buttons).
 - Form inputs and selection controls (amount, frequency, feedback/issue
-  type, message text) are real, working UI state — because that's just
+  type, message text) are real, working UI state — because that is
   local component state, not a backend feature.
 - The final submit/pay action is a real, enabled button (not disabled —
-  disabled is reserved for navigation that genuinely doesn't exist yet,
+  disabled is reserved for navigation that doesn't exist yet,
   which no longer applies to any Home destination) that shows
   `InertActionNotice` on click instead of performing or faking the action.
   It never navigates to a fake success page.
 
 `/contribute` is the one exception: per the Figma/IA audit, it only needs a
 `mailto:` link and a client-side copy-to-clipboard button, neither of which
-depends on the later AI/email-ingestion backend — so it's genuinely
+depends on the later AI/email-ingestion backend — so it's
 functional now, not a scaffold.
 
 ## Why Chosen
@@ -46,7 +46,7 @@ functional now, not a scaffold.
 - Matches the client's explicit distinction: "M1 navigation scaffold: route
   exists and can be reviewed visually" vs. "later milestone implementation:
   actual business action."
-- A real, enabled button that clearly declines the action (via
+- A real, enabled button that declines the action (via
   `InertActionNotice`) is more honest than either faking success or
   disabling a control the design shows as available.
 
@@ -56,7 +56,7 @@ functional now, not a scaffold.
   explicitly distinguished disabled-for-navigation (not allowed) from
   disabled-for-an-unimplemented-action; a disabled submit button on a page
   otherwise built for "visual review" also makes the primary visual element
-  (the button style itself) harder to actually review.
+  (the button style itself) harder to review.
 - **Fake a success screen on submit** — explicitly rejected by the client
   ("do not fake successful data submission").
 

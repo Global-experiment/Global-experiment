@@ -244,7 +244,7 @@ adapter; the Playwright suites run the API with `STRIPE_FIXTURE=1`
 - **Disputes** are answered in the Stripe Dashboard (evidence). The ledger
   follows Stripe's money movements: "Payment disputed" when the funds are
   withdrawn (with Stripe's dispute fee), "Dispute won" when they're
-  reinstated. A lost dispute simply keeps the negative adjustment.
+  reinstated. A lost dispute keeps the negative adjustment.
 - **Test-mode rows** (e.g. after a pre-launch test on production):
   ```bash
   npm run api:purge-test-donations                           # dry run: counts only
