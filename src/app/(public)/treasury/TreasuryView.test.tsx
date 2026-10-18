@@ -41,8 +41,10 @@ describe("Treasury stats", () => {
   });
 
   it("renders an overview from an older API (cached before a deploy: no trends, no sample flag) instead of failing", () => {
-    const { trends: _trends, sampleFigures: _sample, ...older } = overview;
-    const html = render({ ...older, balance: null, sustainability: null });
+    const older: TreasuryOverview = { ...overview, balance: null, sustainability: null };
+    delete older.trends;
+    delete older.sampleFigures;
+    const html = render(older);
     expect(html).toContain("Med. donation");
     expect(html).not.toContain("+1.8%");
     expect(html).not.toContain("Balance");

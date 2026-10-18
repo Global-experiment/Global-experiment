@@ -27,6 +27,8 @@ node_modules/
 # misc
 .DS_Store
 *.pem
+# database dumps and backups (never committed)
+*.dump
 
 # debug
 npm-debug.log*
@@ -51,12 +53,14 @@ next-env.d.ts
 # Never commit real design/CMS exports without explicit approval.
 .local/
 
-# local Claude Code session state (not project source)
+# local editor and assistant settings (per developer, not project source)
 .claude/
+CLAUDE.md
 
 # client design reference (local only — never commit design exports without approval)
 /figma.pdf
 /design.pdf
+/docs/design/
 
 # local file storage (FILE_STORAGE_DIR default outside production: Treasury supporting documents)
 .data/

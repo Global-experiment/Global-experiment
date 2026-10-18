@@ -21,7 +21,9 @@ right seams (overview §7); nothing v1.0 is built ahead.
 | Taxonomy (14 / 120 / 1105) | 0002, 0003 | Domains, Fields, Expertise (read-only) | — |
 | Imports (taxonomy, directory) | 0003 | Imports page, Import Notion | — |
 | Admin shell (Figma) | — | Sidebar, search, toasts, list toolbar | — |
-| Public site shells | — | — | Home, Documentation (live Notion), Treasury / Donate (static examples), Waitlist, Feedback, Issue, Contribute (inert forms) |
+| Donations (module 1, Stripe sandbox phase) | 0006 | — | `/donate` (Once / Monthly, card, Apple Pay, Google Pay, PayPal, SEPA in EUR), `/donate/thank-you`; figures from the database |
+| Treasury (module 1b) | 0007, 0008 | Treasury list and record, supporting documents, Treasury import | `/treasury` and the expense and donation pages, from the database; sample data marked "Test" until go-live |
+| Public site shells | — | — | Home, Documentation (live Notion), Waitlist, Feedback, Issue, Contribute (inert forms) |
 
 ## 2. Build order (v0.1)
 
@@ -116,8 +118,8 @@ than one module worth delegating; until then the owner is the only admin
   reconciliation, the import runner moved off memory.
 - **Breakdown:** public pages 12 · importer 6 · admin list/record 10 ·
   documents + storage 6 · jobs 6.
-- **Built (2026-10-15, branch `feat/treasury`, not yet released):** all of
-  the above. The currency switch drives the stats and the history
+- **Built and released (2026-10-15, `a66f04c`; sample data and the
+  full p11 page `07cf94f`):** all of the above. The currency switch drives the stats and the history
   (`?currency=`, default USD), with an "All currencies" choice that lists
   every currency (stats then stay in the default currency; amounts are
   never converted). Pending client answers are settings, off by default:

@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 env:
   # Consistent with the project's privacy stance — see docs/architecture/overview.md
