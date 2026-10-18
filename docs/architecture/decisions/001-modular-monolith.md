@@ -29,7 +29,7 @@ under `src/integrations/*` or a module's `infrastructure/` folder.
 - Keeps operational cost and complexity low, consistent with the project's
   low-operating-cost and self-hosting goals.
 - Strong internal boundaries make it possible to extract a service later if
-  v1 scale genuinely requires it, without having paid the operational cost
+  v1 scale requires it, without having paid the operational cost
   of microservices/Kafka/Kubernetes prematurely.
 
 ## Alternatives Considered

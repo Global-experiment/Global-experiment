@@ -265,129 +265,130 @@ Then, in rough order, each its own design and estimate later:
 
 Grouped by module. Each is needed before the module it belongs to starts;
 the number is referenced from overview.md and data-model.md.
-✅ = decided by the client (2026-10-15), ⏳ = waiting for client.
+Each question ends with the client's decision and its date, or *Waiting
+for client*.
 
 **General**
 
-- ✅ **Q1 — Notion vs the admin as the editing tool.** After each module's
+- **Q1 — Notion vs the admin as the editing tool.** After each module's
   import, is the admin the only place to edit (recommended: Notion becomes
   read-only history), or does Notion stay an editing tool with repeated
   imports (which overwrite admin edits)?
   **Decided 2026-10-15:** Notion is the editing tool in v0.1 for the Notion-backed modules (importers on demand and on a schedule); in v1.0 the database and admin are the only source and importers are off. Record-level `managed_by`, module modes and the cut-over procedure: overview §2.1.
-- ⏳ **Q8 — Admin roles.** Is v0.1 still owner-only, or do other people get
+- **Q8 — Admin roles.** Is v0.1 still owner-only, or do other people get
   admin access? If yes, is the team-based role list (overview §3.1) right? *Waiting for client.*
-- ⏳ **Q11 — Retention.** How long are kept: the audit log, waitlist entries,
+- **Q11 — Retention.** How long are kept: the audit log, waitlist entries,
   feedback submissions (and their personal data), messages, Stripe event
   ids, treasury documents (accounting law: often 10 years)? *Waiting for client.*
-- ⏳ **Q15 — Environments and releases.** Add a staging environment? Deploy
+- **Q15 — Environments and releases.** Add a staging environment? Deploy
   tagged releases from `main` (production follows `develop` today)? *Waiting for client.*
 
 **Treasury and donations (needed now)**
 
-- ✅ **Q2 — Monthly donations** through Stripe subscriptions: yes or no?
+- **Q2 — Monthly donations** through Stripe subscriptions: yes or no?
   Yearly too (Notion has a Yearly cadence)?
   **Decided 2026-10-15:** Built behind the `donations.monthly` flag, off by default. No yearly donations.
-- ⏳ **Q3 — Recipients in public.** May an expense's recipient (person or
+- **Q3 — Recipients in public.** May an expense's recipient (person or
   organization name) be shown publicly, or only the description and tags? *Waiting for client.*
-- ✅ **Q4 — Treasury refresh.** Every 5 minutes, or Figma's "every 4 hours"?
+- **Q4 — Treasury refresh.** Every 5 minutes, or Figma's "every 4 hours"?
   **Decided 2026-10-15:** On-demand revalidation on every new or changed entry, plus a 5-minute fallback.
-- ⏳ **Q5 — Documents storage.** Same VPS (backed up off-site) or object
+- **Q5 — Documents storage.** Same VPS (backed up off-site) or object
   storage, maximum size, retention. *Waiting for client.*
-- ⏳ **Q18 — Stripe account and settlement.** Account country; are EUR, USD and
+- **Q18 — Stripe account and settlement.** Account country; are EUR, USD and
   CHF each settled in their own currency (to Wise), or converted? *Waiting for client.*
-- ⏳ **Q19 — Payment methods.** Card (with Apple Pay / Google Pay), PayPal and
+- **Q19 — Payment methods.** Card (with Apple Pay / Google Pay), PayPal and
   SEPA as in Figma? SEPA is EUR only. *Waiting for client.*
-- ✅ **Q20 — Refunds** as negative adjustment entries linked to the donation
+- **Q20 — Refunds** as negative adjustment entries linked to the donation
   (recommended)?
   **Decided 2026-10-15:** Negative refund entries linked to the donation.
-- ✅ **Q21 — Amounts.** Minimum and maximum per donation, presets (2 / 5 / 10 /
+- **Q21 — Amounts.** Minimum and maximum per donation, presets (2 / 5 / 10 /
   20 / 50) for all currencies, default currency.
   **Decided 2026-10-15:** Presets 2 / 5 / 10 / 20 / 50, minimum 1, maximum 10,000; default currency configurable (USD).
-- ✅ **Q22 — Balance and Sustainability** before Wise is connected: totals of
+- **Q22 — Balance and Sustainability** before Wise is connected: totals of
   published entries per currency, or hide those two stats?
   **Decided 2026-10-15:** Balance and Sustainability are hidden until Wise is connected.
-- ✅ **Q23 — Notion amounts** are whole currency units (50 = USD 50)? Import
+- **Q23 — Notion amounts** are whole currency units (50 = USD 50)? Import
   old entries with gross = net and fee = 0?
   **Decided 2026-10-15:** Whole units; imported as gross = net, fee 0, and flagged.
-- ✅ **Q24 — Expense categories:** Notion's 10 expense types, or Figma's
+- **Q24 — Expense categories:** Notion's 10 expense types, or Figma's
   expertise-style tags?
   **Decided 2026-10-15:** Notion's 10 expense types.
-- ⏳ **Q25 — Publication of unqualified expenses.** Figma lists unqualified
+- **Q25 — Publication of unqualified expenses.** Figma lists unqualified
   expenses publicly ("Not qualified yet") — publish every transaction with
   amount and date, and the description only once qualified (recommended,
   matches Figma)? Or publish only qualified entries? *Waiting for client.*
-- ✅ **Q26 — Donors.** No donor names or countries (anonymous only, Figma
+- **Q26 — Donors.** No donor names or countries (anonymous only, Figma
   p26–27), and "Donors" / "Monthly donors" counted from Stripe without
   storing donor data?
   **Decided 2026-10-15:** Anonymous donors only; "Donors" hidden; "Monthly donors" = active subscriptions.
-- ✅ **Q27 — Receipts and policies.** Enable Stripe email receipts? Who writes
+- **Q27 — Receipts and policies.** Enable Stripe email receipts? Who writes
   the Privacy Policy and the Donation & Refund Policy pages the donate copy
   links to?
   **Decided 2026-10-15:** Stripe email receipts; the policy links stay hidden until real texts exist — no legal text is ever invented.
-- ⏳ **Q28 — Fees.** Is `net = gross − fee` (fee a positive cost) right for
+- **Q28 — Fees.** Is `net = gross − fee` (fee a positive cost) right for
   donations and expenses, Stripe and Wise fees included? *Waiting for client.*
 
 **CMS**
 
-- ⏳ **Q29 — Documentation expertise.** Notion's Documentation "Expertise" is
+- **Q29 — Documentation expertise.** Notion's Documentation "Expertise" is
   a separate list of 38 labels, not the taxonomy. Map them to taxonomy
   items by name (some won't match), or keep a separate documentation tag
   list? *Waiting for client.*
-- ⏳ **Q30 — Home page content.** Is the Home page one rich-text page (as in
+- **Q30 — Home page content.** Is the Home page one rich-text page (as in
   Notion today, admin p5–p6), or will it get structured blocks (stats,
   buttons) the editor must handle? *Waiting for client.*
 
 **Feedback and issues**
 
-- ⏳ **Q6 — Status list.** Notion has Discarded, Roadmap item, Archived (and
+- **Q6 — Status list.** Notion has Discarded, Roadmap item, Archived (and
   empty = new). Is that the full list, and is it the same for feedback and
   issues? *Waiting for client.*
-- ⏳ **Q7 — Scores.** Ranges and meaning of the AI significance score, the
+- **Q7 — Scores.** Ranges and meaning of the AI significance score, the
   human significance score and the bot score; who sets the human one. *Waiting for client.*
-- ⏳ **Q12 — AI provider** for translation and triage (and where its data may
+- **Q12 — AI provider** for translation and triage (and where its data may
   be processed). *Waiting for client.*
-- ⏳ **Q31 — Public summaries.** Are decisions on feedback ever shown
+- **Q31 — Public summaries.** Are decisions on feedback ever shown
   publicly (e.g. "Roadmap item"), or is everything admin-only in v0.1? *Waiting for client.*
 
 **Waitlist, Messages, Emails**
 
-- ⏳ **Q16 — Email server.** Who installs and runs Stalwart; the final
+- **Q16 — Email server.** Who installs and runs Stalwart; the final
   addresses (contribute@, waitlist@, donations@)? *Waiting for client.*
-- ⏳ **Q17 — Waitlist confirmation** by double opt-in email (recommended)? And
+- **Q17 — Waitlist confirmation** by double opt-in email (recommended)? And
   should a waitlist entry be linked to an existing person automatically by
   email, or only by hand? *Waiting for client.*
-- ⏳ **Q32 — Messages scope.** Read and triage only, or also reply from the
+- **Q32 — Messages scope.** Read and triage only, or also reply from the
   admin? *Waiting for client.*
 
 **Services, access grants, analytics, monitoring**
 
-- ⏳ **Q10 — Permission levels.** Notion stores free text; is there a fixed
+- **Q10 — Permission levels.** Notion stores free text; is there a fixed
   list (e.g. Viewer, Editor, Admin, Owner) per service? *Waiting for client.*
-- ⏳ **Q13 — Analytics tool:** Plausible or Matomo (the documentation and
+- **Q13 — Analytics tool:** Plausible or Matomo (the documentation and
   older records disagree)? *Waiting for client.*
-- ⏳ **Q14 — Error tracking:** add self-hosted GlitchTip, or logs only? *Waiting for client.*
+- **Q14 — Error tracking:** add self-hosted GlitchTip, or logs only? *Waiting for client.*
 
 **Designs without a module yet**
 
-- ⏳ **Q34 — Information notes and Constitution.** The public designs show an
+- **Q34 — Information notes and Constitution.** The public designs show an
   Information notes (News) section ("v0.1 website delivery · April 6") and a
   static Constitution page; neither is in the admin sidebar. Are they v0.1
   pages? If yes they are CMS documents of new kinds (data-model §5.1), not
   new modules. *Waiting for client.*
-- ⏳ **Q35 — "Cloud".** The admin sidebar's text layer has a hidden "Cloud"
+- **Q35 — "Cloud".** The admin sidebar's text layer has a hidden "Cloud"
   item under Other. What is it, and is it v0.1? *Waiting for client.*
-- ⏳ **Q36 — Energy and consent.** The designs show a per-page energy sheet
+- **Q36 — Energy and consent.** The designs show a per-page energy sheet
   (Wh, CO₂, data, renewables, ~50 metrics) and a "Data collection" consent
   banner. v0.1 or later? The consent banner depends on the analytics tool
   (Q13: a cookieless tool needs none). *Waiting for client.*
-- ⏳ **Q37 — Expense links.** Figma links expenses to a roadmap item
+- **Q37 — Expense links.** Figma links expenses to a roadmap item
   ("Part of Roadmap Initiation") and shows tags like Bug / Security /
   Platform. Roadmap items don't exist in v0.1 — confirm this is v1.0. *Waiting for client.*
 
 **Directory**
 
-- ⏳ **Q9 — View tab definitions** for People (Sourcing, Discussions,
+- **Q9 — View tab definitions** for People (Sourcing, Discussions,
   Contributors, Collaborators, "+3"). *Waiting for client.*
-- ⏳ **Q33 — Required fields.** Which Notion properties carry the `*`
+- **Q33 — Required fields.** Which Notion properties carry the `*`
   ("required for completeness") in each database — read from the schema
   today; is that the rule to keep? *Waiting for client.*

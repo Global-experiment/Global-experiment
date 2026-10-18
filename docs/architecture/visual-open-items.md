@@ -61,7 +61,7 @@ benchmarked/updated by the client separately and was left alone this pass.
 
 **Resolved since the first M1 pass:** icons (Material Sharp, including new
 glyphs for checkboxes, document history, and the temporary theme toggle),
-spacing scale, control heights, border colours, muted text colour, button
+spacing scale, control heights, border colors, muted text color, button
 padding, hover treatment (stroke only, no background change), full-bleed
 separators, optional sheet headers, mobile vs. desktop sheet styling, real
 history-based back navigation, keyboard-aware sticky CTA, all six payment

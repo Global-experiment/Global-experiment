@@ -20,7 +20,7 @@ reading live Notion for Home/Documentation — throughout the migration.
 
 - Add a **NestJS** API in `apps/api` (npm workspace
   `@global-experiment/api`). The Next.js site stays at the repository root,
-  unchanged in location and behaviour.
+  unchanged in location and behavior.
 - The API is the **only owner of the database**. Schema lives next to each
   API module (`apps/api/src/**/*.schema.ts`); versioned SQL migrations in
   `apps/api/drizzle`; the single `drizzle.config.ts` at the root points

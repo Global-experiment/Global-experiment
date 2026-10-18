@@ -102,8 +102,8 @@ including the tag-overflow "+1" badge). The module is named
 `presentationData.ts`, not `fixtures.ts` — the existing
 `noRuntimeCmsFixtures` guard test scans runtime source filenames for
 `fixture`/`mock`/`placeholder` to catch CMS-content fixtures specifically;
-this is unrelated M3 financial placeholder data (already clearly labeled
-as such), and the rename avoids a false positive on that guard rather than
+this is unrelated M3 financial placeholder data (already labeled as
+such), and the rename avoids a false positive on that guard rather than
 weakening it.
 
 ## Alternatives Considered
