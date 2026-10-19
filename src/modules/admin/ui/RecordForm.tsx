@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import { AdminIcon, type AdminIconName } from "./adminIcons";
 import { focusRing } from "./controls";
 
@@ -112,6 +112,16 @@ export function DateField({
   );
 }
 
+/** Same pattern as the admin layout's metadata template, for titles known only in the browser. */
+export const adminTitle = (title: string) => `${title} — Admin — Global Experiment`;
+
+export function useAdminTitle(title: string) {
+  useEffect(() => {
+    // Empty while loading: the page's own title ("Person") stays until the record arrives.
+    if (title.trim()) document.title = adminTitle(title.trim());
+  }, [title]);
+}
+
 export function RecordLayout({
   backHref,
   backLabel,
@@ -125,6 +135,8 @@ export function RecordLayout({
   panel?: ReactNode;
   children: ReactNode;
 }) {
+  // The browser tab shows the record's header title (client, 2026-10-19), e.g. "Stanley Qiang".
+  useAdminTitle(title);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-10 shrink-0 items-center gap-2 px-2">

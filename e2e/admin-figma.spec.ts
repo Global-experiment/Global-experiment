@@ -122,10 +122,12 @@ test.describe("signed in", () => {
 
     const sections = await nav(page).locator(":scope > div > p").allTextContents();
     expect(sections).toEqual(["Communication", "Admin", "Monitoring", "Other"]);
-    // Group titles stand out (client, 2026-10-14): small bold uppercase labels, a rule above each group after the first.
-    await expect(nav(page).locator(":scope > div > p").first()).toHaveCSS("text-transform", "uppercase");
-    await expect(nav(page).locator(":scope > div > p").first()).toHaveCSS("font-weight", "700");
-    await expect(nav(page).locator(":scope > div > hr")).toHaveCount(3);
+    // Group titles in the Figma font (client, 2026-10-19): plain 12px muted text, no rules between groups.
+    const groupTitle = nav(page).locator(":scope > div > p").first();
+    await expect(groupTitle).toHaveCSS("text-transform", "none");
+    await expect(groupTitle).toHaveCSS("font-size", "12px");
+    expect(Number(await groupTitle.evaluate((el) => getComputedStyle(el).fontWeight))).toBeLessThan(700);
+    await expect(nav(page).locator("hr")).toHaveCount(0);
     const labels = (await nav(page).locator("li").allInnerTexts()).map((text) => text.replace(/\s*\(coming soon\)$/, "").trim());
     expect(labels).toEqual([
       "Home",
@@ -133,14 +135,17 @@ test.describe("signed in", () => {
       "Treasury",
       "Feedbacks and issues",
       "People",
+      "Organizations",
+      "Contracting",
       "Messages",
-      "Analytics",
-      "Emails",
-      "History",
-      "Technical dashboard",
+      "Cloud",
       "Services",
-      "Access grants",
+      "Permissions",
       "Accounts",
+      "History",
+      "Analytics",
+      "Technical dashboard",
+      "Emails",
       "Expertise",
       "Fields",
       "Domains",
@@ -148,9 +153,12 @@ test.describe("signed in", () => {
       "Waitlist",
     ]);
 
-    // Geometry (p2): search 8,8 224×32; rows 224×32 at x=8, 4px apart; 64px user card 8px above the bottom.
+    // Geometry (p2): search at 8,8, 32 tall, with "Collapse menu" beside it (client, 2026-10-19; Figma's field is 224
+    // wide alone); rows 224×32 at x=8, 4px apart; 64px user card 8px above the bottom.
     const search = await box(page.getByRole("searchbox", { name: "Search the menu" }).locator(".."));
-    expect([search.x, search.y, search.width, search.height]).toEqual([8, 8, 224, 32]);
+    expect([search.x, search.y, search.width, search.height]).toEqual([8, 8, 184, 32]);
+    const collapse = await box(page.getByRole("button", { name: "Collapse menu" }));
+    expect([collapse.x, collapse.y, collapse.width, collapse.height]).toEqual([200, 8, 32, 32]);
     const home = await box(nav(page).locator("li").filter({ hasText: "Home" }).locator("> *"));
     expect([home.x, home.y, home.width, home.height]).toEqual([8, 80, 224, 32]);
     const documentation = await box(nav(page).locator("li").filter({ hasText: "Documentation" }).locator("> *"));
@@ -193,7 +201,7 @@ test.describe("signed in", () => {
     // Remembered across pages and reloads, from the first paint (server-rendered).
     await page.reload();
     expect((await box(sidebar)).width).toBe(56);
-    await page.getByRole("link", { name: "Organizations" }).click();
+    await page.getByRole("link", { name: "Organizations" }).first().click();
     await expect(page).toHaveURL(/\/admin\/organizations$/);
     expect((await box(sidebar)).width).toBe(56);
 
@@ -205,11 +213,11 @@ test.describe("signed in", () => {
     expect((await box(sidebar)).width).toBe(240);
   });
 
-  test("data table: header band, a rule under every row, row hover (client, 2026-10-14)", async ({ page }) => {
+  test("data table: column labels without a band (client, 2026-10-19), a rule under every row, row hover", async ({ page }) => {
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
     const header = page.locator("thead th").first();
-    await expect(header).toHaveCSS("background-color", "rgb(26, 26, 26)");
+    await expect(header).toHaveCSS("background-color", "rgb(0, 0, 0)");
     expect((await box(header)).height).toBe(36);
     const lastRowCell = rows(page).last().locator("td").first();
     await expect(lastRowCell).toHaveCSS("border-bottom-width", "1px");
@@ -221,23 +229,56 @@ test.describe("signed in", () => {
   test("sidebar search filters the menu; modules that don't exist are disabled, never pages", async ({ page }) => {
     await page.goto("/admin/people");
     const search = page.getByRole("searchbox", { name: "Search the menu" });
-    await search.fill("acc");
-    await expect(nav(page).locator("li")).toHaveText([/Access grants/, /Accounts/]);
+    await search.fill("perm");
+    await expect(nav(page).locator("li")).toHaveText([/Permissions/]);
     await expect(nav(page).locator(":scope > div > p")).toHaveText(["Monitoring"]);
+    // Organizations is listed in Admin and in Other (decision 16).
+    await search.fill("organ");
+    await expect(nav(page).locator(":scope > div > p")).toHaveText(["Admin", "Other"]);
     await search.fill("zzz");
     await expect(nav(page).getByRole("status")).toHaveText("No menu items match.");
     await search.press("Escape");
-    await expect(nav(page).locator("li")).toHaveCount(18);
+    await expect(nav(page).locator("li")).toHaveCount(21);
 
     const messages = nav(page).locator("[data-coming-soon]").filter({ hasText: "Messages" });
     await expect(messages).toHaveAttribute("title", "Coming soon");
     await expect(messages).toHaveAttribute("aria-disabled", "true");
+    // Dimmed as in the Figma (#484848), darker than the live rows.
+    await expect(messages).toHaveCSS("color", "rgb(72, 72, 72)");
     await expect(nav(page).getByRole("link", { name: /Messages/ })).toHaveCount(0);
     await messages.click();
     await expect(page).toHaveURL(/\/admin\/people$/);
     // Only the existing modules link anywhere.
     const links = await nav(page).getByRole("link").evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
-    expect(links).toEqual(["/admin/treasury", "/admin/people", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
+    expect(links).toEqual(["/admin/treasury", "/admin/people", "/admin/organizations", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
+    // Decision 16: these stay "Coming soon" until built.
+    for (const label of ["Waitlist", "Messages", "Cloud", "History", "Analytics", "Technical dashboard", "Emails", "Contracting"]) {
+      await expect(nav(page).locator("[data-coming-soon]").filter({ hasText: label }), label).toHaveCount(1);
+    }
+    // One page listed twice is highlighted once.
+    await nav(page).getByRole("link", { name: "Organizations" }).last().click();
+    await expect(page).toHaveURL(/\/admin\/organizations$/);
+    await expect(nav(page).locator("[aria-current=page]")).toHaveCount(1);
+    await expect(page.locator("li[data-module=organizations] a")).toHaveAttribute("aria-current", "page");
+  });
+
+  test("the menu keeps its search and collapse button at the top while it scrolls; light theme from the user card (client, 2026-10-19)", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await page.goto("/admin/people");
+    await expect(rows(page).first()).toBeVisible();
+    await nav(page).evaluate((element) => element.scrollTo(0, element.scrollHeight));
+    await expect.poll(() => nav(page).evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    expect((await box(page.getByRole("searchbox", { name: "Search the menu" }).locator(".."))).y).toBe(8);
+    await expect(page.getByRole("button", { name: "Collapse menu" })).toBeInViewport();
+
+    const toggle = page.locator("#admin-sidebar").getByRole("button", { name: "Switch to light preview" });
+    await toggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(page.locator("[data-admin]")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect.poll(() => page.locator("[data-admin]").evaluate((el) => getComputedStyle(el).color)).toBe("rgb(0, 0, 0)");
+    await capture(page, "light-people");
+    await page.locator("#admin-sidebar").getByRole("button", { name: "Switch to dark preview" }).click();
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
   });
 
   test("filter popover (p2): add, duplicate, reorder, remove; 'Filters applied' toast", async ({ page }) => {
@@ -285,9 +326,27 @@ test.describe("signed in", () => {
     await expect(popover.getByRole("button", { name: "New sort" })).toBeDisabled();
     await expect(page).toHaveURL(/sort=created%3Adesc&sort=[a-z_]+%3A(asc|desc)&sort=[a-z_]+%3A(asc|desc)$/);
     await capture(page, "p03-sort");
+    // Several sorts read as their count (p2 "2 sorts"); closing confirms with "People updated" (p4).
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "3 sorts" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
+    await page.getByRole("button", { name: "3 sorts" }).click();
     await popover.getByRole("button", { name: "Remove all sorts" }).click();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: "Last created first" })).toBeVisible();
+  });
+
+  test("browser tab titles follow the page header, record names included (client, 2026-10-19)", async ({ page }) => {
+    await page.goto("/admin/people");
+    await expect(page).toHaveTitle("People — Admin — Global Experiment");
+    await rows(page).first().locator("a").first().click();
+    const name = (await page.getByRole("heading", { level: 1 }).innerText()).trim();
+    expect(name).not.toBe("");
+    await expect(page).toHaveTitle(`${name} — Admin — Global Experiment`);
+    await page.goto("/admin/organizations");
+    await expect(page).toHaveTitle("Organizations — Admin — Global Experiment");
+    await page.goto("/admin/treasury");
+    await expect(page).toHaveTitle("Treasury — Admin — Global Experiment");
   });
 
   test("column menu (p11): freeze and hide a column; Import Notion button", async ({ page }) => {
@@ -522,12 +581,13 @@ test("side-by-side comparisons", async ({ page }) => {
   await page.setViewportSize({ width: 2 * FRAME.width + 24, height: FRAME.height + 40 });
   const data = (path: string) => `data:image/png;base64,${readFileSync(path).toString("base64")}`;
   for (const [shot, frame, label] of [
+    // Frames of admin-desktop.pdf as updated on 19 Oct (the captures keep their earlier names).
     ["p01-login-1440", "p1", "Login"],
-    ["p02-filters-1440", "p2", "People — filters"],
-    ["p03-sort-1440", "p3", "People — sort"],
-    ["p04-people-1440", "p4", "People"],
-    ["p11-column-menu-1440", "p11", "People — column menu"],
-    ["p12-person-1440", "p12", "Person record"],
+    ["p04-people-1440", "p2", "People"],
+    ["p02-filters-1440", "p3", "People — filters"],
+    ["p03-sort-1440", "p4", "People — sort"],
+    ["p11-column-menu-1440", "p13", "People — column menu"],
+    ["p12-person-1440", "p14", "Person record"],
   ] as const) {
     const app = join(SHOTS, `${shot}.png`);
     const figma = join(figmaDir!, `${frame}.png`);

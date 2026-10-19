@@ -56,7 +56,7 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
 
   return (
     <main>
-      <header className="flex h-10 items-center px-2">
+      <header className="sticky top-0 z-10 flex h-10 items-center bg-surface-base px-2">
         <h1 className="mr-auto text-body font-bold">Profile</h1>
         <AdminButton icon="login" onClick={logout} disabled={pending !== null}>
           {pending === "signing-out" ? "Signing out…" : "Sign out"}

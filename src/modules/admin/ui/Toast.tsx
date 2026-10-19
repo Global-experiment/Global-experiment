@@ -13,9 +13,9 @@ const VISIBLE_MS = 3000;
  * Figma's confirmation toast (p40–p43: "Notion imported 34 new entries",
  * "Filters applied", "People updated"): a 34px #1f1f1f pill, bold 14px
  * white text, 12px side padding, 24px above the bottom edge, centered on
- * the content area (right of the 240px sidebar). Announced politely.
+ * the content area (right of the sidebar, 240px or the 56px rail). Announced politely.
  */
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ sidebarWidth = 240, children }: { sidebarWidth?: number; children: ReactNode }) {
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -30,7 +30,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={show}>
       {children}
-      <div role="status" aria-live="polite" className="pointer-events-none fixed bottom-6 left-[calc(120px+50vw)] z-50 -translate-x-1/2">
+      <div
+        role="status"
+        aria-live="polite"
+        data-admin-toast
+        style={{ left: `calc(${sidebarWidth / 2}px + 50vw)` }}
+        className="pointer-events-none fixed bottom-6 z-50 -translate-x-1/2"
+      >
         {toast ? (
           <p
             key={toast.id}

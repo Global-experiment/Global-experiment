@@ -212,7 +212,7 @@ export function DataTable<Row extends { id: string }>({
                   setDragging(null);
                   setDropAt(null);
                 }}
-                className={`sticky top-0 z-10 h-9 border-b border-line bg-surface-header px-2 text-left align-middle font-bold text-text-muted ${
+                className={`sticky top-0 z-10 h-9 border-b border-line bg-surface-base px-2 text-left align-middle font-bold text-text-muted ${
                   index > 0 && index !== frozenCount ? "border-l" : ""
                 } ${index === arranged.length - 1 ? "border-r" : ""} ${frozenEdge(index)} ${
                   dragging === column.id ? "opacity-50" : ""

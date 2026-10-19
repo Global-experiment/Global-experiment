@@ -80,7 +80,7 @@ export function ImportsScreen() {
 
   return (
     <main className="flex flex-col gap-3 pb-6 text-body">
-      <header className="flex h-10 items-center px-2">
+      <header className="sticky top-0 z-10 flex h-10 items-center bg-surface-base px-2">
         <h1 className="text-body font-bold">Notion import</h1>
       </header>
       <p className="max-w-[720px] px-2 text-text-muted">

@@ -17,6 +17,7 @@ import {
   pageCount,
   readListState,
   serializeFilter,
+  serializeSort,
   type ListState,
   type SortRule,
 } from "./listState";
@@ -79,6 +80,7 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
   const sortTrigger = useRef<HTMLButtonElement>(null);
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const filtersWhenOpened = useRef<string>("");
+  const sortWhenOpened = useRef<string>("");
   const requestKey = `${apiQuery}#${reloadToken}`;
 
   // Follow the URL when it changes from elsewhere (back/forward, "clear"),
@@ -145,6 +147,10 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
     if (openPopover === "filter" && activeFilters.map(serializeFilter).join("|") !== filtersWhenOpened.current) {
       toast("Filters applied");
     }
+    // admin-desktop.pdf p4: a changed sort confirms with "People updated" (the list's title).
+    if (openPopover === "sort" && state.sort.map(serializeSort).join("|") !== sortWhenOpened.current) {
+      toast(`${config.title} updated`);
+    }
     setOpenPopover(null);
   };
 
@@ -197,7 +203,11 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
             type="button"
             aria-haspopup="dialog"
             aria-expanded={openPopover === "sort"}
-            onClick={() => (openPopover === "sort" ? closePopover() : setOpenPopover("sort"))}
+            onClick={() => {
+              if (openPopover === "sort") return closePopover();
+              sortWhenOpened.current = state.sort.map(serializeSort).join("|");
+              setOpenPopover("sort");
+            }}
             className={`${toolbarBox} w-40 cursor-pointer justify-between pr-1 pl-2 text-body ${openPopover === "sort" ? "ring-text-primary" : ""}`}
           >
             <span className="truncate">{sortButtonLabel(config.fields, state.sort)}</span>
