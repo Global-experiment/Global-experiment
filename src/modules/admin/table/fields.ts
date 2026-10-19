@@ -31,8 +31,10 @@ export function directionLabel(field: ListField | undefined, direction: SortRule
 
 /** The sort button text (Figma: "Last published first"), from the primary sort rule. */
 export function sortButtonLabel(fields: readonly ListField[], sort: readonly SortRule[]): string {
-  const [primary, ...rest] = sort;
+  const [primary] = sort;
   if (!primary) return "Sort";
+  // Several sorts read as their count (admin-desktop.pdf p2: "2 sorts").
+  if (sort.length > 1) return `${sort.length} sorts`;
   const field = fields.find((candidate) => candidate.id === primary.field);
   const name = (field?.label ?? primary.field).toLowerCase();
   const text =
@@ -41,5 +43,5 @@ export function sortButtonLabel(fields: readonly ListField[], sort: readonly Sor
         ? `Last ${name} first`
         : `First ${name} first`
       : `${field?.label ?? primary.field} ${primary.direction === "asc" ? "ascending" : "descending"}`;
-  return rest.length > 0 ? `${text} +${rest.length}` : text;
+  return text;
 }

@@ -168,6 +168,10 @@ So that a module or a field is added by configuration, not by a new screen:
   `GET /api/admin/modules` (enabled state, mode, the user's permissions);
   a module that isn't enabled shows as **"Coming soon"** (today's
   behavior, now data-driven).
+  Built in Step 3 (2026-10-19) as `src/modules/admin/registry.ts`: the
+  sidebar's sections, order, glyphs, labels, routes and `live` /
+  `coming_soon` status; the API side (`/api/admin/modules`, permissions)
+  follows with accounts and roles (Step 7).
 - **Config-driven list pages.** Per module: columns (type — text, select,
   relation, date, number, money, boolean, tags; width; icon; default
   visibility), filters with their operators and option sources, sorts,

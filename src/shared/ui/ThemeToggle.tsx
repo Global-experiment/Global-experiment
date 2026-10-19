@@ -52,7 +52,7 @@ function setTheme(theme: Theme) {
  * the `[data-theme="light"]` block in globals.css are the entire feature —
  * removing all three removes it cleanly.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className = "size-10 text-text-primary" }: { className?: string }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   return (
@@ -60,7 +60,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(theme === "light" ? "dark" : "light")}
       aria-pressed={theme === "light"}
-      className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+      className={`inline-flex shrink-0 cursor-pointer items-center justify-center rounded-control ${className} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary`}
     >
       <Icon name={theme === "light" ? "dark_mode" : "light_mode"} />
       <span className="sr-only">{theme === "light" ? "Switch to dark preview" : "Switch to light preview"}</span>

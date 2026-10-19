@@ -5,76 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { adminApi } from "../api/client";
 import { adminDisplayName, type AdminPrincipal } from "../api/types";
-import { AdminIcon, type AdminIconName } from "./adminIcons";
+import { ThemeToggle } from "@/shared/ui/ThemeToggle";
+import { activeModuleKey, ADMIN_MODULES, filterModules } from "../registry";
+import { AdminIcon } from "./adminIcons";
 import { focusRing } from "./controls";
 import { rememberSidebar } from "./sidebarPrefs";
 import { ToastProvider } from "./Toast";
-
-export interface NavItem {
-  label: string;
-  icon: AdminIconName;
-  /** Only modules that exist link anywhere; the rest are listed (Figma IA) but disabled. */
-  href?: string;
-  /** Other paths that belong to this item (e.g. the Notion import page under People). */
-  alsoActiveOn?: string[];
-}
-
-/**
- * Sidebar groups, order and glyphs exactly as admin-desktop.pdf p2 (the
- * History item uses the same lightbulb glyph Figma draws for it).
- */
-export const NAV: { section: string; items: NavItem[] }[] = [
-  {
-    section: "Communication",
-    items: [
-      { label: "Home", icon: "home" },
-      { label: "Documentation", icon: "insert_drive_file" },
-    ],
-  },
-  {
-    section: "Admin",
-    items: [
-      { label: "Treasury", icon: "toll", href: "/admin/treasury" },
-      { label: "Feedbacks and issues", icon: "lightbulb" },
-      { label: "People", icon: "group", href: "/admin/people", alsoActiveOn: ["/admin/imports"] },
-      { label: "Messages", icon: "forum" },
-    ],
-  },
-  {
-    section: "Monitoring",
-    items: [
-      { label: "Analytics", icon: "analytics" },
-      { label: "Emails", icon: "alternate_email" },
-      { label: "History", icon: "lightbulb" },
-      { label: "Technical dashboard", icon: "technical_dashboard" },
-      { label: "Services", icon: "services" },
-      { label: "Access grants", icon: "lock" },
-      { label: "Accounts", icon: "manage_accounts" },
-    ],
-  },
-  {
-    section: "Other",
-    items: [
-      { label: "Expertise", icon: "view_column", href: "/admin/expertise" },
-      { label: "Fields", icon: "view_column", href: "/admin/fields" },
-      { label: "Domains", icon: "view_column", href: "/admin/domains" },
-      { label: "Organizations", icon: "corporate_fare", href: "/admin/organizations" },
-      { label: "Waitlist", icon: "approval" },
-    ],
-  },
-];
-
-/** The menu filtered by the sidebar search (case-insensitive, on the label); empty sections drop out. */
-export function filterNav(nav: typeof NAV, query: string) {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return nav;
-  return nav
-    .map((group) => ({ ...group, items: group.items.filter((item) => item.label.toLowerCase().includes(needle)) }))
-    .filter((group) => group.items.length > 0);
-}
-
-const isActive = (item: NavItem, pathname: string) =>
-  [item.href, ...(item.alsoActiveOn ?? [])].some((path) => path !== undefined && (pathname === path || pathname.startsWith(`${path}/`)));
 
 /**
  * Admin frame (admin-desktop.pdf p2, measured): a 240px sidebar with a 1px
@@ -82,8 +18,10 @@ const isActive = (item: NavItem, pathname: string) =>
  * label on an 8px baseline gap); 224×32 item rows 4px apart (16px glyph
  * 4px in, label at 24px), muted, the current one white on a #1f1f1f
  * rounded fill; and a 64px user card pinned 8px above the bottom edge.
- * Items for modules that don't exist yet are listed but disabled
- * ("Coming soon"); none of them leads to a placeholder page.
+ * The items come from the module registry (../registry.ts): modules that
+ * don't exist yet are listed but disabled ("Coming soon"); none of them
+ * leads to a placeholder page. Section titles are plain 12px muted text and
+ * sections have no rules between them (client, 2026-10-19).
  *
  * Exactly one viewport tall (client, 2026-10-05): the page itself never
  * scrolls; the menu and the content column scroll on their own, and list
@@ -91,7 +29,9 @@ const isActive = (item: NavItem, pathname: string) =>
  * sidebar stays 240px, the content column takes the rest. `data-admin`
  * scopes the admin-only overscroll rules in globals.css.
  *
- * Collapsible (client, 2026-10-14): "Collapse menu" narrows the sidebar to
+ * Collapsible (client, 2026-10-14): "Collapse menu" — next to the search,
+ * which both stay at the top while the menu scrolls (client, 2026-10-19) —
+ * narrows the sidebar to
  * a 56px icon rail — group titles hidden (still read by screen readers),
  * each item's name as its tooltip, the search glyph re-opens the menu. The
  * choice is remembered in a cookie (sidebarPrefs.ts) so the server renders
@@ -103,7 +43,8 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const searchRef = useRef<HTMLInputElement>(null);
   // A collapsed rail shows every item: the search only filters the full menu.
-  const groups = filterNav(NAV, collapsed ? "" : query);
+  const groups = filterModules(ADMIN_MODULES, collapsed ? "" : query);
+  const activeKey = activeModuleKey(ADMIN_MODULES, pathname);
 
   const setMenu = (next: boolean) => {
     setCollapsed(next);
@@ -111,7 +52,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
   };
 
   return (
-    <ToastProvider>
+    <ToastProvider sidebarWidth={collapsed ? 56 : 240}>
       <div
         data-admin
         data-sidebar={collapsed ? "collapsed" : "expanded"}
@@ -121,7 +62,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
       >
         {/* The 1px rule sits on the column edge, outside its 240px (Figma), above the content. */}
         <div id="admin-sidebar" className="relative z-10 flex h-dvh min-h-0 flex-col shadow-[1px_0_0_0_var(--color-line)]">
-          <div className="shrink-0 px-2 pt-2">
+          <div className={`flex shrink-0 gap-2 px-2 pt-2 ${collapsed ? "flex-col" : "items-center"}`}>
             {collapsed ? (
               <button
                 type="button"
@@ -136,48 +77,53 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
                 <AdminIcon name="search" />
               </button>
             ) : (
-            <label className={`flex h-8 items-center gap-1 rounded-control pr-1 pl-2 ring-1 ring-line focus-within:ring-text-primary`}>
-              <AdminIcon name="search" />
-              <span className="sr-only">Search the menu</span>
-              <input
-                ref={searchRef}
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") setQuery("");
-                }}
-                placeholder="Search"
-                autoComplete="off"
-                spellCheck={false}
-                className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
-              />
-            </label>
+              <label className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-control pr-1 pl-2 ring-1 ring-line focus-within:ring-text-primary">
+                <AdminIcon name="search" />
+                <span className="sr-only">Search the menu</span>
+                <input
+                  ref={searchRef}
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setQuery("");
+                  }}
+                  placeholder="Search"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
+                />
+              </label>
             )}
+            <button
+              type="button"
+              onClick={() => setMenu(!collapsed)}
+              aria-controls="admin-sidebar"
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+              title={collapsed ? "Expand menu" : "Collapse menu"}
+              data-sidebar-toggle
+              className={`flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-muted hover:bg-surface-raised hover:text-text-primary ${collapsed ? "w-full" : "w-8"} ${focusRing}`}
+            >
+              <AdminIcon name={collapsed ? "expand_menu" : "collapse_menu"} />
+            </button>
           </div>
 
-          <nav aria-label="Admin" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
+          <nav aria-label="Admin" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 pb-2">
             {groups.length === 0 ? (
               <p role="status" className="px-2 pt-4 text-body text-text-muted">
                 No menu items match.
               </p>
             ) : (
-              groups.map(({ section, items }, groupIndex) => (
-                // Groups are set apart (client, 2026-10-14): a rule above every group after the
-                // first, and the title as a small uppercase label rather than plain muted text.
+              groups.map(({ section, modules }, groupIndex) => (
                 <div key={section}>
-                  {groupIndex > 0 ? <hr aria-hidden="true" className="mx-2 mt-2 border-line" /> : null}
-                  <p
-                    className={
-                      collapsed ? "sr-only" : "flex h-10 items-end px-2 pb-2.5 text-meta font-bold tracking-[0.08em] text-text-muted uppercase"
-                    }
-                  >
+                  <p className={collapsed ? "sr-only" : "flex h-10 items-end pb-2.5 pl-2 text-meta text-text-muted"}>
                     {section}
                   </p>
                   {collapsed && groupIndex === 0 ? <div aria-hidden="true" className="h-2" /> : null}
-                  <ul className="flex flex-col gap-1 px-2">
-                    {items.map((item) => {
-                      const active = isActive(item, pathname);
+                  <ul className="flex flex-col gap-1 pl-2">
+                    {modules.map((item) => {
+                      const active = item.key === activeKey;
                       const content = (
                         <>
                           <AdminIcon name={item.icon} />
@@ -186,8 +132,8 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
                       );
                       const row = `flex h-8 items-center gap-1 rounded-control text-body ${collapsed ? "justify-center" : "pl-1"}`;
                       return (
-                        <li key={item.label}>
-                          {item.href ? (
+                        <li key={item.key} data-module={item.key}>
+                          {item.status === "live" && item.href ? (
                             <Link
                               href={item.href}
                               aria-current={active ? "page" : undefined}
@@ -197,7 +143,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
                               {content}
                             </Link>
                           ) : (
-                            <span aria-disabled="true" title={collapsed ? `${item.label} — coming soon` : "Coming soon"} data-coming-soon className={`${row} cursor-not-allowed text-text-muted`}>
+                            <span aria-disabled="true" title={collapsed ? `${item.label} — coming soon` : "Coming soon"} data-coming-soon className={`${row} cursor-not-allowed text-text-disabled`}>
                               {content}
                               <span className="sr-only"> (coming soon)</span>
                             </span>
@@ -211,23 +157,6 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
             )}
           </nav>
 
-          <div className="mx-2 mb-1 shrink-0 border-t border-line pt-1">
-            <button
-              type="button"
-              onClick={() => setMenu(!collapsed)}
-              aria-controls="admin-sidebar"
-              aria-expanded={!collapsed}
-              aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-              title={collapsed ? "Expand menu" : "Collapse menu"}
-              data-sidebar-toggle
-              className={`flex h-8 w-full cursor-pointer items-center gap-1 rounded-control text-body text-text-muted hover:bg-surface-raised hover:text-text-primary ${
-                collapsed ? "justify-center" : "pl-1"
-              } ${focusRing}`}
-            >
-              <AdminIcon name={collapsed ? "expand_menu" : "collapse_menu"} />
-              {collapsed ? null : <span>Collapse menu</span>}
-            </button>
-          </div>
           <UserCard admin={admin} collapsed={collapsed} />
         </div>
         <div data-admin-content className="relative h-dvh min-w-0 overflow-x-hidden overflow-y-auto overscroll-x-none">
@@ -260,7 +189,7 @@ function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: bool
   return (
     <div className="shrink-0 px-2 pb-2">
       <div
-        className={`flex h-16 rounded-control ring-1 ring-line ${collapsed ? "flex-col items-center justify-center gap-1" : "items-center gap-1 pr-1 pl-2"}`}
+        className={`flex rounded-control ring-1 ring-line ${collapsed ? "flex-col items-center justify-center gap-1 py-2" : "h-16 items-center gap-1 pr-1 pl-2"}`}
       >
         <Link
           href="/admin/profile"
@@ -272,6 +201,8 @@ function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: bool
             {name}
           </span>
         </Link>
+        {/* Temporary light/dark preview (client, 2026-10-19), as on the public Home. */}
+        <ThemeToggle className="size-6 text-text-muted hover:text-text-primary" />
         <button
           type="button"
           onClick={logout}
