@@ -56,6 +56,7 @@ false`** (see §3.2).
 | Variable | Where | Notes |
 |---|---|---|
 | `STRIPE_SECRET_KEY` | API | `sk_test_…` locally; production `sk_live_…` or better a **restricted** `rk_live_…` key (§3.1). A live key is refused unless `STRIPE_LIVE_ENABLED=true`. |
+| `STRIPE_PUBLISHABLE_KEY` | API | `pk_test_…` / `pk_live_…`, same mode as the secret key (checked at start). Public by design: served to the donate page for the embedded card form (`donations.checkout = embedded`, 2026-10-19). Without it, card donations use hosted Checkout. |
 | `STRIPE_WEBHOOK_SECRET` | API | `whsec_…` of the endpoint (production) or of `stripe listen` (local). |
 | `STRIPE_LIVE_ENABLED` | API | `true` only in production with a live key. |
 | `STRIPE_CUSTOMER_PORTAL_URL` | API | Customer-portal login link (https). Shown on the donate page while monthly donations are on. |
@@ -128,8 +129,10 @@ Developers → Webhooks → Add endpoint:
 
 - URL: `https://globalexperiment.org/api/stripe/webhook` (through the
   Next.js proxy, which forwards the raw body unchanged — verified locally).
-- Events (exactly these nine): `checkout.session.completed`,
-  `checkout.session.async_payment_succeeded`, `invoice.paid`,
+- Events (exactly these ten): `checkout.session.completed`,
+  `checkout.session.async_payment_succeeded`, `payment_intent.succeeded`
+  (one-off card donations paid on the donate page, added 2026-10-19),
+  `invoice.paid`,
   `charge.refunded`, `customer.subscription.created`,
   `customer.subscription.updated`, `customer.subscription.deleted`,
   `charge.dispute.funds_withdrawn`, `charge.dispute.funds_reinstated`.
@@ -193,7 +196,7 @@ Test-mode rows are test data.
    database), the site (`npm run dev`, port 3000), and
    ```bash
    stripe listen --forward-to localhost:3000/api/stripe/webhook \
-     --events checkout.session.completed,checkout.session.async_payment_succeeded,invoice.paid,charge.refunded,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,charge.dispute.funds_withdrawn,charge.dispute.funds_reinstated
+     --events checkout.session.completed,checkout.session.async_payment_succeeded,payment_intent.succeeded,invoice.paid,charge.refunded,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,charge.dispute.funds_withdrawn,charge.dispute.funds_reinstated
    ```
    Donations must be open locally: `DONATIONS_ENABLED=true`, or use the
    preview link.

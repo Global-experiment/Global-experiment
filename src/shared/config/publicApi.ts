@@ -32,6 +32,14 @@ export interface DonationConfig {
   minimum: number;
   maximum: number;
   monthly: boolean;
+  /**
+   * How a one-off card donation is paid (donations.checkout, decided
+   * 2026-10-19): "embedded" = Stripe's card fields on the donate page, no
+   * email; "hosted" = Stripe Checkout. Absent from an older API: hosted.
+   */
+  checkout?: "embedded" | "hosted";
+  /** Stripe's publishable key (public by design), set with checkout = "embedded". */
+  publishableKey?: string | null;
   methods: { key: DonationMethodKey; currencies: DonationCurrency[]; frequencies: DonationFrequency[] }[];
   customerPortalUrl: string | null;
 }
@@ -83,6 +91,18 @@ export function fetchCheckoutStatus(sessionId: string): Promise<ApiResult<Checko
   return getJson(`/api/donations/checkout/${encodeURIComponent(sessionId)}`, { cache: "no-store" });
 }
 
+/** An embedded card donation's status, for the thank-you page; the reference replaces the email receipt. */
+export interface PaymentIntentStatus {
+  status: string;
+  amount: number;
+  currency: string;
+  reference: string;
+}
+
+export function fetchPaymentIntentStatus(id: string): Promise<ApiResult<PaymentIntentStatus>> {
+  return getJson(`/api/donations/payment-intents/${encodeURIComponent(id)}`, { cache: "no-store" });
+}
+
 /** One public Treasury entry (apps/api/src/treasury/treasury-public.contracts.ts). No personal data. */
 export interface PublicTreasuryEntry {
   number: number;
@@ -123,6 +143,8 @@ export interface TreasuryOverview {
   expensesTotal: number;
   expenseCount: number;
   donationAppeal: boolean;
+  /** Search, sort, filters and the currency switch (treasury.public_toolbar). Absent from an older API: off. */
+  publicToolbar?: boolean;
   lastUpdatedAt: string | null;
   filters: { currencies: DonationCurrency[]; expenseTypes: { key: string; label: string }[]; firstDate: string | null; lastDate: string | null };
 }
@@ -148,8 +170,9 @@ export interface TreasuryEntriesPage {
 
 const treasuryCache = { next: { revalidate: TREASURY_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.treasury] } };
 
-export function fetchTreasuryOverview(currency: DonationCurrency): Promise<ApiResult<TreasuryOverview>> {
-  return getJson(`/api/treasury/overview?currency=${currency}`, treasuryCache);
+/** Without a currency, the API answers in the stats currency setting (treasury.stats_currency). */
+export function fetchTreasuryOverview(currency?: DonationCurrency): Promise<ApiResult<TreasuryOverview>> {
+  return getJson(currency ? `/api/treasury/overview?currency=${currency}` : "/api/treasury/overview", treasuryCache);
 }
 
 export function fetchTreasuryEntries(query: TreasuryEntriesQuery): Promise<ApiResult<TreasuryEntriesPage>> {

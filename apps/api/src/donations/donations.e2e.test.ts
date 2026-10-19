@@ -59,6 +59,9 @@ describe("donations API (HTTP, Stripe test double)", () => {
         minimum: 1,
         maximum: 10000,
         monthly: false,
+        // No publishable key configured here: card donations open Checkout.
+        checkout: "hosted",
+        publishableKey: null,
         methods: [
           { key: "card", currencies: ["EUR", "USD", "CHF"], frequencies: ["once"] },
           { key: "apple_pay", currencies: ["EUR", "USD", "CHF"], frequencies: ["once"] },
@@ -84,6 +87,10 @@ describe("donations API (HTTP, Stripe test double)", () => {
         { key: "paypal", currencies: ["EUR", "USD", "CHF"], frequencies: ["once"] },
         { key: "sepa_debit", currencies: ["EUR"], frequencies: ["once", "monthly"] },
       ]);
+      // PayPal monthly behind its own setting (Stripe allows it once PayPal recurring payments are on).
+      await setSetting("donations.paypal_monthly", true);
+      const paypal = (await http().get("/api/donations/config").expect(200)).body.methods.find((method: { key: string }) => method.key === "paypal");
+      expect(paypal.frequencies).toEqual(["once", "monthly"]);
 
       await t.db.delete(settings);
       await setSetting("donations.default_currency", "GBP"); // not a currency we take
@@ -330,5 +337,78 @@ describe("donations closed without a preview token configured", () => {
   it("never treats a token as valid", async () => {
     expect((await request(t.app.getHttpServer()).get("/api/donations/config").set("x-donations-preview", "anything").expect(200)).body.enabled).toBe(false);
     await request(t.app.getHttpServer()).post("/api/donations/checkout").set("origin", TEST_ORIGIN).send(checkoutBody({ previewToken: "" })).expect(403);
+  });
+});
+
+/**
+ * One-off card donations paid on the donate page (decided 2026-10-19):
+ * Stripe's card fields, no email; donations.checkout = embedded, which needs
+ * a publishable key. Its own app: on a real PostgreSQL server every test
+ * app resets the shared _test database.
+ */
+describe("embedded card donations (PaymentIntent)", () => {
+  let t: TestApp;
+  const stripe = new FakeStripe();
+  const http = () => request(t.app.getHttpServer());
+  const intent = (body: Record<string, unknown>) => http().post("/api/donations/payment-intent").set("x-forwarded-for", nextClient()).set("origin", TEST_ORIGIN).send(body);
+  const attempt = () => ({ amount: "20", currency: "USD", attemptId: randomUUID() });
+
+  beforeAll(async () => {
+    t = await createTestApp({ TRUST_PROXY_HOPS: "1", DONATIONS_ENABLED: "true", PUBLIC_SITE_URL: TEST_ORIGIN, STRIPE_PUBLISHABLE_KEY: "pk_test_FAKEKEYforapitestsonly" }, [
+      { provide: STRIPE_GATEWAY, useValue: stripe },
+    ]);
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+  afterEach(async () => {
+    stripe.createdIntents.length = 0;
+    await t.db.delete(settings);
+  });
+
+  it("offers the embedded card form with the publishable key; donations.checkout = hosted turns it off", async () => {
+    expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({ checkout: "embedded", publishableKey: "pk_test_FAKEKEYforapitestsonly" });
+    await t.db.insert(settings).values({ key: "donations.checkout", value: "hosted" });
+    expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({ checkout: "hosted", publishableKey: null });
+    const refused = await intent(attempt()).expect(403);
+    expect(refused.body.error.details).toEqual({ reason: "embedded_checkout_off" });
+  });
+
+  it("creates a card-only PaymentIntent for the amount and currency, and returns a reference instead of an email receipt", async () => {
+    const res = await intent({ amount: "12.50", currency: "EUR", attemptId: randomUUID() }).expect(201);
+    expect(stripe.createdIntents).toHaveLength(1);
+    expect(stripe.createdIntents[0]).toMatchObject({ amount: 1250, currency: "EUR", description: "Donation to the Global Experiment" });
+    expect(res.body.clientSecret).toMatch(/^pi_.+_secret_fake$/);
+    expect(res.body.reference).toMatch(/^GE-[A-Z0-9]{8}$/);
+    expect(Object.keys(res.body).sort()).toEqual(["clientSecret", "reference"]);
+  });
+
+  it("applies the same rules as Checkout and only answers the public site", async () => {
+    await intent({ ...attempt(), amount: "0.50" }).expect(400);
+    await intent({ ...attempt(), amount: "10000.01" }).expect(400);
+    await intent({ ...attempt(), currency: "GBP" }).expect(400);
+    await intent({ ...attempt(), frequency: "monthly" }).expect(400);
+    await http().post("/api/donations/payment-intent").set("x-forwarded-for", nextClient()).set("origin", "https://evil.example").send(attempt()).expect(403);
+    expect(stripe.createdIntents).toHaveLength(0);
+  });
+
+  it("returns the same PaymentIntent for a repeated attempt (idempotency key)", async () => {
+    const body = attempt();
+    const first = await intent(body).expect(201);
+    const second = await intent(body).expect(201);
+    expect(second.body.clientSecret).toBe(first.body.clientSecret);
+    expect(stripe.createdIntents).toHaveLength(1);
+  });
+
+  it("reports an embedded payment's status for the thank-you page; 404 for anything else", async () => {
+    const paid = stripe.embeddedDonation("USD", 2000);
+    const res = await http().get(`/api/donations/payment-intents/${paid.intentId}`).expect(200);
+    expect(res.body).toEqual({ status: "succeeded", amount: 2000, currency: "USD", reference: `GE-${paid.intentId.slice(-8).toUpperCase()}` });
+    await http().get("/api/donations/payment-intents/not-an-intent").expect(404);
+    await http().get("/api/donations/payment-intents/pi_doesnotexist000000").expect(404);
+    const checkout = stripe.oneOffDonation("USD", 2000);
+    await http().get(`/api/donations/payment-intents/${checkout.intentId}`).expect(404);
+    const foreign = stripe.embeddedDonation("USD", 2000, { donation: false });
+    await http().get(`/api/donations/payment-intents/${foreign.intentId}`).expect(404);
   });
 });

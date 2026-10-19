@@ -258,6 +258,16 @@ describe("Treasury API", () => {
       await anonymous().get("/api/treasury/entries/999999").expect(404);
     });
 
+    it("without a currency, the overview uses treasury.stats_currency; it reports the public toolbar setting (off by default)", async () => {
+      const usd = (await anonymous().get("/api/treasury/overview").expect(200)).body;
+      expect(usd).toMatchObject({ currency: "USD", publicToolbar: false });
+      await setting("treasury.stats_currency", "CHF");
+      await setting("treasury.public_toolbar", true);
+      expect((await anonymous().get("/api/treasury/overview").expect(200)).body).toMatchObject({ currency: "CHF", publicToolbar: true });
+      expect((await anonymous().get("/api/treasury/overview?currency=EUR").expect(200)).body.currency).toBe("EUR");
+      await anonymous().get("/api/treasury/overview?currency=GBP").expect(400);
+    });
+
     it("searches public text only: the description, an expense type, the entry number; wildcards are literal", async () => {
       const hosting = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, publicDescription: "Server hosting for the platform" }), ["hosting_and_infrastructure"]);
       const legal = await insert(expense({ occurredOn: "2026-10-02", grossAmount: -2000, publicDescription: "Advice on the statutes", name: "Secret internal name" }), ["legal_and_compliance"]);

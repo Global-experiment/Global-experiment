@@ -93,6 +93,17 @@ export const DONATE_COPY = {
     paypal: "PayPal",
     sepa: "Direct debit SEPA",
     redirecting: "Redirecting to Stripe…",
+    opening: "Opening the card form…",
+  },
+
+  /** The embedded card form (decided 2026-10-19): Stripe's card fields on this page, no email asked. */
+  card: {
+    title: "Card payment",
+    intro: (amount: string) => `One-off donation of ${amount}. Your card details go straight to Stripe; no email address is needed.`,
+    pay: (amount: string) => `Donate ${amount}`,
+    paying: "Processing…",
+    loadFailed: "The card form couldn’t be loaded. Nothing was charged. Please try again, or choose another payment method.",
+    declined: "The payment didn’t go through. Nothing was charged.",
   },
 
   /** Warning banner (p31) and the other notices, which reuse its layout. */
@@ -162,5 +173,9 @@ export const DONATE_COPY = {
     spentLink: "The treasury",
     spentAfter: " is public record and accessible to all.",
     toast: "Donation sent",
+    // Card donations paid on the page carry no email: the reference replaces the receipt.
+    referenceHeading: "Your reference",
+    referenceBody: (reference: string) => `${reference}. No email receipt is sent for a card donation made without an email address: keep this reference, and quote it if you contact us about this donation.`,
+    processingBody: "Your bank is still confirming the payment. It will appear on the treasury page once it has cleared.",
   },
 } as const;

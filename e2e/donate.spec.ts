@@ -61,6 +61,23 @@ test.describe("Donate page", () => {
     await axe(page);
   });
 
+  test("light theme: the wallet marks and row labels use the text colour (no white on white)", async ({ page }) => {
+    await page.goto("/donate");
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = "light";
+    });
+    // Wait for the theme's colour transition to settle.
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).color)).toBe("rgb(0, 0, 0)");
+    const text = await page.evaluate(() => getComputedStyle(document.body).color);
+    const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(text).not.toBe(background);
+    for (const name of ["Apple Pay", "Google Pay"]) {
+      const mark = methods(page).getByRole("button", { name }).locator("svg").first();
+      await expect.poll(() => mark.evaluate((svg) => getComputedStyle(svg).color), { message: name }).toBe(text);
+    }
+    expect(await methods(page).getByRole("button", { name: "Card payment via Stripe" }).evaluate((row) => getComputedStyle(row).color)).toBe(text);
+  });
+
   test("the currency switch is kept in the URL and changes presets and figures", async ({ page }) => {
     await page.goto("/donate");
     await page.getByRole("button", { name: /^Currency: USD/ }).click();

@@ -118,9 +118,9 @@ interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   /**
    * Visible artwork box in CSS px. 16 everywhere (client: "visible icons are
    * exactly 16px square"); 12 only for the Waitlist warning mark, which
-   * Figma draws at 12px.
+   * Figma draws at 12px; 24 for checkboxes only (client feedback 2026-10-19).
    */
-  size?: 12 | 16;
+  size?: 12 | 16 | 24;
 }
 
 /**

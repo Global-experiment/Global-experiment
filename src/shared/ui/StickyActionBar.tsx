@@ -5,7 +5,8 @@ import { Container } from "./Container";
 import { useKeyboardInset } from "./useKeyboardInset";
 
 /**
- * Bottom CTA bar: 8px above and below the 40px control, black background,
+ * Bottom CTA bar: 8px above and below the 40px control on mobile, 16px on
+ * desktop (client feedback 2026-10-19), black background,
  * no rule (figma.pdf p1/p33 — the bar simply covers content scrolling
  * beneath it). The bottom padding grows with the device safe area (home
  * indicator) so the CTA stays tappable.
@@ -57,13 +58,13 @@ export function StickyActionBar({ children, className = "" }: { children: ReactN
       <div
         aria-hidden="true"
         data-action-bar-spacer
-        className={`mt-auto h-[calc(3rem+max(0.5rem,env(safe-area-inset-bottom)))] shrink-0 ${className}`}
+        className={`mt-auto h-[calc(3rem+max(0.5rem,env(safe-area-inset-bottom)))] shrink-0 md:h-18 ${className}`}
         style={height ? { height } : undefined}
       />
       <div
         ref={barRef}
         data-action-bar
-        className={`fixed inset-x-0 bottom-0 z-20 ml-(--scrollbar-offset) bg-surface-base pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ${className}`}
+        className={`fixed inset-x-0 bottom-0 z-20 ml-(--scrollbar-offset) bg-surface-base pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pt-4 md:pb-4 ${className}`}
         style={inset > 0 ? { bottom: inset, paddingBottom: "0.5rem" } : undefined}
       >
         <Container>{children}</Container>

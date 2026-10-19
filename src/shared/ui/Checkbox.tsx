@@ -17,7 +17,9 @@ interface CheckboxProps {
  * A real `<input type="checkbox">` (native semantics, keyboard and form
  * behavior) visually replaced by the Material Sharp `check_box` /
  * `check_box_outline_blank` glyphs (client feedback item 8) instead of the
- * browser's own checkbox rendering.
+ * browser's own checkbox rendering. The glyph is 24px (client feedback
+ * 2026-10-19; every other icon stays 16px), centred on the 20px first text
+ * line so rows keep their height.
  */
 export function Checkbox({ checked, onChange, label, description, disabled = false, className = "py-2.5" }: CheckboxProps) {
   return (
@@ -25,8 +27,9 @@ export function Checkbox({ checked, onChange, label, description, disabled = fal
       <input type="checkbox" checked={checked} onChange={onChange} disabled={disabled} className="peer sr-only" />
       <Icon
         name={checked ? "check_box" : "check_box_outline_blank"}
+        size={24}
         // figma.pdf p23: unchecked boxes are drawn in the line color, checked ones in white.
-        className={`mt-px shrink-0 ${checked ? "text-text-primary" : "text-line"} peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-text-primary`}
+        className={`-my-0.5 shrink-0 ${checked ? "text-text-primary" : "text-line"} peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-text-primary`}
       />
       <span>
         <span className="block text-body text-text-primary">{label}</span>

@@ -205,7 +205,10 @@ export class TreasuryPublicRepository {
     return (await this.withExpenseTypes(rows, visibility))[0]!;
   }
 
-  async overview(currency: TreasuryCurrency): Promise<PublicTreasuryOverview> {
+  /** The page's figures in `requested`, or in the stats currency setting when none is asked for (decided 2026-10-19). */
+  async overview(requested?: TreasuryCurrency): Promise<PublicTreasuryOverview> {
+    const page = await this.settings.getMany(["treasury.stats_currency", "treasury.public_toolbar"]);
+    const currency = requested ?? page["treasury.stats_currency"];
     const visibility = await this.visibility();
     const view = treasuryPublicEntries;
     const visible = this.visible(visibility);
@@ -267,6 +270,7 @@ export class TreasuryPublicRepository {
       expensesTotal,
       expenseCount: expenses?.count ?? 0,
       donationAppeal: settings["treasury.donation_appeal"],
+      publicToolbar: page["treasury.public_toolbar"],
       lastUpdatedAt: lastUpdated === null ? null : new Date(lastUpdated).toISOString(),
       filters: {
         currencies: range?.currencies ?? [],

@@ -24,6 +24,8 @@ interface ButtonBaseProps {
 interface ButtonAsLink extends ButtonBaseProps {
   /** Internal navigation — renders a real <Link>, never a disabled control. */
   href: string;
+  /** Another state of the same page (pagination): replaces the history entry, so Back still leaves the page. */
+  replace?: boolean;
   onClick?: never;
   /**
    * Runs on click before navigation; calling `event.preventDefault()`
@@ -128,7 +130,7 @@ export function Button(props: ButtonProps) {
   }
 
   return (
-    <Link href={props.href} onClick={props.onNavigate} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
+    <Link href={props.href} replace={"replace" in props ? props.replace : undefined} onClick={props.onNavigate} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
       {icon}
       {children}
     </Link>

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 import { E2E_ADMIN } from "./e2e/admin-credentials";
 import { E2E_DONATIONS_PREVIEW } from "./e2e/donations-preview";
+import { E2E_REVALIDATE_SECRET } from "./e2e/testSettings";
 
 /**
  * Minimal E2E config for browser-level behaviors unit tests can't cover
@@ -69,6 +70,10 @@ export default defineConfig({
               // Open for the suites; donate-figma.spec closes them with the setting and uses the preview link.
               DONATIONS_ENABLED: "true",
               DONATIONS_PREVIEW_TOKEN: E2E_DONATIONS_PREVIEW,
+              // A stub publishable key (Stripe.js is stubbed in the browser): hosted Checkout stays the
+              // suites' default; donate-embedded.spec switches the embedded card form on.
+              STRIPE_PUBLISHABLE_KEY: "pk_test_e2estubkeynotarealstripekey",
+              DONATIONS_CHECKOUT: "hosted",
               PUBLIC_SITE_URL: `http://localhost:${port}`,
             },
           },
@@ -84,7 +89,8 @@ export default defineConfig({
       // route's live, uncached Notion preload (same reason as `timeout`
       // above) — 30s was occasionally too tight for that one request.
       timeout: 90_000,
-      env: { ADMIN_API_ORIGIN: `http://127.0.0.1:${apiPort}` },
+      // The revalidation hook lets a suite that switches a setting refresh the cached public pages.
+      env: { ADMIN_API_ORIGIN: `http://127.0.0.1:${apiPort}`, REVALIDATE_SECRET: E2E_REVALIDATE_SECRET },
     },
   ],
   use: {
@@ -93,7 +99,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury).spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -119,6 +125,13 @@ export default defineConfig({
       name: "chromium-admin-treasury",
       dependencies: ["chromium-figma"],
       testMatch: /admin-treasury.spec.ts/,
+      use: { browserName: "chromium" },
+    },
+    // After everything: the suites that switch a setting (the Treasury toolbar, the embedded card form) and switch it back.
+    {
+      name: "chromium-settings",
+      dependencies: ["chromium-admin-treasury"],
+      testMatch: /(treasury-toolbar|donate-embedded).spec.ts/,
       use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine

@@ -24,9 +24,9 @@ import { IconButton } from "@/shared/ui/IconButton";
 import { Icon } from "@/shared/ui/icons";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
-import { shareUrl } from "@/shared/ui/ShareButton";
 import { Sheet } from "@/shared/ui/Sheet";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
+import { CardPaymentSheet, type CardIntent } from "./CardPaymentSheet";
 import { DonateNotice, type DonateNoticeContent } from "./DonateNotice";
 import { PaymentMarks } from "./PaymentMarks";
 
@@ -95,6 +95,9 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
         : null,
   );
   const [busy, setBusy] = useState<DonationMethodKey | null>(null);
+  // The embedded card form (donations.checkout = embedded): open while it holds a PaymentIntent.
+  const [cardIntent, setCardIntent] = useState<CardIntent | null>(null);
+  const embeddedCard = config?.checkout === "embedded" && typeof config.publishableKey === "string" && config.publishableKey !== "";
   const [currencyOpen, setCurrencyOpen] = useState(false);
   // One id per visit: a double click opens the same Checkout (the API's idempotency key).
   const [attemptId] = useState(() => crypto.randomUUID());
@@ -194,16 +197,29 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
     setNotice(null);
     setBusy(method);
     if (selection?.kind === "other") setSelection({ ...selection, editing: false });
+    // One-off card donations are paid on this page when donations.checkout is embedded (decided 2026-10-19).
+    const embedded = method === "card" && frequency === "once" && embeddedCard;
     try {
-      const response = await fetch("/api/donations/checkout", {
+      const response = await fetch(embedded ? "/api/donations/payment-intent" : "/api/donations/checkout", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amount: amountText, currency, frequency, method, attemptId, ...(preview ? { previewToken: preview } : {}) }),
+        body: JSON.stringify(
+          embedded
+            ? { amount: amountText, currency, attemptId, ...(preview ? { previewToken: preview } : {}) }
+            : { amount: amountText, currency, frequency, method, attemptId, ...(preview ? { previewToken: preview } : {}) },
+        ),
       });
       const body = (await response.json().catch(() => null)) as {
         url?: string;
+        clientSecret?: string;
+        reference?: string;
         error?: { details?: { reason?: string; issues?: { path: string; message: string }[] } };
       } | null;
+      if (response.ok && embedded && body?.clientSecret && body.reference) {
+        setBusy(null);
+        setCardIntent({ clientSecret: body.clientSecret, reference: body.reference });
+        return;
+      }
       if (response.ok && body?.url) {
         // Leaving for Stripe: the row keeps its "Redirecting…" state until the page unloads.
         window.location.assign(body.url);
@@ -258,7 +274,7 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
               actions={[
                 { label: copy.menu.donate, icon: "volunteer_activism", href: "#donate-amount" },
                 // Never shares the private preview token.
-                { label: copy.menu.share, icon: "share", onClick: () => void shareUrl(donateHref({ currency }), copy.pageTitle) },
+                { label: copy.menu.share, icon: "share", share: { url: donateHref({ currency }), title: copy.pageTitle } },
                 { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
                 { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
                 { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
@@ -306,10 +322,10 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
         <div id="donate-amount" className={stats ? "" : "mt-5"}>
           {monthlyEnabled ? (
             /*
-              Common pages p28/p30: two unfilled 40px segments sharing a 1px
-              seam, rounded on their outer ends only. The selected one has a
-              white stroke and text (drawn on top, so the seam is white), the
-              other a muted stroke and text.
+              Common pages p29/p31 (19 Oct): two 40px segments sharing a 1px
+              seam, rounded on their outer ends only. The selected one is
+              filled like a selected amount tag (drawn on top, so the seam
+              belongs to it), the other has a muted stroke and text.
             */
             <div role="group" aria-label={copy.frequency.label} className="mt-[1.3125rem] flex">
               {(["once", "monthly"] as const).map((value, index) => (
@@ -323,7 +339,7 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
                     !interactive
                       ? inertControl
                       : frequency === value
-                        ? "relative z-10 cursor-pointer border-text-primary text-text-primary"
+                        ? "relative z-10 cursor-pointer border-inverse-surface bg-inverse-surface text-inverse-content"
                         : "cursor-pointer border-line-strong text-text-muted hover:border-content-50"
                   }`}
                 >
@@ -416,12 +432,18 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
 
         <div role="group" aria-label={copy.methods.label} aria-busy={busy !== null} className="mt-2 flex flex-col gap-2">
           {methods.map((method) => (
-            <PaymentRow key={method.key} method={method.key} busy={busy} onSelect={() => void donate(method.key)} />
+            <PaymentRow
+              key={method.key}
+              method={method.key}
+              busy={busy}
+              busyLabel={method.key === "card" && frequency === "once" && embeddedCard ? copy.methods.opening : copy.methods.redirecting}
+              onSelect={() => void donate(method.key)}
+            />
           ))}
         </div>
         {/* Screen readers hear the redirect; sighted visitors see it on the row. */}
         <p role="status" className="sr-only">
-          {busy ? copy.methods.redirecting : ""}
+          {busy ? (busy === "card" && frequency === "once" && embeddedCard ? copy.methods.opening : copy.methods.redirecting) : ""}
         </p>
 
         {/* Common pages p28: rule 12px under the payment rows, "Details" 12px under it, the text 4px under that; paragraphs run on with no gap. */}
@@ -453,20 +475,30 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
         </div>
       </Container>
 
-      {/* Common pages p29: "Validate" above the keyboard while "Other" is being typed. */}
+      {/* Common pages p30: "Validate" above the keyboard while "Other" is being typed — mobile only (client feedback 2026-10-19: no Validate on desktop, Enter validates). */}
       {editingOther ? (
-        <StickyActionBar>
+        <StickyActionBar className="md:hidden">
           <Button variant="primary" onClick={validateOther} fullWidth className="justify-start!">
             {copy.amount.validate}
           </Button>
         </StickyActionBar>
+      ) : null}
+
+      {embeddedCard && amountMinor !== null ? (
+        <CardPaymentSheet
+          intent={cardIntent}
+          publishableKey={config!.publishableKey!}
+          amountLabel={formatExact(amountMinor, currency)}
+          choiceQuery={new URLSearchParams({ currency, amount: amountText ?? "", frequency: "once" }).toString()}
+          onClose={() => setCardIntent(null)}
+        />
       ) : null}
     </main>
   );
 }
 
 /** One payment row: Common pages p28 geometry (40px, 1px #484848 stroke, 4px radius, marks from x=16). */
-function PaymentRow({ method, busy, onSelect }: { method: DonationMethodKey; busy: DonationMethodKey | null; onSelect: () => void }) {
+function PaymentRow({ method, busy, busyLabel, onSelect }: { method: DonationMethodKey; busy: DonationMethodKey | null; busyLabel: string; onSelect: () => void }) {
   const isBusy = busy === method;
   const disabled = busy !== null;
   const { base, size, variant } = buttonClasses;
@@ -477,7 +509,7 @@ function PaymentRow({ method, busy, onSelect }: { method: DonationMethodKey; bus
       onClick={onSelect}
       disabled={disabled}
       aria-disabled={disabled}
-      aria-label={isBusy ? `${content.name}. ${DONATE_COPY.methods.redirecting}` : content.name}
+      aria-label={isBusy ? `${content.name}. ${busyLabel}` : content.name}
       data-method={method}
       className={`${base} ${size.control} ${variant.secondary} w-full justify-start ${content.gap} ${
         disabled ? (isBusy ? "cursor-progress" : "cursor-not-allowed opacity-50") : "cursor-pointer"
@@ -486,7 +518,7 @@ function PaymentRow({ method, busy, onSelect }: { method: DonationMethodKey; bus
       {isBusy ? (
         <>
           <Spinner />
-          <span>{DONATE_COPY.methods.redirecting}</span>
+          <span>{busyLabel}</span>
         </>
       ) : (
         <>

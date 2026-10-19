@@ -2,13 +2,16 @@ import Stripe from "stripe";
 import { ProviderUnavailableError, ValidationFailedError } from "../common/errors/api-error.js";
 import {
   DONATION_METADATA,
+  EMBEDDED_FLOW,
   StripeSignatureError,
   type BalanceInfo,
   type ChargeInfo,
   type CheckoutSessionInfo,
   type CreateCheckoutSessionInput,
+  type CreatePaymentIntentInput,
   type DisputeInfo,
   type InvoiceChargeInfo,
+  type PaymentIntentInfo,
   type RefundInfo,
   type StripeEventInfo,
   type StripeGateway,
@@ -137,6 +140,38 @@ export class StripeSdkGateway implements StripeGateway {
       paymentIntentId: idOf(session.payment_intent),
       subscriptionId: idOf(session.subscription),
       donation: isDonation(session.metadata),
+    };
+  }
+
+  async createPaymentIntent(input: CreatePaymentIntentInput): Promise<{ id: string; clientSecret: string }> {
+    const intent = await this.call(
+      () =>
+        this.stripe.paymentIntents.create(
+          {
+            amount: input.amount,
+            currency: input.currency.toLowerCase(),
+            // Card fields only (no email): wallets, PayPal and SEPA stay on hosted Checkout.
+            payment_method_types: ["card"],
+            description: input.description,
+            metadata: { ...DONATION_METADATA, flow: EMBEDDED_FLOW },
+          },
+          { idempotencyKey: input.idempotencyKey },
+        ),
+      () => new ValidationFailedError([{ path: "method", message: "This payment method is not available for this currency right now." }]),
+    );
+    if (!intent.client_secret) throw new ProviderUnavailableError("Stripe");
+    return { id: intent.id, clientSecret: intent.client_secret };
+  }
+
+  async getPaymentIntent(id: string): Promise<PaymentIntentInfo> {
+    const intent = await this.call(() => this.stripe.paymentIntents.retrieve(id));
+    return {
+      id: intent.id,
+      status: intent.status,
+      amount: intent.amount,
+      currency: intent.currency.toUpperCase(),
+      donation: isDonation(intent.metadata),
+      embedded: intent.metadata?.flow === EMBEDDED_FLOW,
     };
   }
 

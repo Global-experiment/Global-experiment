@@ -210,7 +210,7 @@ test.describe("mobile", () => {
   test.use({ viewport: { width: 412, height: 900 }, hasTouch: true, isMobile: true });
 
   test("dragging a sheet down closes it — no reload, no navigation; a short drag snaps back (item 3)", async ({ page }) => {
-    await page.goto("/treasury");
+    await page.goto("/donate"); // the public Treasury has no ⋮ menu (decided 2026-10-19)
     await page.evaluate(() => {
       (window as unknown as { __noReload: boolean }).__noReload = true;
     });
@@ -239,7 +239,7 @@ test.describe("mobile", () => {
     // Long drag down → closes, same page, no reload.
     await touchDrag(page, { x: box.x + box.width / 2, y: box.y + 40 }, 300, 10);
     await expect(dialog).toBeHidden();
-    await expect(page).toHaveURL("/treasury");
+    await expect(page).toHaveURL("/donate");
     expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
 
     // From the handle strip as well.
@@ -280,7 +280,7 @@ test.describe("mobile", () => {
   });
 
   test("the page behind an open sheet doesn't scroll, and is scrollable again after it closes", async ({ page }) => {
-    await page.goto("/treasury");
+    await page.goto("/donate"); // the public Treasury has no ⋮ menu (decided 2026-10-19)
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe("hidden");
     await page.getByRole("button", { name: "Page actions" }).click();
     await expect(page.getByRole("dialog", { name: "Page actions" })).toBeVisible();

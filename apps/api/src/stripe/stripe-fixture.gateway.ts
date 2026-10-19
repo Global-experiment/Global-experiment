@@ -4,8 +4,10 @@ import {
   type ChargeInfo,
   type CheckoutSessionInfo,
   type CreateCheckoutSessionInput,
+  type CreatePaymentIntentInput,
   type DisputeInfo,
   type InvoiceChargeInfo,
+  type PaymentIntentInfo,
   type RefundInfo,
   type StripeEventInfo,
   type StripeGateway,
@@ -27,6 +29,13 @@ export const FIXTURE_SESSIONS: Record<string, Pick<CheckoutSessionInfo, "mode" |
   cs_test_e2eopensession00001: { mode: "payment", status: "open", paymentStatus: "unpaid" },
 };
 
+/** Embedded card donations the thank-you page knows (status only; the browser tests stub Stripe.js). */
+export const FIXTURE_INTENTS: Record<string, Pick<PaymentIntentInfo, "status" | "amount" | "currency">> = {
+  pi_e2esucceeded000000001: { status: "succeeded", amount: 2000, currency: "USD" },
+  pi_e2eprocessing00000001: { status: "processing", amount: 2000, currency: "USD" },
+  pi_e2efailed000000000001: { status: "requires_payment_method", amount: 2000, currency: "USD" },
+};
+
 export class FixtureStripeGateway implements StripeGateway {
   private created = 0;
 
@@ -38,6 +47,17 @@ export class FixtureStripeGateway implements StripeGateway {
     const id = `cs_test_e2ecreated${String(++this.created).padStart(8, "0")}`;
     const query = new URLSearchParams({ mode: input.mode, currency: input.currency, amount: String(input.amount), methods: input.paymentMethodTypes.join(",") });
     return { id, url: `https://checkout.stripe.com/c/pay/${id}?${query.toString()}` };
+  }
+
+  async createPaymentIntent(input: CreatePaymentIntentInput): Promise<{ id: string; clientSecret: string }> {
+    const id = `pi_e2ecreated${String(++this.created).padStart(8, "0")}`;
+    return { id, clientSecret: `${id}_secret_e2e${input.currency}${input.amount}` };
+  }
+
+  async getPaymentIntent(id: string): Promise<PaymentIntentInfo> {
+    const intent = FIXTURE_INTENTS[id];
+    if (!intent) throw new NotFoundError("Payment not found.");
+    return { id, ...intent, donation: true, embedded: true };
   }
 
   async getCheckoutSession(id: string): Promise<CheckoutSessionInfo> {

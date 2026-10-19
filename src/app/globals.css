@@ -291,6 +291,11 @@ html:has([data-admin]) body {
     opacity: 0;
   }
 
+  /* Sheet.tsx: a close slides the sheet down first; the backdrop fades with it. */
+  dialog.sheet[data-closing]::backdrop {
+    opacity: 0;
+  }
+
   @starting-style {
     dialog.sheet[open]::backdrop {
       opacity: 0;

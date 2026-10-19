@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: getSecurityHeaders(),
       },
+      // The donate pages load Stripe.js for the embedded card form; when two
+      // rules match, the last one wins (Next.js headers docs).
+      {
+        source: "/donate/:path*",
+        headers: getSecurityHeaders({ stripe: true }),
+      },
     ];
   },
 };

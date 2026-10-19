@@ -5,8 +5,10 @@ import type {
   ChargeInfo,
   CheckoutSessionInfo,
   CreateCheckoutSessionInput,
+  CreatePaymentIntentInput,
   DisputeInfo,
   InvoiceChargeInfo,
+  PaymentIntentInfo,
   RefundInfo,
   StripeEventInfo,
   StripeGateway,
@@ -32,6 +34,9 @@ export const cardFee = (amount: number) => Math.round(amount * 0.029) + 30;
 
 export class FakeStripe implements StripeGateway {
   readonly createdSessions: (CreateCheckoutSessionInput & { id: string })[] = [];
+  readonly createdIntents: (CreatePaymentIntentInput & { id: string })[] = [];
+  /** PaymentIntent id → what getPaymentIntent returns (embedded donations and others). */
+  readonly intentInfos = new Map<string, PaymentIntentInfo>();
   readonly sessions = new Map<string, CheckoutSessionInfo>();
   readonly charges = new Map<string, ChargeInfo>();
   /** PaymentIntent id → charge id (null while the charge isn't there yet). */
@@ -65,6 +70,25 @@ export class FakeStripe implements StripeGateway {
     const session = this.sessions.get(id);
     if (!session) throw new Stripe.errors.StripeInvalidRequestError({ message: "No such checkout session", type: "invalid_request_error" });
     return session;
+  }
+
+  async createPaymentIntent(input: CreatePaymentIntentInput) {
+    this.calls.push("createPaymentIntent");
+    if (this.unavailable) throw this.unavailable;
+    const existing = this.createdIntents.find((intent) => intent.idempotencyKey === input.idempotencyKey);
+    const id = existing?.id ?? next("pi");
+    if (!existing) {
+      this.createdIntents.push({ ...input, id });
+      this.intentInfos.set(id, { id, status: "requires_payment_method", amount: input.amount, currency: input.currency, donation: true, embedded: true });
+    }
+    return { id, clientSecret: `${id}_secret_fake` };
+  }
+
+  async getPaymentIntent(id: string) {
+    this.calls.push("getPaymentIntent");
+    const intent = this.intentInfos.get(id);
+    if (!intent) throw new Stripe.errors.StripeInvalidRequestError({ message: "No such payment_intent", type: "invalid_request_error" });
+    return intent;
   }
 
   async getPaymentIntentCharge(paymentIntentId: string) {
@@ -125,6 +149,8 @@ export class FakeStripe implements StripeGateway {
       balance: options.settled === false ? null : this.balance(currency, amount),
     });
     this.intents.set(intentId, chargeId);
+    // Checkout's own PaymentIntent: not embedded (recorded from checkout.session.completed).
+    this.intentInfos.set(intentId, { id: intentId, status: options.paid === false ? "processing" : "succeeded", amount, currency, donation, embedded: false });
     this.sessions.set(sessionId, {
       id: sessionId,
       mode: "payment",
@@ -135,6 +161,25 @@ export class FakeStripe implements StripeGateway {
       donation,
     });
     return { sessionId, chargeId, intentId };
+  }
+
+  /** A one-off card donation paid on the donate page (embedded card fields): PaymentIntent + its charge. */
+  embeddedDonation(currency: string, amount: number, options: { donation?: boolean; paid?: boolean } = {}) {
+    const chargeId = next("ch");
+    const intentId = next("pi");
+    const donation = options.donation ?? true;
+    this.charges.set(chargeId, {
+      id: chargeId,
+      amount,
+      currency,
+      created: new Date("2026-10-19T09:30:00Z"),
+      status: options.paid === false ? "pending" : "succeeded",
+      donation,
+      balance: this.balance(currency, amount),
+    });
+    this.intents.set(intentId, chargeId);
+    this.intentInfos.set(intentId, { id: intentId, status: options.paid === false ? "processing" : "succeeded", amount, currency, donation, embedded: true });
+    return { chargeId, intentId };
   }
 
   /** A monthly donation: subscription + its first paid invoice. */

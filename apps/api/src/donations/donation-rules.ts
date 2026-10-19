@@ -7,7 +7,9 @@ import { TREASURY_CURRENCIES, type TreasuryCurrency } from "../treasury/treasury
  * presets 2 / 5 / 10 / 20 / 50, minimum 1, maximum 10,000 in the chosen
  * currency; EUR, USD, CHF; monthly only behind `donations.monthly`, PayPal
  * and SEPA only behind `donations.extra_methods`; SEPA Direct Debit is EUR
- * only. Pure functions — the API enforces them, the donate page displays them.
+ * only; PayPal monthly only behind `donations.paypal_monthly` (decided
+ * 2026-10-19: Stripe allows PayPal subscriptions once PayPal recurring
+ * payments are enabled on the account). Pure functions — the API enforces them, the donate page displays them.
  */
 export const DONATION_RULES = {
   currencies: TREASURY_CURRENCIES,
@@ -32,8 +34,8 @@ export const DONATION_METHODS: Record<DonationMethodKey, MethodRule> = {
   card: { stripeType: "card", currencies: TREASURY_CURRENCIES, frequencies: ["once", "monthly"], extra: false },
   apple_pay: { stripeType: "card", currencies: TREASURY_CURRENCIES, frequencies: ["once", "monthly"], extra: false },
   google_pay: { stripeType: "card", currencies: TREASURY_CURRENCIES, frequencies: ["once", "monthly"], extra: false },
-  // PayPal recurring payments need a separate Stripe approval: one-off only until then.
-  paypal: { stripeType: "paypal", currencies: TREASURY_CURRENCIES, frequencies: ["once"], extra: true },
+  // Monthly too, but only while donations.paypal_monthly is on (methodFrequencies).
+  paypal: { stripeType: "paypal", currencies: TREASURY_CURRENCIES, frequencies: ["once", "monthly"], extra: true },
   sepa_debit: { stripeType: "sepa_debit", currencies: ["EUR"], frequencies: ["once", "monthly"], extra: true },
 };
 
@@ -42,6 +44,14 @@ export const DONATION_METHOD_ORDER: readonly DonationMethodKey[] = ["card", "app
 export interface DonationFlags {
   monthly: boolean;
   extraMethods: boolean;
+  paypalMonthly: boolean;
+}
+
+/** The frequencies a method offers under the current flags (monthly ones only while monthly donations are on). */
+export function methodFrequencies(method: DonationMethodKey, flags: DonationFlags): readonly DonationFrequency[] {
+  return DONATION_METHODS[method].frequencies.filter(
+    (frequency) => frequency === "once" || (flags.monthly && (method !== "paypal" || flags.paypalMonthly)),
+  );
 }
 
 /** Amount text ("10", "10.5", "10,50") → minor units, or null if it isn't a valid amount format. */
@@ -73,6 +83,7 @@ export function checkoutIssues(choice: CheckoutChoice, flags: DonationFlags): Va
   const method = DONATION_METHODS[choice.method];
   if (!methodAvailable(choice.method, flags)) issues.push({ path: "method", message: "This payment method is not available." });
   else if (!method.currencies.includes(choice.currency)) issues.push({ path: "method", message: `This payment method is not available in ${choice.currency}.` });
-  else if (!method.frequencies.includes(choice.frequency)) issues.push({ path: "method", message: "This payment method is not available for monthly donations." });
+  // The method's own limits only (PayPal monthly); the global monthly switch is the frequency issue above.
+  else if (!methodFrequencies(choice.method, { ...flags, monthly: true }).includes(choice.frequency)) issues.push({ path: "method", message: "This payment method is not available for monthly donations." });
   return issues;
 }

@@ -26,7 +26,6 @@ import { IconButton } from "@/shared/ui/IconButton";
 import { Icon } from "@/shared/ui/icons";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
-import { shareUrl } from "@/shared/ui/ShareButton";
 import { Sheet } from "@/shared/ui/Sheet";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 
@@ -41,6 +40,13 @@ interface TreasuryViewProps {
   history: TreasuryEntriesPage | null;
   /** The server's clock (ISO), so server and browser render the same dates. */
   now: string;
+  /**
+   * treasury.public_toolbar: the currency switch, chart link, ⋮ menu, search,
+   * sort and filters. Off (decided 2026-10-19): the header is back, title and
+   * share only; the stats are in the stats currency setting; the history lists
+   * every currency, latest first.
+   */
+  toolbar?: boolean;
 }
 
 /**
@@ -51,7 +57,7 @@ interface TreasuryViewProps {
  * URL the server renders; the previous view stays on screen (marked busy)
  * until the next one arrives.
  */
-export function TreasuryView({ state, overview, history, now: nowIso }: TreasuryViewProps) {
+export function TreasuryView({ state, overview, history, now: nowIso, toolbar = false }: TreasuryViewProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -63,7 +69,8 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const now = new Date(nowIso);
 
-  const go = (next: TreasuryState) => startTransition(() => router.push(treasuryHref(next), { scroll: false }));
+  // A view change replaces the URL (client feedback 2026-10-19): Back leaves the page, it never steps through its states.
+  const go = (next: TreasuryState) => startTransition(() => router.replace(treasuryHref(next), { scroll: false }));
   const chooseCurrency = (currency: TreasuryCurrencyChoice) => {
     setCurrencyOpen(false);
     if (currency !== state.currency) go(withFilters(state, { currency }));
@@ -90,6 +97,7 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
         title={copy.pageTitle}
         backHref="/"
         actions={
+          toolbar ? (
           <>
             {/* Common pages p11: "USD" bold — the currency of the stats and the history — then the chart glyph and ⋮. */}
             <button
@@ -107,7 +115,7 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
               label={copy.header.pageActions}
               actions={[
                 { label: copy.menu.donate, icon: "volunteer_activism", href: "/donate" },
-                { label: copy.menu.share, icon: "share", onClick: () => void shareUrl(treasuryHref(state), copy.pageTitle) },
+                { label: copy.menu.share, icon: "share", share: { url: treasuryHref(state), title: copy.pageTitle } },
                 { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
                 { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
                 { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
@@ -125,9 +133,11 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
               </p>
             </PageActionsMenu>
           </>
+          ) : null
         }
       />
 
+      {toolbar ? (
       <Sheet open={currencyOpen} onClose={() => setCurrencyOpen(false)} ariaLabel={copy.header.currencySheetLabel}>
         <div className="flex flex-col gap-2">
           {[...DONATION_CURRENCIES, "all" as const].map((code) => (
@@ -137,6 +147,7 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
           ))}
         </div>
       </Sheet>
+      ) : null}
 
       <Container className="pt-1">
         {/*
@@ -144,7 +155,7 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
           The search button opens a field in their place (typing searches after a pause, Enter
           at once); × closes it and clears the search.
         */}
-        {searchOpen ? (
+        {!toolbar ? null : searchOpen ? (
           <form
             role="search"
             onSubmit={(event) => {
@@ -211,7 +222,8 @@ export function TreasuryView({ state, overview, history, now: nowIso }: Treasury
           </div>
         )}
 
-        <div role="group" aria-label={copy.pills.label} className="mt-2 flex gap-2">
+        {/* Without the toolbar the pills take its place, 4px under the header (Figma's y 148). */}
+        <div role="group" aria-label={copy.pills.label} className={`${toolbar ? "mt-2" : ""} flex gap-2`}>
           {(["expense", "donation"] as const satisfies HistoryType[]).map((type) => (
             <button
               key={type}
@@ -296,9 +308,9 @@ function History({ history, filters, now, onErase, state }: { history: TreasuryE
       <HistoryList entries={history.items} now={now} className="mt-[0.6875rem]" />
       {pages > 1 ? (
         <nav aria-label={copy.history.pagination} className="mt-4 flex items-center justify-between gap-2">
-          {history.page > 1 ? <Button href={treasuryHref({ ...state, page: history.page - 1 })}>{copy.history.newer}</Button> : <span />}
+          {history.page > 1 ? <Button href={treasuryHref({ ...state, page: history.page - 1 })} replace>{copy.history.newer}</Button> : <span />}
           <span className="text-meta text-text-muted">{copy.history.page(history.page, pages)}</span>
-          {history.page < pages ? <Button href={treasuryHref({ ...state, page: history.page + 1 })}>{copy.history.older}</Button> : <span />}
+          {history.page < pages ? <Button href={treasuryHref({ ...state, page: history.page + 1 })} replace>{copy.history.older}</Button> : <span />}
         </nav>
       ) : null}
     </>

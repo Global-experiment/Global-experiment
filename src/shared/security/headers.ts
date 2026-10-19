@@ -19,7 +19,19 @@ export interface SecurityHeader {
  * and therefore no real inline-script-injection sink for a nonce to
  * protect against today. Revisit if that ever changes.
  */
-export function getSecurityHeaders(): SecurityHeader[] {
+/**
+ * Stripe.js and its card iframe (the donate page's embedded card form,
+ * decided 2026-10-19), as Stripe documents for the Payment Element. Added
+ * on the donate pages only; every other page keeps the strict policy.
+ */
+const STRIPE_SOURCES = {
+  script: "https://js.stripe.com https://*.js.stripe.com",
+  frame: "https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com",
+  connect: "https://api.stripe.com https://*.stripe.com",
+  img: "https://*.stripe.com",
+} as const;
+
+export function getSecurityHeaders({ stripe = false }: { stripe?: boolean } = {}): SecurityHeader[] {
   const isDev = process.env.NODE_ENV !== "production";
 
   const headers: SecurityHeader[] = [
@@ -34,11 +46,12 @@ export function getSecurityHeaders(): SecurityHeader[] {
       key: "Content-Security-Policy",
       value: [
         "default-src 'self'",
-        `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+        `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${stripe ? ` ${STRIPE_SOURCES.script}` : ""}`,
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data:",
+        `img-src 'self' data:${stripe ? ` ${STRIPE_SOURCES.img}` : ""}`,
         "font-src 'self'",
-        "connect-src 'self'",
+        `connect-src 'self'${stripe ? ` ${STRIPE_SOURCES.connect}` : ""}`,
+        ...(stripe ? [`frame-src ${STRIPE_SOURCES.frame}`] : []),
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",

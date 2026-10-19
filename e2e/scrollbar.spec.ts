@@ -60,7 +60,10 @@ test("the column is centered in the window with and without the scrollbar", asyn
 });
 
 test("the fixed bottom bar and an open sheet line up with the centered column", async ({ page }) => {
+  // A Treasury entry: the fixed bottom bar and a ⋮ sheet (the list has no ⋮ menu since 2026-10-19).
   await page.goto("/treasury", { waitUntil: "load" });
+  await page.locator("main ul li a").first().click();
+  await page.waitForURL(/\/treasury\/(expense|donation)\/\d+$/, { waitUntil: "load" });
   // Make the page scroll so a classic scrollbar is showing.
   await page.evaluate(() => {
     document.querySelector("main")!.style.minHeight = "3000px";
