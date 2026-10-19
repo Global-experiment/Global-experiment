@@ -102,6 +102,7 @@ export const DONATE_COPY = {
     intro: (amount: string) => `One-off donation of ${amount}. Your card details go straight to Stripe; no email address is needed.`,
     pay: (amount: string) => `Donate ${amount}`,
     paying: "Processing…",
+    loading: "Loading the secure card form…",
     loadFailed: "The card form couldn’t be loaded. Nothing was charged. Please try again, or choose another payment method.",
     declined: "The payment didn’t go through. Nothing was charged.",
   },
