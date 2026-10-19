@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconButton } from "@/shared/ui/IconButton";
+import { showToast } from "@/shared/ui/toast";
 
 const CONFIRMATION_MS = 3000;
 
@@ -24,6 +25,7 @@ export function ContributeEmailLink({ email }: { email: string }) {
     try {
       await navigator.clipboard.writeText(email);
       setCopied(true);
+      showToast("Email address copied to clipboard");
       clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setCopied(false), CONFIRMATION_MS);
     } catch {

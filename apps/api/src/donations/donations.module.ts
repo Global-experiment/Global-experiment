@@ -6,7 +6,7 @@ import type { AppConfig } from "../common/config/env.js";
 import { ForbiddenError } from "../common/errors/api-error.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import { StripeModule } from "../stripe/stripe.module.js";
-import { CheckoutRequest, DonationsService } from "./donations.service.js";
+import { CheckoutRequest, DonationsService, PaymentIntentRequest } from "./donations.service.js";
 
 /**
  * Only the public site may start a Checkout: the request's Origin must be
@@ -50,6 +50,22 @@ export class DonationsController {
   @Throttle(CHECKOUT_LIMIT)
   checkout(@Body(new ZodValidationPipe(CheckoutRequest)) body: CheckoutRequest) {
     return this.donations.createCheckout(body);
+  }
+
+  /** POST /api/donations/payment-intent — a one-off card donation paid on the page (embedded card fields). */
+  @Post("payment-intent")
+  @HttpCode(201)
+  @UseGuards(SiteOriginGuard)
+  @Throttle(CHECKOUT_LIMIT)
+  paymentIntent(@Body(new ZodValidationPipe(PaymentIntentRequest)) body: PaymentIntentRequest) {
+    return this.donations.createPaymentIntent(body);
+  }
+
+  /** GET /api/donations/payment-intents/:id — the thank-you page's check after an embedded payment. */
+  @Get("payment-intents/:id")
+  @Throttle(STATUS_LIMIT)
+  paymentIntentStatus(@Param("id") id: string) {
+    return this.donations.paymentIntentStatus(id);
   }
 
   /** GET /api/donations/checkout/:sessionId — the thank-you page's status check. */

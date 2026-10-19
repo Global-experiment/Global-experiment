@@ -49,6 +49,8 @@ const envSchema = z
      */
     STRIPE_SECRET_KEY: z.string().trim().regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe secret or restricted key").optional(),
     STRIPE_WEBHOOK_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9]+$/, "must be a Stripe webhook signing secret").optional(),
+    /** Public by design (the browser loads Stripe with it): the embedded card form on the donate page. */
+    STRIPE_PUBLISHABLE_KEY: z.string().trim().regex(/^pk_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe publishable key").optional(),
     STRIPE_LIVE_ENABLED: booleanFromString.default(false),
     /** NODE_ENV=test only: the Playwright API answers from scripted Checkout sessions instead of Stripe (stripe-fixture.gateway.ts). */
     STRIPE_FIXTURE: booleanFromString.default(false),
@@ -70,6 +72,8 @@ const envSchema = z
     TREASURY_WISE_CONNECTED: booleanFromString.default(false),
     TREASURY_DONATION_APPEAL: booleanFromString.default(false),
     TREASURY_SHOW_TEST_DONATIONS: booleanFromString.default(false),
+    TREASURY_STATS_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
+    TREASURY_PUBLIC_TOOLBAR: booleanFromString.default(false),
     /** Default schedules of the Notion imports: a 5-field cron expression (server time zone: UTC), or "off". */
     IMPORT_SCHEDULE_TAXONOMY: cronOrOff.default("off"),
     IMPORT_SCHEDULE_DIRECTORY: cronOrOff.default("off"),
@@ -91,6 +95,8 @@ const envSchema = z
     DONATIONS_PREVIEW_TOKEN: z.string().trim().regex(/^[A-Za-z0-9_-]{32,128}$/, "must be 32–128 letters, digits, - or _").optional(),
     DONATIONS_MONTHLY: booleanFromString.default(false),
     DONATIONS_EXTRA_METHODS: booleanFromString.default(false),
+    DONATIONS_PAYPAL_MONTHLY: booleanFromString.default(false),
+    DONATIONS_CHECKOUT: z.enum(["embedded", "hosted"]).default("embedded"),
     DONATIONS_DEFAULT_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
   })
   .transform((env, context) => {
@@ -110,6 +116,9 @@ const envSchema = z
     const stripeLive = Boolean(env.STRIPE_SECRET_KEY && /_live_/.test(env.STRIPE_SECRET_KEY));
     if (stripeLive && !env.STRIPE_LIVE_ENABLED) {
       context.addIssue({ code: "custom", path: ["STRIPE_SECRET_KEY"], message: "is a live key; set STRIPE_LIVE_ENABLED=true to allow it" });
+    }
+    if (env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY && /_live_/.test(env.STRIPE_PUBLISHABLE_KEY) !== stripeLive) {
+      context.addIssue({ code: "custom", path: ["STRIPE_PUBLISHABLE_KEY"], message: "must be in the same mode (test or live) as STRIPE_SECRET_KEY" });
     }
     if (production && env.STRIPE_SECRET_KEY) {
       for (const key of ["STRIPE_WEBHOOK_SECRET", "PUBLIC_SITE_URL", "WEB_INTERNAL_URL", "REVALIDATE_SECRET"] as const) {
@@ -145,6 +154,7 @@ const envSchema = z
       stripe: {
         secretKey: id(env.STRIPE_SECRET_KEY),
         webhookSecret: id(env.STRIPE_WEBHOOK_SECRET),
+        publishableKey: id(env.STRIPE_PUBLISHABLE_KEY),
         /** Events from the other mode (live vs test) are ignored. */
         livemode: stripeLive,
         customerPortalUrl: id(env.STRIPE_CUSTOMER_PORTAL_URL),
@@ -162,6 +172,8 @@ const envSchema = z
         wiseConnected: env.TREASURY_WISE_CONNECTED,
         donationAppeal: env.TREASURY_DONATION_APPEAL,
         showTestDonations: env.TREASURY_SHOW_TEST_DONATIONS,
+        statsCurrency: env.TREASURY_STATS_CURRENCY,
+        publicToolbar: env.TREASURY_PUBLIC_TOOLBAR,
       },
       importSchedules: {
         taxonomy: env.IMPORT_SCHEDULE_TAXONOMY,
@@ -175,6 +187,8 @@ const envSchema = z
         enabled: env.DONATIONS_ENABLED,
         monthly: env.DONATIONS_MONTHLY,
         extraMethods: env.DONATIONS_EXTRA_METHODS,
+        paypalMonthly: env.DONATIONS_PAYPAL_MONTHLY,
+        checkout: env.DONATIONS_CHECKOUT,
         defaultCurrency: env.DONATIONS_DEFAULT_CURRENCY,
       },
     };

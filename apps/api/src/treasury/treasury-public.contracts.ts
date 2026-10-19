@@ -28,7 +28,8 @@ export const PublicEntriesQuery = z.strictObject({
 });
 export type PublicEntriesQuery = z.output<typeof PublicEntriesQuery>;
 
-export const PublicOverviewQuery = z.strictObject({ currency: z.enum(TREASURY_CURRENCIES) });
+/** Without a currency: the stats currency setting (treasury.stats_currency). */
+export const PublicOverviewQuery = z.strictObject({ currency: z.enum(TREASURY_CURRENCIES).optional() });
 export type PublicOverviewQuery = z.output<typeof PublicOverviewQuery>;
 
 export interface PublicTreasuryEntry {
@@ -72,6 +73,8 @@ export interface PublicTreasuryOverview {
   expenseCount: number;
   /** The "Cry for donation" banner (treasury.donation_appeal). */
   donationAppeal: boolean;
+  /** The search, sort, filter and currency controls (treasury.public_toolbar; off by default since 2026-10-19). */
+  publicToolbar: boolean;
   lastUpdatedAt: string | null;
   /** Only filter values that have public data. */
   filters: { currencies: string[]; expenseTypes: { key: string; label: string }[]; firstDate: string | null; lastDate: string | null };

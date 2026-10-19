@@ -42,92 +42,56 @@ const sheetCapture = async (page: Page, name: string) => {
   await page.getByRole("dialog").screenshot({ path: join(SHOTS, `${name}.png`) });
 };
 
-test("p11 list: header, sort and filter fields, pills, stats, banner, rows", async ({ page }) => {
+test("p12 list (2026-10-19: no currency switch, search, sort or filter): header, pills, stats, rows", async ({ page }) => {
   await page.goto("/treasury");
   await expect(page.locator("[data-amount]").first()).toBeVisible();
-  await capture(page, "p11-list");
+  await capture(page, "p12-list");
 
-  // The 32px search button at x 8, then the Sort and Filter fields: 32px tall at y 148 (Figma), 8px apart, inside the 8px gutters.
-  const searchButton = await box(page.getByRole("button", { name: "Search the history" }));
-  near(searchButton.x, 8, "search x");
-  near(searchButton.y, fy(148), "search y");
-  near(searchButton.width, 32, "search width");
-  near(searchButton.height, 32, "search height");
-  const sort = await box(page.getByRole("button", { name: /^Sort:/ }));
-  const filter = await box(page.getByRole("button", { name: /^Filter the history/ }));
-  near(sort.y, fy(148), "sort y");
-  near(sort.height, 32, "sort height");
-  near(sort.x, 48, "sort x");
-  near(filter.x + filter.width, 404, "filter right edge");
-  near(filter.x - (sort.x + sort.width), 8, "gap");
-  // Pills: 32px at y 188.
+  // Header (decision 2026-10-19): back glyph at x 8, the title at x 32, the share glyph ending 8px from the edge, all at Figma's y 116.
+  const back = await box(page.locator("header").getByRole("link", { name: "Back" }).locator("svg"));
+  near(back.x, 8, "back glyph x");
+  near(back.y + back.height / 2, fy(124), "back glyph centre");
+  const title = await box(page.getByRole("heading", { level: 1, name: "Treasury" }));
+  near(title.x, 32, "title x");
+  const share = await box(page.locator("header").getByRole("button", { name: "Share" }).locator("svg"));
+  near(share.x + share.width, 404, "share glyph right edge");
+  near(share.y + share.height / 2, fy(124), "share glyph centre");
+  // The pills take the toolbar's place: 32px at Figma's y 148.
   const pill = await box(page.getByRole("button", { name: "Expenses", exact: true }));
-  near(pill.y, fy(188), "pills y");
+  near(pill.y, fy(148), "pills y");
   near(pill.height, 32, "pill height");
+  near(pill.x, 8, "pills x");
   // History rows: 40px, full bleed rule.
   const row = await box(page.locator("main ul li a").first());
   near(row.height, 40, "row height");
   near(row.x, 0, "row x");
   near(row.width, 412, "row width");
-  // Header: "USD" ends 8px before the chart glyph (364–378.67 at y 116, as on Donate p28), then ⋮.
-  const usd = await box(page.getByRole("button", { name: /^Currency: USD/ }));
-  near(usd.x + usd.width - 8, 356, "USD text right edge");
-  const chart = await box(page.locator("header").getByRole("link", { name: "Treasury" }).locator("svg"));
-  near(chart.x, 364, "chart glyph x");
-  near(chart.y, fy(116), "chart glyph y");
-  // The overflow glyph ending 8px from the edge.
-  const more = await box(page.getByRole("button", { name: "Page actions" }).locator("svg"));
-  near(more.x + more.width, 404, "⋮ right edge");
 });
 
-test("p12 the ⋮ sheet: refresh line, last update, five actions", async ({ page }) => {
-  await page.goto("/treasury");
-  await page.getByRole("button", { name: "Page actions" }).click();
-  const sheet = page.getByRole("dialog");
-  await expect(sheet).toContainText("The treasury page is updated within minutes.");
-  await expect(sheet).toContainText(/Last updated at \d{1,2}:\d{2}(AM|PM)/);
-  for (const action of ["Donate", "Share page", "Send feedback", "Report issue", "Documentation"]) await expect(sheet.getByRole("link", { name: action }).or(sheet.getByRole("button", { name: action }))).toBeVisible();
-  await sheetCapture(page, "p12-menu");
-});
-
-test("p13 sort sheet and p14 filter sheet", async ({ page }) => {
-  await page.goto("/treasury");
-  await page.getByRole("button", { name: /^Sort:/ }).click();
-  await expect(page.getByRole("dialog", { name: "Sort by" })).toContainText("Latest first");
-  await sheetCapture(page, "p13-sort");
-  await page.keyboard.press("Escape");
-
-  await page.getByRole("button", { name: /^Filter the history/ }).click();
-  await expect(page.getByRole("dialog", { name: "Filter" })).toContainText("Erase filters");
-  await sheetCapture(page, "p14-filter");
-  await page.getByRole("dialog", { name: "Filter" }).getByRole("button", { name: /^Date/ }).click();
-  await expect(page.getByRole("dialog", { name: "Filter dates" })).toContainText("Apply filter");
-  await sheetCapture(page, "p16-dates");
-});
-
-test("p22–p23 expense and its ⋮ sheet", async ({ page }) => {
+test("p23–p24 expense and its ⋮ sheet", async ({ page }) => {
   await page.goto("/treasury");
   await page.getByRole("link", { name: /USD 5,675/ }).click();
   await expect(page.getByText("Paid Apr 6 2:07 PM")).toBeVisible();
   // Figma p22: the time line at y≈156 with the share glyph on it; the amount at y≈244.
   const paid = await box(page.getByText("Paid Apr 6 2:07 PM"));
   near(paid.y + paid.height / 2, fy(156), "time line", 3);
-  const share = await box(page.getByRole("button", { name: "Share" }).locator("svg"));
+  // The row's own share button (the header has one too, client feedback 2026-10-19).
+  const share = await box(page.locator("main").getByRole("button", { name: "Share" }).nth(1).locator("svg"));
   near(share.y + share.height / 2, paid.y + paid.height / 2, "share aligned with the time", 2);
-  await capture(page, "p22-expense");
+  await capture(page, "p23-expense");
   await page.getByRole("button", { name: "Page actions" }).click();
-  await sheetCapture(page, "p23-menu");
+  await sheetCapture(page, "p24-menu");
 });
 
-test("p26–p27 anonymous donation and its ⋮ sheet", async ({ page }) => {
+test("p27–p28 anonymous donation and its ⋮ sheet", async ({ page }) => {
   await page.goto("/treasury");
   await page.getByRole("link", { name: /^Donation USD 5 / }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Donation" })).toBeVisible();
   const donated = await box(page.getByText(/^Donated /));
   near(donated.y + donated.height / 2, fy(156), "time line", 3);
-  await capture(page, "p26-donation");
+  await capture(page, "p27-donation");
   await page.getByRole("button", { name: "Page actions" }).click();
-  await sheetCapture(page, "p27-menu");
+  await sheetCapture(page, "p28-menu");
 });
 
 test("desktop: the same column, centred (no desktop frame in Figma)", async ({ page }) => {
@@ -148,9 +112,9 @@ test("side-by-side comparisons", async ({ page }) => {
   test.skip(!figmaDir, "Set FIGMA_COMMON_DIR to the PNG renders of Common pages.pdf (cp-NN.png) to write the comparisons.");
   const data = (path: string) => `data:image/png;base64,${readFileSync(path).toString("base64")}`;
   const pages: [string, string, string][] = [
-    ["p11-list", "cp-11", "Treasury — list"],
-    ["p22-expense", "cp-22", "Expense"],
-    ["p26-donation", "cp-26", "Anonymous donation"],
+    ["p12-list", "cp-12", "Treasury — list"],
+    ["p23-expense", "cp-23", "Expense"],
+    ["p27-donation", "cp-27", "Anonymous donation"],
   ];
   await page.setViewportSize({ width: 2 * 412 + 24, height: 900 + 40 });
   for (const [shot, frame, label] of pages) {
@@ -167,12 +131,12 @@ test("side-by-side comparisons", async ({ page }) => {
   }
   // The sheets: the app's sheet (left) and the partial Figma frame (right).
   for (const [shot, frame] of [
-    ["p12-menu", "cp-12"],
-    ["p13-sort", "cp-13"],
-    ["p14-filter", "cp-14"],
-    ["p16-dates", "cp-16"],
-    ["p23-menu", "cp-23"],
-    ["p27-menu", "cp-27"],
+    ["p13-menu", "cp-13"],
+    ["p14-sort", "cp-14"],
+    ["p15-filter", "cp-15"],
+    ["p17-dates", "cp-17"],
+    ["p24-menu", "cp-24"],
+    ["p28-menu", "cp-28"],
   ] as const) {
     const app = join(SHOTS, `${shot}.png`);
     const figma = join(figmaDir!, `${frame}.png`);

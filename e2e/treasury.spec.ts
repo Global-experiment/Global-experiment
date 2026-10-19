@@ -10,6 +10,12 @@ import { expect, test, type Page } from "@playwright/test";
  * example (USD 5,675), one in EUR — and an unpublished CHF one that must
  * never appear. Settings in the test database: unqualified entries may be
  * published, and the "Cry for donation" banner is on.
+ *
+ * The default page (decided 2026-10-19, treasury.public_toolbar off): the
+ * header is back, title and share; the stats are in the stats currency
+ * setting (USD); the history lists every currency, latest first. The
+ * search, sort, filter and currency controls are kept behind the setting
+ * and tested in treasury-toolbar.spec.ts.
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the API isn't running.");
 test.use({ viewport: { width: 412, height: 900 } });
@@ -27,11 +33,11 @@ async function noHorizontalScroll(page: Page) {
 }
 
 test.describe("Treasury list", () => {
-  test("lists the public entries of the chosen currency (USD) newest first, never an unpublished one, with real stats", async ({ page }) => {
+  test("lists every public entry in every currency, latest first; the header is back, title and share (decided 2026-10-19)", async ({ page }) => {
     const response = await page.goto("/treasury");
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Treasury" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: /History/ })).toContainText("8");
+    await expect(page.getByRole("heading", { level: 2, name: /History/ })).toContainText("9");
     expect(await amountsShown(page)).toEqual([
       "+ USD 50",
       "+ USD 10",
@@ -40,17 +46,25 @@ test.describe("Treasury list", () => {
       "+ USD 2",
       "- USD 50",
       "- USD 50",
+      "- EUR 12.50",
       "- USD 5,675",
     ]);
-    await expect(page.getByText("EUR 12.50")).toHaveCount(0); // another currency
-    await expect(page.getByText("CHF 700")).toHaveCount(0);
+    await expect(page.getByText("CHF 700")).toHaveCount(0); // unpublished
     await expect(rows(page).nth(5)).toContainText("Not qualified yet");
     // Screen readers hear the kind, not a dash.
-    await expect(rows(page).nth(7)).toContainText("Expense");
-    // The header: USD, then the chart glyph to the same place as on Donate, then ⋮.
-    await expect(page.locator("header").getByRole("link", { name: "Treasury" })).toHaveAttribute("href", "/treasury");
+    await expect(rows(page).nth(8)).toContainText("Expense");
 
-    // Balance and Sustainability wait for Wise; Med. donation and Expenses are this currency's published entries.
+    // The header: back, title, share — no currency switch, chart link or ⋮.
+    const header = page.locator("header");
+    await expect(header.getByRole("link", { name: "Back" })).toBeVisible();
+    await expect(header.getByRole("button", { name: "Share" })).toBeVisible();
+    await expect(header.getByRole("button", { name: /^Currency/ })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: "Treasury" })).toHaveCount(0);
+    await expect(header.getByRole("button", { name: "Page actions" })).toHaveCount(0);
+    // No search, sort or filter controls.
+    for (const name of [/^Sort:/, /^Filter the history/, "Search the history"]) await expect(page.getByRole("button", { name })).toHaveCount(0);
+
+    // Stats in the stats currency setting (USD); Balance and Sustainability wait for Wise.
     await expect(page.locator("[data-stat-label]")).toHaveText(["Med. donation", "Expenses"]);
     await expect(page.locator("[data-stat-value]")).toHaveText(["$6.4", "5.8K"]);
     await page.getByRole("button", { name: /Expenses$/ }).filter({ has: page.locator("[data-stat-value]") }).click();
@@ -60,117 +74,33 @@ test.describe("Treasury list", () => {
     await page.keyboard.press("Escape");
     await axe(page);
     await noHorizontalScroll(page);
+
+    // Toolbar parameters in a URL are ignored while the toolbar is off.
+    await page.goto("/treasury?currency=EUR&sort=amount_asc&q=hosting&from=2026-01-01");
+    await expect.poll(() => amountsShown(page)).toHaveLength(9);
+    await expect(page.locator("[data-stat-value]").first()).toHaveText("$6.4");
   });
 
-  test("the pills show expenses or donations (refunds and disputes count as donations), and back to all", async ({ page }) => {
-    await page.goto("/treasury");
+  test("the pills show expenses or donations (refunds and disputes count as donations), and back to all; Back leaves the page", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Treasury" }).first().click();
+    await expect(page).toHaveURL("/treasury");
     const expenses = page.getByRole("button", { name: "Expenses", exact: true });
     const donations = page.getByRole("button", { name: "Donations", exact: true });
     await expenses.click();
     await expect(page).toHaveURL("/treasury?type=expense");
     await expect(expenses).toHaveAttribute("aria-pressed", "true");
-    await expect.poll(() => amountsShown(page)).toEqual(["- USD 50", "- USD 50", "- USD 5,675"]);
+    await expect.poll(() => amountsShown(page)).toEqual(["- USD 50", "- USD 50", "- EUR 12.50", "- USD 5,675"]);
     await donations.click();
     await expect(page).toHaveURL("/treasury?type=donation");
     await expect.poll(() => amountsShown(page)).toHaveLength(5);
+    // A pill replaces the URL (client feedback 2026-10-19): Back returns to the previous page, not the previous pill.
+    await page.locator("header").getByRole("link", { name: "Back" }).click();
+    await expect(page).toHaveURL("/");
+    await page.goForward();
+    await expect(page).toHaveURL("/treasury?type=donation");
     await donations.click();
     await expect(page).toHaveURL("/treasury");
-    await expect.poll(() => amountsShown(page)).toHaveLength(8);
-  });
-
-  test("sort by amount (largest first, then smallest first) and back to date", async ({ page }) => {
-    await page.goto("/treasury");
-    await page.getByRole("button", { name: /^Sort: Date, Latest first/ }).click();
-    const sheet = page.getByRole("dialog", { name: "Sort by" });
-    await expect(sheet.getByRole("button", { name: /Date/ })).toHaveAttribute("aria-pressed", "true");
-    await sheet.getByRole("button", { name: "Amount" }).click();
-    await expect(page).toHaveURL("/treasury?sort=amount_desc");
-    await expect.poll(async () => (await amountsShown(page))[0]).toBe("- USD 5,675");
-    await expect(page.getByRole("button", { name: /^Sort: Amount, Largest first/ })).toBeVisible();
-
-    await page.getByRole("button", { name: /^Sort: Amount/ }).click();
-    await page.getByRole("dialog", { name: "Sort by" }).getByRole("button", { name: /Amount/ }).click();
-    await expect(page).toHaveURL("/treasury?sort=amount_asc");
-    await expect.poll(async () => (await amountsShown(page))[0]).toBe("+ USD 2");
-  });
-
-  test("the filter sheet offers only filters with data, applies them, counts them and erases them", async ({ page }) => {
-    await page.goto("/treasury");
-    await page.getByRole("button", { name: "Filter the history" }).click();
-    let sheet = page.getByRole("dialog", { name: "Filter" });
-    await expect(sheet.getByRole("button", { name: "Erase filters" })).toBeVisible();
-    // Location, Expertise and Amount aren't Treasury data.
-    for (const row of ["Date", "Currency", "Expense type"]) await expect(sheet.getByRole("button", { name: new RegExp(`^${row}`) })).toBeVisible();
-    for (const row of ["Location", "Expertise", "Amount"]) await expect(sheet.getByRole("button", { name: new RegExp(`^${row}`) })).toHaveCount(0);
-    await axe(page);
-
-    // Currency: the same choice as the header switch (one of the currencies with data, or all of them).
-    await expect(sheet.getByRole("button", { name: /^Currency/ })).toContainText("Dollar");
-    await sheet.getByRole("button", { name: /^Currency/ }).click();
-    sheet = page.getByRole("dialog", { name: "Filter currencies" });
-    await expect(sheet.getByRole("button", { name: "Back" })).toBeVisible();
-    await expect(sheet.getByRole("radio")).toHaveCount(3); // All currencies, Dollar, Euro — no public CHF entry
-    await sheet.getByRole("radio", { name: "Euro" }).check();
-    await sheet.getByRole("button", { name: "Apply filter" }).click();
-    await expect(page).toHaveURL("/treasury?currency=EUR");
-    await expect(page.getByRole("button", { name: /^Currency: EUR/ })).toHaveText("EUR");
-    await expect.poll(() => amountsShown(page)).toEqual(["- EUR 12.50"]);
-    sheet = page.getByRole("dialog", { name: "Filter" });
-    await expect(sheet.getByRole("button", { name: /^Currency/ })).toContainText("Euro");
-
-    // Expense type on top.
-    await sheet.getByRole("button", { name: /^Expense type/ }).click();
-    await page.getByRole("dialog", { name: "Filter expense types" }).getByText("Development and engineering").click();
-    await page.getByRole("dialog", { name: "Filter expense types" }).getByRole("button", { name: "Apply filter" }).click();
-    await expect.poll(() => amountsShown(page)).toEqual([]);
-    await expect(page.getByText("No entries match these filters.")).toBeVisible();
-
-    // Erase (the currency stays: it's the header's), then a date range in all currencies: September only.
-    await page.getByRole("dialog", { name: "Filter" }).getByRole("button", { name: "Erase filters" }).click();
-    await expect(page).toHaveURL("/treasury?currency=EUR");
-    await page.goto("/treasury?currency=all");
-    await page.getByRole("button", { name: "Filter the history" }).click();
-    await page.getByRole("dialog", { name: "Filter" }).getByRole("button", { name: /^Date/ }).click();
-    sheet = page.getByRole("dialog", { name: "Filter dates" });
-    for (const preset of ["This week", "This month", "Last 6 months", "This year", "All"]) await expect(sheet.getByRole("button", { name: preset })).toBeVisible();
-    await sheet.getByLabel("From").fill("2026-09-01");
-    await sheet.getByLabel("To").fill("2026-09-30");
-    await sheet.getByRole("button", { name: "Apply filter" }).click();
-    await expect(page).toHaveURL("/treasury?currency=all&from=2026-09-01&to=2026-09-30");
-    await expect.poll(() => amountsShown(page)).toEqual(["- EUR 12.50"]);
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("button", { name: "Filter the history, 1 active" })).toHaveText("Filter (1)");
-
-    // Donations unchecked leaves expenses; the last one checked can't be unchecked.
-    await page.goto("/treasury");
-    await page.getByRole("button", { name: "Filter the history" }).click();
-    sheet = page.getByRole("dialog", { name: "Filter" });
-    await sheet.getByText("Donations", { exact: true }).click();
-    await expect(page).toHaveURL("/treasury?type=expense");
-    await expect(sheet.getByRole("checkbox", { name: "Expenses" })).toBeDisabled();
-  });
-
-  test("the currency switch changes the stats and the history; 'All currencies' lists every one, never converted", async ({ page }) => {
-    await page.goto("/treasury");
-    await page.getByRole("button", { name: /^Currency: USD/ }).click();
-    await page.getByRole("dialog", { name: "Choose a currency" }).getByRole("button", { name: "Euro (EUR)" }).click();
-    await expect(page).toHaveURL("/treasury?currency=EUR");
-    await expect(page.getByRole("button", { name: /^Currency: EUR/ })).toHaveText("EUR");
-    await expect(page.locator("[data-stat-value]")).toHaveText(["–", "12.5"]);
-    await expect.poll(() => amountsShown(page)).toEqual(["- EUR 12.50"]);
-    await expect(page.getByRole("heading", { level: 2, name: /History/ })).toContainText("1");
-
-    await page.getByRole("button", { name: /^Currency: EUR/ }).click();
-    await page.getByRole("dialog", { name: "Choose a currency" }).getByRole("button", { name: "All currencies" }).click();
-    await expect(page).toHaveURL("/treasury?currency=all");
-    await expect(page.getByRole("button", { name: /^Currency: All/ })).toHaveText("All");
-    // The stats stay in the default currency (amounts are never added across currencies).
-    await expect(page.locator("[data-stat-value]")).toHaveText(["$6.4", "5.8K"]);
-    await expect.poll(() => amountsShown(page)).toHaveLength(9);
-    await expect(page.getByText("- EUR 12.50")).toBeVisible();
-    // Kept in the URL: a reload shows the same view.
-    await page.reload();
-    await expect(page.getByRole("button", { name: /^Currency: All/ })).toBeVisible();
     await expect.poll(() => amountsShown(page)).toHaveLength(9);
   });
 
@@ -203,31 +133,6 @@ test.describe("Treasury list", () => {
     expect(narrow).toBeLessThanOrEqual(wide);
     expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect((await row.boundingBox())!.height).toBeLessThanOrEqual(41);
-  });
-
-  test("the search button (p11) opens a field: public text and entry numbers, in the URL; × closes it", async ({ page }) => {
-    await page.goto("/treasury");
-    await page.getByRole("button", { name: "Search the history" }).click();
-    const field = page.getByRole("searchbox", { name: "Search descriptions, expense types and entry numbers" });
-    await expect(field).toBeFocused();
-    await field.fill("contribution flow");
-    await expect(page).toHaveURL(/\/treasury\?q=contribution\+flow$/);
-    await expect.poll(() => amountsShown(page)).toEqual(["- USD 5,675"]);
-    await axe(page);
-
-    // An expense type's label matches too; a search with no result says so and can be erased.
-    await field.fill("General operations");
-    await expect.poll(() => amountsShown(page)).toEqual(["- USD 5,675"]);
-    await field.fill("nothing like this");
-    await expect(page.getByText("No entries match “nothing like this”.")).toBeVisible();
-
-    // A reload keeps the search; × clears it and brings Sort and Filter back.
-    await page.reload();
-    await expect(field).toHaveValue("nothing like this");
-    await page.getByRole("button", { name: "Close the search" }).click();
-    await expect(page).toHaveURL(/\/treasury$/);
-    await expect(page.getByRole("button", { name: /^Sort:/ })).toBeVisible();
-    await expect.poll(() => amountsShown(page)).toHaveLength(8);
   });
 
   test("no horizontal scroll from 320px to desktop", async ({ page }) => {

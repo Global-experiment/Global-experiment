@@ -194,6 +194,42 @@ So that a module or a field is added by configuration, not by a new screen:
   Until then Treasury uses the existing list/record components, and its
   flags read their environment defaults.
 
+### 2.3 Decisions 2026-10-19
+
+Taken by the owner on 2026-10-19 so the client review can be built without
+waiting. Each is a setting, a lookup table or a config entry: changing one
+later needs no code change. Built in the step named (plan:
+`docs/design/feedback-2026-10-19.md`, local).
+
+| # | Decision | Where it lives | Step |
+|---|---|---|---|
+| 1 | Home and Documentation get the native CMS now. `cms.mode` = `notion` (default) | `native`: while `notion`, "Administrate" opens the list, record and editor read-only with the "Managed in Notion" badge and a link to Notion, and the importer keeps the content in sync; `native` is the documented cut-over (§2.1). | setting `cms.mode` | 5b |
+| 2 | Public Treasury: the header is back, title and share; the stats use `treasury.stats_currency` (USD); the history lists every currency, latest first. Search, sort, filter and the currency switch stay in the code behind `treasury.public_toolbar` (false). | settings | 2 |
+| 3 | Documentation list columns: Title, Status, Display order, Expertise, Last edited by, Updated, Published. | list config | 5b |
+| 4 | Accounts page: "Role" column; views All / Active / Invited / Deactivated; "New account" creates an invitation; rows open a view-only profile; no inline editing. | list config | 7 |
+| 5 | Permissions "Account" = a person of the directory (works for people without an admin login), optionally linked to their admin account. Services "Responsible account" = an admin account. | schema | 8 |
+| 6 | Services and Permissions start empty, fully editable; a Notion importer for Services and Access grants with the usual dry run (demo rows skipped). | importer | 8 |
+| 7 | Relevance scores: integers 0–10, nullable, editable; `ai_relevance_score` becomes read-only when `ai.enabled` is true (later). | schema + setting `ai.enabled` | 5 |
+| 8 | Contact channels: an admin-editable lookup seeded with Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix, Workana. | lookup `contact_channels` | 5 |
+| 9 | People keep the phone column, hidden in the record (Figma moved it into "Other contact details"); field visibility is config. Sources stay Candide, Contribution email, Other, AI. | record config | 5 |
+| 10 | Any admin with access to a record can comment; authors edit or delete their own comments; edits and deletions are kept in the history. | schema | 5 |
+| 11 | Every opening counts as a view; the feed shows "viewed this page" at most once per account per `history.view_event_window_hours` (24). | setting | 5 |
+| 12 | Archive instead of delete: archived records leave the default views and appear in an "Archived" view; restore is available; permanent delete is owner-only, behind a typed confirmation, and logged. | schema | 5 |
+| 13 | No email server yet: invitations and password resets are one-time links (72 h) the owner copies and sends; "Forgot password?" says "Contact an administrator"; "Change email" needs the current password and is logged. With `email.enabled` the same flows send the links. | setting `email.enabled` | 7 |
+| 14 | Delete account = deactivate: the login is disabled, history keeps the name; the last Rootadmin can never be deactivated or deleted. | schema rule | 7 |
+| 15 | Accounts to create: those of admin p15; the existing owner is kept; missing ones get a Rootadmin invitation link (never committed or logged). | runbook | 7 |
+| 16 | Sidebar exactly as Figma, Organizations in both Admin and Other (same page); Waitlist, Messages, Cloud, History, Analytics, Technical dashboard and Emails "Coming soon" until built (History in Step 5). | module registry | 3 |
+| 17 | Donations: PayPal on Monthly when Stripe allows it, behind `donations.paypal_monthly` (the sandbox allows PayPal subscriptions; live needs PayPal recurring payments enabled). One-off card donations on our page with Stripe's card fields, no email, behind `donations.checkout` = `embedded` (default) | `hosted`; monthly stays on hosted Checkout; the thank-you page shows a reference instead of an email receipt; webhooks and ledger rules unchanged (`payment_intent.succeeded` added). | settings | 2 |
+| 18 | Saved views: create, rename, delete and reorder per account, plus shared views (owner) on every list, stored in the database. | schema | 9 |
+
+Addendum (owner, 2026-10-19): the person record follows the client's
+prototype (admin p14 and its four screenshots) on every detail page — field
+order, Permissions / Contracting / Expenses pickers, First and Last contact,
+Follow-up date and time, metadata rows; the right panel's actions and
+counters stay fixed while only the History list scrolls; every event type
+of the prototype in the History feed, with field-level privacy enforced by
+the API (Step 5); and a minimal Contracting module (contracts CON-n, Step 8).
+
 ## 3. Cross-cutting concerns
 
 ### 3.1 Roles and permissions

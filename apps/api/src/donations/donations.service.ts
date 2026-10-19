@@ -14,6 +14,7 @@ import {
   DONATION_METHODS,
   DONATION_RULES,
   methodAvailable,
+  methodFrequencies,
   parseAmountToMinor,
   type DonationFlags,
   type DonationFrequency,
@@ -35,6 +36,20 @@ export type CheckoutRequest = z.output<typeof CheckoutRequest>;
 
 export const SESSION_ID = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
 
+/** A one-off card donation on the donate page itself (decided 2026-10-19: no email asked). */
+export const PaymentIntentRequest = z.strictObject({
+  amount: z.string().trim().min(1).max(12),
+  currency: z.enum(TREASURY_CURRENCIES),
+  attemptId: z.uuid(),
+  previewToken: z.string().max(200).optional(),
+});
+export type PaymentIntentRequest = z.output<typeof PaymentIntentRequest>;
+
+export const PAYMENT_INTENT_ID = /^pi_[A-Za-z0-9]{10,200}$/;
+
+/** What the donor sees instead of an email receipt: the payment's last 8 characters ("GE-3QX7K2PA"). */
+export const donationReference = (paymentIntentId: string) => `GE-${paymentIntentId.slice(-8).toUpperCase()}`;
+
 export interface DonationConfigDto {
   /** False when Stripe isn't configured: the page explains that donations are unavailable. */
   available: boolean;
@@ -46,6 +61,14 @@ export interface DonationConfigDto {
   minimum: number;
   maximum: number;
   monthly: boolean;
+  /**
+   * How a one-off card donation is paid: "embedded" (Stripe's card fields on
+   * the page, no email) when donations.checkout says so and a publishable
+   * key is configured; otherwise "hosted" (Checkout).
+   */
+  checkout: "embedded" | "hosted";
+  /** Public by design; set only with checkout = "embedded". */
+  publishableKey: string | null;
   methods: { key: DonationMethodKey; currencies: readonly TreasuryCurrency[]; frequencies: readonly DonationFrequency[] }[];
   /** Stripe's customer-portal login link, offered only when monthly donations are on. */
   customerPortalUrl: string | null;
@@ -73,13 +96,25 @@ export class DonationsService {
     this.logger.setContext(DonationsService.name);
   }
 
-  private async flags(previewToken?: string): Promise<DonationFlags & { defaultCurrency: TreasuryCurrency; enabled: boolean }> {
-    const values = await this.settings.getMany(["donations.enabled", "donations.monthly", "donations.extra_methods", "donations.default_currency"]);
+  private async flags(
+    previewToken?: string,
+  ): Promise<DonationFlags & { defaultCurrency: TreasuryCurrency; enabled: boolean; checkout: "embedded" | "hosted" }> {
+    const values = await this.settings.getMany([
+      "donations.enabled",
+      "donations.monthly",
+      "donations.extra_methods",
+      "donations.paypal_monthly",
+      "donations.default_currency",
+      "donations.checkout",
+    ]);
+    const embedded = values["donations.checkout"] === "embedded" && this.config.stripe.publishableKey !== undefined;
     return {
       enabled: values["donations.enabled"] || this.validPreview(previewToken),
       monthly: values["donations.monthly"],
       extraMethods: values["donations.extra_methods"],
+      paypalMonthly: values["donations.paypal_monthly"],
       defaultCurrency: values["donations.default_currency"],
+      checkout: embedded ? "embedded" : "hosted",
     };
   }
 
@@ -102,10 +137,12 @@ export class DonationsService {
       minimum: DONATION_RULES.minimum,
       maximum: DONATION_RULES.maximum,
       monthly: flags.monthly,
+      checkout: flags.checkout,
+      publishableKey: flags.checkout === "embedded" ? (this.config.stripe.publishableKey ?? null) : null,
       methods: DONATION_METHOD_ORDER.filter((key) => methodAvailable(key, flags)).map((key) => ({
         key,
         currencies: DONATION_METHODS[key].currencies,
-        frequencies: flags.monthly ? DONATION_METHODS[key].frequencies : DONATION_METHODS[key].frequencies.filter((value) => value === "once"),
+        frequencies: methodFrequencies(key, flags),
       })),
       customerPortalUrl: flags.monthly ? (this.config.stripe.customerPortalUrl ?? null) : null,
     };
@@ -151,6 +188,51 @@ export class DonationsService {
       "Checkout session created",
     );
     return { url: session.url };
+  }
+
+  /**
+   * A one-off card donation paid on the donate page (Payment Element, card
+   * fields only, no email). The same rules as Checkout; the webhook records
+   * it from payment_intent.succeeded exactly like a Checkout payment.
+   */
+  async createPaymentIntent(request: PaymentIntentRequest): Promise<{ clientSecret: string; reference: string }> {
+    const stripe = this.requireStripe();
+    const flags = await this.flags(request.previewToken);
+    if (!flags.enabled) throw new ApiError("forbidden", "Donations are not open yet.", { reason: "donations_closed" });
+    if (flags.checkout !== "embedded") throw new ApiError("forbidden", "Card donations open Stripe Checkout.", { reason: "embedded_checkout_off" });
+    const issues = checkoutIssues({ ...request, frequency: "once", method: "card" }, flags);
+    if (issues.length > 0) throw new ValidationFailedError(issues);
+    const amount = parseAmountToMinor(request.amount)!;
+    const fingerprint = createHash("sha256").update(JSON.stringify([amount, request.currency])).digest("hex").slice(0, 16);
+    const intent = await stripe
+      .createPaymentIntent({
+        currency: request.currency,
+        amount,
+        description: PRODUCT_NAME.once,
+        idempotencyKey: `donation-intent:${request.attemptId}:${fingerprint}`,
+      })
+      .catch((error: unknown) => {
+        const stripeDetails = (error as { stripe?: unknown }).stripe;
+        if (stripeDetails) this.logger.warn({ stripe: stripeDetails, currency: request.currency }, "Stripe refused the payment intent");
+        throw error;
+      });
+    this.logger.info({ paymentIntentId: intent.id, currency: request.currency, preview: request.previewToken !== undefined }, "Payment intent created");
+    return { clientSecret: intent.clientSecret, reference: donationReference(intent.id) };
+  }
+
+  /** The thank-you page's check after an embedded card payment (3-D Secure returns there too). */
+  async paymentIntentStatus(id: string): Promise<{ status: string; amount: number; currency: string; reference: string }> {
+    const stripe = this.requireStripe();
+    if (!PAYMENT_INTENT_ID.test(id)) throw new NotFoundError("Payment not found.");
+    let intent;
+    try {
+      intent = await stripe.getPaymentIntent(id);
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new NotFoundError("Payment not found.");
+    }
+    if (!intent.donation || !intent.embedded) throw new NotFoundError("Payment not found.");
+    return { status: intent.status, amount: intent.amount, currency: intent.currency, reference: donationReference(intent.id) };
   }
 
   /** The thank-you page's check: only a completed donation session shows "Donation sent". */

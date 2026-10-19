@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useCurrentSourcePage } from "@/shared/navigation/useCurrentSourcePage";
 import { reportKindForHref } from "@/shared/report/reportKinds";
 import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
+import { shareUrl } from "./ShareButton";
 import { Sheet } from "./Sheet";
 import type { IconName } from "./icons";
 
@@ -14,7 +15,12 @@ export interface PageAction {
   icon: IconName;
   href?: string;
   onClick?: () => void;
+  /** A copy/share row ("Share page"): copies on desktop (check icon, toast, then the sheet closes), native share on mobile. */
+  share?: { url: string; title?: string };
 }
+
+/** How long the copied row shows its check before the sheet closes. */
+const COPIED_CLOSE_MS = 600;
 
 interface PageActionsMenuProps {
   /** Accessible name of the sheet and the trigger button. Not shown visually — these menus have no header in Figma (client feedback item 9). */
@@ -35,6 +41,24 @@ interface PageActionsMenuProps {
  */
 export function PageActionsMenu({ label, actions, children, source: explicitSource }: PageActionsMenuProps) {
   const [open, setOpen] = useState(false);
+  const [copiedRow, setCopiedRow] = useState<string | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+
+  async function runShare(action: PageAction & { share: NonNullable<PageAction["share"]> }) {
+    const result = await shareUrl(action.share.url, action.share.title);
+    if (result !== "copied") {
+      setOpen(false);
+      return;
+    }
+    // Client feedback 2026-10-19: the row's icon turns into a check, the toast shows, the sheet closes.
+    setCopiedRow(action.label);
+    clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => {
+      setOpen(false);
+      setCopiedRow(null);
+    }, COPIED_CLOSE_MS);
+  }
   const currentPage = useCurrentSourcePage();
   const source = explicitSource ?? currentPage;
 
@@ -58,6 +82,15 @@ export function PageActionsMenu({ label, actions, children, source: explicitSour
               >
                 {action.label}
               </ReportLaunchButton>
+            ) : action.share ? (
+              <Button
+                key={action.label}
+                onClick={() => void runShare(action as PageAction & { share: NonNullable<PageAction["share"]> })}
+                icon={copiedRow === action.label ? "check_circle" : action.icon}
+                fullWidth
+              >
+                {action.label}
+              </Button>
             ) : action.href ? (
               <Button key={action.label} href={action.href} icon={action.icon} fullWidth>
                 {action.label}

@@ -55,6 +55,7 @@ export default async function DocumentationHistoryPage({ params }: HistoryPagePr
       <NavHeader
         title="Document history"
         backHref={articleHref}
+        shareUrl={documentationAnchorHref(article.slug)}
         actions={<DocumentationPageMenu url={documentationAnchorHref(article.slug)} title={article.title} />}
       />
       <Container className="pt-1">

@@ -24,6 +24,30 @@ export interface CreateCheckoutSessionInput {
   idempotencyKey: string;
 }
 
+/** A one-off card donation paid on the donate page itself (Payment Element; decided 2026-10-19). */
+export interface CreatePaymentIntentInput {
+  currency: string;
+  /** Minor units. */
+  amount: number;
+  description: string;
+  idempotencyKey: string;
+}
+
+/** Marks a PaymentIntent the donate page created itself (the webhook records it from payment_intent.succeeded). */
+export const EMBEDDED_FLOW = "embedded";
+
+export interface PaymentIntentInfo {
+  id: string;
+  /** "requires_payment_method", "requires_action", "processing", "succeeded", "canceled", … */
+  status: string;
+  amount: number;
+  currency: string;
+  /** Created by the donate flow. */
+  donation: boolean;
+  /** Created for the embedded card form (not by a Checkout session). */
+  embedded: boolean;
+}
+
 /** Stripe's balance transaction: what the payment or refund settled as, fees included. */
 export interface BalanceInfo {
   currency: string;
@@ -129,6 +153,9 @@ export interface StripeGateway {
   constructEvent(rawBody: Buffer, signatureHeader: string): StripeEventInfo;
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<{ id: string; url: string }>;
   getCheckoutSession(id: string): Promise<CheckoutSessionInfo>;
+  /** Card only, tagged as an embedded donation; the browser confirms it with the client secret. */
+  createPaymentIntent(input: CreatePaymentIntentInput): Promise<{ id: string; clientSecret: string }>;
+  getPaymentIntent(id: string): Promise<PaymentIntentInfo>;
   /** The PaymentIntent's latest charge, or null if it has none yet. */
   getPaymentIntentCharge(paymentIntentId: string): Promise<ChargeInfo | null>;
   getCharge(chargeId: string): Promise<ChargeInfo>;

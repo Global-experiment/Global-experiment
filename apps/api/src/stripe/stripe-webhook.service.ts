@@ -67,6 +67,8 @@ function assertLedgerCurrency(plan: Plan): void {
 export const HANDLED_EVENT_TYPES = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
+  // One-off card donations paid on the donate page (embedded card fields, 2026-10-19).
+  "payment_intent.succeeded",
   "invoice.paid",
   "charge.refunded",
   "customer.subscription.created",
@@ -169,6 +171,14 @@ export class StripeWebhookService {
         if (session.paymentStatus !== "paid") return { kind: "ignore", reason: "payment_pending" };
         if (!session.paymentIntentId) throw new RetryLaterError("no_payment_intent");
         const charge = await this.stripe.getPaymentIntentCharge(session.paymentIntentId);
+        if (!charge || charge.status !== "succeeded") throw new RetryLaterError("charge_not_ready");
+        return { kind: "donation", charge: { ...charge, donation: true }, cadence: "one_off", subscription: null };
+      }
+      case "payment_intent.succeeded": {
+        const intent = await this.stripe.getPaymentIntent(event.objectId);
+        // Checkout's own PaymentIntents are recorded from checkout.session.completed.
+        if (!intent.donation || !intent.embedded) return { kind: "ignore", reason: "not_an_embedded_donation" };
+        const charge = await this.stripe.getPaymentIntentCharge(intent.id);
         if (!charge || charge.status !== "succeeded") throw new RetryLaterError("charge_not_ready");
         return { kind: "donation", charge: { ...charge, donation: true }, cadence: "one_off", subscription: null };
       }

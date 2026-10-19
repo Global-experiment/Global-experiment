@@ -1,7 +1,6 @@
 "use client";
 
 import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
-import { shareUrl } from "@/shared/ui/ShareButton";
 import { TREASURY_COPY } from "./copy";
 
 /**
@@ -17,7 +16,7 @@ export function EntryActionsMenu({ sentence, url, title }: { sentence: string; u
       label={TREASURY_COPY.header.pageActions}
       actions={[
         { label: menu.donate, icon: "volunteer_activism", href: "/donate" },
-        { label: menu.share, icon: "share", onClick: () => void shareUrl(url, title) },
+        { label: menu.share, icon: "share", share: { url, title } },
         { label: menu.feedback, icon: "lightbulb", href: "/feedback" },
         { label: menu.issue, icon: "new_releases", href: "/issue" },
         { label: menu.documentation, icon: "insert_drive_file", href: "/documentation" },

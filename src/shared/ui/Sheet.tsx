@@ -111,6 +111,7 @@ export function Sheet({ open, onClose, title, ariaLabel, headerVariant = "detail
       // Drop any offset left by a drag-to-close so the next open slides up from scratch.
       dialog.style.removeProperty("translate");
       dialog.style.removeProperty("transition");
+      delete dialog.dataset.closing;
       dialog.showModal();
       // showModal() focuses the first control (✕); when the sheet opens
       // without a click (the type pickers open on page load) browsers then
@@ -118,7 +119,38 @@ export function Sheet({ open, onClose, title, ariaLabel, headerVariant = "detail
       // keeps focus inside it (Tab still reaches ✕ first) without the ring.
       dialog.focus();
     }
-    if (!open && dialog.open) dialog.close();
+    if (!open && dialog.open) {
+      if (!window.matchMedia(MOBILE_QUERY).matches) {
+        dialog.close();
+        return;
+      }
+      // Every close (✕, backdrop tap, Escape, an action) slides down exactly like a
+      // drag-down close (client feedback 2026-10-19): the same 0.25s translate
+      // transition from wherever the sheet is, the backdrop fading with it; the
+      // dialog leaves the top layer only once it is off screen. Browsers without
+      // discrete close transitions (Safari) used to drop it at once.
+      dialog.dataset.closing = "";
+      dialog.style.removeProperty("transition");
+      dialog.style.translate = "0 100%";
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        dialog.removeEventListener("transitionend", onEnd);
+        delete dialog.dataset.closing;
+        if (dialog.open) dialog.close();
+      };
+      const onEnd = (event: TransitionEvent) => {
+        if (event.target === dialog && event.propertyName === "translate") finish();
+      };
+      dialog.addEventListener("transitionend", onEnd);
+      // Fallback when no transition runs (already off screen after a drag, reduced motion).
+      const timer = window.setTimeout(finish, 300);
+      return () => {
+        window.clearTimeout(timer);
+        finish();
+      };
+    }
   }, [open]);
 
   // Gesture engine shared by the touch and pointer paths.

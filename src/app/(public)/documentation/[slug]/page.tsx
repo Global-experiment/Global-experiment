@@ -52,6 +52,7 @@ export default async function DocumentationArticlePage({ params }: Documentation
       <NavHeader
         title={article.title}
         backHref="/documentation"
+        shareUrl={documentationAnchorHref(article.slug)}
         actions={
           <DocumentationPageMenu
             url={documentationAnchorHref(article.slug)}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { fetchCheckoutStatus } from "@/shared/config/publicApi";
+import { fetchCheckoutStatus, fetchPaymentIntentStatus } from "@/shared/config/publicApi";
 import { DONATE_COPY } from "@/shared/donate/copy";
 import { donateHref } from "@/shared/donate/donateParams";
 import { isDonationCurrency, minorToAmountText, parseAmountToMinor } from "@/shared/donate/money";
@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 const SESSION_ID = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
+const PAYMENT_INTENT_ID = /^pi_[A-Za-z0-9]{10,200}$/;
 const copy = DONATE_COPY.thankYou;
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
@@ -29,6 +30,11 @@ const linkClass = "underline underline-offset-2";
  * shows "Donation sent"; an unfinished, unknown or missing session goes back
  * to /donate with the same choice. If the API can't be reached the page
  * still thanks the donor (Stripe sent them here) but makes no claim.
+ *
+ * A card donation paid on the donate page (embedded card fields, decided
+ * 2026-10-19) arrives with `payment_intent` instead: a succeeded or
+ * processing payment shows "Donation sent" and its reference — the donor
+ * gave no email, so the reference replaces the receipt.
  */
 export default async function ThankYouPage(props: PageProps<"/donate/thank-you">) {
   const params = await props.searchParams;
@@ -42,19 +48,33 @@ export default async function ThankYouPage(props: PageProps<"/donate/thank-you">
       })
     : "/donate";
 
-  const sessionId = first(params.session_id);
-  if (!sessionId || !SESSION_ID.test(sessionId)) redirect(back);
-  const status = await fetchCheckoutStatus(sessionId);
-  if (status.ok ? status.data.status !== "complete" : status.status === 404) redirect(back);
-
-  const confirmed = status.ok;
-  // Delayed methods (SEPA Direct Debit) complete before the money arrives.
-  const pending = status.ok && status.data.paymentStatus !== "paid";
+  const paymentIntentId = first(params.payment_intent);
+  let confirmed: boolean;
+  let pending: boolean;
+  let reference: string | null = null;
+  if (paymentIntentId !== undefined) {
+    if (!PAYMENT_INTENT_ID.test(paymentIntentId)) redirect(back);
+    const intent = await fetchPaymentIntentStatus(paymentIntentId);
+    if (intent.ok ? intent.data.status !== "succeeded" && intent.data.status !== "processing" : intent.status === 404) redirect(back);
+    confirmed = intent.ok;
+    pending = intent.ok && intent.data.status === "processing";
+    reference = intent.ok ? intent.data.reference : null;
+  } else {
+    const sessionId = first(params.session_id);
+    if (!sessionId || !SESSION_ID.test(sessionId)) redirect(back);
+    const status = await fetchCheckoutStatus(sessionId);
+    if (status.ok ? status.data.status !== "complete" : status.status === 404) redirect(back);
+    confirmed = status.ok;
+    // Delayed methods (SEPA Direct Debit) complete before the money arrives.
+    pending = status.ok && status.data.paymentStatus !== "paid";
+  }
 
   return (
     <main className="flex flex-1 flex-col pb-6">
       <NavHeader
         title={copy.pageTitle}
+        // Never the payment in this URL: sharing invites to donate.
+        shareUrl="/donate"
         actions={
           <>
             <IconButton href="/treasury" label={DONATE_COPY.header.treasuryLink} icon="leaderboard" />
@@ -76,7 +96,15 @@ export default async function ThankYouPage(props: PageProps<"/donate/thank-you">
         <h2 className="font-bold">{copy.heading}</h2>
         <p className="mt-1">{copy.body}</p>
         <FullBleedSeparator className="mt-3" />
-        <h2 className="mt-3 font-bold">{copy.treasuryHeading}</h2>
+        {reference ? (
+          <>
+            <h2 className="mt-3 font-bold">{copy.referenceHeading}</h2>
+            <p className="mt-1" data-donation-reference>
+              {copy.referenceBody(reference)}
+            </p>
+          </>
+        ) : null}
+        <h2 className={`${reference ? "mt-6" : "mt-3"} font-bold`}>{copy.treasuryHeading}</h2>
         <p className="mt-1">
           {copy.treasuryBefore}
           <Link href="/treasury" className={linkClass}>

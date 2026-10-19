@@ -386,16 +386,17 @@ test.describe("Feedback / Issue: type selection happens before the composer (cli
   });
 
   test("the source page is kept from ?source= and only internal paths are accepted", async ({ page }) => {
-    await page.goto("/treasury");
+    // The public Treasury has no ⋮ menu (decided 2026-10-19); Donate keeps one.
+    await page.goto("/donate");
     await page.getByRole("button", { name: "Page actions" }).click();
     await page.getByRole("dialog").getByRole("link", { name: "Send feedback" }).click();
     // Qualification opens over Treasury first (Review #3 item 5), then the composer.
     const picker = page.getByRole("dialog", { name: "Feedback type" });
     await expect(picker).toBeVisible();
-    await expect(page).toHaveURL("/treasury");
+    await expect(page).toHaveURL("/donate");
     await picker.getByRole("button", { name: "Send feedback" }).click();
-    await expect(page).toHaveURL("/feedback?source=%2Ftreasury&qualified=1");
-    await expect(page.locator("main")).toHaveAttribute("data-source-page", "/treasury");
+    await expect(page).toHaveURL("/feedback?source=%2Fdonate&qualified=1");
+    await expect(page.locator("main")).toHaveAttribute("data-source-page", "/donate");
 
     await page.goto("/issue?source=https%3A%2F%2Fevil.example%2F");
     await expect(page.getByRole("dialog", { name: "Issue type" })).toBeVisible();
@@ -452,6 +453,7 @@ test.describe("Icons and icon buttons", () => {
       "data-variant",
       "filled",
     );
+    await page.goto("/donate"); // the public Treasury has no ⋮ menu (decided 2026-10-19)
     await page.getByRole("button", { name: "Page actions" }).click();
     for (const svg of await page.getByRole("dialog").locator("svg[data-icon]").all()) {
       await expect(svg).toHaveAttribute("data-variant", "outlined");
@@ -508,7 +510,8 @@ test.describe("Mobile sheet drag-to-close", () => {
   }
 
   test("a short slow drag snaps back; a long drag closes; dragging up never lifts the sheet", async ({ page }) => {
-    await page.goto("/treasury");
+    // The public Treasury has no ⋮ menu (decided 2026-10-19); Donate keeps one.
+    await page.goto("/donate");
     await page.getByRole("button", { name: "Page actions" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -531,7 +534,8 @@ test.describe("Mobile sheet drag-to-close", () => {
 
   test("desktop dialogs ignore the drag", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/treasury");
+    // The public Treasury has no ⋮ menu (decided 2026-10-19); Donate keeps one.
+    await page.goto("/donate");
     await page.getByRole("button", { name: "Page actions" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();

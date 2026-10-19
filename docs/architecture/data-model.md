@@ -90,7 +90,11 @@ Every change writes an audit event. Declared keys in v0.1:
 | `donations.enabled` | boolean | `DONATIONS_ENABLED` = false | Donations open: until then `/donate` says "Donations open soon" and Checkout is refused (403 `donations_closed`), except through the private preview link `?preview=<DONATIONS_PREVIEW_TOKEN>` |
 | `donations.monthly` | boolean | `DONATIONS_MONTHLY` = false | Monthly donations (Stripe subscriptions) |
 | `donations.extra_methods` | boolean | `DONATIONS_EXTRA_METHODS` = false | PayPal and SEPA rows (Q19) |
+| `donations.paypal_monthly` | boolean | `DONATIONS_PAYPAL_MONTHLY` = false | PayPal also on Monthly (Stripe subscriptions with PayPal; decision 17, 2026-10-19). Needs `donations.monthly` and `donations.extra_methods` |
+| `donations.checkout` | `embedded` | `hosted` | `DONATIONS_CHECKOUT` = embedded | One-off card donations: Stripe card fields on the donate page, no email, a reference on the thank-you page (embedded; needs `STRIPE_PUBLISHABLE_KEY`, otherwise hosted) or Stripe Checkout (hosted). Monthly is always hosted (decision 17) |
 | `donations.default_currency` | `EUR` \| `USD` \| `CHF` | `DONATIONS_DEFAULT_CURRENCY` = USD | Donate page's initial currency |
+| `treasury.stats_currency` | `EUR` | `USD` | `CHF` | `TREASURY_STATS_CURRENCY` = USD | Currency of the public Treasury stats (decision 2, 2026-10-19) |
+| `treasury.public_toolbar` | boolean | `TREASURY_PUBLIC_TOOLBAR` = false | Public Treasury search, sort, filter and currency switch; off: the history lists every currency, latest first (decision 2) |
 | `treasury.wise_connected` | boolean | `TREASURY_WISE_CONNECTED` = false | Shows Balance and Sustainability (hidden until Wise) |
 | `treasury.public_recipient_names` | boolean | `TREASURY_PUBLIC_RECIPIENT_NAMES` = false | Public pages show an expense's recipient name; off: only the public description (pending client answer) |
 | `treasury.publish_unqualified` | boolean | `TREASURY_PUBLISH_UNQUALIFIED` = false | Unqualified expenses may be published ("Not qualified yet"); off: only Qualified / Not required entries can be published or are public (Q25, pending) |
@@ -105,6 +109,35 @@ with their modules. A stored value that doesn't match its key's type is
 ignored (the environment default applies) and logged by key only. Until
 module 2 adds the admin page and audit events, rows are changed only by
 SQL in a release runbook.
+
+### 1.2 Decisions 2026-10-19
+
+The owner's decisions of 2026-10-19 (list and steps: overview §2.3), as
+they land in the data model:
+
+- **Settings:** `donations.paypal_monthly`, `donations.checkout`,
+  `treasury.stats_currency`, `treasury.public_toolbar` (Step 2, above);
+  `cms.mode` (5b), `ai.enabled`, `history.view_event_window_hours` = 24
+  (5), `email.enabled` (7).
+- **Lookups:** `contact_channels` seeded with Email, Phone, WhatsApp,
+  Signal, Telegram, LinkedIn, X, Matrix, Workana; contract statuses (8).
+  Seeded vocabulary only, never demo rows.
+- **Columns:** `people.relevance_score` and `people.ai_relevance_score`
+  integer 0–10, nullable (check constraint); `archived_at` / `archived_by`
+  on every record table (archive instead of delete; permanent delete
+  owner-only, logged); `access_grants.person_id` → `people` with an
+  optional admin account link, `services.responsible_account_id` →
+  `admin_users` (8).
+- **Tables:** comments (authors edit or delete their own; versions kept),
+  record views (every opening; the feed folds them per account per window),
+  field-level privacy as config enforced by the API (5); invitations and
+  one-time links valid 72 h, account deactivation instead of delete, the
+  last Rootadmin protected (7); `contracts` (CON-n, 8); saved views per
+  account, shared by the owner, ordered (9).
+- **Donations:** one-off card donations may come from a PaymentIntent
+  (`payment_intent.succeeded`, metadata `flow = embedded`) instead of a
+  Checkout session; the ledger row, its idempotency and the refund and
+  dispute rules are the same (§4.1, §4.4).
 
 ## 2. Overview
 
@@ -454,6 +487,8 @@ overwritten.
 
 Events handled: `checkout.session.completed` (one-off, paid),
 `checkout.session.async_payment_succeeded` (delayed methods),
+`payment_intent.succeeded` (one-off card paid on the donate page, only
+PaymentIntents with `kind = donation` and `flow = embedded`; 2026-10-19),
 `invoice.paid` (each monthly charge, first included — monthly flag only),
 `charge.refunded` (one **negative refund entry** per Stripe refund, linked
 to the donation — decided), and `customer.subscription.created / updated /

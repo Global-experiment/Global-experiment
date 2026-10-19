@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { checkoutIssues, DONATION_RULES, methodAvailable, parseAmountToMinor, type CheckoutChoice } from "./donation-rules.js";
+import { checkoutIssues, DONATION_RULES, methodAvailable, methodFrequencies, parseAmountToMinor, type CheckoutChoice } from "./donation-rules.js";
 
-const ALL_ON = { monthly: true, extraMethods: true };
-const ALL_OFF = { monthly: false, extraMethods: false };
+const ALL_ON = { monthly: true, extraMethods: true, paypalMonthly: true };
+const ALL_OFF = { monthly: false, extraMethods: false, paypalMonthly: false };
 const choice = (values: Partial<CheckoutChoice> = {}): CheckoutChoice => ({ amount: "10", currency: "EUR", frequency: "once", method: "card", ...values });
 const paths = (values: Partial<CheckoutChoice>, flags = ALL_ON) => checkoutIssues(choice(values), flags).map((issue) => issue.path);
 
@@ -50,9 +50,15 @@ describe("donation rules (decided 2026-10-15)", () => {
     expect(paths({ method: "sepa_debit", frequency: "monthly" })).toEqual([]);
   });
 
-  it("keeps PayPal one-off (recurring PayPal needs a separate Stripe approval)", () => {
-    expect(paths({ method: "paypal", frequency: "monthly" })).toEqual(["method"]);
-    expect(paths({ method: "paypal", currency: "CHF" })).toEqual([]);
+  it("offers PayPal monthly only behind donations.paypal_monthly (and monthly donations on)", () => {
+    expect(paths({ method: "paypal", frequency: "monthly" })).toEqual([]);
+    expect(paths({ method: "paypal", frequency: "monthly" }, { ...ALL_ON, paypalMonthly: false })).toEqual(["method"]);
+    expect(paths({ method: "paypal", currency: "CHF" }, { ...ALL_ON, paypalMonthly: false })).toEqual([]);
+    expect(methodFrequencies("paypal", ALL_ON)).toEqual(["once", "monthly"]);
+    expect(methodFrequencies("paypal", { ...ALL_ON, paypalMonthly: false })).toEqual(["once"]);
+    expect(methodFrequencies("paypal", { ...ALL_ON, monthly: false })).toEqual(["once"]);
+    expect(methodFrequencies("card", { ...ALL_ON, monthly: false })).toEqual(["once"]);
+    expect(methodFrequencies("sepa_debit", ALL_ON)).toEqual(["once", "monthly"]);
   });
 
   it("reports every issue at once", () => {

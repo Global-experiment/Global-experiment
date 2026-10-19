@@ -81,6 +81,35 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
   });
 
   describe("one-off donations", () => {
+    it("records an embedded card donation (payment_intent.succeeded) once, like a Checkout payment", async () => {
+      const donation = stripe.embeddedDonation("USD", 2000);
+      const { res } = await send("payment_intent.succeeded", donation.intentId);
+      expect(res.body).toEqual({ received: true, result: "processed" });
+      const [entry] = await entries();
+      expect(entry).toMatchObject({
+        entryType: "donation",
+        name: "Anonymous donation",
+        currency: "USD",
+        grossAmount: 2000,
+        feeAmount: cardFee(2000),
+        cadence: "one_off",
+        source: "stripe",
+        externalTransactionId: donation.chargeId,
+        publicationStatus: "published",
+      });
+      // A redelivery (new event id) finds the same charge: still one entry.
+      await send("payment_intent.succeeded", donation.intentId);
+      expect(await entries()).toHaveLength(1);
+    });
+
+    it("ignores payment_intent.succeeded for Checkout's own payments and for payments that aren't donations", async () => {
+      const checkout = stripe.oneOffDonation("EUR", 1000);
+      expect((await send("payment_intent.succeeded", checkout.intentId)).res.body).toEqual({ received: true, result: "ignored" });
+      const foreign = stripe.embeddedDonation("EUR", 1000, { donation: false });
+      expect((await send("payment_intent.succeeded", foreign.intentId)).res.body).toEqual({ received: true, result: "ignored" });
+      expect(await entries()).toEqual([]);
+    });
+
     it("records a completed Checkout as a published, anonymous native donation with Stripe's fee", async () => {
       const donation = stripe.oneOffDonation("EUR", 1000);
       const { event, res } = await send("checkout.session.completed", donation.sessionId);

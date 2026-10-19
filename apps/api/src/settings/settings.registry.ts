@@ -52,6 +52,20 @@ export const SETTINGS = {
     public: true,
     description: "The donate page's initial currency.",
   }),
+  "donations.paypal_monthly": define({
+    schema: z.boolean(),
+    envDefault: (config) => config.donationDefaults.paypalMonthly,
+    public: true,
+    description:
+      "PayPal is offered for monthly donations (Stripe subscriptions). Needs PayPal recurring payments enabled on the Stripe account; the sandbox allows it (checked 2026-10-19).",
+  }),
+  "donations.checkout": define({
+    schema: z.enum(["embedded", "hosted"]),
+    envDefault: (config) => config.donationDefaults.checkout,
+    public: true,
+    description:
+      "How a one-off card donation is paid: \"embedded\" (Stripe's card fields on the donate page, no email asked) or \"hosted\" (Stripe Checkout). Monthly donations always use hosted Checkout.",
+  }),
   // Treasury (roadmap 1b) — pending client answers, so behind settings.
   "treasury.public_recipient_names": define({
     schema: z.boolean(),
@@ -76,6 +90,18 @@ export const SETTINGS = {
     envDefault: (config) => config.treasuryDefaults.donationAppeal,
     public: true,
     description: "The Treasury page shows the \"Cry for donation\" banner. Turned on by hand until Wise gives a Sustainability score to trigger it.",
+  }),
+  "treasury.stats_currency": define({
+    schema: z.enum(TREASURY_CURRENCIES),
+    envDefault: (config) => config.treasuryDefaults.statsCurrency,
+    public: true,
+    description: "The currency of the public Treasury's stats (decided 2026-10-19: the page header has no currency switch; the history lists every currency).",
+  }),
+  "treasury.public_toolbar": define({
+    schema: z.boolean(),
+    envDefault: (config) => config.treasuryDefaults.publicToolbar,
+    public: true,
+    description: "The public Treasury's search, sort and filter controls (and its currency switch). Off (2026-10-19): the history is latest first, every currency.",
   }),
   "treasury.show_test_donations": define({
     schema: z.boolean(),

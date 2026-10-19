@@ -59,22 +59,28 @@ async function noHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 }
 
-test("p28 default: geometry of the header, segment, amounts and payment rows", async ({ page }) => {
+test("p29 default: geometry of the header, segment, amounts and payment rows", async ({ page }) => {
   await page.goto("/donate");
   await expect(page.getByRole("group", { name: "Frequency" })).toBeVisible();
   await noHorizontalScroll(page);
-  await capture(page, "p28-default-usd");
+  await capture(page, "p29-default-usd");
 
   // Stats with monthly on: Donations, Med. donation, Monthly donors (Donors hidden by decision).
   await expect(page.locator("[data-stat-label]")).toHaveText(["Donations", "Med. donation", "Monthly donors"]);
   await expect(page.getByRole("button", { name: /Monthly donors/ })).toContainText("1");
 
-  // Header: USD ends 8px before the Treasury glyph (Common pages p28: text 326–355.6, glyph 365.33–378.67).
+  // Header: Common pages p29 has USD (text 326–355.6), the Treasury glyph (365.33–378.67) and ⋮. The
+  // share button the client added on every header (2026-10-19) comes first, left of USD: the controls
+  // are right-aligned, so USD, the glyph and ⋮ keep their Figma positions.
+  const share = await box(page.locator("header").getByRole("button", { name: "Share" }).locator("svg"));
   const usd = await box(page.getByRole("button", { name: /^Currency: USD/ }));
   near(usd.x + usd.width - 8, 356, "USD text right edge");
   const treasury = await box(page.getByRole("link", { name: "Treasury" }).locator("svg"));
   near(treasury.x, 364, "Treasury glyph x");
   near(treasury.y, fy(116), "Treasury glyph y");
+  expect(share.x + share.width, "share before USD").toBeLessThanOrEqual(usd.x + 8);
+  const more = await box(page.locator("header").getByRole("button", { name: "Page actions" }).locator("svg"));
+  near(more.x + more.width, 404, "⋮ right edge");
 
   // Segment 8–404 × 266–306; selected "Once".
   const once = await box(page.getByRole("button", { name: "Once", exact: true }));
@@ -110,10 +116,11 @@ test("p28 default: geometry of the header, segment, amounts and payment rows", a
   near((await box(marks.nth(1))).x, 44, "Mastercard x");
   near((await box(marks.nth(2))).x, 72, "Amex x");
   near((await box(rows.nth(0).getByText("Secure payment via Stripe"))).x, 100, "card label x");
-  near((await box(rows.nth(1).locator("img"))).x, 16, "Apple Pay mark x");
+  // Apple Pay is drawn inline (white set to the text colour, 2026-10-19: no white-on-white in the light theme).
+  near((await box(rows.nth(1).locator("svg"))).x, 16, "Apple Pay mark x");
 });
 
-test("p28 in EUR: Direct debit SEPA appears with the bank glyph", async ({ page }) => {
+test("p29 in EUR: Direct debit SEPA appears with the bank glyph", async ({ page }) => {
   await page.goto("/donate?currency=EUR");
   const rows = methods(page).getByRole("button");
   await expect(rows).toHaveCount(5);
@@ -125,10 +132,10 @@ test("p28 in EUR: Direct debit SEPA appears with the bank glyph", async ({ page 
   near((await box(sepa.getByText("Direct debit SEPA"))).x, 40, "SEPA label x");
   // Rule 12px under the rows (654), "Details" 12px under it.
   near((await box(page.locator("hr").first())).y, fy(654), "rule y");
-  await capture(page, "p28-default-eur");
+  await capture(page, "p29-default-eur");
 });
 
-test("p29 Other: the typed amount, outlined, with Validate at the bottom", async ({ page }) => {
+test("p30 Other: the typed amount, outlined, with Validate at the bottom", async ({ page }) => {
   await page.goto("/donate");
   await amounts(page).getByRole("button", { name: "Other" }).click();
   await page.getByLabel("Other amount").fill("500");
@@ -141,10 +148,16 @@ test("p29 Other: the typed amount, outlined, with Validate at the bottom", async
   near(bar.x, 8, "Validate x");
   near(bar.width, 396, "Validate width");
   near(bar.height, 40, "Validate height");
-  await capture(page, "p29-other");
+  await capture(page, "p30-other");
+
+  // Desktop (client feedback 2026-10-19): no Validate CTA while the field is being typed; Enter validates.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.getByRole("button", { name: "Validate" })).toBeHidden();
+  await page.getByLabel("Other amount").press("Enter");
+  await expect(amounts(page).getByRole("button", { name: "Other amount: $500" })).toBeVisible();
 });
 
-test("p30 Monthly with $5 selected (PayPal is one-off only, so it leaves)", async ({ page }) => {
+test("p31 Monthly with $5 selected (PayPal is one-off only, so it leaves)", async ({ page }) => {
   await page.goto("/donate");
   await page.getByRole("button", { name: "Monthly", exact: true }).click();
   await amounts(page).getByRole("button", { name: "$5", exact: true }).click();
@@ -153,8 +166,12 @@ test("p30 Monthly with $5 selected (PayPal is one-off only, so it leaves)", asyn
   await expect(methods(page).getByRole("button", { name: "PayPal" })).toHaveCount(0);
   await expect(amounts(page).getByRole("button", { name: "$5", exact: true })).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(amounts(page).getByRole("button", { name: "$5", exact: true })).toHaveCSS("color", "rgb(0, 0, 0)");
+  // The selected segment uses the selected amount tag's style (Common pages p31, 19 Oct): filled, dark text.
+  await expect(page.getByRole("button", { name: "Monthly", exact: true })).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByRole("button", { name: "Monthly", exact: true })).toHaveCSS("color", "rgb(0, 0, 0)");
+  await expect(page.getByRole("button", { name: "Once", exact: true })).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   // Monthly on: the customer portal link is offered when configured; not configured in the e2e API.
-  await capture(page, "p30-monthly");
+  await capture(page, "p31-monthly");
 
   // A monthly Checkout is a subscription.
   await page.route(/^https:\/\/checkout\.stripe\.com\//, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>stub</title>" }));
@@ -162,7 +179,7 @@ test("p30 Monthly with $5 selected (PayPal is one-off only, so it leaves)", asyn
   await expect(page).toHaveURL(/checkout\.stripe\.com\/c\/pay\/cs_test_e2ecreated\d+\?mode=subscription&currency=USD&amount=500&methods=card/);
 });
 
-test("p31 'Select an amount': the banner's box, glyphs and the rows pushed down", async ({ page }) => {
+test("p32 'Select an amount': the banner's box, glyphs and the rows pushed down", async ({ page }) => {
   await page.goto("/donate");
   await methods(page).getByRole("button", { name: "Card payment via Stripe" }).click();
   const banner = page.locator("[data-notice=warning][role=alert]");
@@ -180,10 +197,10 @@ test("p31 'Select an amount': the banner's box, glyphs and the rows pushed down"
   near(close.x, 380, "close glyph x");
   near(close.y, fy(418), "close glyph y");
   near((await box(methods(page).getByRole("button").first())).y, fy(470), "card row y under the banner");
-  await capture(page, "p31-select-amount");
+  await capture(page, "p32-select-amount");
 });
 
-test("p32 the ⋮ sheet: update line, partners, five actions", async ({ page }) => {
+test("p33 the ⋮ sheet: update line, partners, five actions", async ({ page }) => {
   await page.goto("/donate");
   await page.getByRole("button", { name: "Page actions" }).click();
   const sheet = page.getByRole("dialog");
@@ -195,10 +212,10 @@ test("p32 the ⋮ sheet: update line, partners, five actions", async ({ page }) 
   await expect(lead.locator("br")).toHaveCount(1);
   await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText(["Stripe", "Wise", "Donate", "Share page", "Send feedback", "Report issue", "Documentation"]);
   await sheet.screenshot({ path: join(SHOTS, "p32-menu.png") });
-  await capture(page, "p32-menu-page");
+  await capture(page, "p33-menu-page");
 });
 
-test("p33/p34 thank you: sections, rule, toast; then its ⋮ sheet", async ({ page }) => {
+test("p34/p35 thank you: sections, rule, toast; then its ⋮ sheet", async ({ page }) => {
   await page.goto("/donate/thank-you?currency=USD&amount=5&frequency=once&session_id=cs_test_e2ecompletepaid0001");
   const toast = page.locator("[data-toast]");
   await expect(toast).toHaveText("Donation sent");
@@ -209,7 +226,7 @@ test("p33/p34 thank you: sections, rule, toast; then its ⋮ sheet", async ({ pa
   near((await box(page.locator("hr").first())).y, fy(272), "rule y");
   near((await box(page.getByRole("heading", { name: "Thank you" }))).y, fy(148), "Thank you y");
   near((await box(page.getByRole("heading", { name: "Treasury update" }))).y, fy(285), "Treasury update y");
-  await capture(page, "p33-thank-you");
+  await capture(page, "p34-thank-you");
 
   await page.getByRole("button", { name: "Page actions" }).click();
   const sheet = page.getByRole("dialog");
@@ -270,12 +287,12 @@ test("side-by-side comparisons", async ({ page }) => {
   test.skip(!figmaDir, "Set FIGMA_COMMON_DIR to the PNG renders of Common pages.pdf (cp-NN.png) to write the comparisons.");
   const data = (path: string) => `data:image/png;base64,${readFileSync(path).toString("base64")}`;
   const pages: [string, string, string][] = [
-    ["p28-default-usd", "cp-28", "Donate — default (USD)"],
-    ["p28-default-eur", "cp-28", "Donate — default (EUR, with SEPA)"],
-    ["p29-other", "cp-29", "Donate — Other"],
-    ["p30-monthly", "cp-30", "Donate — Monthly, $5"],
-    ["p31-select-amount", "cp-31", "Donate — Select an amount"],
-    ["p33-thank-you", "cp-33", "Thank you — Donation sent"],
+    ["p29-default-usd", "cp-29", "Donate — default (USD)"],
+    ["p29-default-eur", "cp-29", "Donate — default (EUR, with SEPA)"],
+    ["p30-other", "cp-30", "Donate — Other"],
+    ["p31-monthly", "cp-31", "Donate — Monthly, $5"],
+    ["p32-select-amount", "cp-32", "Donate — Select an amount"],
+    ["p34-thank-you", "cp-34", "Thank you — Donation sent"],
   ];
   await page.setViewportSize({ width: 2 * 412 + 24, height: 900 + 40 });
   for (const [shot, frame, label] of pages) {
@@ -291,7 +308,7 @@ test("side-by-side comparisons", async ({ page }) => {
     await page.screenshot({ path: join(SHOTS, `compare-${shot}.png`) });
   }
   // The sheets: app sheet (left) and the partial Figma frame (right).
-  for (const [shot, frame, height] of [["p32-menu", "cp-32", 328], ["p34-menu", "cp-34", 218]] as const) {
+  for (const [shot, frame, height] of [["p33-menu", "cp-33", 328], ["p35-menu", "cp-35", 218]] as const) {
     const app = join(SHOTS, `${shot}.png`);
     const figma = join(figmaDir!, `${frame}.png`);
     if (!existsSync(app) || !existsSync(figma)) continue;

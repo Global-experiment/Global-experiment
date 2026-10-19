@@ -50,20 +50,32 @@ describe("parseConfig — Stripe and donations", () => {
   it("defaults to donations off-flags, USD, no Stripe, local site and web origins", () => {
     const config = parseConfig({ ...base });
     expect(config.stripe).toEqual({ secretKey: undefined, webhookSecret: undefined, livemode: false, customerPortalUrl: undefined, feeReconcileMinutes: 15, fixture: false });
-    expect(config.donationDefaults).toEqual({ enabled: false, monthly: false, extraMethods: false, defaultCurrency: "USD" });
+    expect(config.donationDefaults).toEqual({ enabled: false, monthly: false, extraMethods: false, defaultCurrency: "USD", paypalMonthly: false, checkout: "embedded" });
     expect(config.donationPreviewToken).toBeUndefined();
     expect(config.publicSiteUrl).toBe("http://localhost:3000");
     expect(config.revalidation).toEqual({ webUrl: "http://127.0.0.1:3000", secret: undefined });
   });
 
   it("reads the donation defaults from the environment", () => {
-    const config = parseConfig({ ...base, DONATIONS_MONTHLY: "true", DONATIONS_EXTRA_METHODS: "true", DONATIONS_DEFAULT_CURRENCY: "CHF" });
-    expect(config.donationDefaults).toEqual({ enabled: false, monthly: true, extraMethods: true, defaultCurrency: "CHF" });
+    const config = parseConfig({
+      ...base,
+      DONATIONS_MONTHLY: "true",
+      DONATIONS_EXTRA_METHODS: "true",
+      DONATIONS_DEFAULT_CURRENCY: "CHF",
+      DONATIONS_PAYPAL_MONTHLY: "true",
+      DONATIONS_CHECKOUT: "hosted",
+    });
+    expect(config.donationDefaults).toEqual({ enabled: false, monthly: true, extraMethods: true, defaultCurrency: "CHF", paypalMonthly: true, checkout: "hosted" });
+    expect(() => parseConfig({ ...base, DONATIONS_CHECKOUT: "popup" })).toThrow(/DONATIONS_CHECKOUT/);
     expect(() => parseConfig({ ...base, DONATIONS_DEFAULT_CURRENCY: "GBP" })).toThrow(/DONATIONS_DEFAULT_CURRENCY/);
   });
 
   it("accepts test keys, refuses live keys unless explicitly enabled, never echoing them", () => {
     expect(parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY }).stripe.livemode).toBe(false);
+    // The publishable key (embedded card form): a pk_ key in the same mode as the secret key.
+    expect(parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY, STRIPE_PUBLISHABLE_KEY: "pk_test_FAKEKEYFORTESTS0000" }).stripe.publishableKey).toBe("pk_test_FAKEKEYFORTESTS0000");
+    expect(() => parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY, STRIPE_PUBLISHABLE_KEY: "pk_live_FAKEKEYFORTESTS0000" })).toThrow(/STRIPE_PUBLISHABLE_KEY/);
+    expect(() => parseConfig({ ...base, STRIPE_PUBLISHABLE_KEY: TEST_KEY })).toThrow(/STRIPE_PUBLISHABLE_KEY/);
     expect(() => parseConfig({ ...base, STRIPE_SECRET_KEY: LIVE_KEY })).toThrow(/STRIPE_LIVE_ENABLED/);
     try {
       parseConfig({ ...base, STRIPE_SECRET_KEY: LIVE_KEY });
