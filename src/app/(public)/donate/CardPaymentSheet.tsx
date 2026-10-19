@@ -138,6 +138,12 @@ function CardForm({ amountLabel, choiceQuery }: { amountLabel: string; choiceQue
         onReady={() => setReady(true)}
         onLoadError={() => setFailed(true)}
       />
+      {!ready && !failed ? (
+        // Stripe's fields can take a few seconds to arrive on a slow connection.
+        <p role="status" data-card-loading className="text-body text-text-muted">
+          {copy.loading}
+        </p>
+      ) : null}
       {failed || error ? (
         <p role="alert" className="text-body text-text-primary">
           {failed ? copy.loadFailed : error}

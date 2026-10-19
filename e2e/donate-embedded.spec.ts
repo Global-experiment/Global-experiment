@@ -52,7 +52,7 @@ const STRIPE_STUB = `
               mount(node) {
                 const target = typeof node === "string" ? document.querySelector(node) : node;
                 target.innerHTML = '<div data-stub-card-fields>Card number · MM / YY · CVC</div>';
-                setTimeout(() => handlers.ready && handlers.ready({ elementType: type }), 0);
+                setTimeout(() => handlers.ready && handlers.ready({ elementType: type }), window.__stripeReadyDelay || 0);
               },
               on(event, handler) { handlers[event] = handler; },
               off: noop, update: noop, destroy: noop, unmount: noop, focus: noop, blur: noop, clear: noop,
@@ -101,6 +101,7 @@ test("a one-off card donation is paid in a sheet on the page (card fields only, 
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText("One-off donation of $20. Your card details go straight to Stripe; no email address is needed.");
   await expect(sheet.locator("[data-stub-card-fields]")).toBeVisible();
+  await expect(sheet.locator("[data-card-loading]")).toHaveCount(0);
   expect(body).toMatchObject({ amount: "20", currency: "USD" });
   expect(body).not.toHaveProperty("frequency");
   // Card fields only: Stripe.js got the publishable key, the PaymentIntent's secret, and no email/wallet fields.
@@ -126,11 +127,18 @@ test("a one-off card donation is paid in a sheet on the page (card fields only, 
 
 test("a declined card says so in the sheet and charges nothing; the donor can try again", async ({ page }) => {
   await stubStripeJs(page, "decline");
+  // Slow card fields: a loading line until Stripe says they are ready, and no pay button before.
+  await page.addInitScript(() => {
+    (window as unknown as { __stripeReadyDelay: number }).__stripeReadyDelay = 1500;
+  });
   await page.goto("/donate?currency=EUR");
   await amounts(page).getByRole("button", { name: "€10" }).click();
   await methods(page).getByRole("button", { name: "Card payment via Stripe" }).click();
   const sheet = page.getByRole("dialog", { name: "Card payment" });
+  await expect(sheet.getByRole("status")).toHaveText("Loading the secure card form…");
+  await expect(sheet.getByRole("button", { name: "Donate €10" })).toHaveCount(0);
   await sheet.getByRole("button", { name: "Donate €10" }).click();
+  await expect(sheet.getByRole("status")).toHaveCount(0);
   await expect(sheet.getByRole("alert")).toHaveText("Your card was declined.");
   await expect(sheet.getByRole("button", { name: "Donate €10" })).toBeEnabled();
   expect(await page.evaluate(() => (window as unknown as { __stripeConfirm: { redirect: string } }).__stripeConfirm.redirect)).toBe("if_required");
