@@ -7,9 +7,7 @@ import { donateHref } from "@/shared/donate/donateParams";
 import { isDonationCurrency, minorToAmountText, parseAmountToMinor } from "@/shared/donate/money";
 import { Container } from "@/shared/ui/Container";
 import { FullBleedSeparator } from "@/shared/ui/FullBleedSeparator";
-import { IconButton } from "@/shared/ui/IconButton";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
 import { DonationSentToast } from "./DonationSentToast";
 
 export const metadata: Metadata = {
@@ -75,21 +73,17 @@ export default async function ThankYouPage(props: PageProps<"/donate/thank-you">
         title={copy.pageTitle}
         // Never the payment in this URL: sharing invites to donate.
         shareUrl="/donate"
-        actions={
-          <>
-            <IconButton href="/treasury" label={DONATE_COPY.header.treasuryLink} icon="leaderboard" />
-            {/* Common pages p34: the actions only, no lead text. */}
-            <PageActionsMenu
-              label={DONATE_COPY.header.pageActions}
-              actions={[
-                { label: DONATE_COPY.menu.donate, icon: "volunteer_activism", href: "/donate" },
-                { label: DONATE_COPY.menu.feedback, icon: "lightbulb", href: "/feedback" },
-                { label: DONATE_COPY.menu.issue, icon: "new_releases", href: "/issue" },
-                { label: DONATE_COPY.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
-              ]}
-            />
-          </>
-        }
+        // Common pages p34: the actions only, no lead text; the Treasury link moved from the header into the menu (client review 2026-10-21).
+        menu={{
+          label: DONATE_COPY.header.pageActions,
+          actions: [
+            { label: DONATE_COPY.menu.donate, icon: "volunteer_activism", href: "/donate" },
+            { label: DONATE_COPY.menu.feedback, icon: "lightbulb", href: "/feedback" },
+            { label: DONATE_COPY.menu.issue, icon: "new_releases", href: "/issue" },
+            { label: DONATE_COPY.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
+            { label: DONATE_COPY.header.treasuryLink, icon: "leaderboard", href: "/treasury" },
+          ],
+        }}
       />
       {/* p33: heading 4px under the header, text 4px under the heading; full-bleed rule 12px under the text, next heading 12px under the rule; sections 24px apart. */}
       <Container className="pt-1 text-body text-text-primary">

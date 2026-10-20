@@ -2,8 +2,7 @@ import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
 import { RichText } from "@/shared/ui/RichText";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
-import { ThemeToggle } from "@/shared/ui/ThemeToggle";
-import { ShareButton } from "@/shared/ui/ShareButton";
+import { NavHeader } from "@/shared/ui/NavHeader";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
 import { HomeSections } from "@/modules/home/ui/HomeSections";
 import { homeActions, homePrimaryAction, homeWordmark } from "./home-navigation";
@@ -28,20 +27,9 @@ export default async function Home() {
 
   return (
     <main className="flex flex-1 flex-col md:pb-6">
+      {/* The shared header (client review 2026-10-21): the wordmark, then Share and ⋮ — no theme toggle. */}
+      <NavHeader title={homeWordmark.brand} brand={{ name: homeWordmark.brand, eyebrow: homeWordmark.eyebrow }} shareUrl="/" />
       <Container>
-        {/* Sticky like every public header (client feedback 2026-10-19), with the share button. */}
-        <div data-nav-header className="sticky top-0 z-30 -mx-gutter flex min-h-10 items-center justify-center bg-surface-base px-gutter">
-          {/* figma.pdf p1: 14px bold brand, 12px muted eyebrow, one shared baseline. */}
-          <p className="flex items-baseline gap-1">
-            <span className="text-body font-bold text-text-primary">{homeWordmark.brand}</span>
-            <span className="text-meta text-text-muted">{homeWordmark.eyebrow}</span>
-          </p>
-          {/* Share, then the temporary, review-only theme toggle (see ThemeToggle.tsx). */}
-          <div className="absolute top-1/2 right-gutter flex -translate-y-1/2 items-center">
-            <ShareButton url="/" className="-mr-2" />
-            <ThemeToggle />
-          </div>
-        </div>
         <h1 className="mt-3.5 text-center text-lead text-text-primary">
           <RichText text={content.tagline} />
         </h1>

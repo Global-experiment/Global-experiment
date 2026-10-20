@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { atFigmaScale } from "./figmaScale";
 
 /**
  * Treasury against Common pages.pdf (412px-wide phone frames; the browser
@@ -22,6 +23,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the API isn't running.");
 test.describe.configure({ mode: "serial" });
 test.use({ viewport: { width: 412, height: 900 } });
+// The frames are drawn at a 16px root; the public scale is tested in public-ux.spec.ts.
+test.beforeEach(async ({ page }) => atFigmaScale(page));
 
 const SHOTS = "test-results/figma-treasury";
 const CHROME = 104;
@@ -47,14 +50,17 @@ test("p12 list (2026-10-19: no currency switch, search, sort or filter): header,
   await expect(page.locator("[data-amount]").first()).toBeVisible();
   await capture(page, "p12-list");
 
-  // Header (decision 2026-10-19): back glyph at x 8, the title at x 32, the share glyph ending 8px from the edge, all at Figma's y 116.
+  // Header (decisions 2026-10-19 and 2026-10-21): back glyph at x 8, the title at x 32, then Share and ⋮ — ⋮ ending 8px
+  // from the edge, Share 24px before it — all at Figma's y 116.
   const back = await box(page.locator("header").getByRole("link", { name: "Back" }).locator("svg"));
   near(back.x, 8, "back glyph x");
   near(back.y + back.height / 2, fy(124), "back glyph centre");
   const title = await box(page.getByRole("heading", { level: 1, name: "Treasury" }));
   near(title.x, 32, "title x");
   const share = await box(page.locator("header").getByRole("button", { name: "Share" }).locator("svg"));
-  near(share.x + share.width, 404, "share glyph right edge");
+  near(share.x + share.width, 380, "share glyph right edge");
+  const more = await box(page.locator("header").getByRole("button", { name: "Page actions" }).locator("svg"));
+  near(more.x + more.width, 404, "⋮ right edge");
   near(share.y + share.height / 2, fy(124), "share glyph centre");
   // The pills take the toolbar's place: 32px at Figma's y 148.
   const pill = await box(page.getByRole("button", { name: "Expenses", exact: true }));

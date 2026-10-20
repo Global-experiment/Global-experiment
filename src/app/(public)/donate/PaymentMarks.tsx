@@ -29,7 +29,7 @@ const CARD_MARKS: readonly MarkSpec[] = [
 ];
 
 function Mark({ file, width, height }: MarkSpec) {
-  return <Image src={`${ASSET_DIR}/${file}`} alt="" width={width} height={height} unoptimized className="shrink-0" />;
+  return <Image src={`${ASSET_DIR}/${file}`} alt="" width={width} height={height} unoptimized className="shrink-0" style={{ width: `${width / 16}rem`, height: `${height / 16}rem` }} />;
 }
 
 export type PaymentMarkId = "card" | "apple-pay" | "google-pay" | "paypal";

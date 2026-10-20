@@ -20,6 +20,18 @@ const notice = (page: Page) => page.locator("[data-notice]");
 /** The donate warning banner (Next's route announcer is a role=alert too). */
 const warning = (page: Page) => page.locator("[data-notice=warning][role=alert]");
 
+/** The header keeps only Share and ⋮ (client review 2026-10-21): the currency switch is the menu's first row. */
+async function openMenu(page: Page) {
+  await page.locator("[data-nav-header]").getByRole("button", { name: "Page actions" }).click();
+  return page.getByRole("dialog", { name: "Page actions" });
+}
+async function expectCurrency(page: Page, currency: string) {
+  const menu = await openMenu(page);
+  await expect(menu.getByRole("button", { name: `Currency: ${currency}` })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+}
+
 /** Stripe's hosted page, stubbed: the test only needs to see the browser get there. */
 async function stubStripe(page: Page) {
   await page.route(STRIPE, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>Stripe Checkout (stub)</title>" }));
@@ -35,7 +47,7 @@ test.describe("Donate page", () => {
     const response = await page.goto("/donate");
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Donate" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Currency: USD/ })).toHaveText("USD");
+    await expectCurrency(page, "USD");
 
     // Test-only fixtures: 2 + 5 + 6.40 + 10 + 50 = $73.40, median $6.40. Donors never shown; Monthly donors only with monthly on.
     await expect(page.getByRole("button", { name: /Donations/ })).toContainText("$ 73.4");
@@ -80,7 +92,7 @@ test.describe("Donate page", () => {
 
   test("the currency switch is kept in the URL and changes presets and figures", async ({ page }) => {
     await page.goto("/donate");
-    await page.getByRole("button", { name: /^Currency: USD/ }).click();
+    await (await openMenu(page)).getByRole("button", { name: "Currency: USD" }).click();
     const sheet = page.getByRole("dialog", { name: "Choose a currency" });
     await expect(sheet.getByRole("button")).toHaveText(["Euro (EUR)", "US dollar (USD)", "Swiss franc (CHF)"]);
     await sheet.getByRole("button", { name: "Euro (EUR)" }).click();
@@ -91,7 +103,7 @@ test.describe("Donate page", () => {
     await expect(page.getByRole("button", { name: /Med\. donation/ })).toContainText("–");
 
     await page.reload();
-    await expect(page.getByRole("button", { name: /^Currency: EUR/ })).toBeVisible();
+    await expectCurrency(page, "EUR");
     await expect(amounts(page).getByRole("button").first()).toHaveText("€2");
 
     await page.goto("/donate?currency=chf");
@@ -172,7 +184,7 @@ test.describe("Donate page", () => {
   test("Stripe's cancel link returns with the same currency and amount", async ({ page }) => {
     // What Stripe redirects to (built by the API from the choice).
     await page.goto("/donate?currency=EUR&amount=12.50&frequency=once&canceled=1");
-    await expect(page.getByRole("button", { name: /^Currency: EUR/ })).toBeVisible();
+    await expectCurrency(page, "EUR");
     await expect(amounts(page).getByRole("button", { name: "Other amount: €12.50" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("status").filter({ hasText: "Donation canceled" })).toContainText("No payment was made");
     // The one-time flag leaves the address bar; the choice stays.
@@ -269,7 +281,7 @@ test.describe("Thank you page", () => {
     // p34: the actions only.
     await page.getByRole("button", { name: "Page actions" }).click();
     const sheet = page.getByRole("dialog");
-    await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText(["Donate", "Send feedback", "Report issue", "Documentation"]);
+    await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText(["Donate", "Send feedback", "Report issue", "Documentation", "Treasury"]);
   });
 
   test("a delayed payment (SEPA) is thanked without promising it's already on the treasury", async ({ page }) => {

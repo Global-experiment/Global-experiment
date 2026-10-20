@@ -207,7 +207,7 @@ later needs no code change. Built in the step named (plan:
 
 | # | Decision | Where it lives | Step |
 |---|---|---|---|
-| 1 | Home and Documentation get the native CMS now. `cms.mode` = `notion` (default) | `native`: while `notion`, "Administrate" opens the list, record and editor read-only with the "Managed in Notion" badge and a link to Notion, and the importer keeps the content in sync; `native` is the documented cut-over (§2.1). | setting `cms.mode` | 5b |
+| 1 | Home and Documentation get the native CMS now. `cms.mode` = `notion` (default) \| `native`: while `notion`, "Administrate" opens the list, record and editor read-only with the "Managed in Notion" badge and a link to Notion, and the importer keeps the content in sync; `native` is the documented cut-over (§2.1). | setting `cms.mode` | 5b |
 | 2 | Public Treasury: the header is back, title and share; the stats use `treasury.stats_currency` (USD); the history lists every currency, latest first. Search, sort, filter and the currency switch stay in the code behind `treasury.public_toolbar` (false). | settings | 2 |
 | 3 | Documentation list columns: Title, Status, Display order, Expertise, Last edited by, Updated, Published. | list config | 5b |
 | 4 | Accounts page: "Role" column; views All / Active / Invited / Deactivated; "New account" creates an invitation; rows open a view-only profile; no inline editing. | list config | 7 |
@@ -223,7 +223,7 @@ later needs no code change. Built in the step named (plan:
 | 14 | Delete account = deactivate: the login is disabled, history keeps the name; the last Rootadmin can never be deactivated or deleted. | schema rule | 7 |
 | 15 | Accounts to create: those of admin p15; the existing owner is kept; missing ones get a Rootadmin invitation link (never committed or logged). | runbook | 7 |
 | 16 | Sidebar exactly as Figma, Organizations in both Admin and Other (same page); Waitlist, Messages, Cloud, History, Analytics, Technical dashboard and Emails "Coming soon" until built (History in Step 5). | module registry | 3 |
-| 17 | Donations: PayPal on Monthly when Stripe allows it, behind `donations.paypal_monthly` (the sandbox allows PayPal subscriptions; live needs PayPal recurring payments enabled). One-off card donations on our page with Stripe's card fields, no email, behind `donations.checkout` = `embedded` (default) | `hosted`; monthly stays on hosted Checkout; the thank-you page shows a reference instead of an email receipt; webhooks and ledger rules unchanged (`payment_intent.succeeded` added). | settings | 2 |
+| 17 | (Changed by the client review of 2026-10-21: every donation uses Stripe's hosted Checkout — `donations.checkout` defaults to `hosted`, the embedded form is kept but off — and Checkout collects as little as Stripe allows; see docs/operations/stripe.md.) Donations: PayPal on Monthly when Stripe allows it, behind `donations.paypal_monthly` (the sandbox allows PayPal subscriptions; live needs PayPal recurring payments enabled). One-off card donations on our page with Stripe's card fields, no email, behind `donations.checkout` = `embedded` (default) \| `hosted`; monthly stays on hosted Checkout; the thank-you page shows a reference instead of an email receipt; webhooks and ledger rules unchanged (`payment_intent.succeeded` added). | settings | 2 |
 | 18 | Saved views: create, rename, delete and reorder per account, plus shared views (owner) on every list, stored in the database. | schema | 9 |
 
 Addendum (owner, 2026-10-19): the person record follows the client's

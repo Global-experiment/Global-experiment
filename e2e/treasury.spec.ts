@@ -54,13 +54,13 @@ test.describe("Treasury list", () => {
     // Screen readers hear the kind, not a dash.
     await expect(rows(page).nth(8)).toContainText("Expense");
 
-    // The header: back, title, share — no currency switch, chart link or ⋮.
+    // The header: back, title, Share and ⋮ (client review 2026-10-21) — no currency switch or chart link.
     const header = page.locator("header");
     await expect(header.getByRole("link", { name: "Back" })).toBeVisible();
     await expect(header.getByRole("button", { name: "Share" })).toBeVisible();
     await expect(header.getByRole("button", { name: /^Currency/ })).toHaveCount(0);
     await expect(header.getByRole("link", { name: "Treasury" })).toHaveCount(0);
-    await expect(header.getByRole("button", { name: "Page actions" })).toHaveCount(0);
+    await expect(header.getByRole("button", { name: "Page actions" })).toBeVisible();
     // No search, sort or filter controls.
     for (const name of [/^Sort:/, /^Filter the history/, "Search the history"]) await expect(page.getByRole("button", { name })).toHaveCount(0);
 
@@ -132,7 +132,9 @@ test.describe("Treasury list", () => {
     const narrow = await chips.count();
     expect(narrow).toBeLessThanOrEqual(wide);
     expect(await row.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    expect((await row.boundingBox())!.height).toBeLessThanOrEqual(41);
+    // One 2.5rem line (40px at Figma's scale).
+    const root = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
+    expect((await row.boundingBox())!.height).toBeLessThanOrEqual(2.5 * root + 1);
   });
 
   test("no horizontal scroll from 320px to desktop", async ({ page }) => {
@@ -151,8 +153,8 @@ test.describe("Treasury entries", () => {
     await expect(page).toHaveURL(/\/treasury\/expense\/\d+$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Expense" })).toBeVisible();
     await expect(page.getByText("Paid Apr 6 2:07 PM")).toBeVisible();
-    // p22: the chart glyph before ⋮, to the same place as on Donate.
-    await expect(page.locator("header").getByRole("link", { name: "Treasury" })).toHaveAttribute("href", "/treasury");
+    // The chart link moved from the header into the ⋮ menu (client review 2026-10-21).
+    await expect(page.locator("header").getByRole("link", { name: "Treasury" })).toHaveCount(0);
     for (const tag of ["Development and engineering", "Design and product", "Research and consulting", "General operations"]) await expect(page.getByText(tag)).toBeVisible();
     await expect(page.getByText("USD 5,675", { exact: true })).toBeVisible();
     await expect(page.getByText("Development of the contribution flow")).toBeVisible();
@@ -161,6 +163,12 @@ test.describe("Treasury entries", () => {
     await axe(page);
     await page.getByRole("button", { name: "Page actions" }).click();
     await expect(page.getByRole("dialog")).toContainText("This expense of five thousand six hundred seventy-five American dollars was made on April 6 at 2:07 PM.");
+    await expect(page.getByRole("dialog").getByRole("link", { name: "Treasury" })).toHaveAttribute("href", "/treasury");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    // Send feedback and Report issue under the entry, as under every documentation article.
+    await expect(page.locator("main").getByRole("link", { name: "Send feedback" }).last()).toBeVisible();
+    await expect(page.locator("main").getByRole("link", { name: "Report issue" }).last()).toBeVisible();
   });
 
   test("an unqualified expense shows 'Not qualified yet' and no description", async ({ page }) => {

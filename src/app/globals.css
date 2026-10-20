@@ -163,8 +163,33 @@ body {
  * Exposed as --scrollbar-offset for StickyActionBar (`100%` resolves where
  * it's used: the bar's containing block has the root's width).
  */
+/*
+ * Public site scale (client review 2026-10-21): every size on the public
+ * pages is in rem, so this one variable scales type, spacing, icons and
+ * radii together. Figma's frames are drawn at 16px; the site is a little
+ * larger — 18px on phones, 17px from 768px up. Percentages keep the
+ * visitor's own browser font size. The admin stays at 16px. Adjust here.
+ */
+:root {
+  --public-root-size: 112.5%; /* 18px on phones */
+}
+@media (min-width: 48rem) {
+  :root {
+    --public-root-size: 106.25%; /* 17px from 768px up */
+  }
+}
 html:not(:has([data-admin])) {
+  font-size: var(--public-root-size);
   --scrollbar-offset: min(100vw - 100%, max(0px, (100vw - var(--container-page)) / 2));
+}
+/*
+ * Applied on <body>, not <html>: WebKit resolves rem in the root element's
+ * own margin against 16px, not the scaled root size, so the column moved
+ * when the scrollbar appeared just under 41rem wide (Safari, 2026-10-21).
+ * On <body>, 100% is the root's width (the window minus the scrollbar), as
+ * it was on <html>.
+ */
+html:not(:has([data-admin])) body {
   margin-left: var(--scrollbar-offset);
 }
 /*

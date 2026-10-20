@@ -23,19 +23,35 @@ test.afterAll(async ({ request }) => {
 const rows = (page: Page) => page.locator("main ul li a");
 const amountsShown = (page: Page) => rows(page).locator("[data-amount]").allInnerTexts();
 
+/** The header keeps only Share and ⋮ (client review 2026-10-21): with the toolbar on, the currency switch is the menu's first row. */
+async function openMenu(page: Page) {
+  await page.locator("[data-nav-header]").getByRole("button", { name: "Page actions" }).click();
+  return page.getByRole("dialog", { name: "Page actions" });
+}
+async function expectCurrency(page: Page, label: string) {
+  const menu = await openMenu(page);
+  await expect(menu.getByRole("button", { name: `Currency: ${label}` })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+}
+async function chooseCurrency(page: Page, from: string, to: string) {
+  await (await openMenu(page)).getByRole("button", { name: `Currency: ${from}` }).click();
+  await page.getByRole("dialog", { name: "Choose a currency" }).getByRole("button", { name: to }).click();
+}
+
 async function axe(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
 }
 
 test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
-  test("with the toolbar on, the header has the currency switch, chart link and ⋮, and the history is the chosen currency (USD)", async ({ page }) => {
+  test("with the toolbar on, the currency switch is the ⋮ menu's first row (the header keeps Share and ⋮), and the history is the chosen currency (USD)", async ({ page }) => {
     await page.goto("/treasury");
     await expect(page.getByRole("heading", { level: 2, name: /History/ })).toContainText("8");
     await expect(page.getByText("EUR 12.50")).toHaveCount(0);
-    await expect(page.locator("header").getByRole("button", { name: /^Currency: USD/ })).toBeVisible();
-    await expect(page.locator("header").getByRole("link", { name: "Treasury" })).toHaveAttribute("href", "/treasury");
+    await expect(page.locator("header").getByRole("button", { name: /^Currency/ })).toHaveCount(0);
     await axe(page);
+    await expectCurrency(page, "USD");
   });
 
   test("sort by amount (largest first, then smallest first) and back to date", async ({ page }) => {
@@ -73,7 +89,6 @@ test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
     await sheet.getByRole("radio", { name: "Euro" }).check();
     await sheet.getByRole("button", { name: "Apply filter" }).click();
     await expect(page).toHaveURL("/treasury?currency=EUR");
-    await expect(page.getByRole("button", { name: /^Currency: EUR/ })).toHaveText("EUR");
     await expect.poll(() => amountsShown(page)).toEqual(["- EUR 12.50"]);
     sheet = page.getByRole("dialog", { name: "Filter" });
     await expect(sheet.getByRole("button", { name: /^Currency/ })).toContainText("Euro");
@@ -112,25 +127,23 @@ test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
 
   test("the currency switch changes the stats and the history; 'All currencies' lists every one, never converted", async ({ page }) => {
     await page.goto("/treasury");
-    await page.getByRole("button", { name: /^Currency: USD/ }).click();
-    await page.getByRole("dialog", { name: "Choose a currency" }).getByRole("button", { name: "Euro (EUR)" }).click();
+    await chooseCurrency(page, "USD", "Euro (EUR)");
     await expect(page).toHaveURL("/treasury?currency=EUR");
-    await expect(page.getByRole("button", { name: /^Currency: EUR/ })).toHaveText("EUR");
+    await expectCurrency(page, "EUR");
     await expect(page.locator("[data-stat-value]")).toHaveText(["–", "12.5"]);
     await expect.poll(() => amountsShown(page)).toEqual(["- EUR 12.50"]);
     await expect(page.getByRole("heading", { level: 2, name: /History/ })).toContainText("1");
 
-    await page.getByRole("button", { name: /^Currency: EUR/ }).click();
-    await page.getByRole("dialog", { name: "Choose a currency" }).getByRole("button", { name: "All currencies" }).click();
+    await chooseCurrency(page, "EUR", "All currencies");
     await expect(page).toHaveURL("/treasury?currency=all");
-    await expect(page.getByRole("button", { name: /^Currency: All/ })).toHaveText("All");
+    await expectCurrency(page, "All");
     // The stats stay in the default currency (amounts are never added across currencies).
     await expect(page.locator("[data-stat-value]")).toHaveText(["$6.4", "5.8K"]);
     await expect.poll(() => amountsShown(page)).toHaveLength(9);
     await expect(page.getByText("- EUR 12.50")).toBeVisible();
     // Kept in the URL: a reload shows the same view.
     await page.reload();
-    await expect(page.getByRole("button", { name: /^Currency: All/ })).toBeVisible();
+    await expectCurrency(page, "All");
     await expect.poll(() => amountsShown(page)).toHaveLength(9);
   });
 

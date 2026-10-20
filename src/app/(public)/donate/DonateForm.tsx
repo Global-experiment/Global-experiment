@@ -20,10 +20,8 @@ import { ClickableStatsRow, type StatItem } from "@/shared/treasury/ClickableSta
 import { Button, buttonClasses } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
 import { FullBleedSeparator } from "@/shared/ui/FullBleedSeparator";
-import { IconButton } from "@/shared/ui/IconButton";
 import { Icon } from "@/shared/ui/icons";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
 import { Sheet } from "@/shared/ui/Sheet";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { CardPaymentSheet, type CardIntent } from "./CardPaymentSheet";
@@ -256,50 +254,40 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
       <NavHeader
         title={copy.pageTitle}
         backHref="/"
-        actions={
-          <>
-            {/* Common pages p28: "USD" bold, ending 8px before the Treasury glyph. */}
-            <button
-              type="button"
-              onClick={() => setCurrencyOpen(true)}
-              aria-label={copy.header.currencyLabel(currency)}
-              aria-haspopup="dialog"
-              className={`h-10 shrink-0 cursor-pointer rounded-control px-2 text-body font-bold text-text-primary ${focusRing}`}
-            >
-              {currency}
-            </button>
-            <IconButton href="/treasury" label={copy.header.treasuryLink} icon="leaderboard" />
-            <PageActionsMenu
-              label={copy.header.pageActions}
-              actions={[
-                { label: copy.menu.donate, icon: "volunteer_activism", href: "#donate-amount" },
-                // Never shares the private preview token.
-                { label: copy.menu.share, icon: "share", share: { url: donateHref({ currency }), title: copy.pageTitle } },
-                { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
-                { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
-                { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
-              ]}
-            >
-              {/* Common pages p32: two sentences on consecutive lines, no paragraph space. */}
-              <p>
-                {lastUpdated ? (
-                  <>
-                    {copy.menu.updated(lastUpdated)}
-                    <br />
-                  </>
-                ) : null}
-                <a href="https://stripe.com" className="underline underline-offset-2">
-                  {copy.menu.stripe}
-                </a>
-                {copy.menu.and}
-                <a href="https://wise.com" className="underline underline-offset-2">
-                  {copy.menu.wise}
-                </a>
-                {copy.menu.partnersAfter}
-              </p>
-            </PageActionsMenu>
-          </>
-        }
+        // Exactly Share and ⋮ on the right (client review 2026-10-21): the currency switch and the Treasury link are menu rows.
+        menu={{
+          label: copy.header.pageActions,
+          actions: [
+            { label: copy.header.currencyRow(currency), icon: "account_balance", onClick: () => setCurrencyOpen(true) },
+            { label: copy.menu.donate, icon: "volunteer_activism", href: "#donate-amount" },
+            // Never shares the private preview token.
+            { label: copy.menu.share, icon: "share", share: { url: donateHref({ currency }), title: copy.pageTitle } },
+            { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
+            { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
+            { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
+            { label: copy.header.treasuryLink, icon: "leaderboard", href: "/treasury" },
+          ],
+          // Common pages p32: two sentences on consecutive lines, no paragraph space.
+          note: (
+            <p>
+              {lastUpdated ? (
+                <>
+                  {copy.menu.updated(lastUpdated)}
+                  <br />
+                </>
+              ) : null}
+              <a href="https://stripe.com" className="underline underline-offset-2">
+                {copy.menu.stripe}
+              </a>
+              {copy.menu.and}
+              <a href="https://wise.com" className="underline underline-offset-2">
+                {copy.menu.wise}
+              </a>
+              {copy.menu.partnersAfter}
+            </p>
+          ),
+        }}
+        shareUrl={donateHref({ currency })}
       />
 
       <Sheet open={currencyOpen} onClose={() => setCurrencyOpen(false)} ariaLabel={copy.header.currencySheetLabel}>

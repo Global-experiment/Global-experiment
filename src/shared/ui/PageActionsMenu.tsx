@@ -8,16 +8,9 @@ import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 import { shareUrl } from "./ShareButton";
 import { Sheet } from "./Sheet";
-import type { IconName } from "./icons";
+import type { PageAction } from "./reportRows";
 
-export interface PageAction {
-  label: string;
-  icon: IconName;
-  href?: string;
-  onClick?: () => void;
-  /** A copy/share row ("Share page"): copies on desktop (check icon, toast, then the sheet closes), native share on mobile. */
-  share?: { url: string; title?: string };
-}
+export type { PageAction } from "./reportRows";
 
 /** How long the copied row shows its check before the sheet closes. */
 const COPIED_CLOSE_MS = 600;

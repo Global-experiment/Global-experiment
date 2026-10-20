@@ -6,7 +6,7 @@ import {
   getDocumentationSummaries,
 } from "@/modules/documentation/application/getDocumentationDataset";
 import { DocumentationList } from "@/modules/documentation/ui/DocumentationList";
-import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
+import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 
 // getDocumentationDataset() is cached server-side (unstable_cache, 60s
 // revalidate — see that file), so this no longer hits Notion on every
@@ -42,7 +42,7 @@ export default async function DocumentationIndexPage() {
       <NavHeader
         title="Documentation"
         backHref="/"
-        actions={<DocumentationPageMenu url="/documentation" title="Documentation" />}
+        menu={documentationMenu({ url: "/documentation", title: "Documentation" })}
       />
       <Container className="pt-1">
         <DocumentationList articles={articles} content={content}>

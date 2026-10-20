@@ -1,4 +1,5 @@
 import { Container } from "@/shared/ui/Container";
+import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { Icon } from "@/shared/ui/icons";
 
@@ -28,7 +29,7 @@ const SKELETON_ROW_COUNT = 6;
 export default function DocumentationLoading() {
   return (
     <main className="flex flex-1 flex-col pb-6" aria-busy="true">
-      <NavHeader title="Documentation" backHref="/" />
+      <NavHeader title="Documentation" backHref="/" menu={documentationMenu({ url: "/documentation", title: "Documentation" })} />
       <Container className="pt-1">
         <div className="relative">
           <Icon

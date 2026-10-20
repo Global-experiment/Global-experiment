@@ -85,8 +85,9 @@ test.describe("Home navigation", () => {
     await expect(page.getByRole("link", { name: "Join waitlist" })).toHaveCount(1);
     await expect(page.locator("[data-action-bar]")).toBeHidden();
     await expect(page.locator("[data-action-bar-spacer]")).toBeHidden();
-    const mainPaddingBottom = await page.locator("main").evaluate((el) => getComputedStyle(el).paddingBottom);
-    expect(mainPaddingBottom).toBe("24px");
+    // 1.5rem (24px at Figma's scale; 25.5px at the 17px desktop root).
+    const [mainPaddingBottom, root] = await page.locator("main").evaluate((el) => [getComputedStyle(el).paddingBottom, getComputedStyle(document.documentElement).fontSize]);
+    expect(Number.parseFloat(mainPaddingBottom)).toBe(1.5 * Number.parseFloat(root));
   });
 
   test("keyboard navigation reaches and activates a Home link", async ({ page }) => {
@@ -99,26 +100,16 @@ test.describe("Home navigation", () => {
 });
 
 test.describe("Temporary light/dark theme toggle (client feedback item 7)", () => {
-  test("switches the theme, updates the pressed state, and survives navigation", async ({ page }) => {
+  test("no toggle on the public header any more (client review 2026-10-21); a light preview chosen in the admin still applies", async ({ page }) => {
     await page.goto("/");
-    const toggle = page.getByRole("button", { name: "Switch to light preview" });
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("button", { name: /Switch to (light|dark) preview/ })).toHaveCount(0);
     await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
 
-    await toggle.click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-    await expect(page.getByRole("button", { name: "Switch to dark preview" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-
-    // Persists across a full navigation, not just client-side state.
-    await page.goto("/documentation");
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-
-    // And across a fresh load (localStorage, read by the inline init script
-    // before paint — no flash asserted here, just the end state).
+    // The admin's toggle stores the same per-browser choice; the inline init script reads it before paint.
+    await page.evaluate(() => localStorage.setItem("ge-theme", "light"));
     await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await page.goto("/documentation");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   });
 });
@@ -434,12 +425,13 @@ test.describe("Contribute: copy confirmation (client feedback item 30)", () => {
 // Treasury (real data through the API): treasury.spec.ts and treasury-figma.spec.ts.
 
 test.describe("Icons and icon buttons", () => {
-  test("every visible icon is 16×16; primary CTAs use filled glyphs, others outlined", async ({ page }) => {
+  test("every visible icon is 1rem (16px at Figma's scale); primary CTAs use filled glyphs, others outlined", async ({ page }) => {
     await page.setViewportSize({ width: 412, height: 900 });
     await page.goto("/");
+    const root = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
     for (const svg of await page.locator("svg[data-icon]").filter({ visible: true }).all()) {
       const box = await svg.boundingBox();
-      expect([box?.width, box?.height]).toEqual([16, 16]);
+      expect([box?.width, box?.height]).toEqual([root, root]);
     }
     const sticky = page.getByRole("link", { name: "Join waitlist" }).last();
     await expect(sticky.locator("svg[data-icon=how_to_vote]")).toHaveAttribute("data-variant", "filled");

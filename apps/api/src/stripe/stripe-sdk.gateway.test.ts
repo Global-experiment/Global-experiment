@@ -65,6 +65,11 @@ describe("StripeSdkGateway", () => {
       "payment_method_types[0]": "card",
       "managed_payments[enabled]": "false",
       "adaptive_pricing[enabled]": "false",
+      "billing_address_collection": "auto",
+      "phone_number_collection[enabled]": "false",
+      "tax_id_collection[enabled]": "false",
+      "consent_collection[terms_of_service]": "none",
+      "wallet_options[link][display]": "never",
       success_url: checkoutInput.successUrl,
       cancel_url: checkoutInput.cancelUrl,
       locale: "auto",
@@ -86,6 +91,15 @@ describe("StripeSdkGateway", () => {
       "subscription_data[metadata][kind]": "donation",
       "subscription_data[description]": "Monthly donation to the Global Experiment",
     });
+    // The same minimal data collection as one-off donations; no shipping address, no custom fields.
+    expect(params).toMatchObject({
+      "billing_address_collection": "auto",
+      "phone_number_collection[enabled]": "false",
+      "tax_id_collection[enabled]": "false",
+      "consent_collection[terms_of_service]": "none",
+      "wallet_options[link][display]": "never",
+    });
+    for (const key of Object.keys(params)) expect(key).not.toMatch(/^(shipping_address_collection|custom_fields|name_collection|consent_collection[promotions])/);
     // One-off-only parameters are not sent (Stripe rejects them in subscription mode).
     for (const key of ["submit_type", "customer_creation", "payment_intent_data[metadata][kind]"]) expect(params).not.toHaveProperty(key);
   });

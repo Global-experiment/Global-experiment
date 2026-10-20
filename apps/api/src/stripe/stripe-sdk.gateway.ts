@@ -108,6 +108,17 @@ export class StripeSdkGateway implements StripeGateway {
           // The donor pays in the currency they chose (EUR, USD or CHF — the ledger's
           // currencies), never a local-currency conversion offered by Adaptive Pricing.
           adaptive_pricing: { enabled: false },
+          // As little data as Stripe allows (client review 2026-10-21): the billing address only when the
+          // payment method needs it, no phone, no tax ID, no terms checkbox. Not sent, because off is
+          // Stripe's default and it refuses them as "off": name_collection (only accepted to turn a name
+          // field on) and consent_collection.promotions (not offered to Swiss accounts). No shipping
+          // address and no custom fields (not requested). Stripe always asks for the email.
+          billing_address_collection: "auto",
+          phone_number_collection: { enabled: false },
+          tax_id_collection: { enabled: false },
+          consent_collection: { terms_of_service: "none" },
+          // No "Save my information with Link" box: it is ticked by default and asks for a phone number.
+          wallet_options: { link: { display: "never" } },
           success_url: input.successUrl,
           cancel_url: input.cancelUrl,
           locale: "auto",
