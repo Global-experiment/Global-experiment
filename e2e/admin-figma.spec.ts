@@ -250,7 +250,7 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(/\/admin\/people$/);
     // Only the existing modules link anywhere.
     const links = await nav(page).getByRole("link").evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
-    expect(links).toEqual(["/admin/treasury", "/admin/people", "/admin/organizations", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
+    expect(links).toEqual(["/admin/home", "/admin/documentation", "/admin/treasury", "/admin/people", "/admin/organizations", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
     // Decision 16: these stay "Coming soon" until built.
     for (const label of ["Waitlist", "Messages", "Cloud", "History", "Analytics", "Technical dashboard", "Emails", "Contracting"]) {
       await expect(nav(page).locator("[data-coming-soon]").filter({ hasText: label }), label).toHaveCount(1);

@@ -98,7 +98,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|treasury-toolbar|donate-embedded).spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -115,7 +115,7 @@ export default defineConfig({
     {
       name: "chromium-figma",
       dependencies: ["chromium"],
-      testMatch: /(admin|donate|treasury)-figma.spec.ts/,
+      testMatch: /((admin|donate|treasury)-figma|admin-public-pages).spec.ts/,
       use: { browserName: "chromium" },
     },
     // Last: the admin Treasury suite publishes, unpublishes and reviews entries

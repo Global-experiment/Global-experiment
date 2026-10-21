@@ -54,7 +54,7 @@ export function TreasuryRecord({ id }: { id: string }) {
 
   if (entry.error || !entry.data) {
     return (
-      <RecordLayout backHref="/admin/treasury" backLabel="Treasury" title="">
+      <RecordLayout backHref="/admin/treasury/manage" backLabel="Treasury" title="">
         {entry.error ? (
           <StatusMessage tone="error">{entry.error.status === 404 ? "This Treasury entry doesn’t exist." : entry.error.message}</StatusMessage>
         ) : (
@@ -144,7 +144,7 @@ export function TreasuryRecord({ id }: { id: string }) {
 
   return (
     <form onSubmit={save} noValidate className="h-full">
-      <RecordLayout backHref="/admin/treasury" backLabel="Treasury" title={`${formatEntryNumber(loaded.number)} · ${loaded.name}`} panel={panel}>
+      <RecordLayout backHref="/admin/treasury/manage" backLabel="Treasury" title={`${formatEntryNumber(loaded.number)} · ${loaded.name}`} panel={panel}>
         {notion ? (
           <div data-managed="notion" className="flex flex-wrap items-center gap-2 pl-1 text-body">
             <span className="inline-flex h-6 items-center gap-1 rounded-control px-2 font-bold ring-1 ring-line">

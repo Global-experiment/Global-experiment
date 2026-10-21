@@ -30,8 +30,8 @@ export const ADMIN_MODULES: AdminSection[] = [
   {
     section: "Communication",
     modules: [
-      { key: "home", label: "Home", icon: "home", status: "coming_soon" },
-      { key: "documentation", label: "Documentation", icon: "insert_drive_file", status: "coming_soon" },
+      { key: "home", label: "Home", icon: "home", status: "live", href: "/admin/home" },
+      { key: "documentation", label: "Documentation", icon: "insert_drive_file", status: "live", href: "/admin/documentation" },
       { key: "treasury", label: "Treasury", icon: "toll", status: "live", href: "/admin/treasury" },
     ],
   },

@@ -33,6 +33,7 @@ export function ArticleAccordionItem({
   expanded,
   onToggle,
   highlight,
+  leadingAction,
 }: {
   article: DocumentationArticleSummary;
   body: ArticleBody;
@@ -40,6 +41,8 @@ export function ArticleAccordionItem({
   onToggle: () => void;
   /** Active search query: every occurrence in title, tags and body is marked. */
   highlight?: string;
+  /** An action before Send feedback and Report issue (the admin's "Administrate"). */
+  leadingAction?: React.ReactNode;
 }) {
   const panelId = useId();
   const anchorHref = documentationAnchorHref(article.slug);
@@ -102,7 +105,7 @@ export function ArticleAccordionItem({
           ) : (
             <DocumentationContent blocks={body} headingLevelOffset={1} highlight={highlight} />
           )}
-          <FeedbackIssueActions className="mt-5" source={anchorHref} />
+          <FeedbackIssueActions className="mt-5" source={anchorHref} leading={leadingAction} />
         </div>
       </div>
     </div>

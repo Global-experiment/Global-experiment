@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
 
 /**
@@ -9,11 +10,13 @@ import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
  * (new_releases). Each opens its qualification sheet over this page and
  * carries the page as the report's source (client: the admin needs that
  * context) — the current page by default, or an explicit one (e.g. a
- * specific Documentation article anchor).
+ * specific Documentation article anchor). `leading` puts another action
+ * first (the admin's "Administrate", admin-desktop.pdf p8).
  */
-export function FeedbackIssueActions({ className = "", source }: { className?: string; source?: string }) {
+export function FeedbackIssueActions({ className = "", source, leading }: { className?: string; source?: string; leading?: ReactNode }) {
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
+      {leading}
       <ReportLaunchButton kind="feedback" source={source} size="compact" icon="lightbulb">
         Send feedback
       </ReportLaunchButton>
