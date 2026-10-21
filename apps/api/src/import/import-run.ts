@@ -1,4 +1,6 @@
 import type { Database } from "../common/database/database.module.js";
+import { recordAuditEvent } from "../audit/audit.service.js";
+import { AUTOMATION } from "../audit/audit.types.js";
 import { importRuns } from "./import.schema.js";
 
 type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
@@ -64,6 +66,15 @@ export async function runImport<Plan>(db: Database, spec: ImportRunSpec<Plan>): 
       .insert(importRuns)
       .values({ kind: spec.kind, mode, startedAt, finishedAt: new Date(), counts, issues, triggeredBy: spec.triggeredBy })
       .returning({ id: importRuns.id });
+    // Every run is logged (imports are writes, even a dry run's record).
+    await recordAuditEvent(executor, {
+      entityType: "import_run",
+      entityId: run!.id,
+      action: "created",
+      actor: AUTOMATION,
+      source: "import",
+      meta: { label: `${spec.kind} import · ${mode.replace("_", " ")}`, triggeredBy: spec.triggeredBy },
+    });
     return run!.id;
   };
 

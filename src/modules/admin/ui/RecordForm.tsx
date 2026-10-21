@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useId, useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
+import { formatDateOnly, formatFullDateTime, formatReference } from "@/shared/format/dates";
+import { useViewerTimeZone } from "@/shared/format/Timestamp";
+import { Icon } from "@/shared/ui/icons";
 import { AdminIcon, type AdminIconName } from "./adminIcons";
 import { focusRing } from "./controls";
 
@@ -11,9 +14,11 @@ import { focusRing } from "./controls";
  * - a 40px header: back arrow 8px in, the bold title 8px after it;
  * - the properties column: rows 32px tall and 16px apart, a 168px label
  *   cell (type glyph 4px in, muted label at 24px) and the value from there;
- *   every value is a visible field (client, 2026-10-14: Figma's borderless
- *   values didn't read as editable) — a 1px rule, lighter on hover, white
- *   when focused; single-line fields stop at 560px, notes at 720px; limits
+ *   values are the design-system fields of the updated Figma (p14 and the
+ *   person-record prototype, 2026-10-21): the value as plain text, with its
+ *   placeholder ("Enter a number", "Search", "Set a date") when empty. They
+ *   still read as editable (client, 2026-10-14): a 1px rule on hover, white
+ *   when focused. Single-line fields stop at 560px, notes at 720px; limits
  *   ("up to 10 expertise") as muted help text under the field;
  * - a right panel (400px at 1440, narrowing to 280px at 1024) behind a 1px
  *   rule: 34px meta rows (label at 24px, value at 176px), then full-width
@@ -21,8 +26,8 @@ import { focusRing } from "./controls";
  */
 
 /** The field look shared by every record value (no text colour or width: callers add them). */
-const recordField =
-  "h-8 w-full rounded-control bg-transparent px-2 text-body font-normal outline-none ring-1 ring-line placeholder:text-text-muted hover:ring-text-muted focus-visible:ring-text-primary";
+export const recordField =
+  "h-8 w-full rounded-control bg-transparent px-2 text-body font-normal outline-none ring-1 ring-transparent placeholder:text-text-muted hover:ring-line focus-visible:ring-text-primary";
 
 /** A single-line value: a visible field, text at 8px, at most 560px wide. */
 export const recordInput = `${recordField} max-w-[560px] text-text-primary`;
@@ -75,7 +80,7 @@ export function DateField({
     }
   };
   return (
-    <span className="relative flex w-full max-w-[240px] items-center">
+    <span className="relative flex w-full max-w-[280px] items-center">
       {/* The real date input: invisible, under the button, so the picker opens right there. */}
       <input
         ref={picker}
@@ -90,13 +95,13 @@ export function DateField({
         id={id}
         type="button"
         onClick={open}
-        aria-label={`${label}: ${value ? formatCalendarDay(value) : "not set"}. Choose a date`}
+        aria-label={`${label}: ${value ? formatDateOnly(value) : "not set"}. Set a date`}
         className={`${recordField} relative flex cursor-pointer items-center gap-2 text-left ${value ? "text-text-primary" : "text-text-muted"}`}
       >
+        <AdminIcon name="calendar" />
         <span data-date-value className="flex-1 truncate">
-          {value ? formatCalendarDay(value) : "Choose a date"}
+          {value ? formatDateOnly(value) : "Set a date"}
         </span>
-        <AdminIcon name="schedule" className="text-text-muted" />
       </button>
       {value ? (
         <button
@@ -108,6 +113,82 @@ export function DateField({
           <AdminIcon name="close" />
         </button>
       ) : null}
+    </span>
+  );
+}
+
+/**
+ * A date AND time in the record's field style (the follow-up): the value in
+ * the client's detail format and the viewer's time zone ("October 14 at
+ * 9:24 PM"; the year on hover), or "Set a date"; the native picker works in
+ * the browser's time zone. `value` is a datetime-local string or "".
+ */
+export function DateTimeField({ id, value, onChange, label }: { id: string; value: string; onChange: (value: string) => void; label: string }) {
+  const picker = useRef<HTMLInputElement>(null);
+  const timeZone = useViewerTimeZone();
+  const instant = value ? new Date(value) : null;
+  const shown = instant && !Number.isNaN(instant.getTime()) ? formatFullDateTime(instant, timeZone) : null;
+  return (
+    <span className="relative flex w-full max-w-[280px] items-center">
+      <input
+        ref={picker}
+        type="datetime-local"
+        tabIndex={-1}
+        aria-hidden="true"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="pointer-events-none absolute inset-0 opacity-0 [color-scheme:dark]"
+      />
+      <button
+        id={id}
+        type="button"
+        onClick={() => {
+          try {
+            picker.current?.showPicker();
+          } catch {
+            picker.current?.focus();
+          }
+        }}
+        title={instant ? formatReference(instant, timeZone) : undefined}
+        aria-label={`${label}: ${shown ?? "not set"}. Set a date and time`}
+        className={`${recordField} relative flex cursor-pointer items-center gap-2 text-left ${shown ? "text-text-primary" : "text-text-muted"}`}
+      >
+        <AdminIcon name="calendar" />
+        <span data-date-value className="flex-1 truncate">
+          {shown ?? "Set a date"}
+        </span>
+      </button>
+      {value ? (
+        <button type="button" onClick={() => onChange("")} aria-label={`Clear ${label}`} className={`relative ml-1 shrink-0 cursor-pointer rounded-control text-text-muted hover:text-text-primary ${focusRing}`}>
+          <AdminIcon name="close" />
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+/** A checkbox value (prototype: "☑ Do not contact"): the box, then its label, 24px apart from the row's edge. */
+export function CheckboxField({ id, checked, onChange, children }: { id: string; checked: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
+  return (
+    <label htmlFor={id} className="flex h-8 w-fit cursor-pointer items-center gap-2 rounded-control px-2 text-body text-text-primary ring-1 ring-transparent hover:ring-line has-[:focus-visible]:ring-text-primary">
+      <input id={id} type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="peer sr-only" />
+      <Icon name={checked ? "check_box" : "check_box_outline_blank"} />
+      {children}
+    </label>
+  );
+}
+
+/** A read-only value (Person ID, Updated, Created…). */
+export function ReadOnlyValue({ children }: { children: ReactNode }) {
+  return <span className="flex h-8 items-center px-2 text-body text-text-primary">{children}</span>;
+}
+
+/** An admin as the record shows them (Last edited by, Created by): the avatar disc and the bold name. */
+export function PersonChip({ name }: { name: string }) {
+  return (
+    <span className="flex h-8 items-center gap-2 px-2 text-meta font-bold text-text-primary">
+      <span aria-hidden="true" className="size-4 rounded-full bg-avatar" />
+      {name}
     </span>
   );
 }
@@ -179,19 +260,20 @@ export function PropertyRow({
   const Label = htmlFor ? "label" : "span";
   return (
     <div className="grid grid-cols-[168px_minmax(0,1fr)] items-start">
-      <div>
-        <Label id={`${id}-label`} {...(htmlFor ? { htmlFor } : {})} className="flex h-8 items-center gap-1 pl-1 text-body text-text-muted">
+      <div className="pr-2">
+        <Label id={`${id}-label`} {...(htmlFor ? { htmlFor } : {})} className="flex min-h-8 items-center gap-1 pl-1 text-body text-text-muted">
           <AdminIcon name={icon} />
           {label}
         </Label>
-      </div>
-      <div className="flex min-h-8 min-w-0 flex-col justify-center text-body">
-        {children}
         {hint ? (
-          <p data-hint className="mt-1 px-0.5 text-meta text-text-muted">
+          // Prototype: the limit in a small box under the label ("People can have up to 5 organizations.").
+          <p data-hint className="mt-2 rounded-control bg-surface-raised px-2 py-1 text-meta text-text-primary">
             {hint}
           </p>
         ) : null}
+      </div>
+      <div className="flex min-h-8 min-w-0 flex-col justify-center text-body">
+        {children}
         {error ? (
           <p role="alert" className="mt-1 px-2 text-meta text-text-primary">
             {error}

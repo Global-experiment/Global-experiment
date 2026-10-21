@@ -96,6 +96,9 @@ const VIEWS: { id: string; label: string; filters: FilterRule[] }[] = [
   { id: "test", label: "Test mode", filters: [{ field: "mode", operator: "is", value: "test" }] },
 ];
 
+/** Archived entries (decision 12): a view of its own, not a filter (listState's `view`). */
+const ARCHIVED = { id: "archived", label: "Archived" };
+
 const key = (filters: readonly FilterRule[]) => filters.map(serializeFilter).sort().join("&");
 
 function TreasuryViews() {
@@ -103,16 +106,17 @@ function TreasuryViews() {
   const pathname = usePathname();
   const params = useSearchParams();
   const current = key(params.getAll("filter").map(parseFilter).filter((rule): rule is FilterRule => rule !== undefined));
-  const active = VIEWS.find((view) => key(view.filters) === current)?.id ?? "";
+  const archived = params.get("view") === "archived";
+  const active = archived ? (current === "" ? ARCHIVED.id : "") : (VIEWS.find((view) => key(view.filters) === current)?.id ?? "");
   const select = (id: string) => {
-    const view = VIEWS.find((candidate) => candidate.id === id)!;
     const next = new URLSearchParams();
-    for (const rule of view.filters) next.append("filter", serializeFilter(rule));
+    if (id === ARCHIVED.id) next.set("view", "archived");
+    else for (const rule of VIEWS.find((candidate) => candidate.id === id)!.filters) next.append("filter", serializeFilter(rule));
     for (const sort of params.getAll("sort")) next.append("sort", sort);
     const query = next.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
   };
-  return <ViewTabs views={VIEWS} current={active} onSelect={select} maxVisible={6} />;
+  return <ViewTabs views={[...VIEWS, ARCHIVED]} current={active} onSelect={select} maxVisible={7} />;
 }
 
 /**

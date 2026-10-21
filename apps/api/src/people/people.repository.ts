@@ -15,40 +15,49 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { CLOCK, zurichDate, type Clock } from "../common/clock/clock.js";
+import type { Executor } from "../audit/audit.service.js";
+import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { assertBelowLimit, LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
 import { expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
+import { treasuryEntries } from "../treasury/treasury.schema.js";
 import type {
   CreatePersonRequest,
   EntityRef,
+  ExpenseRef,
   PeopleListQuery,
   PeopleOptionsDto,
   PeopleSortField,
   PersonCompletenessField,
   PersonDto,
   UpdatePersonRequest,
+  VocabularyEntry,
 } from "./people.contracts.js";
-import { people, peopleExpertise, peopleOrganizations, personSources, personStates } from "./people.schema.js";
-
-type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
+import {
+  contactChannels,
+  people,
+  peopleExpertise,
+  peopleOrganizations,
+  personContactChannels,
+  personSources,
+  personStates,
+} from "./people.schema.js";
 
 /**
- * Overdue follow-up: the next follow-up date is before today in Zurich
- * (`today` = zurichDate(clock()), not the server's UTC date), and the
+ * Overdue follow-up: the next follow-up (date and time) has passed, and the
  * person is neither Rejected nor Do not contact.
  */
-const overdue = (today: string) =>
-  sql`coalesce(${people.nextFollowupOn} < ${today}::date and ${people.stateKey} is distinct from 'rejected' and not ${people.doNotContact}, false)`;
+const overdue = (now: Date) =>
+  sql`coalesce(${people.nextFollowupAt} < ${now.toISOString()}::timestamptz and ${people.stateKey} is distinct from 'rejected' and not ${people.doNotContact}, false)`;
 
 const hasAnyExpertise = sql`exists (select 1 from ${peopleExpertise} where ${peopleExpertise.personId} = ${people.id})`;
 /** Incomplete: any of PERSON_COMPLETENESS empty. */
 const incomplete = sql`(${people.stateKey} is null or ${people.sourceKey} is null or ${people.personalNote} is null or not ${hasAnyExpertise})`;
 
-const personColumns = (today: string) => ({
+const personColumns = (now: Date) => ({
   id: people.id,
   personNumber: people.personNumber,
   notionPageId: people.notionPageId,
@@ -65,17 +74,23 @@ const personColumns = (today: string) => ({
   linkedin: people.linkedin,
   x: people.x,
   otherContact: people.otherContact,
+  otherSocials: people.otherSocials,
   wiseRecipientId: people.wiseRecipientId,
-  nextFollowupOn: people.nextFollowupOn,
+  nextFollowupAt: people.nextFollowupAt,
+  firstContactOn: people.firstContactOn,
+  lastContactOn: people.lastContactOn,
+  aiRelevanceScore: people.aiRelevanceScore,
+  relevanceScore: people.relevanceScore,
   lastFollowupAtLegacy: people.lastFollowupAtLegacy,
-  followUpOverdue: sql<boolean>`${overdue(today)}`,
+  followUpOverdue: sql<boolean>`${overdue(now)}`,
+  archivedAt: people.archivedAt,
   createdAt: people.createdAt,
   updatedAt: people.updatedAt,
 });
 
-function selectPeople(db: Executor, today: string) {
+function selectPeople(db: Executor, now: Date) {
   return db
-    .select(personColumns(today))
+    .select(personColumns(now))
     .from(people)
     .leftJoin(personStates, eq(personStates.key, people.stateKey))
     .leftJoin(personSources, eq(personSources.key, people.sourceKey));
@@ -92,7 +107,7 @@ function orderBy(sorts: readonly Sort<PeopleSortField>[]): SQL[] {
     source: sql`${personSources.sortOrder}`,
     created: sql`${people.createdAt}`,
     updated: sql`${people.updatedAt}`,
-    next_followup: sql`${people.nextFollowupOn}`,
+    next_followup: sql`${people.nextFollowupAt}`,
   };
   return [
     ...sorts.map(({ field, direction }) =>
@@ -133,19 +148,41 @@ export function personMissing(
   return missing;
 }
 
+/** The person columns copied by Duplicate (never the Notion page, the number, the legacy value or the archive state). */
+const COPIED = [
+  "name",
+  "stateKey",
+  "sourceKey",
+  "personalNote",
+  "doNotContact",
+  "email",
+  "phone",
+  "website",
+  "linkedin",
+  "x",
+  "otherContact",
+  "otherSocials",
+  "wiseRecipientId",
+  "nextFollowupAt",
+  "firstContactOn",
+  "lastContactOn",
+  "aiRelevanceScore",
+  "relevanceScore",
+] as const;
+
+/**
+ * People storage. Writes take the caller's transaction (`tx`): the service
+ * reads the record before and after and records the audit event in the
+ * same transaction.
+ */
 @Injectable()
 export class PeopleRepository {
   constructor(@Inject(DATABASE) private readonly db: Database, @Inject(CLOCK) private readonly clock: Clock) {}
 
-  /** Today in Zurich (YYYY-MM-DD), for the overdue rule. */
-  private today(): string {
-    return zurichDate(this.clock());
-  }
-
   async list(query: PeopleListQuery): Promise<Page<PersonDto>> {
     const where = this.whereClause(query);
     const [rows, [count]] = await Promise.all([
-      selectPeople(this.db, this.today())
+      selectPeople(this.db, this.clock())
         .where(where)
         .orderBy(...orderBy(query.sort))
         .limit(query.pageSize)
@@ -161,7 +198,7 @@ export class PeopleRepository {
   }
 
   async findById(id: string, db: Executor = this.db): Promise<PersonDto | undefined> {
-    const rows = await selectPeople(db, this.today()).where(eq(people.id, id)).limit(1);
+    const rows = await selectPeople(db, this.clock()).where(eq(people.id, id)).limit(1);
     const [person] = await this.hydrate(rows, db);
     return person;
   }
@@ -171,12 +208,13 @@ export class PeopleRepository {
     return row !== undefined;
   }
 
-  async options(): Promise<PeopleOptionsDto> {
-    const [states, sources] = await Promise.all([
+  async options(): Promise<Omit<PeopleOptionsDto, "aiScoreReadOnly">> {
+    const [states, sources, channels] = await Promise.all([
       this.db.select({ key: personStates.key, label: personStates.label }).from(personStates).orderBy(asc(personStates.sortOrder)),
       this.db.select({ key: personSources.key, label: personSources.label }).from(personSources).orderBy(asc(personSources.sortOrder)),
+      this.db.select({ key: contactChannels.key, label: contactChannels.label }).from(contactChannels).orderBy(asc(contactChannels.sortOrder)),
     ]);
-    return { states, sources };
+    return { states, sources, contactChannels: channels };
   }
 
   async vocabularyExists(kind: "state" | "source", key: string): Promise<boolean> {
@@ -185,102 +223,131 @@ export class PeopleRepository {
     return row !== undefined;
   }
 
-  async create(input: CreatePersonRequest): Promise<PersonDto> {
-    return this.db.transaction(async (tx) => {
-      const [created] = await tx
-        .insert(people)
-        .values({ ...this.columnValues(input), name: input.name })
-        .returning({ id: people.id });
-      const id = created!.id;
-      await this.replaceRelations(tx, id, input);
-      return (await this.findById(id, tx))!;
-    });
+  async countContactChannels(keys: readonly string[]): Promise<number> {
+    if (keys.length === 0) return 0;
+    const rows = await this.db.select({ key: contactChannels.key }).from(contactChannels).where(inArray(contactChannels.key, [...keys]));
+    return rows.length;
   }
 
-  async update(id: string, input: UpdatePersonRequest): Promise<PersonDto | undefined> {
-    return this.db.transaction(async (tx) => {
-      const [updated] = await tx
-        .update(people)
-        .set({ ...this.columnValues(input), updatedAt: new Date() })
-        .where(eq(people.id, id))
-        .returning({ id: people.id });
-      if (!updated) return undefined;
-      await this.replaceRelations(tx, id, input);
-      return this.findById(id, tx);
-    });
+  /** The expenses among `ids` and their current recipients (for validating a link). */
+  async expensesById(ids: readonly string[]) {
+    if (ids.length === 0) return [];
+    return this.db
+      .select({
+        id: treasuryEntries.id,
+        entryType: treasuryEntries.entryType,
+        recipientPersonId: treasuryEntries.recipientPersonId,
+        recipientOrganizationId: treasuryEntries.recipientOrganizationId,
+        reviewStatusKey: treasuryEntries.reviewStatusKey,
+      })
+      .from(treasuryEntries)
+      .where(inArray(treasuryEntries.id, [...ids]));
+  }
+
+  async create(tx: Executor, input: CreatePersonRequest): Promise<string> {
+    const [created] = await tx
+      .insert(people)
+      .values({ ...this.columnValues(input), name: input.name })
+      .returning({ id: people.id });
+    const id = created!.id;
+    await this.replaceRelations(tx, id, input);
+    return id;
+  }
+
+  async update(tx: Executor, id: string, input: UpdatePersonRequest): Promise<boolean> {
+    const [updated] = await tx
+      .update(people)
+      .set({ ...this.columnValues(input), updatedAt: this.clock() })
+      .where(eq(people.id, id))
+      .returning({ id: people.id });
+    if (!updated) return false;
+    await this.replaceRelations(tx, id, input);
+    return true;
   }
 
   /**
    * A new person with the same values and links, but no Notion page id
-   * (it isn't that Notion page) and a fresh Person ID. The legacy
-   * follow-up value stays with the original. Undefined if `id` is unknown.
+   * (it isn't that Notion page) and a fresh Person ID. Expenses keep their
+   * one recipient (the original). Undefined if `id` is unknown.
    */
-  async duplicate(id: string): Promise<PersonDto | undefined> {
-    return this.db.transaction(async (tx) => {
-      const [source] = await tx.select().from(people).where(eq(people.id, id)).limit(1);
-      if (!source) return undefined;
-      const { name, stateKey, sourceKey, personalNote, doNotContact, email, phone, website, linkedin, x, otherContact, wiseRecipientId, nextFollowupOn } =
-        source;
-      const [created] = await tx
-        .insert(people)
-        .values({ name, stateKey, sourceKey, personalNote, doNotContact, email, phone, website, linkedin, x, otherContact, wiseRecipientId, nextFollowupOn })
-        .returning({ id: people.id });
-      const copyId = created!.id;
-      const organizationLinks = await tx.select({ organizationId: peopleOrganizations.organizationId }).from(peopleOrganizations).where(eq(peopleOrganizations.personId, id));
-      if (organizationLinks.length > 0) await tx.insert(peopleOrganizations).values(organizationLinks.map((link) => ({ personId: copyId, ...link })));
-      const expertiseLinks = await tx.select({ expertiseId: peopleExpertise.expertiseId }).from(peopleExpertise).where(eq(peopleExpertise.personId, id));
-      if (expertiseLinks.length > 0) await tx.insert(peopleExpertise).values(expertiseLinks.map((link) => ({ personId: copyId, ...link })));
-      return (await this.findById(copyId, tx))!;
-    });
+  async duplicate(tx: Executor, id: string): Promise<string | undefined> {
+    const [source] = await tx.select().from(people).where(eq(people.id, id)).limit(1);
+    if (!source) return undefined;
+    const values = Object.fromEntries(COPIED.map((key) => [key, source[key]])) as Pick<typeof source, (typeof COPIED)[number]>;
+    const [created] = await tx.insert(people).values(values).returning({ id: people.id });
+    const copyId = created!.id;
+    const organizationLinks = await tx.select({ organizationId: peopleOrganizations.organizationId }).from(peopleOrganizations).where(eq(peopleOrganizations.personId, id));
+    if (organizationLinks.length > 0) await tx.insert(peopleOrganizations).values(organizationLinks.map((link) => ({ personId: copyId, ...link })));
+    const expertiseLinks = await tx.select({ expertiseId: peopleExpertise.expertiseId }).from(peopleExpertise).where(eq(peopleExpertise.personId, id));
+    if (expertiseLinks.length > 0) await tx.insert(peopleExpertise).values(expertiseLinks.map((link) => ({ personId: copyId, ...link })));
+    const channelLinks = await tx.select({ channelKey: personContactChannels.channelKey }).from(personContactChannels).where(eq(personContactChannels.personId, id));
+    if (channelLinks.length > 0) await tx.insert(personContactChannels).values(channelLinks.map((link) => ({ personId: copyId, ...link })));
+    return copyId;
   }
 
   /**
    * Idempotent: linking twice is a no-op. Callers check that both sides
    * exist first. A new link past the person's cap is refused (400).
    */
-  async link(kind: "organization" | "expertise", personId: string, targetId: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      if (kind === "organization") {
-        await assertBelowLimit(
-          tx,
-          peopleOrganizations,
-          peopleOrganizations.personId,
-          personId,
-          and(eq(peopleOrganizations.personId, personId), eq(peopleOrganizations.organizationId, targetId))!,
-          RELATION_LIMITS.organizationsPerPerson,
-          { path: "organizationIds", message: LIMIT_MESSAGES.personOrganizations },
-        );
-        await tx.insert(peopleOrganizations).values({ personId, organizationId: targetId }).onConflictDoNothing();
-      } else {
-        await assertBelowLimit(
-          tx,
-          peopleExpertise,
-          peopleExpertise.personId,
-          personId,
-          and(eq(peopleExpertise.personId, personId), eq(peopleExpertise.expertiseId, targetId))!,
-          RELATION_LIMITS.expertise,
-          { path: "expertiseIds", message: LIMIT_MESSAGES.personExpertise },
-        );
-        await tx.insert(peopleExpertise).values({ personId, expertiseId: targetId }).onConflictDoNothing();
-      }
-      await tx.update(people).set({ updatedAt: new Date() }).where(eq(people.id, personId));
-    });
+  async link(tx: Executor, kind: "organization" | "expertise", personId: string, targetId: string): Promise<void> {
+    if (kind === "organization") {
+      await assertBelowLimit(
+        tx as Database,
+        peopleOrganizations,
+        peopleOrganizations.personId,
+        personId,
+        and(eq(peopleOrganizations.personId, personId), eq(peopleOrganizations.organizationId, targetId))!,
+        RELATION_LIMITS.organizationsPerPerson,
+        { path: "organizationIds", message: LIMIT_MESSAGES.personOrganizations },
+      );
+      await tx.insert(peopleOrganizations).values({ personId, organizationId: targetId }).onConflictDoNothing();
+    } else {
+      await assertBelowLimit(
+        tx as Database,
+        peopleExpertise,
+        peopleExpertise.personId,
+        personId,
+        and(eq(peopleExpertise.personId, personId), eq(peopleExpertise.expertiseId, targetId))!,
+        RELATION_LIMITS.expertise,
+        { path: "expertiseIds", message: LIMIT_MESSAGES.personExpertise },
+      );
+      await tx.insert(peopleExpertise).values({ personId, expertiseId: targetId }).onConflictDoNothing();
+    }
+    await tx.update(people).set({ updatedAt: this.clock() }).where(eq(people.id, personId));
   }
 
-  async unlink(kind: "organization" | "expertise", personId: string, targetId: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      const removed =
-        kind === "organization"
-          ? await tx
-              .delete(peopleOrganizations)
-              .where(and(eq(peopleOrganizations.personId, personId), eq(peopleOrganizations.organizationId, targetId)))
-              .returning({ personId: peopleOrganizations.personId })
-          : await tx
-              .delete(peopleExpertise)
-              .where(and(eq(peopleExpertise.personId, personId), eq(peopleExpertise.expertiseId, targetId)))
-              .returning({ personId: peopleExpertise.personId });
-      if (removed.length > 0) await tx.update(people).set({ updatedAt: new Date() }).where(eq(people.id, personId));
-    });
+  async unlink(tx: Executor, kind: "organization" | "expertise", personId: string, targetId: string): Promise<void> {
+    const removed =
+      kind === "organization"
+        ? await tx
+            .delete(peopleOrganizations)
+            .where(and(eq(peopleOrganizations.personId, personId), eq(peopleOrganizations.organizationId, targetId)))
+            .returning({ personId: peopleOrganizations.personId })
+        : await tx
+            .delete(peopleExpertise)
+            .where(and(eq(peopleExpertise.personId, personId), eq(peopleExpertise.expertiseId, targetId)))
+            .returning({ personId: peopleExpertise.personId });
+    if (removed.length > 0) await tx.update(people).set({ updatedAt: this.clock() }).where(eq(people.id, personId));
+  }
+
+  /** Archive (by `adminId`) or restore (null). False when the person doesn't exist. */
+  async setArchived(tx: Executor, id: string, adminId: string | null): Promise<boolean> {
+    const [row] = await tx
+      .update(people)
+      .set(adminId ? { archivedAt: this.clock(), archivedById: adminId } : { archivedAt: null, archivedById: null })
+      .where(eq(people.id, id))
+      .returning({ id: people.id });
+    return row !== undefined;
+  }
+
+  /** Permanent delete: links go with the person (cascade); expenses paid to them block it (their recipient). */
+  async delete(tx: Executor, id: string): Promise<void> {
+    await tx.delete(people).where(eq(people.id, id));
+  }
+
+  async hasExpenses(id: string): Promise<boolean> {
+    const [row] = await this.db.select({ id: treasuryEntries.id }).from(treasuryEntries).where(eq(treasuryEntries.recipientPersonId, id)).limit(1);
+    return row !== undefined;
   }
 
   private columnValues(input: UpdatePersonRequest) {
@@ -296,8 +363,13 @@ export class PeopleRepository {
     if (input.linkedin !== undefined) values.linkedin = input.linkedin;
     if (input.x !== undefined) values.x = input.x;
     if (input.otherContact !== undefined) values.otherContact = input.otherContact;
+    if (input.otherSocials !== undefined) values.otherSocials = input.otherSocials;
     if (input.wiseRecipientId !== undefined) values.wiseRecipientId = input.wiseRecipientId;
-    if (input.nextFollowupOn !== undefined) values.nextFollowupOn = input.nextFollowupOn;
+    if (input.nextFollowupAt !== undefined) values.nextFollowupAt = input.nextFollowupAt === null ? null : new Date(input.nextFollowupAt);
+    if (input.firstContactOn !== undefined) values.firstContactOn = input.firstContactOn;
+    if (input.lastContactOn !== undefined) values.lastContactOn = input.lastContactOn;
+    if (input.aiRelevanceScore !== undefined) values.aiRelevanceScore = input.aiRelevanceScore;
+    if (input.relevanceScore !== undefined) values.relevanceScore = input.relevanceScore;
     return values;
   }
 
@@ -306,9 +378,7 @@ export class PeopleRepository {
     if (input.organizationIds !== undefined) {
       await tx.delete(peopleOrganizations).where(eq(peopleOrganizations.personId, personId));
       if (input.organizationIds.length > 0) {
-        await tx
-          .insert(peopleOrganizations)
-          .values(input.organizationIds.map((organizationId) => ({ personId, organizationId })));
+        await tx.insert(peopleOrganizations).values(input.organizationIds.map((organizationId) => ({ personId, organizationId })));
       }
     }
     if (input.expertiseIds !== undefined) {
@@ -317,10 +387,37 @@ export class PeopleRepository {
         await tx.insert(peopleExpertise).values(input.expertiseIds.map((expertiseId) => ({ personId, expertiseId })));
       }
     }
+    if (input.contactChannelKeys !== undefined) {
+      await tx.delete(personContactChannels).where(eq(personContactChannels.personId, personId));
+      if (input.contactChannelKeys.length > 0) {
+        await tx.insert(personContactChannels).values(input.contactChannelKeys.map((channelKey) => ({ personId, channelKey })));
+      }
+    }
+    if (input.expenseIds !== undefined) {
+      // Expenses no longer listed lose this recipient; listed ones get it (the service checked they're free).
+      await tx
+        .update(treasuryEntries)
+        .set({ recipientPersonId: null, updatedAt: this.clock() })
+        .where(
+          and(
+            eq(treasuryEntries.recipientPersonId, personId),
+            input.expenseIds.length > 0 ? not(inArray(treasuryEntries.id, input.expenseIds)) : undefined,
+          ),
+        );
+      if (input.expenseIds.length > 0) {
+        await tx
+          .update(treasuryEntries)
+          .set({ recipientPersonId: personId, updatedAt: this.clock() })
+          .where(and(inArray(treasuryEntries.id, input.expenseIds), isNull(treasuryEntries.recipientPersonId)));
+      }
+    }
   }
 
   private whereClause(query: PeopleListQuery): SQL | undefined {
     const conditions: (SQL | undefined)[] = [];
+    // Archived people are only in the "Archived" view (decision 12).
+    const archivedFilter = query.filters.find((filter) => filter.field === "archived");
+    conditions.push(archivedFilter?.value === true ? isNotNull(people.archivedAt) : isNull(people.archivedAt));
 
     if (query.search) {
       const pattern = containsPattern(query.search);
@@ -334,13 +431,14 @@ export class PeopleRepository {
           ilike(people.linkedin, pattern),
           ilike(people.x, pattern),
           ilike(people.otherContact, pattern),
+          ilike(people.otherSocials, pattern),
           hasOrganizationMatching(this.db, ilike(organizations.name, pattern)),
           hasExpertiseMatching(this.db, ilike(expertiseItems.name, pattern)),
         ),
       );
     }
 
-    const { anyOf, all } = groupFilters(query.filters);
+    const { anyOf, all } = groupFilters(query.filters.filter((filter) => filter.field !== "archived"));
     for (const [field, values] of anyOf) {
       const strings = values.map(String);
       if (field === "state") conditions.push(inArray(people.stateKey, strings));
@@ -361,7 +459,7 @@ export class PeopleRepository {
           ),
         );
       } else if (field === "follow_up") {
-        conditions.push(overdue(this.today()));
+        conditions.push(overdue(this.clock()));
       } else if (field === "completeness") {
         const wanted = new Set(strings);
         if (!(wanted.has("complete") && wanted.has("incomplete"))) conditions.push(wanted.has("incomplete") ? incomplete : sql`not ${incomplete}`);
@@ -435,13 +533,11 @@ export class PeopleRepository {
 
   private async hydrate(rows: PersonRow[], db: Executor = this.db): Promise<PersonDto[]> {
     const ids = rows.map((row) => row.id);
-    const [organizationsByPerson, expertiseByPerson] = await Promise.all([
+    const [organizationsByPerson, expertiseByPerson, channelsByPerson, expensesByPerson] = await Promise.all([
       this.organizationsFor(ids, db),
-      expertiseRefsByOwner(
-        db as Database,
-        { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId },
-        ids,
-      ),
+      expertiseRefsByOwner(db as Database, { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId }, ids),
+      this.channelsFor(ids, db),
+      this.expensesFor(ids, db),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -458,10 +554,18 @@ export class PeopleRepository {
       linkedin: row.linkedin,
       x: row.x,
       otherContact: row.otherContact,
+      otherSocials: row.otherSocials,
       wiseRecipientId: row.wiseRecipientId,
-      nextFollowupOn: row.nextFollowupOn,
+      nextFollowupAt: row.nextFollowupAt?.toISOString() ?? null,
+      firstContactOn: row.firstContactOn,
+      lastContactOn: row.lastContactOn,
+      aiRelevanceScore: row.aiRelevanceScore,
+      relevanceScore: row.relevanceScore,
+      contactChannels: channelsByPerson.get(row.id) ?? [],
+      expenses: expensesByPerson.get(row.id) ?? [],
       lastFollowupAtLegacy: row.lastFollowupAtLegacy?.toISOString() ?? null,
       followUpOverdue: row.followUpOverdue === true,
+      archivedAt: row.archivedAt?.toISOString() ?? null,
       missing: personMissing(row, (expertiseByPerson.get(row.id) ?? []).length > 0),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -479,9 +583,38 @@ export class PeopleRepository {
       .innerJoin(organizations, eq(organizations.id, peopleOrganizations.organizationId))
       .where(inArray(peopleOrganizations.personId, personIds))
       .orderBy(asc(sql`lower(${organizations.name})`), asc(organizations.id));
-    for (const row of rows) {
-      result.set(row.personId, [...(result.get(row.personId) ?? []), { id: row.id, name: row.name }]);
-    }
+    for (const row of rows) result.set(row.personId, [...(result.get(row.personId) ?? []), { id: row.id, name: row.name }]);
+    return result;
+  }
+
+  private async channelsFor(personIds: string[], db: Executor): Promise<Map<string, VocabularyEntry[]>> {
+    const result = new Map<string, VocabularyEntry[]>();
+    if (personIds.length === 0) return result;
+    const rows = await db
+      .select({ personId: personContactChannels.personId, key: contactChannels.key, label: contactChannels.label })
+      .from(personContactChannels)
+      .innerJoin(contactChannels, eq(contactChannels.key, personContactChannels.channelKey))
+      .where(inArray(personContactChannels.personId, personIds))
+      .orderBy(asc(contactChannels.sortOrder));
+    for (const row of rows) result.set(row.personId, [...(result.get(row.personId) ?? []), { key: row.key, label: row.label }]);
+    return result;
+  }
+
+  private async expensesFor(personIds: string[], db: Executor): Promise<Map<string, ExpenseRef[]>> {
+    const result = new Map<string, ExpenseRef[]>();
+    if (personIds.length === 0) return result;
+    const rows = await db
+      .select({
+        personId: treasuryEntries.recipientPersonId,
+        id: treasuryEntries.id,
+        entryNumber: treasuryEntries.entryNumber,
+        currency: treasuryEntries.currency,
+        grossAmount: treasuryEntries.grossAmount,
+      })
+      .from(treasuryEntries)
+      .where(and(inArray(treasuryEntries.recipientPersonId, personIds), eq(treasuryEntries.entryType, "expense")))
+      .orderBy(asc(treasuryEntries.entryNumber));
+    for (const { personId, ...expense } of rows) result.set(personId!, [...(result.get(personId!) ?? []), expense]);
     return result;
   }
 }

@@ -107,8 +107,10 @@ to need flags) with the `donations.*` keys declared
 (`apps/api/src/settings/settings.registry.ts`); the other keys are declared
 with their modules. A stored value that doesn't match its key's type is
 ignored (the environment default applies) and logged by key only. Until
-module 2 adds the admin page and audit events, rows are changed only by
-SQL in a release runbook.
+module 2 adds the admin page, rows are changed only by SQL in a release
+runbook; the sample-treasury command records its changes in the audit log
+(§11). Added with the detail page: `history.view_event_window_hours` (24)
+and `ai.enabled` (false; when true the AI relevance score is read-only).
 
 ### 1.2 Decisions 2026-10-19
 
@@ -246,10 +248,10 @@ Every module's own diagram and columns follow.
 | Team (items) | — | — | `expertise_teams` → `teams` | |
 | Full path (items) | — | — | — (computed) | Domain > Field > Item, from the joins. |
 
-### 3.5 Relationship limits as database rules (new in 0008)
+### 3.5 Relationship limits as database rules (planned: 0011)
 
 Today the 10 expertise / 5 organizations limits are enforced by the API
-and the importer (contracts, link endpoints, importer cap). Migration 0008
+and the importer (contracts, link endpoints, importer cap). Migration 0011
 (module 2) adds a **deferrable constraint trigger** per link table so no code path —
 present or future, including a manual SQL fix — can exceed them:
 
@@ -847,26 +849,56 @@ and `admin_sessions` (hashed tokens, expiry, revocation). Proposed
 v1.0 participant accounts are a **separate** `accounts` table (overview §7):
 staff access and participation are different concerns with different rules.
 
-## 11. Audit log
+## 11. Audit log, comments and views (built: migrations 0009–0010)
+
+Every write in People, Organizations, the taxonomy, the Treasury, settings
+and imports records one event **in the same transaction** as the write
+(one "Submit changes" = one PATCH = one event). Never secrets: passwords,
+tokens and keys are not audited fields.
 
 | Column (`audit_events`) | Type | Rules |
 |---|---|---|
-| `id` | bigint identity PK | Append-only |
+| `id` | bigint identity PK | Orders events (newest first = id desc) |
 | `occurred_at` | timestamptz | default now() |
-| `actor_type` | text | `admin`, `system`, `import`, `stripe`, `job` (CHECK) |
-| `actor_admin_id` | uuid null → admin_users `set null` | Required when actor_type = admin (CHECK) |
-| `actor_label` | text | Snapshot shown in History ("Candide · Rootadmin"), so renames don't rewrite history |
-| `action` | text | `create`, `update`, `delete`, `publish`, `unpublish`, `link`, `unlink`, `import`, `login`, `logout`, `permission_denied` (CHECK) |
-| `entity_type` | text | `person`, `organization`, `treasury_entry`, `document`, `submission`, `access_grant`, … |
-| `entity_id` | uuid null | |
-| `changes` | jsonb | `{ field: { before, after } }`; links as `{ added: [...], removed: [...] }` |
-| `import_run_id` | uuid null → import_runs `set null` | |
-| `request_id` | text null | |
+| `entity_type` | text | `person`, `organization`, `treasury_entry`, `expertise_domain`, `expertise_field`, `expertise_item`, `setting`, `import_run` (text, so a new module needs no migration here) |
+| `entity_id` | text | The record's id (a setting's key) |
+| `action` | text (CHECK) | `created`, `imported`, `duplicated`, `updated`, `archived`, `restored`, `deleted`, `comment_added`, `comment_edited`, `comment_deleted` |
+| `actor_type` | text (CHECK) | `admin` or `automation` (imports, Stripe, scripts) |
+| `actor_id` | uuid null → admin_users `restrict` | Accounts are deactivated, never deleted (decision 14) |
+| `actor_label` | text | The name when the event was written ("Automation" for automation) |
+| `source` | text (CHECK) | `admin`, `import`, `stripe`, `system` |
+| `changes` | jsonb | `[{ field, label, kind, privacy?, before, after }]`; relations as `[{ id, label }]`, selects as `{ key, label }` |
+| `meta` | jsonb | Context: the record's label, import source ("Notion · People"), duplicated-from record, comment id and text |
 
-Indexes: `(entity_type, entity_id, occurred_at desc)` (the record's History
-panel), `(occurred_at desc)` (Monitoring → History), `(actor_admin_id,
-occurred_at desc)`. In production the API's database role has `INSERT,
-SELECT` only on this table.
+A trigger (`audit_events_append_only`) refuses UPDATE, DELETE and
+TRUNCATE: the log is never rewritten. Indexes: `(entity_type, entity_id,
+id desc)` (a record's history) and `(occurred_at desc)` (Monitoring →
+History).
+
+- **`record_comments`** (id, entity_type, entity_id, author_id, body,
+  created_at, updated_at, deleted_at): authors edit or delete their own
+  (soft delete); each version stays in the log (decision 10).
+- **`record_views`** (id, entity_type, entity_id, admin_id, viewed_at,
+  in_history): every opening counts toward "Views"; the feed shows
+  "viewed this page" once per account per
+  `history.view_event_window_hours` (24, decision 11).
+- **Field privacy is config, enforced by the API**
+  (`HISTORY_FIELD_ACCESS` in `apps/api/src/audit/record-fields.ts`):
+  contact fields (email, phone, other contact details, Wise recipient ID)
+  are returned masked (`s•••@example.org`) to roles the config doesn't
+  allow — every role today, as in the prototype; the private note is never
+  returned ("Private note updated. Previous and new text available to
+  authorized viewers."), though its values are kept in the log for a
+  future authorized view.
+- **Archive (decision 12):** `archived_at` / `archived_by_id` on
+  `people`, `organizations` and `treasury_entries`. Lists leave archived
+  records out unless filtered with `archived:is:true` (the "Archived"
+  view); archived Treasury entries leave the public pages. Permanent
+  delete is owner-only with the name (or `EXP-n`) typed; refused while a
+  person or organization is an expense's recipient, and for Stripe or
+  Notion Treasury entries (archive them instead).
+- **Access events** (granted, changed, revoked) wait for the Permissions
+  module.
 
 ## 12. Imports and jobs
 
@@ -916,13 +948,16 @@ files; data steps and triggers are added to the generated file by hand.
 | 0000–0005 | built | Auth, Directory, Taxonomy, Imports | — |
 | **0006** | `treasury_donations` | Treasury (module 1, **24 Oct**) | `settings` (moved here from 0008: module 1 needs its flags); `treasury_review_statuses`, `treasury_expense_types` (seeded); `treasury_entries` (with `managed_by`; view `treasury_public_entries`; integrity trigger); `treasury_entry_expense_types` (expenses-only trigger); `stripe_events`; `stripe_subscriptions` |
 | **0007** | `treasury_documents` | Treasury (module 1b) | `treasury_documents`; `import_runs.kind` += treasury |
-| **0008** | `platform` | Platform (module 2) | `audit_events`; `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
-| **0009** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
-| **0010** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
-| **0011** | `waitlist` | Waitlist | `waitlist_entries` |
-| **0012** | `services_access` | Services | `services`, `access_grant_statuses`, `access_grants` |
-| **0013** | `admin_roles` | Accounts and roles | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_users` changes, invitations and password resets (per Q8) |
-| **0014** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| **0008** | `treasury_sample_entries` | Treasury (built) | `treasury_entries.sample` (sample entries before go-live) |
+| **0009** | `audit_history` | Platform (built, detail page) | `audit_events` (+ append-only trigger), `record_comments`, `record_views` (§11) |
+| **0010** | `record_fields_and_archive` | People, Organizations, Treasury (built, detail page) | `contact_channels` (seeded: Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix, Workana) and `person_contact_channels`; people `do_not_contact`, `relevance_score`, `ai_relevance_score` (0–10), `other_socials`, `first_contact_on`, `last_contact_on`, `next_followup_at` (timestamptz: replaces `next_followup_on`, a date becoming 09:00 Europe/Zurich); `archived_at` / `archived_by_id` on people, organizations and Treasury entries; the public Treasury view leaves archived entries out |
+| **0011** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
+| **0012** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
+| **0013** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
+| **0014** | `waitlist` | Waitlist | `waitlist_entries` |
+| **0015** | `services_access` | Services | `services`, `access_grant_statuses`, `access_grants` |
+| **0016** | `admin_roles` | Accounts and roles | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_users` changes, invitations and password resets (per Q8) |
+| **0017** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
 
 Numbers follow the build order (roadmap §2); if a module moves, its
 migration takes the next free number at that time — numbers are never

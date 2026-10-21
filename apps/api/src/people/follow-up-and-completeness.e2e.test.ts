@@ -34,15 +34,15 @@ describe("people list: follow-ups, rollups, completeness", () => {
   const names = async (query: string, resource = "people") =>
     (await admin.get(`/api/admin/${resource}?pageSize=100&sort=name:asc&${query}`).expect(200)).body.items.map((item: { name: string }) => item.name);
 
-  it("overdue = next follow-up before today, not Rejected, not Do not contact", async () => {
-    now = new Date("2026-10-14T10:00:00Z"); // Oct 14 in Zurich
+  it("overdue = the follow-up (date and time) has passed, not Rejected, not Do not contact", async () => {
+    now = new Date("2026-10-14T10:00:00Z");
     await t.db.insert(people).values([
-      { name: "Overdue", nextFollowupOn: "2026-10-13", stateKey: "contacted" },
-      { name: "Overdue, no state", nextFollowupOn: "2026-09-14" },
-      { name: "Rejected", nextFollowupOn: "2026-10-11", stateKey: "rejected" },
-      { name: "Do not contact", nextFollowupOn: "2026-10-11", doNotContact: true },
-      { name: "Due today", nextFollowupOn: "2026-10-14" },
-      { name: "Later", nextFollowupOn: "2026-10-19" },
+      { name: "Overdue", nextFollowupAt: new Date("2026-10-13T07:00:00Z"), stateKey: "contacted" },
+      { name: "Overdue, no state", nextFollowupAt: new Date("2026-09-14T07:00:00Z") },
+      { name: "Rejected", nextFollowupAt: new Date("2026-10-11T07:00:00Z"), stateKey: "rejected" },
+      { name: "Do not contact", nextFollowupAt: new Date("2026-10-11T07:00:00Z"), doNotContact: true },
+      { name: "Due later today", nextFollowupAt: new Date("2026-10-14T15:00:00Z") },
+      { name: "Later", nextFollowupAt: new Date("2026-10-19T07:00:00Z") },
       { name: "No date" },
     ]);
     expect(await names("filter=follow_up:is:overdue")).toEqual(["Overdue", "Overdue, no state"]);
@@ -51,19 +51,17 @@ describe("people list: follow-ups, rollups, completeness", () => {
     await admin.get("/api/admin/people?filter=follow_up:is:soon").expect(400);
   });
 
-  it("'today' is Zurich's date: just after midnight in Zurich, yesterday's follow-up is already overdue", async () => {
+  it("a follow-up becomes overdue the moment its time passes, whatever the time zone", async () => {
     await t.db.insert(people).values([
-      { name: "Due Oct 14", nextFollowupOn: "2026-10-14" },
-      { name: "Due Oct 15", nextFollowupOn: "2026-10-15" },
+      { name: "Due at 9:00 Zurich", nextFollowupAt: new Date("2026-10-14T07:00:00Z") },
+      { name: "Due tomorrow", nextFollowupAt: new Date("2026-10-15T07:00:00Z") },
     ]);
-    // 23:59 on Oct 14 in Zurich: nothing is overdue yet.
-    now = new Date("2026-10-14T21:59:00Z");
+    now = new Date("2026-10-14T06:59:00Z");
     expect(await names("filter=follow_up:is:overdue")).toEqual([]);
-    // 00:30 on Oct 15 in Zurich — still Oct 14 in UTC, where the server's date would say "not overdue".
-    now = new Date("2026-10-14T22:30:00Z");
-    expect(await names("filter=follow_up:is:overdue")).toEqual(["Due Oct 14"]);
+    now = new Date("2026-10-14T07:01:00Z");
+    expect(await names("filter=follow_up:is:overdue")).toEqual(["Due at 9:00 Zurich"]);
     const [person] = (await admin.get("/api/admin/people?sort=name:asc").expect(200)).body.items as { name: string; followUpOverdue: boolean }[];
-    expect(person).toMatchObject({ name: "Due Oct 14", followUpOverdue: true });
+    expect(person).toMatchObject({ name: "Due at 9:00 Zurich", followUpOverdue: true });
   });
 
   it("filters by expertise field or domain through the rollup (people link only to Expertise items)", async () => {

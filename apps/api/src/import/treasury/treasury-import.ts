@@ -1,4 +1,7 @@
-import { eq, isNotNull, sql } from "drizzle-orm";
+import { eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { recordAuditEvent } from "../../audit/audit.service.js";
+import { AUTOMATION, type AuditChange } from "../../audit/audit.types.js";
+import { entryLabel, moneyLabel } from "../../audit/entity-labels.js";
 import type { Database } from "../../common/database/database.module.js";
 import { organizations } from "../../organizations/organizations.schema.js";
 import { people } from "../../people/people.schema.js";
@@ -82,8 +85,87 @@ export async function loadTreasurySnapshot(db: Executor, options: { publishUnqua
 const PARKED = 2_000_000_000;
 
 /** Writes a Treasury plan. Must run inside the caller's transaction. */
+/** The entry columns an import can change, as the history shows them. */
+const ENTRY_AUDIT = [
+  ["name", "Name", "text"],
+  ["currency", "Currency", "text"],
+  ["grossAmount", "Amount", "text"],
+  ["occurredOn", "Date", "date"],
+  ["reviewStatusKey", "Review status", "text"],
+  ["publicationStatus", "Publication", "text"],
+  ["publicDescription", "Public description", "text"],
+  ["internalNote", "Internal note", "text"],
+  ["recipientPersonId", "Recipient (person)", "text"],
+  ["recipientOrganizationId", "Recipient (organization)", "text"],
+] as const;
+
+type EntrySnapshot = Pick<typeof treasuryEntries.$inferSelect, "id" | "entryNumber" | "currency" | "grossAmount" | (typeof ENTRY_AUDIT)[number][0]>;
+
+async function entrySnapshots(tx: Executor, ids: string[]): Promise<Map<string, EntrySnapshot>> {
+  if (ids.length === 0) return new Map();
+  const rows = await tx
+    .select({
+      id: treasuryEntries.id,
+      entryNumber: treasuryEntries.entryNumber,
+      name: treasuryEntries.name,
+      currency: treasuryEntries.currency,
+      grossAmount: treasuryEntries.grossAmount,
+      occurredOn: treasuryEntries.occurredOn,
+      reviewStatusKey: treasuryEntries.reviewStatusKey,
+      publicationStatus: treasuryEntries.publicationStatus,
+      publicDescription: treasuryEntries.publicDescription,
+      internalNote: treasuryEntries.internalNote,
+      recipientPersonId: treasuryEntries.recipientPersonId,
+      recipientOrganizationId: treasuryEntries.recipientOrganizationId,
+    })
+    .from(treasuryEntries)
+    .where(inArray(treasuryEntries.id, ids));
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+function entryChanges(before: EntrySnapshot, after: EntrySnapshot): AuditChange[] {
+  const shown = (row: EntrySnapshot, field: (typeof ENTRY_AUDIT)[number][0]) =>
+    field === "grossAmount" ? moneyLabel(row.grossAmount, row.currency) : ((row[field] as string | null) ?? null);
+  return ENTRY_AUDIT.filter(([field]) => shown(before, field) !== shown(after, field)).map(([field, label, kind]) => ({
+    field,
+    label,
+    kind,
+    before: shown(before, field),
+    after: shown(after, field),
+  }));
+}
+
+/**
+ * Writes a Treasury plan with its audit events (actor "Automation", source
+ * Notion): "imported" for each new expense, "updated" with old → new for
+ * each changed one. Must run inside the caller's transaction.
+ */
 export async function applyTreasuryPlan(tx: Executor, plan: TreasuryPlan): Promise<void> {
   const now = new Date();
+  const updatedIds = plan.entries.filter((entry) => entry.action === "update").map((entry) => entry.dbId!);
+  const before = await entrySnapshots(tx, updatedIds);
+  await writeTreasuryPlan(tx, plan, now);
+  const after = await entrySnapshots(tx, updatedIds);
+  for (const [id, previous] of before) {
+    const current = after.get(id);
+    const changes = current ? entryChanges(previous, current) : [];
+    if (changes.length > 0) {
+      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: id, action: "updated", actor: AUTOMATION, source: "import", changes, meta: { label: entryLabel(current!), importSource: "Notion · Treasury" } }, now);
+    }
+  }
+  const createdPages = plan.entries.filter((entry) => entry.action === "create").map((entry) => entry.pageId);
+  if (createdPages.length > 0) {
+    const created = await tx
+      .select({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency })
+      .from(treasuryEntries)
+      .where(inArray(treasuryEntries.notionPageId, createdPages));
+    for (const entry of created) {
+      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: entry.id, action: "imported", actor: AUTOMATION, source: "import", meta: { label: entryLabel(entry), importSource: "Notion · Treasury" } }, now);
+    }
+  }
+}
+
+async function writeTreasuryPlan(tx: Executor, plan: TreasuryPlan, now: Date): Promise<void> {
   const columns = (values: TreasuryPlan["entries"][number]["values"]) => ({
     notionPageId: values.notionPageId,
     managedBy: "notion" as const,

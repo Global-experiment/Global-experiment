@@ -1,4 +1,7 @@
 import { count, eq, inArray } from "drizzle-orm";
+import { recordAuditEvent } from "../audit/audit.service.js";
+import { AUTOMATION } from "../audit/audit.types.js";
+import { entryLabel, organizationLabel } from "../audit/entity-labels.js";
 import { zurichDate } from "../common/clock/clock.js";
 import type { Database } from "../common/database/database.module.js";
 import { organizations } from "../organizations/organizations.schema.js";
@@ -104,7 +107,14 @@ export async function seedSampleTreasury(db: Database, now: Date): Promise<Sampl
   return db.transaction(async (tx) => {
     const [existing] = await tx.select({ n: count() }).from(treasuryEntries).where(eq(treasuryEntries.sample, true));
     if ((existing?.n ?? 0) > 0) throw new Error(`${existing!.n} sample entries are already there: purge them first (purge-sample-treasury).`);
-    await tx.insert(organizations).values(SAMPLE_RECIPIENT).onConflictDoNothing({ target: organizations.id });
+    const [recipient] = await tx
+      .insert(organizations)
+      .values(SAMPLE_RECIPIENT)
+      .onConflictDoNothing({ target: organizations.id })
+      .returning({ id: organizations.id, orgNumber: organizations.orgNumber, name: organizations.name });
+    if (recipient) {
+      await recordAuditEvent(tx, { entityType: "organization", entityId: recipient.id, action: "created", actor: AUTOMATION, source: "system", meta: { label: organizationLabel(recipient), origin: "seed-sample-treasury" } }, now);
+    }
     for (const expense of SAMPLE_EXPENSES) {
       const day = new Date(now.getTime() - expense.daysAgo * 86_400_000);
       // A working-hours time on that day (UTC), varied per entry so the rows don't all read the same.
@@ -130,13 +140,15 @@ export async function seedSampleTreasury(db: Database, now: Date): Promise<Sampl
           publicDescription: expense.description,
           internalNote: "Sample entry (before go-live): removed by purge-sample-treasury.",
         })
-        .returning({ id: treasuryEntries.id });
+        .returning({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency });
       await tx.insert(treasuryEntryExpenseTypes).values(expense.types.map((typeKey) => ({ entryId: entry!.id, typeKey })));
+      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: entry!.id, action: "created", actor: AUTOMATION, source: "system", meta: { label: entryLabel(entry!), origin: "seed-sample-treasury" } }, now);
     }
     await tx
       .insert(settings)
       .values({ key: SAMPLE_FIGURES_KEY, value: SAMPLE_FIGURES })
       .onConflictDoUpdate({ target: settings.key, set: { value: SAMPLE_FIGURES } });
+    await recordAuditEvent(tx, { entityType: "setting", entityId: SAMPLE_FIGURES_KEY, action: "updated", actor: AUTOMATION, source: "system", changes: [{ field: "value", label: "Value", kind: "text", before: null, after: "Sample figures" }], meta: { label: SAMPLE_FIGURES_KEY, origin: "seed-sample-treasury" } }, now);
     return planSampleSeed();
   });
 }
@@ -144,7 +156,13 @@ export async function seedSampleTreasury(db: Database, now: Date): Promise<Sampl
 /** Removes every sample entry (their expense types go with them), the sample recipient and figures. Refuses while a sample has documents. */
 export async function purgeSampleTreasury(db: Database): Promise<SamplePlan> {
   return db.transaction(async (tx) => {
-    const samples = await tx.select({ id: treasuryEntries.id, currency: treasuryEntries.currency }).from(treasuryEntries).where(eq(treasuryEntries.sample, true));
+    const samples = await tx
+      .select({ id: treasuryEntries.id, currency: treasuryEntries.currency, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount })
+      .from(treasuryEntries)
+      .where(eq(treasuryEntries.sample, true));
+    for (const sample of samples) {
+      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: sample.id, action: "deleted", actor: AUTOMATION, source: "system", meta: { label: entryLabel(sample), origin: "purge-sample-treasury" } });
+    }
     const ids = samples.map((row) => row.id);
     if (ids.length > 0) {
       const [documents] = await tx.select({ n: count() }).from(treasuryDocuments).where(inArray(treasuryDocuments.entryId, ids));
@@ -153,8 +171,16 @@ export async function purgeSampleTreasury(db: Database): Promise<SamplePlan> {
     }
     // The sample recipient goes too, unless a real entry was linked to it since.
     const [linked] = await tx.select({ n: count() }).from(treasuryEntries).where(eq(treasuryEntries.recipientOrganizationId, SAMPLE_RECIPIENT.id));
-    if ((linked?.n ?? 0) === 0) await tx.delete(organizations).where(eq(organizations.id, SAMPLE_RECIPIENT.id));
+    if ((linked?.n ?? 0) === 0) {
+      const removed = await tx.delete(organizations).where(eq(organizations.id, SAMPLE_RECIPIENT.id)).returning({ id: organizations.id, orgNumber: organizations.orgNumber, name: organizations.name });
+      for (const organization of removed) {
+        await recordAuditEvent(tx, { entityType: "organization", entityId: organization.id, action: "deleted", actor: AUTOMATION, source: "system", meta: { label: organizationLabel(organization), origin: "purge-sample-treasury" } });
+      }
+    }
     const removedFigures = await tx.delete(settings).where(eq(settings.key, SAMPLE_FIGURES_KEY)).returning({ key: settings.key });
+    if (removedFigures.length > 0) {
+      await recordAuditEvent(tx, { entityType: "setting", entityId: SAMPLE_FIGURES_KEY, action: "updated", actor: AUTOMATION, source: "system", changes: [{ field: "value", label: "Value", kind: "text", before: "Sample figures", after: null }], meta: { label: SAMPLE_FIGURES_KEY, origin: "purge-sample-treasury" } });
+    }
     return planOf(samples, removedFigures.length > 0);
   });
 }

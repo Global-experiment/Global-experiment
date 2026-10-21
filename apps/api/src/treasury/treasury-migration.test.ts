@@ -38,6 +38,19 @@ async function databaseAt(count: number): Promise<PGlite> {
 }
 
 const latest = () => databaseAt(journal.entries.length);
+
+/** A migrations folder holding the first `count` migrations (to migrate an older database forward to a fixed point). */
+function folderUpTo(count: number): string {
+  const dir = mkdtempSync(join(tmpdir(), "ge-migrations-"));
+  tempDirs.push(dir);
+  cpSync(join(MIGRATIONS, "meta"), join(dir, "meta"), { recursive: true });
+  const entries = journal.entries.slice(0, count);
+  for (const { tag } of entries) cpSync(join(MIGRATIONS, `${tag}.sql`), join(dir, `${tag}.sql`));
+  writeFileSync(join(dir, "meta/_journal.json"), JSON.stringify({ ...journal, entries }));
+  return dir;
+}
+/** Through 0008: the state these tests were written for (0009–0010 are tested in migrations-0009-0010.test.ts). */
+const THROUGH_0008 = 9;
 const rows = async <T = Record<string, unknown>>(client: PGlite, query: string, params: unknown[] = []) => (await client.query<T>(query, params)).rows;
 const count = async (client: PGlite, table: string) => (await rows<{ n: number }>(client, `select count(*)::int as n from ${table}`))[0]!.n;
 
@@ -139,7 +152,7 @@ describe("migration 0006 — treasury and donations", () => {
       admins: await rows(client, "select * from admin_users"),
     };
 
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    await migrate(drizzle(client), { migrationsFolder: folderUpTo(THROUGH_0008) });
 
     expect(await rows(client, "select * from people")).toEqual(before.people);
     expect(await rows(client, "select * from organizations")).toEqual(before.organizations);
@@ -467,7 +480,7 @@ describe("migration 0007 — treasury documents", () => {
     const client = await databaseAt(AT_0006);
     await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500 });
     const before = await rows(client, "select * from treasury_entries");
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    await migrate(drizzle(client), { migrationsFolder: folderUpTo(THROUGH_0008) });
     // Untouched (0008 then adds `sample`, false for every existing row).
     expect(await rows(client, "select * from treasury_entries")).toEqual(before.map((row) => ({ ...row, sample: false })));
     expect(await count(client, "treasury_documents")).toBe(0);
@@ -500,7 +513,7 @@ describe("migration 0008 — sample entries", () => {
     const client = await databaseAt(AT_0007);
     await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500, publication_status: "published", published_at: new Date().toISOString() });
     const before = await rows(client, "select * from treasury_entries");
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    await migrate(drizzle(client), { migrationsFolder: folderUpTo(THROUGH_0008) });
     expect(await rows(client, "select * from treasury_entries")).toEqual(before.map((row) => ({ ...row, sample: false })));
     expect((await rows(client, "select sample from treasury_public_entries")).map((row) => row.sample)).toEqual([false]);
   });

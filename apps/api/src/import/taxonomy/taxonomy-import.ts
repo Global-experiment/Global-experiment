@@ -1,4 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { recordAuditEvent } from "../../audit/audit.service.js";
+import { AUTOMATION, type AuditChange } from "../../audit/audit.types.js";
 import type { Database } from "../../common/database/database.module.js";
 import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams, taxonomyStatuses, teams } from "../../expertise/expertise.schema.js";
 import { countsChangedRefusal, runImport } from "../import-run.js";
@@ -39,10 +41,72 @@ export async function loadTaxonomySnapshot(db: Executor): Promise<DbSnapshot> {
   };
 }
 
-/** Writes a plan. Must run inside the caller's transaction. */
+const ENTITY_TYPE = { domain: "expertise_domain", field: "expertise_field", expertise: "expertise_item" } as const;
+const IMPORT_SOURCE = { domain: "Notion · Domains", field: "Notion · Fields", expertise: "Notion · Expertise" } as const;
+
+type NodeSnapshot = { id: string; name: string; stableId: string | null; statusKey: string | null };
+
+async function nodeSnapshots(tx: Executor, level: (typeof LEVELS)[number], ids: string[]): Promise<Map<string, NodeSnapshot>> {
+  if (ids.length === 0) return new Map();
+  const table = TABLE[level];
+  const rows = await tx.select({ id: table.id, name: table.name, stableId: table.stableId, statusKey: table.statusKey }).from(table).where(inArray(table.id, ids));
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+const nodeLabel = (node: NodeSnapshot) => (node.stableId ? `${node.name} (${node.stableId})` : node.name);
+
+/**
+ * Writes a plan with its audit events (actor "Automation", source Notion):
+ * "imported" for each new node, "updated" with old → new for each changed
+ * one (name, Stable ID, status). Must run inside the caller's transaction.
+ */
 export async function applyTaxonomyPlan(tx: Executor, plan: TaxonomyPlan): Promise<void> {
-  const idByPage = new Map<string, string>();
   const now = new Date();
+  const touched = Object.fromEntries(
+    LEVELS.map((level) => [
+      level,
+      [
+        ...plan.levels[level].rows.filter((row) => row.action === "update").map((row) => row.dbId!),
+        ...plan.levels[level].missing.filter((row) => row.deprecate).map((row) => row.dbId),
+      ],
+    ]),
+  ) as Record<(typeof LEVELS)[number], string[]>;
+  const before = Object.fromEntries(await Promise.all(LEVELS.map(async (level) => [level, await nodeSnapshots(tx, level, touched[level])] as const)));
+  await writeTaxonomyPlan(tx, plan, now);
+  for (const level of LEVELS) {
+    const after = await nodeSnapshots(tx, level, touched[level]);
+    for (const [id, previous] of before[level]!) {
+      const current = after.get(id);
+      if (!current) continue;
+      const changes: AuditChange[] = (
+        [
+          ["name", "Name"],
+          ["stableId", "Stable ID"],
+          ["statusKey", "Status"],
+        ] as const
+      )
+        .filter(([field]) => previous[field] !== current[field])
+        .map(([field, label]) => ({ field, label, kind: "text", before: previous[field], after: current[field] }));
+      if (changes.length > 0) {
+        await recordAuditEvent(tx, { entityType: ENTITY_TYPE[level], entityId: id, action: "updated", actor: AUTOMATION, source: "import", changes, meta: { label: nodeLabel(current), importSource: IMPORT_SOURCE[level] } }, now);
+      }
+    }
+    const createdPages = plan.levels[level].rows.filter((row) => row.action === "create").map((row) => row.pageId);
+    for (let start = 0; start < createdPages.length; start += 500) {
+      const table = TABLE[level];
+      const created = await tx
+        .select({ id: table.id, name: table.name, stableId: table.stableId, statusKey: table.statusKey })
+        .from(table)
+        .where(inArray(table.notionPageId, createdPages.slice(start, start + 500)));
+      for (const node of created) {
+        await recordAuditEvent(tx, { entityType: ENTITY_TYPE[level], entityId: node.id, action: "imported", actor: AUTOMATION, source: "import", meta: { label: nodeLabel(node), importSource: IMPORT_SOURCE[level] } }, now);
+      }
+    }
+  }
+}
+
+async function writeTaxonomyPlan(tx: Executor, plan: TaxonomyPlan, now: Date): Promise<void> {
+  const idByPage = new Map<string, string>();
 
   for (const level of LEVELS) {
     const table = TABLE[level];

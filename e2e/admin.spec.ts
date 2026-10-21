@@ -132,17 +132,20 @@ test.describe("people administration", () => {
     await page.getByRole("group", { name: "State" }).getByRole("button", { name: "Collaborating" }).click();
 
     await page.getByLabel("Search organization").fill("Harbor");
-    await page.getByRole("list", { name: "Organization results" }).getByRole("button", { name: "Harbor Legal Collective" }).click();
+    await page.getByRole("list", { name: "Organizations results" }).getByRole("button", { name: "Harbor Legal Collective" }).click();
     await page.keyboard.press("Escape");
 
     await page.getByLabel("Search expertise").fill("digital rights");
     await page.getByRole("list", { name: "Expertise results" }).getByRole("button", { name: /Digital rights/ }).click();
     await page.keyboard.press("Escape");
 
+    // No autosave (2026-10-21): Submit saves once, then goes back to the list it came from.
     await page.getByRole("button", { name: "Submit changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/people\?q=bea/);
 
-    await page.reload();
+    await rows(page).first().getByRole("link").click();
+    await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
     await expect(page.getByLabel("Personal note")).toHaveValue("Edited during the E2E run.");
     await expect(page.getByRole("group", { name: "State" }).getByRole("button", { name: "Collaborating" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Remove Harbor Legal Collective" })).toBeVisible();
@@ -162,6 +165,9 @@ test.describe("people administration", () => {
     await page.getByLabel("Email", { exact: true }).fill("not-an-email");
     await page.getByRole("button", { name: "Submit changes" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Invalid email address." })).toBeVisible();
+    // A refused submit stays on the record; Discard (under More options) restores the saved values.
+    await expect(page).toHaveURL(/\/admin\/people\/de000000-/);
+    await page.getByRole("button", { name: "More options" }).click();
     await page.getByRole("button", { name: "Discard changes" }).click();
     await expect(page.getByLabel("Email", { exact: true })).toHaveValue("cyril.demo@example.org");
   });

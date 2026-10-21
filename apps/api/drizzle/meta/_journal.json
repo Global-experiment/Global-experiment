@@ -64,6 +64,20 @@
       "when": 1792041326902,
       "tag": "0008_treasury_sample_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792579151868,
+      "tag": "0009_audit_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792579211816,
+      "tag": "0010_record_fields_and_archive",
+      "breakpoints": true
     }
   ]
 }

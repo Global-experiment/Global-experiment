@@ -11,10 +11,10 @@ describe("admin module registry", () => {
     ]);
   });
 
-  it("keeps the decided modules 'Coming soon' and gives every live module a page", () => {
+  it("keeps the decided modules 'Coming soon' and gives every live module a page (History is live since 2026-10-21)", () => {
     const all = ADMIN_MODULES.flatMap((group) => group.modules);
     expect(new Set(all.map((entry) => entry.key)).size).toBe(all.length);
-    for (const key of ["waitlist", "messages", "cloud", "history", "analytics", "technical_dashboard", "emails", "contracting"]) {
+    for (const key of ["waitlist", "messages", "cloud", "analytics", "technical_dashboard", "emails", "contracting"]) {
       expect(all.find((entry) => entry.key === key)?.status, key).toBe("coming_soon");
     }
     for (const entry of all.filter((candidate) => candidate.status === "live")) expect(entry.href, entry.key).toMatch(/^\/admin\//);
@@ -25,6 +25,7 @@ describe("admin module registry", () => {
     expect(activeModuleKey(ADMIN_MODULES, "/admin/organizations")).toBe("organizations");
     expect(activeModuleKey(ADMIN_MODULES, "/admin/organizations/12")).toBe("organizations");
     expect(activeModuleKey(ADMIN_MODULES, "/admin/imports")).toBe("people");
+    expect(activeModuleKey(ADMIN_MODULES, "/admin/history")).toBe("history");
     expect(activeModuleKey(ADMIN_MODULES, "/admin/peoplex")).toBeUndefined();
     expect(activeModuleKey(ADMIN_MODULES, "/admin/profile")).toBeUndefined();
   });

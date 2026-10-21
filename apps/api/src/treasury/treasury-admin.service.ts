@@ -2,6 +2,9 @@ import { basename } from "node:path";
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { PinoLogger } from "nestjs-pino";
+import { actorFor, AuditService, type Executor } from "../audit/audit.service.js";
+import type { AuditChange } from "../audit/audit.types.js";
+import { entryLabel } from "../audit/entity-labels.js";
 import type { AdminPrincipal } from "../auth/auth.service.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
@@ -67,6 +70,7 @@ export class TreasuryAdminService {
     private readonly settings: SettingsService,
     private readonly revalidation: RevalidationService,
     private readonly logger: PinoLogger,
+    private readonly audit: AuditService,
   ) {
     this.logger.setContext(TreasuryAdminService.name);
   }
@@ -176,12 +180,74 @@ export class TreasuryAdminService {
     };
   }
 
+  /** One audit event for an entry, in the write's transaction (the entry's label as it is now). */
+  private async recordEntry(tx: Executor, entry: Entry, admin: AdminPrincipal, action: "updated" | "archived" | "restored" | "deleted", changes: AuditChange[] = []) {
+    if (action === "updated" && changes.length === 0) return;
+    await this.audit.record(tx, { entityType: "treasury_entry", entityId: entry.id, action, actor: actorFor(admin), source: "admin", changes, meta: { label: entryLabel(entry) } });
+  }
+
   async update(id: string, body: UpdateTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
-    this.assertTreasuryAdmin(admin);
+    const editor = this.assertTreasuryAdmin(admin);
     const entry = await this.load(id);
     if (entry.managedBy === "notion") throw refused("managed_in_notion", "Managed in Notion: edit this entry there; the importer updates it here.");
-    await this.db.update(treasuryEntries).set({ internalNote: body.internalNote, updatedAt: this.clock() }).where(eq(treasuryEntries.id, id));
+    const review = body.reviewStatus === undefined ? null : await this.checkReview(entry, body.reviewStatus);
+    const now = this.clock();
+    const changes: AuditChange[] = [];
+    if (body.internalNote !== undefined && (entry.internalNote ?? null) !== (body.internalNote ?? null)) {
+      changes.push({ field: "internalNote", label: "Internal note", kind: "text", before: entry.internalNote, after: body.internalNote ?? null });
+    }
+    if (review && entry.reviewStatusKey !== body.reviewStatus) {
+      changes.push({ field: "reviewStatus", label: "Review status", kind: "select", before: review.before, after: review.after });
+    }
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(treasuryEntries)
+        .set({
+          ...(body.internalNote !== undefined ? { internalNote: body.internalNote } : {}),
+          // Choosing a status (even the same one) counts as a review.
+          ...(body.reviewStatus !== undefined ? { reviewStatusKey: body.reviewStatus, reviewedAt: now, reviewedByAdminId: editor.id } : {}),
+          updatedAt: now,
+        })
+        .where(eq(treasuryEntries.id, id));
+      if (changes.length > 0) await this.recordEntry(tx, entry, editor, "updated", changes);
+    });
+    if (review && entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
     return this.get(id);
+  }
+
+  /** Archive (decision 12): out of the default admin views and off the public pages; restorable. */
+  async setArchived(id: string, archived: boolean, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
+    const editor = this.assertTreasuryAdmin(admin);
+    const entry = await this.load(id);
+    if ((entry.archivedAt !== null) === archived) return this.get(id);
+    const now = this.clock();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(treasuryEntries)
+        .set(archived ? { archivedAt: now, archivedById: editor.id, updatedAt: now } : { archivedAt: null, archivedById: null, updatedAt: now })
+        .where(eq(treasuryEntries.id, id));
+      await this.recordEntry(tx, entry, editor, archived ? "archived" : "restored");
+    });
+    if (entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
+    return this.get(id);
+  }
+
+  /**
+   * Permanent delete (decision 12): owner only, the entry number typed
+   * exactly, logged. Only manual entries: Stripe and Notion entries are the
+   * ledger's and the importer's — archive them instead.
+   */
+  async delete(id: string, confirm: string, admin: AdminPrincipal | undefined): Promise<void> {
+    const editor = this.assertTreasuryAdmin(admin);
+    const entry = await this.load(id);
+    if (entry.source !== "manual" || entry.managedBy === "notion") throw refused("cannot_delete", "Only manual entries can be deleted; archive Stripe and Notion entries instead.");
+    if (confirm.trim() !== `EXP-${entry.entryNumber}`) throw new ValidationFailedError([{ path: "confirm", message: `Type EXP-${entry.entryNumber} to confirm.` }]);
+    await this.db.transaction(async (tx) => {
+      await this.recordEntry(tx, entry, editor, "deleted");
+      await tx.delete(treasuryDocuments).where(eq(treasuryDocuments.entryId, id));
+      await tx.delete(treasuryEntries).where(eq(treasuryEntries.id, id));
+    });
+    if (entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
   }
 
   async publish(id: string, publish: boolean, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
@@ -191,37 +257,44 @@ export class TreasuryAdminService {
     const rule = publish ? canPublish : canUnpublish;
     if (!rule.allowed) throw refused(entry.managedBy === "notion" ? "managed_in_notion" : publish ? "cannot_publish" : "cannot_unpublish", rule.reason!);
     const now = this.clock();
-    await this.db
-      .update(treasuryEntries)
-      .set(publish ? { publicationStatus: "published", publishedAt: now, updatedAt: now } : { publicationStatus: "unpublished", publishedAt: null, updatedAt: now })
-      .where(eq(treasuryEntries.id, id));
+    const editor = this.assertTreasuryAdmin(admin);
+    const status = (key: string) => ({ key, label: key === "published" ? "Published" : "Unpublished" });
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(treasuryEntries)
+        .set(publish ? { publicationStatus: "published", publishedAt: now, updatedAt: now } : { publicationStatus: "unpublished", publishedAt: null, updatedAt: now })
+        .where(eq(treasuryEntries.id, id));
+      await this.recordEntry(tx, entry, editor, "updated", [
+        { field: "publication", label: "Publication", kind: "select", before: status(entry.publicationStatus), after: status(publish ? "published" : "unpublished") },
+      ]);
+    });
     this.logger.info({ entryId: id, action: publish ? "publish" : "unpublish" }, "Treasury publication changed");
     await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
     return this.get(id);
   }
 
-  async review(id: string, body: ReviewTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
-    const reviewer = this.assertTreasuryAdmin(admin);
-    const entry = await this.load(id);
+  /** The review on its own (kept for API clients); the record page sends it with "Submit changes" (update). */
+  review(id: string, body: ReviewTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
+    return this.update(id, { reviewStatus: body.reviewStatus }, admin);
+  }
+
+  /** The review rules (overview §2.1): refuses a status the entry can't take; returns the history's before/after. */
+  private async checkReview(entry: Entry, reviewStatus: string) {
     const { review } = await this.permissions(entry);
     if (!review.allowed) throw refused(entry.managedBy === "notion" ? "managed_in_notion" : "cannot_review", review.reason!);
-    if (!review.options.some((option) => option.key === body.reviewStatus)) {
+    if (!review.options.some((option) => option.key === reviewStatus)) {
       throw new ValidationFailedError([{ path: "reviewStatus", message: "Qualified and Not required need exactly one recipient." }]);
     }
     const publishUnqualified = await this.settings.get("treasury.publish_unqualified");
-    if (entry.publicationStatus === "published" && !REVIEWED.has(body.reviewStatus) && !publishUnqualified) {
+    if (entry.publicationStatus === "published" && !REVIEWED.has(reviewStatus) && !publishUnqualified) {
       throw refused("cannot_review", "Unpublish it first: an unqualified entry can't stay public (treasury.publish_unqualified is off).");
     }
-    if (entry.publicationStatus === "published" && REVIEWED.has(body.reviewStatus) && !entry.publicDescription?.trim()) {
+    if (entry.publicationStatus === "published" && REVIEWED.has(reviewStatus) && !entry.publicDescription?.trim()) {
       throw refused("cannot_review", "A published, reviewed entry needs a public description.");
     }
-    const now = this.clock();
-    await this.db
-      .update(treasuryEntries)
-      .set({ reviewStatusKey: body.reviewStatus, reviewedAt: now, reviewedByAdminId: reviewer.id, updatedAt: now })
-      .where(eq(treasuryEntries.id, id));
-    if (entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
-    return this.get(id);
+    const { reviewStatuses } = await this.repository.vocabularies();
+    const label = (key: string) => ({ key, label: reviewStatuses.find((status) => status.key === key)?.label ?? key });
+    return { before: entry.reviewStatusKey ? label(entry.reviewStatusKey) : null, after: label(reviewStatus) };
   }
 
   // ---- Supporting documents (private: admins only, never public) ----
@@ -242,13 +315,18 @@ export class TreasuryAdminService {
     const fileName = cleanFileName(file.originalname, contentType);
 
     const stored = await this.storage.put(file.buffer);
+    const entry = await this.load(entryId);
     try {
-      const [row] = await this.db
-        .insert(treasuryDocuments)
-        .values({ entryId, fileName, contentType, sizeBytes: file.size, sha256: stored.sha256, storageKey: stored.key, uploadedByAdminId: uploader.id })
-        .onConflictDoNothing({ target: [treasuryDocuments.entryId, treasuryDocuments.sha256] })
-        .returning({ id: treasuryDocuments.id });
-      if (!row) throw refused("duplicate_document", "This file is already attached to this entry.");
+      const row = await this.db.transaction(async (tx) => {
+        const [inserted] = await tx
+          .insert(treasuryDocuments)
+          .values({ entryId, fileName, contentType, sizeBytes: file.size, sha256: stored.sha256, storageKey: stored.key, uploadedByAdminId: uploader.id })
+          .onConflictDoNothing({ target: [treasuryDocuments.entryId, treasuryDocuments.sha256] })
+          .returning({ id: treasuryDocuments.id });
+        if (!inserted) throw refused("duplicate_document", "This file is already attached to this entry.");
+        await this.recordEntry(tx, entry, uploader, "updated", [{ field: "documents", label: "Documents", kind: "relation", before: [], after: [{ id: inserted.id, label: fileName }] }]);
+        return inserted;
+      });
       this.logger.info({ entryId, documentId: row.id, contentType, sizeBytes: file.size }, "Treasury document uploaded");
       return (await this.repository.documents(entryId)).find((document) => document.id === row.id)!;
     } catch (error) {
@@ -270,9 +348,14 @@ export class TreasuryAdminService {
   }
 
   async deleteDocument(documentId: string, admin: AdminPrincipal | undefined): Promise<void> {
-    this.assertTreasuryAdmin(admin);
-    const [deleted] = await this.db.delete(treasuryDocuments).where(eq(treasuryDocuments.id, documentId)).returning();
-    if (!deleted) throw new NotFoundError("Document not found.");
+    const editor = this.assertTreasuryAdmin(admin);
+    const deleted = await this.db.transaction(async (tx) => {
+      const [row] = await tx.delete(treasuryDocuments).where(eq(treasuryDocuments.id, documentId)).returning();
+      if (!row) throw new NotFoundError("Document not found.");
+      const [entry] = await tx.select().from(treasuryEntries).where(eq(treasuryEntries.id, row.entryId));
+      if (entry) await this.recordEntry(tx, entry, editor, "updated", [{ field: "documents", label: "Documents", kind: "relation", before: [{ id: row.id, label: row.fileName }], after: [] }]);
+      return row;
+    });
     await this.removeIfUnused(deleted.storageKey);
     this.logger.info({ entryId: deleted.entryId, documentId }, "Treasury document deleted");
   }

@@ -3,43 +3,40 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatPersonNumber, type Organization, type Page, type PeopleOptions, type Person } from "../api/types";
+import { formatPersonNumber, type Organization, type Page, type PeopleOptions, type Person, type PersonInput, type RecordHistory } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { personMissing } from "../completeness";
 import { ExpertiseField } from "../expertise/ExpertiseField";
+import { RecordMeta } from "../record/RecordMeta";
+import { RecordPage } from "../record/RecordPage";
 import { LIMIT_HINTS, RELATION_LIMITS } from "../relationLimits";
 import { CompletenessRow } from "../ui/CompletenessRow";
 import { AdminButton, StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, DateField, formatPanelDate, PanelButton, PanelRow, Pills, PropertyRow, RecordLayout, recordInput } from "../ui/RecordForm";
+import { AutoGrowTextarea, CheckboxField, DateField, DateTimeField, Pills, PropertyRow, ReadOnlyValue, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 import { formatDate } from "./peopleTable";
-import { draftFromPerson, hasChanges, personPatch, type PersonDraft } from "./personForm";
+import { draftFromPerson, expenseOption, hasChanges, personCreateBody, personDraftErrors, personPatch, type PersonDraft } from "./personForm";
+import { PERSON_RECORD_CONFIG } from "./personRecordConfig";
 
-type TextField = "email" | "phone" | "website" | "linkedin" | "x" | "otherContact" | "wiseRecipientId";
+type TextField = "email" | "phone" | "website" | "x" | "linkedin" | "otherSocials" | "wiseRecipientId";
 
+/** The contact fields in the prototype's order (Figma p14). */
 const CONTACT_FIELDS: {
   field: TextField;
   label: string;
   icon: "alternate_email" | "call" | "link" | "title";
-  /** An example of what goes in the field. */
   placeholder: string;
   type?: string;
   inputMode?: "email" | "tel" | "url";
 }[] = [
   { field: "email", label: "Email", icon: "alternate_email", placeholder: "name@example.com", type: "email", inputMode: "email" },
   { field: "phone", label: "Phone", icon: "call", placeholder: "+41 79 123 45 67", type: "tel", inputMode: "tel" },
-  { field: "website", label: "Website", icon: "link", placeholder: "https://example.org", inputMode: "url" },
-  { field: "linkedin", label: "Linkedin", icon: "link", placeholder: "https://www.linkedin.com/in/…", inputMode: "url" },
-  { field: "x", label: "X", icon: "link", placeholder: "https://x.com/…" },
-  { field: "otherContact", label: "Other contact", icon: "title", placeholder: "Another way to reach them" },
-  { field: "wiseRecipientId", label: "Wise recipient ID", icon: "title", placeholder: "Wise recipient ID" },
+  { field: "website", label: "Website", icon: "link", placeholder: "https://", inputMode: "url" },
+  { field: "x", label: "X", icon: "link", placeholder: "https://", inputMode: "url" },
+  { field: "linkedin", label: "LinkedIn", icon: "link", placeholder: "https://", inputMode: "url" },
+  { field: "otherSocials", label: "Other socials", icon: "link", placeholder: "https://", inputMode: "url" },
 ];
-
-const CONTACT_PILLS = [
-  { value: "contact", label: "Contact" },
-  { value: "do_not_contact", label: "Do not contact" },
-] as const;
 
 export async function searchOrganizations(text: string, signal: AbortSignal): Promise<RelationOption[]> {
   const query = new URLSearchParams({ pageSize: "20", sort: "name:asc" });
@@ -48,26 +45,55 @@ export async function searchOrganizations(text: string, signal: AbortSignal): Pr
   return page.items.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` }));
 }
 
+/** Expenses with no recipient yet (an expense has one recipient). */
+async function searchExpenses(text: string, signal: AbortSignal): Promise<RelationOption[]> {
+  const query = new URLSearchParams({ pageSize: "20", sort: "date:desc" });
+  query.append("filter", "type:is:expense");
+  query.append("filter", "recipient:is_empty");
+  if (text.trim()) query.set("search", text.trim());
+  const page = await adminApi<Page<{ id: string; number: number; name: string; currency: string; grossAmount: number }>>(`/treasury?${query}`, { signal });
+  return page.items.map((row) => ({ ...expenseOption({ id: row.id, entryNumber: row.number, currency: row.currency, grossAmount: row.grossAmount }), detail: row.name }));
+}
+
+/** A copy made with "Duplicate as a draft" travels to /admin/people/new in the tab's session storage (never saved until Submit). */
+const DRAFT_KEY = "ge-person-draft";
+
+function readStoredDraft(): PersonDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as PersonDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * /admin/people/[id] (admin-desktop.pdf p12) — every native field and both
- * relationships, saved with one PATCH of only what changed (relationship
- * sets replace atomically server-side). Validation errors appear next to
- * their field. Not shown yet (future modules): Access grant, Expenses and
- * the History panel — the layout keeps room for them.
+ * /admin/people/[id] — the person record of the client's prototype (Figma p14
+ * and its four screenshots): every field in the prototype's order, the right
+ * panel with Duplicate / Submit changes / More options, the Views and Edits
+ * counters and the history. Nothing is saved until "Submit changes" (one
+ * PATCH of what changed = one history event), which returns to the previous
+ * page. /admin/people/new is a "Duplicate as a draft" copy, created on Submit.
  */
 export function PersonRecord({ id }: { id: string }) {
+  if (id === "new") return <NewPersonRecord />;
+  return <ExistingPersonRecord id={id} />;
+}
+
+function ExistingPersonRecord({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
   const person = useAdminData<Person>(`/people/${id}`);
   const options = useAdminData<PeopleOptions>("/people/options");
+  const history = useAdminData<RecordHistory>(`/history/person/${id}`);
   const [edit, setEdit] = useState<{ baseId: string; base: PersonDraft; draft: PersonDraft } | null>(null);
-  const [busy, setBusy] = useState<"saving" | "duplicating" | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   if (person.error || !person.data) {
     return (
-      <RecordLayout backHref="/admin/people" backLabel="People" title="">
+      <RecordPage backHref="/admin/people" backLabel="People" title="">
         {person.error ? (
           <div>
             <StatusMessage tone="error">{person.error.status === 404 ? "This person doesn’t exist." : person.error.message}</StatusMessage>
@@ -76,19 +102,20 @@ export function PersonRecord({ id }: { id: string }) {
         ) : (
           <StatusMessage>Loading person…</StatusMessage>
         )}
-      </RecordLayout>
+      </RecordPage>
     );
   }
 
   const loaded = person.data;
-  const current = edit && edit.baseId === `${loaded.id}@${loaded.updatedAt}` ? edit : null;
+  const baseId = `${loaded.id}@${loaded.updatedAt}@${loaded.archivedAt}`;
+  const current = edit && edit.baseId === baseId ? edit : null;
   const base = current?.base ?? draftFromPerson(loaded);
   const draft = current?.draft ?? base;
   const patch = personPatch(base, draft);
   const dirty = hasChanges(patch);
 
   const set = <Key extends keyof PersonDraft>(key: Key, value: PersonDraft[Key]) => {
-    setEdit({ baseId: `${loaded.id}@${loaded.updatedAt}`, base, draft: { ...draft, [key]: value } });
+    setEdit({ baseId, base, draft: { ...draft, [key]: value } });
     if (errors[key]) {
       setErrors((previous) => {
         const next = { ...previous };
@@ -98,31 +125,22 @@ export function PersonRecord({ id }: { id: string }) {
     }
   };
 
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    if (!dirty) return;
+  async function submit(): Promise<boolean> {
+    const found = personDraftErrors(draft);
+    if (Object.keys(found).length > 0) {
+      setErrors(found);
+      setFormError("Some fields need attention.");
+      return false;
+    }
     setBusy("saving");
     setFormError(null);
     try {
-      // The edit stays until the refreshed record (new updatedAt) replaces it — no flash of old values.
       await adminApi<Person>(`/people/${id}`, { method: "PATCH", body: patch });
-      setErrors({});
-      person.reload();
       toast("People updated");
+      return true;
     } catch (caught) {
-      if (caught instanceof AdminApiError && caught.issues.length > 0) {
-        const byField: Record<string, string> = {};
-        for (const issue of caught.issues) {
-          // Array issues arrive as "expertiseIds.0"; map API paths onto form fields.
-          const root = issue.path.split(".")[0] ?? "";
-          const key = root === "organizationIds" ? "organizations" : root === "expertiseIds" ? "expertise" : root;
-          byField[key || "form"] = issue.message;
-        }
-        setErrors(byField);
-        setFormError(byField.form ?? "Some fields need attention.");
-      } else {
-        setFormError(caught instanceof AdminApiError ? caught.message : "Couldn't save.");
-      }
+      showErrors(caught, setErrors, setFormError);
+      return false;
     } finally {
       setBusy(null);
     }
@@ -141,126 +159,287 @@ export function PersonRecord({ id }: { id: string }) {
     }
   }
 
-  const panel = (
-    <>
-      <PanelRow icon="schedule" label="Last updated">
-        {formatPanelDate(loaded.updatedAt)}
-      </PanelRow>
-      <PanelRow icon="schedule" label="Created">
-        {formatPanelDate(loaded.createdAt)}
-      </PanelRow>
-      <PanelRow icon="numbers" label="Number">
-        {formatPersonNumber(loaded.personNumber)}
-      </PanelRow>
-      <div className="mt-1 flex flex-col gap-2">
-        <PanelButton icon="restart_alt" onClick={() => setEdit(null)} disabled={!dirty || busy !== null}>
-          Discard changes
-        </PanelButton>
-        <PanelButton
-          icon="content_copy"
-          onClick={() => void duplicate()}
-          disabled={dirty || busy !== null}
-          title={dirty ? "Submit or discard your changes first" : "Create a copy of this person and open it"}
-        >
-          {busy === "duplicating" ? "Duplicating…" : "Duplicate"}
-        </PanelButton>
-        <PanelButton icon="check_circle" type="submit" disabled={!dirty || busy !== null}>
-          {busy === "saving" ? "Submitting…" : "Submit changes"}
-        </PanelButton>
-      </div>
-    </>
-  );
+  async function setArchived(archived: boolean) {
+    setBusy(archived ? "archiving" : "restoring");
+    try {
+      await adminApi(`/people/${id}/${archived ? "archive" : "restore"}`, { method: "POST" });
+      toast(archived ? "Person archived" : "Person restored");
+      person.reload();
+    } catch (caught) {
+      setFormError(caught instanceof AdminApiError ? caught.message : "Couldn't change the archive state.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
-    <form onSubmit={save} noValidate className="h-full">
-      <RecordLayout backHref="/admin/people" backLabel="People" title={draft.name} panel={panel}>
-        {formError ? <StatusMessage tone="error">{formError}</StatusMessage> : null}
-        <PropertyRow icon="title" label="Name" htmlFor="person-name" error={errors.name}>
+    <RecordPage
+      backHref="/admin/people"
+      backLabel="People"
+      title={draft.name}
+      entity={{ type: "person", id }}
+      recordLink={(other) => `/admin/people/${other}`}
+      actions={{
+        submit,
+        discard: () => {
+          setEdit(null);
+          setErrors({});
+          setFormError(null);
+        },
+        duplicate,
+        duplicateAsDraft: () => {
+          try {
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, name: `${draft.name} (copy)`, expenses: [] }));
+          } catch {
+            // Storage blocked: the draft page starts empty instead.
+          }
+          router.push("/admin/people/new");
+        },
+        archived: loaded.archivedAt !== null,
+        setArchived,
+        remove: {
+          confirmText: loaded.name,
+          run: async (confirm) => {
+            await adminApi(`/people/${id}`, { method: "DELETE", body: { confirm } });
+            toast("Person deleted");
+            router.push("/admin/people");
+          },
+        },
+        savedMessage: "People updated",
+        dirty,
+        busy,
+      }}
+    >
+      <PersonFields
+        draft={draft}
+        set={set}
+        errors={errors}
+        formError={formError}
+        options={options.data}
+        meta={{
+          number: formatPersonNumber(loaded.personNumber),
+          updatedAt: loaded.updatedAt,
+          createdAt: loaded.createdAt,
+          lastEditedBy: history.data?.lastEditedBy?.label ?? null,
+          createdBy: history.data?.createdBy?.label ?? (loaded.notionPageId ? "Automation" : null),
+          legacyFollowUp: loaded.lastFollowupAtLegacy,
+        }}
+      />
+    </RecordPage>
+  );
+}
+
+function NewPersonRecord() {
+  const router = useRouter();
+  const toast = useToast();
+  const options = useAdminData<PeopleOptions>("/people/options");
+  const [draft, setDraft] = useState<PersonDraft | null>(() => (typeof window === "undefined" ? null : readStoredDraft()));
+  const [busy, setBusy] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  if (!draft) {
+    return (
+      <RecordPage backHref="/admin/people" backLabel="People" title="New person">
+        <StatusMessage>Nothing to duplicate here: use “Duplicate as a draft” on a person.</StatusMessage>
+      </RecordPage>
+    );
+  }
+  const set = <Key extends keyof PersonDraft>(key: Key, value: PersonDraft[Key]) => setDraft({ ...draft, [key]: value });
+
+  async function submit(): Promise<boolean> {
+    const found = personDraftErrors(draft!);
+    if (Object.keys(found).length > 0) {
+      setErrors(found);
+      setFormError("Some fields need attention.");
+      return false;
+    }
+    setBusy("saving");
+    setFormError(null);
+    try {
+      const created = await adminApi<Person>("/people", { method: "POST", body: personCreateBody(draft!) satisfies PersonInput });
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Storage blocked: nothing to clear.
+      }
+      toast("Person created");
+      router.replace(`/admin/people/${created.id}`);
+      return false; // Already on its way to the new record.
+    } catch (caught) {
+      showErrors(caught, setErrors, setFormError);
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <RecordPage
+      backHref="/admin/people"
+      backLabel="People"
+      title={draft.name}
+      actions={{
+        submit,
+        discard: () => {
+          setDraft(readStoredDraft());
+          setErrors({});
+        },
+        savedMessage: "Person created",
+        dirty: true,
+        busy,
+      }}
+    >
+      <p role="status" className="px-2 text-meta text-text-muted">
+        A draft copy: nothing is saved until “Submit changes”.
+      </p>
+      <PersonFields draft={draft} set={set} errors={errors} formError={formError} options={options.data} />
+    </RecordPage>
+  );
+}
+
+function showErrors(caught: unknown, setErrors: (errors: Record<string, string>) => void, setFormError: (message: string) => void) {
+  if (caught instanceof AdminApiError && caught.issues.length > 0) {
+    const byField: Record<string, string> = {};
+    for (const issue of caught.issues) {
+      // Array issues arrive as "expertiseIds.0"; map API paths onto form fields.
+      const root = issue.path.split(".")[0] ?? "";
+      const key = root === "organizationIds" ? "organizations" : root === "expertiseIds" ? "expertise" : root === "expenseIds" ? "expenses" : root === "contactChannelKeys" ? "contactChannels" : root;
+      byField[key || "form"] = issue.message;
+    }
+    setErrors(byField);
+    setFormError(byField.form ?? "Some fields need attention.");
+  } else {
+    setFormError(caught instanceof AdminApiError ? caught.message : "Couldn't save.");
+  }
+}
+
+/**
+ * The person's fields, in the prototype's order (Figma p14 + screenshots):
+ * Name, Expertise, Personal note, Source, State, Email, Website, X, LinkedIn,
+ * Other socials, Other contact details, Contact channels, Do not contact,
+ * AI relevance score, Relevance score, Organizations, Expenses, First and
+ * Last contact, Follow-up date, then Person ID, Updated, Last edited by,
+ * Created, Created by. Hidden by config (personRecordConfig.ts): Phone and
+ * the Wise recipient ID (kept in the data), Permissions and Contracting
+ * (their modules don't exist yet).
+ */
+function PersonFields({
+  draft,
+  set,
+  errors,
+  formError,
+  options,
+  meta,
+}: {
+  draft: PersonDraft;
+  set: <Key extends keyof PersonDraft>(key: Key, value: PersonDraft[Key]) => void;
+  errors: Record<string, string>;
+  formError: string | null;
+  options?: PeopleOptions;
+  meta?: { number: string; updatedAt: string; createdAt: string; lastEditedBy: string | null; createdBy: string | null; legacyFollowUp: string | null };
+}) {
+  const visible = (field: keyof typeof PERSON_RECORD_CONFIG) => !PERSON_RECORD_CONFIG[field].hidden;
+  const channels = options?.contactChannels ?? [];
+  return (
+    <>
+      {formError ? <StatusMessage tone="error">{formError}</StatusMessage> : null}
+      <PropertyRow icon="title" label="Name" htmlFor="person-name" error={errors.name}>
+        <input id="person-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" placeholder="Full name" className={recordInput} />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="Expertise" hint={LIMIT_HINTS.personExpertise} error={errors.expertise}>
+        <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.personExpertise} />
+      </PropertyRow>
+      <PropertyRow icon="title" label="Personal note" htmlFor="person-note" error={errors.personalNote}>
+        <AutoGrowTextarea id="person-note" value={draft.personalNote} onChange={(e) => set("personalNote", e.target.value)} maxLength={5000} placeholder="Add a note" />
+      </PropertyRow>
+      <PropertyRow icon="select" label="Source" error={errors.sourceKey}>
+        <Pills label="Source" allowEmpty options={(options?.sources ?? []).map((source) => ({ value: source.key, label: source.label }))} value={draft.sourceKey} onChange={(value) => set("sourceKey", value)} />
+      </PropertyRow>
+      <PropertyRow icon="select" label="State" error={errors.stateKey}>
+        <Pills label="State" allowEmpty options={(options?.states ?? []).map((state) => ({ value: state.key, label: state.label }))} value={draft.stateKey} onChange={(value) => set("stateKey", value)} />
+      </PropertyRow>
+      {CONTACT_FIELDS.filter(({ field }) => visible(field)).map(({ field, label, icon, placeholder, type, inputMode }) => (
+        <PropertyRow key={field} icon={icon} label={label} htmlFor={`person-${field}`} error={errors[field]}>
           <input
-            id="person-name"
-            value={draft.name}
-            onChange={(e) => set("name", e.target.value)}
-            maxLength={200}
-            required
+            id={`person-${field}`}
+            type={type ?? "text"}
+            inputMode={inputMode}
+            value={draft[field]}
+            onChange={(e) => set(field, e.target.value)}
             autoComplete="off"
-            placeholder="Full name"
+            spellCheck={false}
+            placeholder={placeholder}
             className={recordInput}
           />
         </PropertyRow>
-        <PropertyRow icon="select" label="State" error={errors.stateKey}>
-          <Pills
-            label="State"
-            allowEmpty
-            options={(options.data?.states ?? []).map((state) => ({ value: state.key, label: state.label }))}
-            value={draft.stateKey}
-            onChange={(value) => set("stateKey", value)}
-          />
-        </PropertyRow>
-        <PropertyRow icon="select" label="Source" error={errors.sourceKey}>
-          <Pills
-            label="Source"
-            allowEmpty
-            options={(options.data?.sources ?? []).map((source) => ({ value: source.key, label: source.label }))}
-            value={draft.sourceKey}
-            onChange={(value) => set("sourceKey", value)}
-          />
-        </PropertyRow>
-        <PropertyRow icon="arrow_outward" label="Expertise" hint={LIMIT_HINTS.personExpertise} error={errors.expertise}>
-          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.personExpertise} />
-        </PropertyRow>
-        <PropertyRow icon="title" label="Personal note" htmlFor="person-note" error={errors.personalNote}>
-          <AutoGrowTextarea
-            id="person-note"
-            value={draft.personalNote}
-            onChange={(e) => set("personalNote", e.target.value)}
-            maxLength={5000}
-            placeholder="Add a note…"
-          />
-        </PropertyRow>
-        <PropertyRow icon="arrow_outward" label="Organization" hint={LIMIT_HINTS.personOrganizations} error={errors.organizations}>
-          <RelationPicker
-            label="Organization"
-            selected={draft.organizations}
-            onChange={(next) => set("organizations", next)}
-            search={searchOrganizations}
-            max={RELATION_LIMITS.organizationsPerPerson}
-            limitMessage={LIMIT_HINTS.personOrganizations}
-          />
-        </PropertyRow>
-        <PropertyRow icon="check_box" label="Do not contact">
-          <Pills
-            label="Do not contact"
-            options={CONTACT_PILLS}
-            value={draft.doNotContact ? "do_not_contact" : "contact"}
-            onChange={(value) => set("doNotContact", value === "do_not_contact")}
-          />
-        </PropertyRow>
-        {CONTACT_FIELDS.map(({ field, label, icon, placeholder, type, inputMode }) => (
-          <PropertyRow key={field} icon={icon} label={label} htmlFor={`person-${field}`} error={errors[field]}>
-            <input
-              id={`person-${field}`}
-              type={type ?? "text"}
-              inputMode={inputMode}
-              value={draft[field]}
-              onChange={(e) => set(field, e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={placeholder}
-              className={recordInput}
-            />
-          </PropertyRow>
-        ))}
-        <PropertyRow icon="schedule" label="Follow-up date" htmlFor="person-followup" error={errors.nextFollowupOn}>
-          <DateField id="person-followup" label="Follow-up date" value={draft.nextFollowupOn} onChange={(value) => set("nextFollowupOn", value)} />
-        </PropertyRow>
-        {loaded.lastFollowupAtLegacy ? (
-          // Kept from before the Follow-up date meant "next" (migration 0002): read-only.
-          <PropertyRow icon="schedule" label="Last followup (legacy)">
-            <span className="px-2">{formatDate(loaded.lastFollowupAtLegacy)}</span>
-          </PropertyRow>
-        ) : null}
-        <CompletenessRow missing={personMissing(draft)} />
-      </RecordLayout>
-    </form>
+      ))}
+      <PropertyRow icon="title" label="Other contact details" htmlFor="person-otherContact" error={errors.otherContact}>
+        <AutoGrowTextarea id="person-otherContact" value={draft.otherContact} onChange={(e) => set("otherContact", e.target.value)} maxLength={500} placeholder="Another way to reach them" />
+      </PropertyRow>
+      <PropertyRow icon="contact_channels" label="Contact channels" error={errors.contactChannels}>
+        <RelationPicker
+          label="Contact channels"
+          selected={draft.contactChannelKeys.map((key) => ({ id: key, label: channels.find((channel) => channel.key === key)?.label ?? key }))}
+          onChange={(next) => set("contactChannelKeys", next.map((option) => option.id))}
+          search={async (text) => channels.filter((channel) => channel.label.toLowerCase().includes(text.trim().toLowerCase())).map((channel) => ({ id: channel.key, label: channel.label }))}
+        />
+      </PropertyRow>
+      <PropertyRow icon="check_box" label="Do not contact">
+        <CheckboxField id="person-dnc" checked={draft.doNotContact} onChange={(checked) => set("doNotContact", checked)}>
+          Do not contact
+        </CheckboxField>
+      </PropertyRow>
+      <PropertyRow icon="tag" label="AI relevance score" htmlFor="person-ai-score" error={errors.aiRelevanceScore}>
+        <input
+          id="person-ai-score"
+          inputMode="numeric"
+          value={draft.aiRelevanceScore}
+          onChange={(e) => set("aiRelevanceScore", e.target.value)}
+          readOnly={options?.aiScoreReadOnly}
+          title={options?.aiScoreReadOnly ? "Set automatically" : undefined}
+          autoComplete="off"
+          placeholder="Enter a number"
+          className={`${recordInput} max-w-[240px]`}
+        />
+      </PropertyRow>
+      <PropertyRow icon="tag" label="Relevance score" htmlFor="person-score" error={errors.relevanceScore}>
+        <input id="person-score" inputMode="numeric" value={draft.relevanceScore} onChange={(e) => set("relevanceScore", e.target.value)} autoComplete="off" placeholder="Enter a number" className={`${recordInput} max-w-[240px]`} />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="Organizations" hint={LIMIT_HINTS.personOrganizations} error={errors.organizations}>
+        <RelationPicker
+          label="Organizations"
+          selected={draft.organizations}
+          onChange={(next) => set("organizations", next)}
+          search={searchOrganizations}
+          max={RELATION_LIMITS.organizationsPerPerson}
+          limitMessage={LIMIT_HINTS.personOrganizations}
+        />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="Expenses" error={errors.expenses}>
+        <RelationPicker label="Expenses" selected={draft.expenses} onChange={(next) => set("expenses", next)} search={searchExpenses} />
+      </PropertyRow>
+      <PropertyRow icon="calendar" label="First contact" htmlFor="person-first-contact" error={errors.firstContactOn}>
+        <DateField id="person-first-contact" label="First contact" value={draft.firstContactOn} onChange={(value) => set("firstContactOn", value)} />
+      </PropertyRow>
+      <PropertyRow icon="calendar" label="Last contact" htmlFor="person-last-contact" error={errors.lastContactOn}>
+        <DateField id="person-last-contact" label="Last contact" value={draft.lastContactOn} onChange={(value) => set("lastContactOn", value)} />
+      </PropertyRow>
+      <PropertyRow icon="calendar" label="Follow-up date" htmlFor="person-followup" error={errors.nextFollowupAt}>
+        <DateTimeField id="person-followup" label="Follow-up date" value={draft.nextFollowupAt} onChange={(value) => set("nextFollowupAt", value)} />
+      </PropertyRow>
+      {meta ? (
+        <>
+          <RecordMeta numberLabel="Person ID" {...meta} />
+          {meta.legacyFollowUp ? (
+            // Kept from before the Follow-up date meant "next" (migration 0002): read-only.
+            <PropertyRow icon="schedule" label="Last followup (legacy)">
+              <ReadOnlyValue>{formatDate(meta.legacyFollowUp)}</ReadOnlyValue>
+            </PropertyRow>
+          ) : null}
+        </>
+      ) : null}
+      <CompletenessRow missing={personMissing(draft)} />
+    </>
   );
 }

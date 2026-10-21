@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Timestamp } from "@/shared/format/Timestamp";
 import { completenessLabel } from "../completeness";
 import { Highlight } from "@/shared/ui/Highlight";
 import { Icon } from "@/shared/ui/icons";
@@ -58,7 +59,7 @@ export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "wise_recipient_id", label: "Wise recipient ID", icon: "title", width: 160, render: (p) => p.wiseRecipientId },
   { id: "created", label: "Created", icon: "schedule", width: 120, render: (p) => formatDate(p.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, render: (p) => formatDate(p.updatedAt) },
-  { id: "next_followup", label: "Follow-up date", icon: "schedule", width: 140, render: (p) => formatCalendarDate(p.nextFollowupOn) },
+  { id: "next_followup", label: "Follow-up date", icon: "schedule", width: 140, render: (p) => (p.nextFollowupAt ? <Timestamp value={p.nextFollowupAt} format="short" /> : null) },
   {
     id: "overdue",
     label: "Overdue",

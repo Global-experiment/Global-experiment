@@ -106,7 +106,8 @@ describe("migration 0002 — directory aligned with Notion", () => {
   it("carries existing rows over without losing data", async () => {
     const client = await databaseAt(2);
     await insertPre0002Rows(client);
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    // Through 0008: the state this test was written for (0010 replaces next_followup_on; tested below).
+    await migrate(drizzle(client), { migrationsFolder: migrationsUpTo(9) });
 
     const migratedPeople = await rows<Record<string, unknown>>(
       client,

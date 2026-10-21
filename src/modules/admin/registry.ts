@@ -54,7 +54,7 @@ export const ADMIN_MODULES: AdminSection[] = [
       { key: "permissions", label: "Permissions", icon: "lock", status: "coming_soon" },
       { key: "accounts", label: "Accounts", icon: "manage_accounts", status: "coming_soon" },
       // Figma draws History with the lightbulb glyph.
-      { key: "history", label: "History", icon: "lightbulb", status: "coming_soon" },
+      { key: "history", label: "History", icon: "lightbulb", status: "live", href: "/admin/history" },
       { key: "analytics", label: "Analytics", icon: "analytics", status: "coming_soon" },
       { key: "technical_dashboard", label: "Technical dashboard", icon: "technical_dashboard", status: "coming_soon" },
       { key: "emails", label: "Emails", icon: "alternate_email", status: "coming_soon" },

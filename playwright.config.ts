@@ -98,7 +98,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|treasury-toolbar|donate-embedded).spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -131,6 +131,13 @@ export default defineConfig({
       name: "chromium-settings",
       dependencies: ["chromium-admin-treasury"],
       testMatch: /(treasury-toolbar|donate-embedded).spec.ts/,
+      use: { browserName: "chromium" },
+    },
+    // Last: the detail page archives and deletes records (its own), which would change the other suites' counts.
+    {
+      name: "chromium-detail",
+      dependencies: ["chromium-settings"],
+      testMatch: /admin-detail-page.spec.ts/,
       use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine

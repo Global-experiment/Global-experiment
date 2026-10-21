@@ -56,7 +56,10 @@ test("pick expertise on a person: server search with path and team chips, chips 
 
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
-  await page.reload();
+  // Submit goes back to the list; the saved record shows the chip.
+  await expect(page).toHaveURL(/\/admin\/people\?q=alex/);
+  await rows(page).first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("button", { name: "Remove Interaction design" })).toBeVisible();
 });
 

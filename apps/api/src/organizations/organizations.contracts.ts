@@ -35,7 +35,16 @@ export const CreateOrganizationRequest = z.strictObject(organizationFields);
 export type CreateOrganizationRequest = z.output<typeof CreateOrganizationRequest>;
 
 export const UpdateOrganizationRequest = z
-  .strictObject({ ...organizationFields, name: organizationFields.name.optional() })
+  .strictObject({
+    ...organizationFields,
+    name: organizationFields.name.optional(),
+    /** The organization's people, all at once (one Submit = one event); each person keeps the 5-organization cap. */
+    personIds: z
+      .array(z.uuid())
+      .max(500)
+      .refine((ids) => new Set(ids).size === ids.length, "Duplicate ids.")
+      .optional(),
+  })
   .refine((body) => Object.keys(body).length > 0, "Nothing to update.");
 export type UpdateOrganizationRequest = z.output<typeof UpdateOrganizationRequest>;
 
@@ -53,6 +62,8 @@ export const OrganizationsListQuery = listQuerySchema({
     expertise: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
     person: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
     completeness: { operators: ["is"], value: z.enum(["complete", "incomplete"]) },
+    /** The "Archived" view (decision 12): without this filter, archived organizations are left out. */
+    archived: { operators: ["is"], value: z.enum(["true", "false"]).transform((value) => value === "true") },
   },
 });
 export type OrganizationsListQuery = z.output<typeof OrganizationsListQuery>;
@@ -76,6 +87,11 @@ export interface OrganizationDto {
   wiseRecipientId: string | null;
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
   people: EntityRef[];
   expertise: ExpertiseRef[];
 }
+
+/** Permanent delete (owner only, decision 12): the organization's name typed exactly. */
+export const DeleteOrganizationRequest = z.strictObject({ confirm: z.string().max(200) });
+export type DeleteOrganizationRequest = z.output<typeof DeleteOrganizationRequest>;

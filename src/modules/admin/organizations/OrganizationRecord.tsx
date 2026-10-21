@@ -3,15 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatOrgNumber, type Organization, type OrganizationInput, type Page, type Person } from "../api/types";
+import { formatOrgNumber, type Organization, type OrganizationInput, type Page, type Person, type RecordHistory } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { organizationMissing } from "../completeness";
 import { ExpertiseField } from "../expertise/ExpertiseField";
 import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import { LIMIT_HINTS, RELATION_LIMITS } from "../relationLimits";
 import { CompletenessRow } from "../ui/CompletenessRow";
-import { StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, formatPanelDate, PanelButton, PanelRow, PropertyRow, RecordLayout, recordInput } from "../ui/RecordForm";
+import { RecordMeta } from "../record/RecordMeta";
+import { RecordPage } from "../record/RecordPage";
+import { AdminButton, StatusMessage } from "../ui/controls";
+import { AutoGrowTextarea, PropertyRow, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 
@@ -49,17 +51,9 @@ function patchFor(base: Draft, draft: Draft): OrganizationInput {
   }
   const ids = (options: RelationOption[]) => options.map((option) => option.id).sort().join(",");
   if (ids(draft.expertise) !== ids(base.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
+  // People travel in the same PATCH: one Submit, one history event.
+  if (ids(draft.people) !== ids(base.people)) patch.personIds = draft.people.map((option) => option.id);
   return patch;
-}
-
-/** People added/removed in the draft — applied through the organization's link endpoints. */
-function peopleChanges(base: Draft, draft: Draft) {
-  const before = new Set(base.people.map((person) => person.id));
-  const after = new Set(draft.people.map((person) => person.id));
-  return {
-    added: [...after].filter((id) => !before.has(id)),
-    removed: [...before].filter((id) => !after.has(id)),
-  };
 }
 
 /** People search for the People picker: someone already at 5 organizations can't be added here. */
@@ -79,57 +73,59 @@ async function searchPeople(text: string, signal: AbortSignal): Promise<Relation
 }
 
 /**
- * /admin/organizations/[id] — the person record's layout (admin-desktop.pdf
- * p12; organizations have no frame of their own). People are linked and
- * unlinked here exactly as organizations are on a person's record (client,
- * 2026-10-05): the link is one shared people_organizations row, so it shows
- * on both records, and each person's 5-organization limit applies.
+ * /admin/organizations/[id] — the person record's layout and panel
+ * (prototype p14; organizations have no frame of their own). People are
+ * linked and unlinked here exactly as organizations are on a person's
+ * record (client, 2026-10-05): the link is one shared people_organizations
+ * row, so it shows on both records, and each person's 5-organization limit
+ * applies. Nothing is saved until "Submit changes" (one PATCH, one event).
  */
 export function OrganizationRecord({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
   const organization = useAdminData<Organization>(`/organizations/${id}`);
+  const history = useAdminData<RecordHistory>(`/history/organization/${id}`);
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
-  const [busy, setBusy] = useState<"saving" | "duplicating" | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (organization.error || !organization.data) {
     return (
-      <RecordLayout backHref="/admin/organizations" backLabel="Organizations" title="">
+      <RecordPage backHref="/admin/organizations" backLabel="Organizations" title="">
         {organization.error ? (
-          <StatusMessage tone="error">{organization.error.status === 404 ? "This organization doesn’t exist." : organization.error.message}</StatusMessage>
+          <div>
+            <StatusMessage tone="error">{organization.error.status === 404 ? "This organization doesn’t exist." : organization.error.message}</StatusMessage>
+            {organization.error.status !== 404 ? <AdminButton onClick={organization.reload}>Retry</AdminButton> : null}
+          </div>
         ) : (
           <StatusMessage>Loading organization…</StatusMessage>
         )}
-      </RecordLayout>
+      </RecordPage>
     );
   }
 
   const loaded = organization.data;
-  const version = `${loaded.id}@${loaded.updatedAt}`;
+  const version = `${loaded.id}@${loaded.updatedAt}@${loaded.archivedAt}`;
   const base = toDraft(loaded);
   const draft = edit?.version === version ? edit.draft : base;
   const patch = patchFor(base, draft);
-  const links = peopleChanges(base, draft);
-  const dirty = Object.keys(patch).length > 0 || links.added.length > 0 || links.removed.length > 0;
+  const dirty = Object.keys(patch).length > 0;
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
 
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    if (!dirty) return;
+  async function submit(): Promise<boolean> {
+    if (!draft.name.trim()) {
+      setError("Name is required.");
+      return false;
+    }
     setBusy("saving");
     setError(null);
     try {
-      if (Object.keys(patch).length > 0) await adminApi(`/organizations/${id}`, { method: "PATCH", body: patch });
-      for (const personId of links.added) await adminApi(`/organizations/${id}/people/${personId}`, { method: "PUT" });
-      for (const personId of links.removed) await adminApi(`/organizations/${id}/people/${personId}`, { method: "DELETE" });
-      // The edit stays until the refreshed record (new updatedAt) replaces it.
-      organization.reload();
+      await adminApi(`/organizations/${id}`, { method: "PATCH", body: patch });
       toast("Organization updated");
+      return true;
     } catch (caught) {
       setError(caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : "Couldn't save.");
-      // Some steps may have applied: show the server's state.
-      organization.reload();
+      return false;
     } finally {
       setBusy(null);
     }
@@ -148,108 +144,125 @@ export function OrganizationRecord({ id }: { id: string }) {
     }
   }
 
-  const panel = (
-    <>
-      <PanelRow icon="schedule" label="Last updated">
-        {formatPanelDate(loaded.updatedAt)}
-      </PanelRow>
-      <PanelRow icon="schedule" label="Created">
-        {formatPanelDate(loaded.createdAt)}
-      </PanelRow>
-      <PanelRow icon="numbers" label="Number">
-        {formatOrgNumber(loaded.orgNumber)}
-      </PanelRow>
-      <div className="mt-1 flex flex-col gap-2">
-        <PanelButton icon="restart_alt" onClick={() => setEdit(null)} disabled={!dirty || busy !== null}>
-          Discard changes
-        </PanelButton>
-        <PanelButton
-          icon="content_copy"
-          onClick={() => void duplicate()}
-          disabled={dirty || busy !== null}
-          title={dirty ? "Submit or discard your changes first" : "Create a copy of this organization (without its people) and open it"}
-        >
-          {busy === "duplicating" ? "Duplicating…" : "Duplicate"}
-        </PanelButton>
-        <PanelButton icon="check_circle" type="submit" disabled={!dirty || busy !== null}>
-          {busy === "saving" ? "Submitting…" : "Submit changes"}
-        </PanelButton>
-      </div>
-    </>
-  );
+  async function setArchived(archived: boolean) {
+    setBusy(archived ? "archiving" : "restoring");
+    setError(null);
+    try {
+      await adminApi(`/organizations/${id}/${archived ? "archive" : "restore"}`, { method: "POST" });
+      toast(archived ? "Organization archived" : "Organization restored");
+      organization.reload();
+    } catch (caught) {
+      setError(caught instanceof AdminApiError ? caught.message : "Couldn't change the archive state.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
-    <form onSubmit={save} noValidate className="h-full">
-      <RecordLayout backHref="/admin/organizations" backLabel="Organizations" title={draft.name} panel={panel}>
-        {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-        <PropertyRow icon="title" label="Name" htmlFor="organization-name">
-          <input
-            id="organization-name"
-            value={draft.name}
-            onChange={(e) => set("name", e.target.value)}
-            maxLength={200}
-            required
-            autoComplete="off"
-            placeholder="Organization name"
-            className={recordInput}
-          />
-        </PropertyRow>
-        <PropertyRow icon="title" label="Description" htmlFor="organization-description">
-          <AutoGrowTextarea
-            id="organization-description"
-            value={draft.description}
-            onChange={(e) => set("description", e.target.value)}
-            maxLength={5000}
-            placeholder="What the organization does…"
-          />
-        </PropertyRow>
-        <PropertyRow icon="arrow_outward" label="Expertise" hint={LIMIT_HINTS.organizationExpertise}>
-          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.organizationExpertise} />
-        </PropertyRow>
-        <PropertyRow icon="arrow_outward" label="People">
-          <RelationPicker label="People" selected={draft.people} onChange={(next) => set("people", next)} search={searchPeople} />
-        </PropertyRow>
-        <PropertyRow icon="link" label="Website" htmlFor="organization-website">
-          <input
-            id="organization-website"
-            inputMode="url"
-            value={draft.website}
-            onChange={(e) => set("website", e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="https://example.org"
-            className={recordInput}
-          />
-        </PropertyRow>
-        <PropertyRow icon="alternate_email" label="Email" htmlFor="organization-email">
-          <input
-            id="organization-email"
-            type="email"
-            inputMode="email"
-            value={draft.email}
-            onChange={(e) => set("email", e.target.value)}
-            maxLength={320}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="contact@example.org"
-            className={recordInput}
-          />
-        </PropertyRow>
-        <PropertyRow icon="title" label="Wise recipient ID" htmlFor="organization-wise">
-          <input
-            id="organization-wise"
-            value={draft.wiseRecipientId}
-            onChange={(e) => set("wiseRecipientId", e.target.value)}
-            maxLength={100}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="Wise recipient ID"
-            className={recordInput}
-          />
-        </PropertyRow>
-        <CompletenessRow missing={organizationMissing(draft)} />
-      </RecordLayout>
-    </form>
+    <RecordPage
+      backHref="/admin/organizations"
+      backLabel="Organizations"
+      title={draft.name}
+      entity={{ type: "organization", id }}
+      entityNoun="organization"
+      recordLink={(other) => `/admin/organizations/${other}`}
+      actions={{
+        submit,
+        discard: () => {
+          setEdit(null);
+          setError(null);
+        },
+        duplicate,
+        archived: loaded.archivedAt !== null,
+        setArchived,
+        remove: {
+          confirmText: loaded.name,
+          run: async (confirm) => {
+            await adminApi(`/organizations/${id}`, { method: "DELETE", body: { confirm } });
+            toast("Organization deleted");
+            router.push("/admin/organizations");
+          },
+        },
+        savedMessage: "Organization updated",
+        dirty,
+        busy,
+      }}
+    >
+      {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+      <PropertyRow icon="title" label="Name" htmlFor="organization-name">
+        <input
+          id="organization-name"
+          value={draft.name}
+          onChange={(e) => set("name", e.target.value)}
+          maxLength={200}
+          required
+          autoComplete="off"
+          placeholder="Organization name"
+          className={recordInput}
+        />
+      </PropertyRow>
+      <PropertyRow icon="title" label="Description" htmlFor="organization-description">
+        <AutoGrowTextarea
+          id="organization-description"
+          value={draft.description}
+          onChange={(e) => set("description", e.target.value)}
+          maxLength={5000}
+          placeholder="What the organization does…"
+        />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="Expertise" hint={LIMIT_HINTS.organizationExpertise}>
+        <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.organizationExpertise} />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="People">
+        <RelationPicker label="People" selected={draft.people} onChange={(next) => set("people", next)} search={searchPeople} />
+      </PropertyRow>
+      <PropertyRow icon="link" label="Website" htmlFor="organization-website">
+        <input
+          id="organization-website"
+          inputMode="url"
+          value={draft.website}
+          onChange={(e) => set("website", e.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="https://"
+          className={recordInput}
+        />
+      </PropertyRow>
+      <PropertyRow icon="alternate_email" label="Email" htmlFor="organization-email">
+        <input
+          id="organization-email"
+          type="email"
+          inputMode="email"
+          value={draft.email}
+          onChange={(e) => set("email", e.target.value)}
+          maxLength={320}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="contact@example.org"
+          className={recordInput}
+        />
+      </PropertyRow>
+      <PropertyRow icon="title" label="Wise recipient ID" htmlFor="organization-wise">
+        <input
+          id="organization-wise"
+          value={draft.wiseRecipientId}
+          onChange={(e) => set("wiseRecipientId", e.target.value)}
+          maxLength={100}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Wise recipient ID"
+          className={recordInput}
+        />
+      </PropertyRow>
+      <RecordMeta
+        numberLabel="Organization ID"
+        number={formatOrgNumber(loaded.orgNumber)}
+        updatedAt={loaded.updatedAt}
+        createdAt={loaded.createdAt}
+        lastEditedBy={history.data?.lastEditedBy?.label ?? null}
+        createdBy={history.data?.createdBy?.label ?? (loaded.notionPageId ? "Automation" : null)}
+      />
+      <CompletenessRow missing={organizationMissing(draft)} />
+    </RecordPage>
   );
 }
-

@@ -1,4 +1,6 @@
 import { statSync } from "node:fs";
+import { recordAuditEvent } from "../audit/audit.service.js";
+import { AUTOMATION } from "../audit/audit.types.js";
 import { inArray, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../common/database/database.module.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
@@ -174,7 +176,9 @@ export async function planDemoPurge(db: Executor): Promise<PurgePlan> {
   return plan;
 }
 
-/** Deletes exactly the plan's rows in one transaction (links go with them). Returns the plan it applied. */
+const ENTITY_OF = { person: "person", organization: "organization", expertise: "expertise_item", field: "expertise_field", domain: "expertise_domain" } as const;
+
+/** Deletes exactly the plan's rows in one transaction (links go with them), each logged. Returns the plan it applied. */
 export async function purgeDemoData(db: Database): Promise<PurgePlan> {
   return db.transaction(async (tx) => {
     // Re-planned inside the transaction, so it deletes what it reports.
@@ -182,7 +186,12 @@ export async function purgeDemoData(db: Database): Promise<PurgePlan> {
     const ids = (kind: Kind) => plan.delete.filter((row) => row.kind === kind).map((row) => row.id);
     const remove = async (table: typeof people | typeof organizations | typeof expertiseItems | typeof expertiseFields | typeof expertiseDomains, kind: Kind) => {
       const list = ids(kind);
-      if (list.length > 0) await tx.delete(table).where(inArray(table.id, list));
+      if (list.length === 0) return;
+      // Logged before the rows go (Automation: an operator command).
+      for (const row of plan.delete.filter((candidate) => candidate.kind === kind)) {
+        await recordAuditEvent(tx, { entityType: ENTITY_OF[kind], entityId: row.id, action: "deleted", actor: AUTOMATION, source: "system", meta: { label: row.name, origin: "purge-demo-data" } });
+      }
+      await tx.delete(table).where(inArray(table.id, list));
     };
     await remove(people, "person");
     await remove(organizations, "organization");

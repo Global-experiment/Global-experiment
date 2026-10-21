@@ -119,8 +119,8 @@ const value = (property: NotionProperty | undefined): string | null => {
       text = property.phone_number;
       break;
     case "date":
-      // A date or a date-time: the calendar day as written in Notion.
-      text = property.date?.start?.slice(0, 10);
+      // A date ("2026-10-14") or a date-time with its offset, as written in Notion.
+      text = property.date?.start ?? undefined;
       break;
   }
   return text?.trim() ? text.trim() : null;
@@ -157,7 +157,8 @@ export interface SourcePerson extends SourceRecordBase {
   linkedin: string | null;
   x: string | null;
   otherContact: string | null;
-  nextFollowupOn: string | null;
+  /** Notion's Follow-up date: a date or a date-time. */
+  nextFollowupAt: string | null;
   organizationPageIds: string[];
   accessGrantsCount: number;
 }
@@ -225,7 +226,7 @@ export async function toSourcePerson(page: NotionPage, layout: DatabaseLayout, r
     x: text("X"),
     otherContact: text("Other contact details"),
     wiseRecipientId: text("Wise recipient account ID"),
-    nextFollowupOn: text("Follow-up date"),
+    nextFollowupAt: text("Follow-up date"),
     organizationPageIds: (await relation("Organizations")) ?? [],
     expertisePageIds: await relation("Expertise"),
     expensesCount: ((await relation("Expenses")) ?? []).length,

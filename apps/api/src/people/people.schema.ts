@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { adminUsers } from "../auth/auth.schema.js";
 import { expertiseItems } from "../expertise/expertise.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
 
@@ -57,8 +58,24 @@ export const people = pgTable(
     x: text("x"),
     otherContact: text("other_contact"),
     wiseRecipientId: text("wise_recipient_id"),
-    /** Notion's Follow-up date: the NEXT planned follow-up. */
-    nextFollowupOn: date("next_followup_on", { mode: "string" }),
+    /**
+     * Notion's Follow-up date: the NEXT planned follow-up, date AND time
+     * (person-record prototype, 2026-10-21). Replaced next_followup_on in
+     * 0010: a date-only value became that day at 09:00 Europe/Zurich.
+     */
+    nextFollowupAt: timestamp("next_followup_at", { withTimezone: true }),
+    /** First and last contact: date-only, never converted between time zones. */
+    firstContactOn: date("first_contact_on", { mode: "string" }),
+    lastContactOn: date("last_contact_on", { mode: "string" }),
+    /** Whole scores 0–10 (decision 7); the AI score becomes read-only once ai.enabled. */
+    aiRelevanceScore: smallint("ai_relevance_score"),
+    relevanceScore: smallint("relevance_score"),
+    /** "Other socials" (Figma p14): one more profile link. */
+    otherSocials: text("other_socials"),
+    /** Archived (decision 12): left out of the default views, listed under "Archived", restorable. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedById: uuid("archived_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
+
     /**
      * Values of the former `last_followup_at` column (0001), whose meaning
      * was "last follow-up" — kept as they were, never converted into
@@ -75,10 +92,14 @@ export const people = pgTable(
     index("people_source_key_idx").on(table.sourceKey),
     index("people_created_at_idx").on(table.createdAt),
     index("people_updated_at_idx").on(table.updatedAt),
-    index("people_next_followup_on_idx").on(table.nextFollowupOn),
     uniqueIndex("people_person_number_unique").on(table.personNumber),
     uniqueIndex("people_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
     check("people_person_number_positive", sql`${table.personNumber} > 0`),
+    check("people_relevance_scores_range", sql`(${table.aiRelevanceScore} is null or ${table.aiRelevanceScore} between 0 and 10) and (${table.relevanceScore} is null or ${table.relevanceScore} between 0 and 10)`),
+    check("people_other_socials_length", sql`${table.otherSocials} is null or length(${table.otherSocials}) between 1 and 2048`),
+    check("people_contact_dates_order", sql`${table.firstContactOn} is null or ${table.lastContactOn} is null or ${table.firstContactOn} <= ${table.lastContactOn}`),
+    index("people_next_followup_at_idx").on(table.nextFollowupAt),
+    index("people_archived_at_idx").on(table.archivedAt),
     check("people_wise_recipient_id_length", sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`),
     check("people_name_present", sql`length(btrim(${table.name})) between 1 and 200`),
     check("people_email_shape", sql`${table.email} is null or ${table.email} ~ '^[^@\\s]+@[^@\\s]+$'`),
@@ -126,4 +147,28 @@ export const peopleExpertise = pgTable(
     primaryKey({ name: "people_expertise_pk", columns: [table.personId, table.expertiseId] }),
     index("people_expertise_expertise_id_idx").on(table.expertiseId),
   ],
+);
+
+/**
+ * Contact channels (decision 8 of 2026-10-19): an admin-editable lookup,
+ * seeded with Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix
+ * and Workana; a person lists the channels they can be reached on.
+ */
+export const contactChannels = pgTable("contact_channels", vocabularyColumns, (table) => [
+  check("contact_channels_key_shape", sql`${table.key} ~ '^[a-z][a-z0-9_]{0,39}$'`),
+  check("contact_channels_label_present", sql`length(btrim(${table.label})) between 1 and 60`),
+]);
+
+export const personContactChannels = pgTable(
+  "person_contact_channels",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    channelKey: text("channel_key")
+      .notNull()
+      .references(() => contactChannels.key, { onDelete: "restrict", onUpdate: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ name: "person_contact_channels_pk", columns: [table.personId, table.channelKey] })],
 );

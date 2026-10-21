@@ -98,6 +98,9 @@ export const treasuryEntries = pgTable(
     createdByAdminId: uuid("created_by_admin_id").references(() => adminUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Archived (decision 12): out of the default admin views and off the public pages, restorable. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedById: uuid("archived_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
   },
   (table) => [
     uniqueIndex("treasury_entries_entry_number_unique").on(table.entryNumber),
@@ -116,6 +119,7 @@ export const treasuryEntries = pgTable(
     // Test-mode Stripe rows: hidden from the public, purged by the purge-test-donations command.
     index("treasury_entries_test_mode_idx").on(table.createdAt).where(sql`not ${table.livemode}`),
     // Sample entries (before go-live): removed by the purge-sample-treasury command.
+    index("treasury_entries_archived_at_idx").on(table.archivedAt),
     index("treasury_entries_sample_idx").on(table.createdAt).where(sql`${table.sample}`),
     // Fee reconciliation: Stripe entries whose fee isn't known yet.
     index("treasury_entries_fee_pending_idx")

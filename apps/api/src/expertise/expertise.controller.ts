@@ -1,4 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { actorFor } from "../audit/audit.service.js";
+import type { AdminRequest } from "../auth/admin-area.js";
+import { UnauthenticatedError } from "../common/errors/api-error.js";
 import { z } from "zod";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import {
@@ -16,6 +19,11 @@ const IdParam = new ZodValidationPipe(z.uuid("Invalid id."));
  * /api/admin/expertise — the Domain → Field → Expertise taxonomy.
  * Assigning expertise to people/organizations lives on those resources.
  */
+const actor = (request: AdminRequest) => {
+  if (!request.admin) throw new UnauthenticatedError();
+  return actorFor(request.admin);
+};
+
 @Controller("admin/expertise")
 export class ExpertiseController {
   constructor(private readonly expertise: ExpertiseService) {}
@@ -32,50 +40,50 @@ export class ExpertiseController {
   }
 
   @Post("domains")
-  createDomain(@Body(new ZodValidationPipe(CreateDomainRequest)) body: CreateDomainRequest) {
-    return this.expertise.createDomain(body.name);
+  createDomain(@Body(new ZodValidationPipe(CreateDomainRequest)) body: CreateDomainRequest, @Req() request: AdminRequest) {
+    return this.expertise.createDomain(body.name, actor(request));
   }
 
   @Patch("domains/:id")
-  renameDomain(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(RenameRequest)) body: RenameRequest) {
-    return this.expertise.rename("domain", id, body.name);
+  renameDomain(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(RenameRequest)) body: RenameRequest, @Req() request: AdminRequest) {
+    return this.expertise.rename("domain", id, body.name, actor(request));
   }
 
   @Delete("domains/:id")
   @HttpCode(204)
-  deleteDomain(@Param("id", IdParam) id: string) {
-    return this.expertise.delete("domain", id);
+  deleteDomain(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    return this.expertise.delete("domain", id, actor(request));
   }
 
   @Post("fields")
-  createField(@Body(new ZodValidationPipe(CreateFieldRequest)) body: CreateFieldRequest) {
-    return this.expertise.createField(body.domainId, body.name);
+  createField(@Body(new ZodValidationPipe(CreateFieldRequest)) body: CreateFieldRequest, @Req() request: AdminRequest) {
+    return this.expertise.createField(body.domainId, body.name, actor(request));
   }
 
   @Patch("fields/:id")
-  renameField(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(RenameRequest)) body: RenameRequest) {
-    return this.expertise.rename("field", id, body.name);
+  renameField(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(RenameRequest)) body: RenameRequest, @Req() request: AdminRequest) {
+    return this.expertise.rename("field", id, body.name, actor(request));
   }
 
   @Delete("fields/:id")
   @HttpCode(204)
-  deleteField(@Param("id", IdParam) id: string) {
-    return this.expertise.delete("field", id);
+  deleteField(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    return this.expertise.delete("field", id, actor(request));
   }
 
   @Post("items")
-  createExpertise(@Body(new ZodValidationPipe(CreateExpertiseRequest)) body: CreateExpertiseRequest) {
-    return this.expertise.createExpertise(body.fieldId, body.name);
+  createExpertise(@Body(new ZodValidationPipe(CreateExpertiseRequest)) body: CreateExpertiseRequest, @Req() request: AdminRequest) {
+    return this.expertise.createExpertise(body.fieldId, body.name, actor(request));
   }
 
   @Patch("items/:id")
-  renameExpertise(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(RenameRequest)) body: RenameRequest) {
-    return this.expertise.rename("expertise", id, body.name);
+  renameExpertise(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(RenameRequest)) body: RenameRequest, @Req() request: AdminRequest) {
+    return this.expertise.rename("expertise", id, body.name, actor(request));
   }
 
   @Delete("items/:id")
   @HttpCode(204)
-  deleteExpertise(@Param("id", IdParam) id: string) {
-    return this.expertise.delete("expertise", id);
+  deleteExpertise(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    return this.expertise.delete("expertise", id, actor(request));
   }
 }
