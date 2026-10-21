@@ -20,6 +20,7 @@ import { OrganizationsModule } from "./organizations/organizations.module.js";
 import { PeopleModule } from "./people/people.module.js";
 import { RevalidationModule } from "./revalidation/revalidation.service.js";
 import { SettingsModule } from "./settings/settings.service.js";
+import { AuditModule } from "./audit/audit.module.js";
 import { StripeModule } from "./stripe/stripe.module.js";
 import { TreasuryModule } from "./treasury/treasury.module.js";
 
@@ -34,6 +35,7 @@ export class AppModule {
         LoggingModule,
         DatabaseModule,
         SettingsModule,
+        AuditModule,
         RevalidationModule,
         JobsModule,
         FilesModule,

@@ -3,6 +3,13 @@ import type { Database } from "../../common/database/database.module.js";
 import { expertiseItems } from "../../expertise/expertise.schema.js";
 import { organizationExpertise, organizations } from "../../organizations/organizations.schema.js";
 import { people, peopleExpertise, peopleOrganizations, personSources, personStates } from "../../people/people.schema.js";
+import { recordAuditEvent } from "../../audit/audit.service.js";
+import { AUTOMATION } from "../../audit/audit.types.js";
+import { diffRecord } from "../../audit/record-fields.js";
+import { labelOfOrganization, ORGANIZATION_FIELDS } from "../../organizations/organizations.audit.js";
+import { OrganizationsRepository } from "../../organizations/organizations.repository.js";
+import { labelOfPerson, PERSON_FIELDS } from "../../people/people.audit.js";
+import { PeopleRepository } from "../../people/people.repository.js";
 import { countsChangedRefusal, runImport } from "../import-run.js";
 import {
   countDirectoryPlan,
@@ -50,7 +57,7 @@ export async function loadDirectorySnapshot(db: Executor): Promise<DirectorySnap
         x: people.x,
         otherContact: people.otherContact,
         wiseRecipientId: people.wiseRecipientId,
-        nextFollowupOn: people.nextFollowupOn,
+        nextFollowupAt: people.nextFollowupAt,
       })
       .from(people),
     db.select({ personId: peopleOrganizations.personId, organizationId: peopleOrganizations.organizationId }).from(peopleOrganizations),
@@ -65,7 +72,8 @@ export async function loadDirectorySnapshot(db: Executor): Promise<DirectorySnap
   ]);
   return {
     organizations: organizationRows,
-    people: peopleRows,
+    // The plan compares follow-ups as ISO strings.
+    people: peopleRows.map((row) => ({ ...row, nextFollowupAt: row.nextFollowupAt?.toISOString() ?? null })),
     personOrganization,
     personExpertise,
     organizationExpertise: organizationTags,
@@ -131,13 +139,73 @@ async function writeRecords<Values extends Record<string, unknown>>(
   );
 }
 
-/** Writes a directory plan. Must run inside the caller's transaction. */
+/**
+ * Writes a directory plan with its audit events (actor "Automation", source
+ * Notion): "imported" for each new record, one "updated" event per changed
+ * record with its fields old → new. Must run inside the caller's transaction.
+ */
 export async function applyDirectoryPlan(tx: Executor, plan: DirectoryPlan): Promise<void> {
   const now = new Date();
+  const peopleRepository = new PeopleRepository(tx as Database, () => now);
+  const organizationsRepository = new OrganizationsRepository(tx as Database);
+  const existingPeople = new Set<string>([
+    ...plan.people.filter((record) => record.action === "update").map((record) => record.dbId!),
+    ...plan.personOrganization.remove.map((link) => link.personId),
+    ...plan.personOrganization.add.flatMap((link) => ("dbId" in link.person ? [link.person.dbId] : [])),
+    ...plan.personExpertise.remove.map((link) => link.ownerId),
+    ...plan.personExpertise.add.flatMap((link) => ("dbId" in link.owner ? [link.owner.dbId] : [])),
+  ]);
+  const existingOrganizations = new Set<string>([
+    ...plan.organizations.filter((record) => record.action === "update").map((record) => record.dbId!),
+    ...plan.personOrganization.remove.map((link) => link.organizationId),
+    ...plan.personOrganization.add.flatMap((link) => ("dbId" in link.organization ? [link.organization.dbId] : [])),
+    ...plan.organizationExpertise.remove.map((link) => link.ownerId),
+    ...plan.organizationExpertise.add.flatMap((link) => ("dbId" in link.owner ? [link.owner.dbId] : [])),
+  ]);
+  const peopleBefore = new Map((await Promise.all([...existingPeople].map((id) => peopleRepository.findById(id, tx)))).flatMap((person) => (person ? [[person.id, person] as const] : [])));
+  const organizationsBefore = new Map(
+    (await Promise.all([...existingOrganizations].map((id) => organizationsRepository.findById(id, tx)))).flatMap((organization) => (organization ? [[organization.id, organization] as const] : [])),
+  );
+
+  await writeDirectoryPlan(tx, plan, now);
+
+  const createdPeople = plan.people.filter((record) => record.action === "create").map((record) => record.pageId);
+  const createdOrganizations = plan.organizations.filter((record) => record.action === "create").map((record) => record.pageId);
+  const idsByPage = async (table: typeof people | typeof organizations, pages: string[]) =>
+    pages.length === 0 ? [] : (await tx.select({ id: table.id }).from(table).where(inArray(table.notionPageId, pages))).map((row) => row.id);
+  for (const id of await idsByPage(organizations, createdOrganizations)) {
+    const organization = (await organizationsRepository.findById(id, tx))!;
+    await recordAuditEvent(tx, { entityType: "organization", entityId: id, action: "imported", actor: AUTOMATION, source: "import", meta: { label: labelOfOrganization(organization), importSource: "Notion · Organizations" } }, now);
+  }
+  for (const id of await idsByPage(people, createdPeople)) {
+    const person = (await peopleRepository.findById(id, tx))!;
+    await recordAuditEvent(tx, { entityType: "person", entityId: id, action: "imported", actor: AUTOMATION, source: "import", meta: { label: labelOfPerson(person), importSource: "Notion · People" } }, now);
+  }
+  for (const [id, before] of organizationsBefore) {
+    const after = await organizationsRepository.findById(id, tx);
+    const changes = after ? diffRecord(ORGANIZATION_FIELDS, before, after) : [];
+    if (changes.length > 0) {
+      await recordAuditEvent(tx, { entityType: "organization", entityId: id, action: "updated", actor: AUTOMATION, source: "import", changes, meta: { label: labelOfOrganization(after!), importSource: "Notion · Organizations" } }, now);
+    }
+  }
+  for (const [id, before] of peopleBefore) {
+    const after = await peopleRepository.findById(id, tx);
+    const changes = after ? diffRecord(PERSON_FIELDS, before, after) : [];
+    if (changes.length > 0) {
+      await recordAuditEvent(tx, { entityType: "person", entityId: id, action: "updated", actor: AUTOMATION, source: "import", changes, meta: { label: labelOfPerson(after!), importSource: "Notion · People" } }, now);
+    }
+  }
+}
+
+async function writeDirectoryPlan(tx: Executor, plan: DirectoryPlan, now: Date): Promise<void> {
   const organizationIds = new Map<string, string>();
   const personIds = new Map<string, string>();
   await writeRecords(tx, organizations, "orgNumber", "organizations.org_number", plan.organizations, organizationIds, now);
-  await writeRecords(tx, people, "personNumber", "people.person_number", plan.people, personIds, now);
+  const peopleRecords = plan.people.map((record) => ({
+    ...record,
+    values: { ...record.values, nextFollowupAt: record.values.nextFollowupAt === null ? null : new Date(record.values.nextFollowupAt) },
+  }));
+  await writeRecords(tx, people, "personNumber", "people.person_number", peopleRecords, personIds, now);
 
   const resolve = (ref: Ref, ids: Map<string, string>) => {
     const id = "dbId" in ref ? ref.dbId : ids.get(ref.pageId);

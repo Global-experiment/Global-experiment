@@ -29,17 +29,28 @@ export const TreasuryListQuery = listQuerySchema({
     occurred_from: { operators: ["is"], value: z.iso.date() },
     occurred_to: { operators: ["is"], value: z.iso.date() },
     documents: { operators: ["is_empty", "is_not_empty"] },
+    /** The "Archived" view (decision 12): without this filter, archived entries are left out. */
+    archived: { operators: ["is"], value: z.enum(["true", "false"]).transform((value) => value === "true") },
   },
 });
+
+/** Permanent delete (owner only, manual entries only, decision 12): the entry number typed exactly ("EXP-12"). */
+export const DeleteTreasuryEntryRequest = z.strictObject({ confirm: z.string().max(40) });
+export type DeleteTreasuryEntryRequest = z.output<typeof DeleteTreasuryEntryRequest>;
 export type TreasuryListQuery = z.output<typeof TreasuryListQuery>;
 
-export const UpdateTreasuryEntryRequest = z.strictObject({
-  internalNote: z
-    .string()
-    .max(5000)
-    .transform((value) => value.trim() || null)
-    .nullable(),
-});
+/** What "Submit changes" sends: the internal note and/or the review status, applied together (one history event). */
+export const UpdateTreasuryEntryRequest = z
+  .strictObject({
+    internalNote: z
+      .string()
+      .max(5000)
+      .transform((value) => value.trim() || null)
+      .nullable()
+      .optional(),
+    reviewStatus: vocabularyKey.optional(),
+  })
+  .refine((body) => body.internalNote !== undefined || body.reviewStatus !== undefined, "Nothing to update.");
 export type UpdateTreasuryEntryRequest = z.output<typeof UpdateTreasuryEntryRequest>;
 
 export const ReviewTreasuryEntryRequest = z.strictObject({ reviewStatus: vocabularyKey });
@@ -89,6 +100,7 @@ export interface TreasuryEntryRowDto {
   documents: number;
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
 }
 
 export interface TreasuryDocumentDto {

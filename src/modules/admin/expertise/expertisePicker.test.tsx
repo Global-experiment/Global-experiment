@@ -77,7 +77,7 @@ describe("expertise picker rendering", () => {
     expect(html).toContain('<span class="sr-only">Government &gt; Participation &gt; Petitions (Deprecated)</span>');
     // Figma's inline search line (a combobox), not an "Add" button.
     expect(html).toContain('role="combobox"');
-    expect(html).toContain('placeholder="Search expertise to add…"');
+    expect(html).toContain('placeholder="Search"');
   });
 
   it("shows the Fields / Domains rollup under the chips", () => {

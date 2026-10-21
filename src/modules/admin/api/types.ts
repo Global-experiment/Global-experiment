@@ -51,17 +51,35 @@ export interface Person {
   x: string | null;
   otherContact: string | null;
   wiseRecipientId: string | null;
-  /** Next planned follow-up, YYYY-MM-DD. */
-  nextFollowupOn: string | null;
+  otherSocials: string | null;
+  /** Next planned follow-up: an instant (ISO), shown in the viewer's time zone. */
+  nextFollowupAt: string | null;
+  /** Calendar dates (YYYY-MM-DD), never converted. */
+  firstContactOn: string | null;
+  lastContactOn: string | null;
+  /** Whole scores 0–10. */
+  aiRelevanceScore: number | null;
+  relevanceScore: number | null;
+  contactChannels: VocabularyEntry[];
+  expenses: ExpenseRef[];
   /** The former "last follow-up" value, kept as-is (read-only). */
   lastFollowupAtLegacy: string | null;
-  /** Next follow-up before today, and neither Rejected nor Do not contact. */
+  /** The next follow-up has passed, and neither Rejected nor Do not contact. */
   followUpOverdue: boolean;
+  archivedAt: string | null;
   missing: PersonCompletenessField[];
   createdAt: string;
   updatedAt: string;
   organizations: EntityRef[];
   expertise: ExpertiseRef[];
+}
+
+export interface ExpenseRef {
+  id: string;
+  entryNumber: number;
+  currency: string;
+  /** Minor units (negative for an expense). */
+  grossAmount: number;
 }
 
 export interface PersonInput {
@@ -77,7 +95,14 @@ export interface PersonInput {
   x?: string | null;
   otherContact?: string | null;
   wiseRecipientId?: string | null;
-  nextFollowupOn?: string | null;
+  otherSocials?: string | null;
+  nextFollowupAt?: string | null;
+  firstContactOn?: string | null;
+  lastContactOn?: string | null;
+  aiRelevanceScore?: number | null;
+  relevanceScore?: number | null;
+  contactChannelKeys?: string[];
+  expenseIds?: string[];
   organizationIds?: string[];
   expertiseIds?: string[];
 }
@@ -96,6 +121,7 @@ export interface Organization {
   missing: OrganizationCompletenessField[];
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
   people: EntityRef[];
   expertise: ExpertiseRef[];
 }
@@ -107,12 +133,16 @@ export interface OrganizationInput {
   email?: string | null;
   wiseRecipientId?: string | null;
   expertiseIds?: string[];
+  personIds?: string[];
 }
 
 export const formatPersonNumber = (n: number) => `PER-${n}`;
 export const formatOrgNumber = (n: number) => `ORG-${n}`;
 
 export interface PeopleOptions {
+  contactChannels: VocabularyEntry[];
+  /** ai.enabled: the AI relevance score is filled automatically (read-only). */
+  aiScoreReadOnly: boolean;
   states: VocabularyEntry[];
   sources: VocabularyEntry[];
 }
@@ -240,6 +270,8 @@ export interface TreasuryEntryRow {
   documents: number;
   createdAt: string;
   updatedAt: string;
+  /** Archived (decision 12): only in the "Archived" view. */
+  archivedAt: string | null;
 }
 
 export interface TreasuryDocument {
@@ -285,3 +317,60 @@ export interface TreasuryOptions {
 }
 
 export const formatEntryNumber = (number: number) => `EXP-${number}`;
+
+/** The record types that have a detail page with a history. */
+export type HistoryEntityType = "person" | "organization" | "treasury_entry";
+
+export type HistoryFieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation";
+export type HistoryValue = string | number | boolean | null | { key: string; label: string } | { id: string; label: string }[];
+
+/** One changed field of a history event (old struck through → new). */
+export interface HistoryChange {
+  field: string;
+  label: string;
+  kind: HistoryFieldKind;
+  privacy?: "contact" | "private_note";
+  before: HistoryValue;
+  after: HistoryValue;
+  /** Contact details the viewer's role may not read: shown masked (s•••@example.org). */
+  masked?: true;
+  /** A private note: never shown, only that it changed. */
+  redacted?: true;
+}
+
+export type HistoryAction =
+  | "created"
+  | "imported"
+  | "duplicated"
+  | "updated"
+  | "archived"
+  | "restored"
+  | "deleted"
+  | "comment_added"
+  | "comment_edited"
+  | "comment_deleted"
+  | "viewed";
+
+export interface HistoryItem {
+  id: string;
+  kind: "event" | "view";
+  action: HistoryAction;
+  occurredAt: string;
+  actor: { type: "admin" | "automation"; label: string };
+  changes: HistoryChange[];
+  meta: { label?: string; collection?: string; importSource?: string; duplicatedFrom?: { id: string; label: string }; body?: string; origin?: string; [key: string]: unknown };
+  comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
+}
+
+export interface RecordHistory {
+  total: number;
+  views: number;
+  edits: number;
+  createdBy: { label: string; at: string } | null;
+  lastEditedBy: { label: string; at: string } | null;
+  items: HistoryItem[];
+}
+
+export interface HistoryListItem extends HistoryItem {
+  entity: { type: string; id: string; label: string };
+}

@@ -29,11 +29,8 @@ export const managedLabel = (row: Pick<TreasuryEntryRow, "managedBy" | "source">
 
 const amount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** "−USD 5,675.00", "USD 12.50" — exact, signed with a real minus. */
-export function formatMoney(minor: number | null, currency: string): string {
-  if (minor === null) return "—";
-  return `${minor < 0 ? "−" : ""}${currency} ${amount.format(Math.abs(minor) / 100)}`;
-}
+/** "−USD 5,675.00", "USD 12.50" — the shared rule (formatting.md): exact, signed with a real minus. */
+export { formatMoney } from "@/shared/format/numbers";
 
 /** Gross / fee / net on one line: "USD 50.00 / 1.75 / 48.25"; an unknown fee shows "—". */
 export function formatBreakdown(row: Pick<TreasuryEntryRow, "grossAmount" | "feeAmount" | "netAmount" | "currency">): string {

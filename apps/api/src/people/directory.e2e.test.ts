@@ -99,13 +99,25 @@ describe("native directory API", () => {
             stateKey: "contacted",
             phone: "+41 00 000 00 00",
             personalNote: "",
-            nextFollowupOn: "2026-11-02",
+            nextFollowupAt: "2026-11-02T09:30:00+01:00",
+            firstContactOn: "2026-10-01",
+            lastContactOn: "2026-10-12",
+            aiRelevanceScore: 7,
+            relevanceScore: 8,
+            otherSocials: "https://mastodon.example/@ada",
+            contactChannelKeys: ["signal", "email"],
           })
           .expect(200)
       ).body;
       expect(updated.state).toEqual({ key: "contacted", label: "Contacted" });
       expect(updated.personalNote).toBeNull();
-      expect(updated.nextFollowupOn).toBe("2026-11-02");
+      expect(updated.nextFollowupAt).toBe("2026-11-02T08:30:00.000Z");
+      expect(updated).toMatchObject({ firstContactOn: "2026-10-01", lastContactOn: "2026-10-12", aiRelevanceScore: 7, relevanceScore: 8, otherSocials: "https://mastodon.example/@ada" });
+      // In the lookup's order, whatever order they were sent in.
+      expect(updated.contactChannels).toEqual([
+        { key: "email", label: "Email" },
+        { key: "signal", label: "Signal" },
+      ]);
       expect(updated.lastFollowupAtLegacy).toBeNull();
       expect(updated.name).toBe("Ada Example");
       expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(created.updatedAt).getTime());
@@ -124,8 +136,12 @@ describe("native directory API", () => {
         [{ name: "X", email: "not-an-email" }, "email"],
         [{ name: "X", stateKey: "Not A Key" }, "stateKey"],
         [{ name: "X", unknownField: 1 }, ""],
-        [{ name: "X", nextFollowupOn: "yesterday" }, "nextFollowupOn"],
-        [{ name: "X", nextFollowupOn: "2026-11-02T10:00:00Z" }, "nextFollowupOn"],
+        [{ name: "X", nextFollowupAt: "yesterday" }, "nextFollowupAt"],
+        [{ name: "X", nextFollowupAt: "2026-11-02" }, "nextFollowupAt"],
+        [{ name: "X", relevanceScore: 11 }, "relevanceScore"],
+        [{ name: "X", aiRelevanceScore: 2.5 }, "aiRelevanceScore"],
+        [{ name: "X", firstContactOn: "2026-10-05", lastContactOn: "2026-10-01" }, "lastContactOn"],
+        [{ name: "X", contactChannelKeys: ["pigeon"] }, "contactChannelKeys"],
         // Read-only: the old column's values are kept, never written through the API.
         [{ name: "X", lastFollowupAt: "2026-09-01T10:00:00.000Z" }, ""],
         [{ name: "X", lastFollowupAtLegacy: "2026-09-01T10:00:00.000Z" }, ""],
@@ -407,14 +423,14 @@ describe("native directory API", () => {
       expect(res.body.items.map((p: { name: string }) => p.name)).toEqual(["Amy", "Zed"]);
     });
 
-    it("stores the next follow-up as a calendar date and sorts by it, empty last", async () => {
-      await createPerson({ name: "Later", nextFollowupOn: "2026-12-01" });
-      await createPerson({ name: "Sooner", nextFollowupOn: "2026-11-01" });
+    it("stores the next follow-up as a date and time (an instant) and sorts by it, empty last", async () => {
+      await createPerson({ name: "Later", nextFollowupAt: "2026-12-01T09:00:00+01:00" });
+      await createPerson({ name: "Sooner", nextFollowupAt: "2026-11-01T15:30:00Z" });
       await createPerson({ name: "None" });
       const res = await admin.get("/api/admin/people?sort=next_followup:asc").expect(200);
-      expect(res.body.items.map((p: { name: string; nextFollowupOn: string | null }) => [p.name, p.nextFollowupOn])).toEqual([
-        ["Sooner", "2026-11-01"],
-        ["Later", "2026-12-01"],
+      expect(res.body.items.map((p: { name: string; nextFollowupAt: string | null }) => [p.name, p.nextFollowupAt])).toEqual([
+        ["Sooner", "2026-11-01T15:30:00.000Z"],
+        ["Later", "2026-12-01T08:00:00.000Z"],
         ["None", null],
       ]);
       await admin.get("/api/admin/people?sort=last_followup:asc").expect(400);

@@ -16,8 +16,9 @@ import type {
   UpdateOrganizationRequest,
 } from "./organizations.contracts.js";
 import { organizationExpertise, organizations } from "./organizations.schema.js";
+import { treasuryEntries } from "../treasury/treasury.schema.js";
 
-type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
+export type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
 const peopleCount = sql<number>`(select count(*)::int from ${peopleOrganizations} where ${peopleOrganizations.organizationId} = ${organizations.id})`;
 
@@ -32,6 +33,7 @@ function selectOrganizations(db: Executor) {
       website: organizations.website,
       email: organizations.email,
       wiseRecipientId: organizations.wiseRecipientId,
+      archivedAt: organizations.archivedAt,
       createdAt: organizations.createdAt,
       updatedAt: organizations.updatedAt,
     })
@@ -119,28 +121,25 @@ export class OrganizationsRepository {
     return row !== undefined;
   }
 
-  async create(input: CreateOrganizationRequest): Promise<OrganizationDto> {
-    return this.db.transaction(async (tx) => {
-      const [created] = await tx
-        .insert(organizations)
-        .values({ ...this.columnValues(input), name: input.name })
-        .returning({ id: organizations.id });
-      await this.replaceExpertise(tx, created!.id, input.expertiseIds);
-      return (await this.findById(created!.id, tx))!;
-    });
+  /** Writes take the caller's transaction: the service audits in the same one. */
+  async create(tx: Executor, input: CreateOrganizationRequest): Promise<string> {
+    const [created] = await tx
+      .insert(organizations)
+      .values({ ...this.columnValues(input), name: input.name })
+      .returning({ id: organizations.id });
+    await this.replaceExpertise(tx, created!.id, input.expertiseIds);
+    return created!.id;
   }
 
-  async update(id: string, input: UpdateOrganizationRequest): Promise<OrganizationDto | undefined> {
-    return this.db.transaction(async (tx) => {
-      const [updated] = await tx
-        .update(organizations)
-        .set({ ...this.columnValues(input), updatedAt: new Date() })
-        .where(eq(organizations.id, id))
-        .returning({ id: organizations.id });
-      if (!updated) return undefined;
-      await this.replaceExpertise(tx, id, input.expertiseIds);
-      return this.findById(id, tx);
-    });
+  async update(tx: Executor, id: string, input: UpdateOrganizationRequest): Promise<boolean> {
+    const [updated] = await tx
+      .update(organizations)
+      .set({ ...this.columnValues(input), updatedAt: new Date() })
+      .where(eq(organizations.id, id))
+      .returning({ id: organizations.id });
+    if (!updated) return false;
+    await this.replaceExpertise(tx, id, input.expertiseIds);
+    return true;
   }
 
   /**
@@ -149,8 +148,8 @@ export class OrganizationsRepository {
    * counts toward that person's 5-organization limit, so it's a choice to
    * make on the copy. Undefined if `id` is unknown.
    */
-  async duplicate(id: string): Promise<OrganizationDto | undefined> {
-    return this.db.transaction(async (tx) => {
+  async duplicate(tx: Executor, id: string): Promise<string | undefined> {
+    {
       const [source] = await tx.select().from(organizations).where(eq(organizations.id, id)).limit(1);
       if (!source) return undefined;
       const { name, description, website, email, wiseRecipientId } = source;
@@ -164,12 +163,12 @@ export class OrganizationsRepository {
         .from(organizationExpertise)
         .where(eq(organizationExpertise.organizationId, id));
       if (expertiseLinks.length > 0) await tx.insert(organizationExpertise).values(expertiseLinks.map((link) => ({ organizationId: copyId, ...link })));
-      return (await this.findById(copyId, tx))!;
-    });
+      return copyId;
+    }
   }
 
-  async linkExpertise(organizationId: string, expertiseId: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
+  async linkExpertise(tx: Executor, organizationId: string, expertiseId: string): Promise<void> {
+    {
       await assertBelowLimit(
         tx,
         organizationExpertise,
@@ -181,17 +180,17 @@ export class OrganizationsRepository {
       );
       await tx.insert(organizationExpertise).values({ organizationId, expertiseId }).onConflictDoNothing();
       await tx.update(organizations).set({ updatedAt: new Date() }).where(eq(organizations.id, organizationId));
-    });
+    }
   }
 
-  async unlinkExpertise(organizationId: string, expertiseId: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
+  async unlinkExpertise(tx: Executor, organizationId: string, expertiseId: string): Promise<void> {
+    {
       const removed = await tx
         .delete(organizationExpertise)
         .where(and(eq(organizationExpertise.organizationId, organizationId), eq(organizationExpertise.expertiseId, expertiseId)))
         .returning({ id: organizationExpertise.organizationId });
       if (removed.length > 0) await tx.update(organizations).set({ updatedAt: new Date() }).where(eq(organizations.id, organizationId));
-    });
+    }
   }
 
   async personExists(personId: string): Promise<boolean> {
@@ -204,8 +203,8 @@ export class OrganizationsRepository {
    * people_organizations row the person's side manages. Idempotent; a real
    * change touches both records' updatedAt, since both now show it.
    */
-  async linkPerson(organizationId: string, personId: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
+  async linkPerson(tx: Executor, organizationId: string, personId: string): Promise<void> {
+    {
       // The cap belongs to the person: at most 5 organizations, whichever side links.
       await assertBelowLimit(
         tx,
@@ -222,17 +221,35 @@ export class OrganizationsRepository {
         .onConflictDoNothing()
         .returning({ personId: peopleOrganizations.personId });
       if (added.length > 0) await this.touchBoth(tx, organizationId, personId);
-    });
+    }
   }
 
-  async unlinkPerson(organizationId: string, personId: string): Promise<void> {
-    await this.db.transaction(async (tx) => {
+  async unlinkPerson(tx: Executor, organizationId: string, personId: string): Promise<void> {
+    {
       const removed = await tx
         .delete(peopleOrganizations)
         .where(and(eq(peopleOrganizations.organizationId, organizationId), eq(peopleOrganizations.personId, personId)))
         .returning({ personId: peopleOrganizations.personId });
       if (removed.length > 0) await this.touchBoth(tx, organizationId, personId);
-    });
+    }
+  }
+
+  /** Archive (by `adminId`) or restore (null). */
+  async setArchived(tx: Executor, id: string, adminId: string | null): Promise<void> {
+    await tx
+      .update(organizations)
+      .set(adminId ? { archivedAt: new Date(), archivedById: adminId } : { archivedAt: null, archivedById: null })
+      .where(eq(organizations.id, id));
+  }
+
+  /** Permanent delete: links go with it (cascade); expenses paid to it block it (their recipient). */
+  async delete(tx: Executor, id: string): Promise<void> {
+    await tx.delete(organizations).where(eq(organizations.id, id));
+  }
+
+  async hasExpenses(id: string): Promise<boolean> {
+    const [row] = await this.db.select({ id: treasuryEntries.id }).from(treasuryEntries).where(eq(treasuryEntries.recipientOrganizationId, id)).limit(1);
+    return row !== undefined;
   }
 
   /** Only the fields present in the request; `null` clears a field. */
@@ -262,6 +279,9 @@ export class OrganizationsRepository {
 
   private whereClause(query: OrganizationsListQuery): SQL | undefined {
     const conditions: (SQL | undefined)[] = [];
+    // Archived organizations are only in the "Archived" view (decision 12).
+    const archivedFilter = query.filters.find((filter) => filter.field === "archived");
+    conditions.push(archivedFilter?.value === true ? isNotNull(organizations.archivedAt) : isNull(organizations.archivedAt));
     if (query.search) {
       const pattern = containsPattern(query.search);
       conditions.push(
@@ -275,7 +295,7 @@ export class OrganizationsRepository {
         ),
       );
     }
-    const { anyOf, all } = groupFilters(query.filters);
+    const { anyOf, all } = groupFilters(query.filters.filter((filter) => filter.field !== "archived"));
     for (const [field, values] of anyOf) {
       const ids = values.map(String);
       if (field === "expertise") conditions.push(hasExpertiseMatching(this.db, inArray(organizationExpertise.expertiseId, ids)));
@@ -356,6 +376,7 @@ export class OrganizationsRepository {
       missing: organizationMissing(row, (expertiseByOrganization.get(row.id) ?? []).length > 0),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+      archivedAt: row.archivedAt?.toISOString() ?? null,
       people: peopleByOrganization.get(row.id) ?? [],
       expertise: expertiseByOrganization.get(row.id) ?? [],
     }));

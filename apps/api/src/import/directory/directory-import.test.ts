@@ -1,4 +1,5 @@
 import { asc, eq, sql } from "drizzle-orm";
+import { auditEvents } from "../../audit/audit.schema.js";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "../../common/database/database.module.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../../expertise/expertise.schema.js";
@@ -46,7 +47,7 @@ const person = (n: number, name: string, extra: Partial<SourcePerson> = {}): Sou
   x: null,
   otherContact: null,
   wiseRecipientId: null,
-  nextFollowupOn: "2026-11-03",
+  nextFollowupAt: "2026-11-03",
   organizationPageIds: [],
   expertisePageIds: [],
   expensesCount: 0,
@@ -86,6 +87,10 @@ describe("directory import (database)", () => {
     await db.delete(expertiseFields);
     await db.delete(expertiseDomains);
     await db.delete(importRuns);
+    // The audit log is append-only (a trigger refuses deletes): each test gets a log it can read from a clean point.
+    await db.execute(sql`alter table audit_events disable trigger audit_events_no_update_or_delete`);
+    await db.delete(auditEvents);
+    await db.execute(sql`alter table audit_events enable trigger audit_events_no_update_or_delete`);
     // Each test starts numbering from PER-1 / ORG-1 (deleting rows doesn't rewind identity sequences).
     await db.execute(sql`alter table people alter column person_number restart with 1`);
     await db.execute(sql`alter table organizations alter column org_number restart with 1`);
@@ -108,9 +113,10 @@ describe("directory import (database)", () => {
     const result = await runDirectoryImport(db, realSource(), { ...options, apply: true });
     expect(result.counts.changes).toBe(2 + 2 + 3 + 1);
 
-    expect((await peopleRows()).map((p) => ({ n: p.personNumber, name: p.name, state: p.stateKey, source: p.sourceKey, dnc: p.doNotContact, next: p.nextFollowupOn }))).toEqual([
-      { n: 1, name: "Amina Diallo", state: "collaborating", source: "ai", dnc: true, next: "2026-11-03" },
-      { n: 2, name: "Bruno Keller", state: "collaborating", source: "ai", dnc: false, next: "2026-11-03" },
+    expect((await peopleRows()).map((p) => ({ n: p.personNumber, name: p.name, state: p.stateKey, source: p.sourceKey, dnc: p.doNotContact, next: p.nextFollowupAt?.toISOString() }))).toEqual([
+      // Notion's date alone: 09:00 in Zurich (CET after Oct 25: 08:00 UTC).
+      { n: 1, name: "Amina Diallo", state: "collaborating", source: "ai", dnc: true, next: "2026-11-03T08:00:00.000Z" },
+      { n: 2, name: "Bruno Keller", state: "collaborating", source: "ai", dnc: false, next: "2026-11-03T08:00:00.000Z" },
     ]);
     expect((await db.select().from(organizations).orderBy(asc(organizations.orgNumber))).map((o) => [o.orgNumber, o.name, o.wiseRecipientId])).toEqual([
       [1, "Civic Lab", "W-1"],
@@ -123,6 +129,28 @@ describe("directory import (database)", () => {
     const [next] = await db.insert(people).values({ name: "Created in the admin" }).returning({ n: people.personNumber });
     expect(next!.n).toBe(3);
     expect(formatDirectoryReport(result)).toContain("person ↔ organization links: 3 added, 0 removed");
+  });
+
+  it("logs every imported record ('Automation', Notion · People) and each later change, old → new", async () => {
+    await runDirectoryImport(db, realSource(), { ...options, apply: true });
+    const events = async (action: string) => db.select().from(auditEvents).where(eq(auditEvents.action, action));
+    const imported = await events("imported");
+    expect(imported.filter((event) => event.entityType === "person").map((event) => event.meta.label).sort()).toEqual(["PER-1 · Amina Diallo", "PER-2 · Bruno Keller"]);
+    expect(imported.filter((event) => event.entityType === "organization")).toHaveLength(2);
+    expect(imported[0]).toMatchObject({ actorType: "automation", actorLabel: "Automation", actorId: null, source: "import" });
+    expect(imported.find((event) => event.entityType === "person")!.meta.importSource).toBe("Notion · People");
+    // The run itself is logged.
+    expect((await db.select().from(auditEvents).where(eq(auditEvents.entityType, "import_run"))).map((event) => event.meta.label)).toEqual(["directory import · apply"]);
+
+    const changed = realSource();
+    changed.people[1] = { ...changed.people[1]!, name: "Bruno K. Keller", website: "https://bruno.example" };
+    await runDirectoryImport(db, changed, { ...options, apply: true });
+    const [updated] = await events("updated");
+    expect(updated).toMatchObject({ entityType: "person", actorType: "automation", source: "import", meta: { label: "PER-2 · Bruno K. Keller", importSource: "Notion · People" } });
+    expect(updated!.changes.map((change) => [change.field, change.before, change.after])).toEqual([
+      ["name", "Bruno Keller", "Bruno K. Keller"],
+      ["website", null, "https://bruno.example"],
+    ]);
   });
 
   it("is idempotent: a second run reports 0 changes and writes nothing", async () => {

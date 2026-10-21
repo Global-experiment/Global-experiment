@@ -10,7 +10,6 @@ import { useAdminData } from "../api/useAdminData";
 import { expertiseOptions, formatDate } from "../people/peopleTable";
 import { AdminListPage } from "../table/AdminListPage";
 import { NotionImportControl } from "../people/NotionImportControl";
-import { ViewTabs } from "../table/ViewTabs";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
@@ -136,7 +135,8 @@ export function OrganizationsList() {
         fields,
         columns: COLUMNS,
         recordHref: (organization) => `/admin/organizations/${organization.id}`,
-        views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
+        // All and Archived until the client defines the saved views (ViewTabs is ready for them).
+        archivedView: true,
         actions: (
           <>
             <NotionImportControl />

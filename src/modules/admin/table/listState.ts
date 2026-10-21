@@ -25,6 +25,8 @@ export interface ListState {
   sort: SortRule[];
   filters: FilterRule[];
   page: number;
+  /** The saved view ("archived" = the Archived view, decision 12); omitted = All. */
+  view?: string;
 }
 
 export const VALUELESS_OPERATORS: ReadonlySet<FilterOperator> = new Set(["is_empty", "is_not_empty"]);
@@ -65,6 +67,7 @@ export function readListState(params: URLSearchParams, defaultSort: SortRule[]):
     sort: sort.length > 0 ? sort : defaultSort,
     filters,
     page: Number.isFinite(page) && page > 0 ? page : 1,
+    ...(params.get("view") === "archived" ? { view: "archived" } : {}),
   };
 }
 
@@ -75,6 +78,7 @@ export function listStateToUrl(state: ListState, defaultSort: SortRule[]): strin
   if (!sameSort(state.sort, defaultSort)) for (const rule of state.sort) params.append("sort", serializeSort(rule));
   for (const rule of state.filters) params.append("filter", serializeFilter(rule));
   if (state.page > 1) params.set("page", String(state.page));
+  if (state.view === "archived") params.set("view", "archived");
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -87,6 +91,8 @@ export function listStateToApiQuery(state: ListState, pageSize: number): string 
   if (state.search.trim()) params.set("search", state.search.trim());
   for (const rule of state.sort) params.append("sort", serializeSort(rule));
   for (const rule of state.filters.filter(isCompleteFilter)) params.append("filter", serializeFilter(rule));
+  // Archived records are left out of every list unless the Archived view asks for them.
+  if (state.view === "archived") params.append("filter", "archived:is:true");
   return `?${params.toString()}`;
 }
 

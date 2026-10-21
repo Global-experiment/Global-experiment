@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Person } from "../api/types";
-import { draftFromPerson, hasChanges, personPatch } from "./personForm";
+import { draftFromPerson, fromLocalInput, hasChanges, personCreateBody, personDraftErrors, personPatch, toLocalInput } from "./personForm";
 
 const person: Person = {
   id: "p1",
@@ -18,9 +18,17 @@ const person: Person = {
   x: null,
   otherContact: null,
   wiseRecipientId: null,
-  nextFollowupOn: "2026-09-01",
+  otherSocials: null,
+  nextFollowupAt: "2026-09-01T07:00:00.000Z",
+  firstContactOn: null,
+  lastContactOn: null,
+  aiRelevanceScore: null,
+  relevanceScore: 7,
+  contactChannels: [{ key: "signal", label: "Signal" }],
+  expenses: [{ id: "x1", entryNumber: 204, currency: "USD", grossAmount: -20000 }],
   lastFollowupAtLegacy: "2026-08-15T09:00:00.000Z",
   followUpOverdue: false,
+  archivedAt: null,
   missing: ["Source"],
   createdAt: "2026-08-01T09:00:00.000Z",
   updatedAt: "2026-08-01T09:00:00.000Z",
@@ -51,10 +59,33 @@ describe("person record form", () => {
     });
   });
 
-  it("sends the next follow-up as a plain date, or clears it", () => {
-    expect(original.nextFollowupOn).toBe("2026-09-01");
-    expect(personPatch(original, { ...original, nextFollowupOn: "2026-10-02" })).toEqual({ nextFollowupOn: "2026-10-02" });
-    expect(personPatch(original, { ...original, nextFollowupOn: "" })).toEqual({ nextFollowupOn: null });
+  it("edits the follow-up as a date and time in the viewer's time zone and sends the instant, or clears it", () => {
+    // The test runner's time zone is the viewer's: whatever it is, the round trip keeps the instant.
+    expect(fromLocalInput(original.nextFollowupAt)).toBe("2026-09-01T07:00:00.000Z");
+    const local = toLocalInput("2026-10-02T13:30:00.000Z");
+    expect(personPatch(original, { ...original, nextFollowupAt: local })).toEqual({ nextFollowupAt: "2026-10-02T13:30:00.000Z" });
+    expect(personPatch(original, { ...original, nextFollowupAt: "" })).toEqual({ nextFollowupAt: null });
+  });
+
+  it("scores: whole numbers 0–10 or empty, checked before sending", () => {
+    expect(original.relevanceScore).toBe("7");
+    expect(personPatch(original, { ...original, relevanceScore: "8", aiRelevanceScore: "0" })).toEqual({ relevanceScore: 8, aiRelevanceScore: 0 });
+    expect(personPatch(original, { ...original, relevanceScore: " " })).toEqual({ relevanceScore: null });
+    for (const typed of ["11", "-1", "2.5", "a"]) expect(personDraftErrors({ ...original, relevanceScore: typed }), typed).toEqual({ relevanceScore: "Use a whole number from 0 to 10." });
+    expect(personDraftErrors({ ...original, firstContactOn: "2026-10-05", lastContactOn: "2026-10-01" })).toEqual({ lastContactOn: "The last contact can't be before the first contact." });
+    expect(personDraftErrors(original)).toEqual({});
+  });
+
+  it("contact channels and expenses are sets: sent only when membership changed", () => {
+    expect(original.expenses).toEqual([{ id: "x1", label: "EXP-204 · \u2212USD\u00a0200.00", href: "/admin/treasury/x1" }]);
+    expect(personPatch(original, { ...original, contactChannelKeys: ["signal"] })).toEqual({});
+    expect(personPatch(original, { ...original, contactChannelKeys: ["email", "signal"], expenses: [] })).toEqual({ contactChannelKeys: ["email", "signal"], expenseIds: [] });
+  });
+
+  it("a duplicate as a draft sends every filled field, but never the expenses (they keep their recipient)", () => {
+    const body = personCreateBody({ ...original, name: "Ada Example (copy)" });
+    expect(body).toMatchObject({ name: "Ada Example (copy)", stateKey: "sourced", personalNote: "Note", email: "ada@example.org", relevanceScore: 7, contactChannelKeys: ["signal"], organizationIds: ["o1"], expertiseIds: ["e1"] });
+    expect(body).not.toHaveProperty("expenseIds");
   });
 
   it("treats the Wise recipient ID as free text", () => {

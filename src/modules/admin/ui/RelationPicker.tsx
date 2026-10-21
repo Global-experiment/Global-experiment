@@ -144,7 +144,7 @@ export function RelationPicker({
   return (
     <div ref={root} onKeyDown={onKeyDown} data-relation-picker={noun}>
       <div className="relative">
-        <label className="flex h-8 max-w-[560px] items-center gap-2 rounded-control px-2 text-text-muted ring-1 ring-line focus-within:ring-text-primary hover:ring-text-muted">
+        <label className="flex h-8 max-w-[560px] items-center gap-2 rounded-control px-2 text-text-muted ring-1 ring-transparent focus-within:ring-text-primary hover:ring-line">
           <AdminIcon name="search" />
           <span className="sr-only">Search {noun}</span>
           <input
@@ -161,7 +161,7 @@ export function RelationPicker({
             }}
             onFocus={() => setOpen(true)}
             onClick={() => setOpen(true)}
-            placeholder={`Search ${noun} to add…`}
+            placeholder="Search"
             autoComplete="off"
             spellCheck={false}
             className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted"

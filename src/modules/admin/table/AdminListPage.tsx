@@ -23,6 +23,7 @@ import {
 } from "./listState";
 import { FilterPopover, SortPopover } from "./RulePopovers";
 import { useColumnPrefs } from "./useColumnPrefs";
+import { ViewTabs } from "./ViewTabs";
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -52,6 +53,8 @@ export interface AdminListConfig<Row extends { id: string }> {
   actions?: ReactNode;
   /** Left side of the toolbar row (Figma's saved-view tabs). */
   views?: ReactNode;
+  /** All / Archived view tabs (decision 12), in place of `views`. */
+  archivedView?: boolean;
 }
 
 /**
@@ -174,7 +177,18 @@ export function AdminListPage<Row extends { id: string }>({ config }: { config: 
           data-admin-views
           className="flex min-w-0 flex-1 items-center overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {config.views}
+          {config.archivedView ? (
+            <ViewTabs
+              views={[
+                { id: "all", label: "All" },
+                { id: "archived", label: "Archived" },
+              ]}
+              current={state.view ?? "all"}
+              onSelect={(id) => navigate({ view: id === "archived" ? "archived" : undefined, page: 1 })}
+            />
+          ) : (
+            config.views
+          )}
         </div>
 
         <label className={`${toolbarBox} w-40 shrink-0 pr-1 pl-2`}>

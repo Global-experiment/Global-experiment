@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { adminUsers } from "../auth/auth.schema.js";
 import { expertiseItems } from "../expertise/expertise.schema.js";
 
 /**
@@ -22,12 +23,16 @@ export const organizations = pgTable(
     wiseRecipientId: text("wise_recipient_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Archived (decision 12): left out of the default views, listed under "Archived", restorable. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedById: uuid("archived_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
   },
   (table) => [
     index("organizations_name_idx").on(sql`lower(${table.name})`),
     index("organizations_email_idx").on(sql`lower(${table.email})`),
     index("organizations_created_at_idx").on(table.createdAt),
     index("organizations_updated_at_idx").on(table.updatedAt),
+    index("organizations_archived_at_idx").on(table.archivedAt),
     uniqueIndex("organizations_org_number_unique").on(table.orgNumber),
     uniqueIndex("organizations_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
     check("organizations_org_number_positive", sql`${table.orgNumber} > 0`),

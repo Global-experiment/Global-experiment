@@ -2,6 +2,7 @@
  * Every table, registered in one place for the typed Drizzle instance.
  * Each module owns its own `*.schema.ts`; add new modules here.
  */
+export * from "../../audit/audit.schema.js";
 export * from "../../auth/auth.schema.js";
 export * from "../../expertise/expertise.schema.js";
 export * from "../../import/import.schema.js";

@@ -95,9 +95,11 @@ test("a Notion-managed expense is read-only, with the badge and the Notion link"
   await expect(badge.getByRole("link", { name: /Open in Notion/ })).toHaveAttribute("href", /^https:\/\/www\.notion\.so\/de0000006000400080000000000/);
   await expect(page.getByRole("button", { name: "Unpublish" })).toBeDisabled();
   await expect(page.getByText("Managed in Notion: unpublish it there.")).toBeVisible();
-  await expect(page.getByRole("textbox")).toHaveCount(0);
+  // No editable field (the panel's comment box is the history's, not the entry's).
+  await expect(page.locator("[data-record-main]").getByRole("textbox")).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Review status" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Submit changes" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Submit changes" })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: /^History/ })).toBeVisible();
   await axe();
 });
 
@@ -145,8 +147,10 @@ test("a Stripe donation: only the internal note and the publication change", asy
 
   await page.getByLabel("Internal note").fill("Thank-you email sent");
   await page.getByRole("button", { name: "Submit changes" }).click();
-  await expect(page.getByText("Internal note saved")).toBeVisible();
-  await page.reload();
+  await expect(page.getByText("Treasury entry updated")).toBeVisible();
+  // Submit goes back to the list; the entry kept the note.
+  await expect(page).toHaveURL(/\/admin\/treasury\/manage\?q=EXP-1/);
+  await rows().first().click();
   await expect(page.getByLabel("Internal note")).toHaveValue("Thank-you email sent");
 
   await page.getByRole("button", { name: "Unpublish" }).click();
@@ -159,17 +163,27 @@ test("a Stripe donation: only the internal note and the publication change", asy
 
   await page.getByLabel("Internal note").fill("");
   await page.getByRole("button", { name: "Submit changes" }).click();
-  await expect(page.getByText("Internal note saved")).toBeVisible();
+  await expect(page.getByText("Treasury entry updated")).toBeVisible();
 });
 
 test("a native expense can be reviewed; Qualified needs its recipient", async () => {
   await openRecord("Association bank fees");
   const review = page.getByRole("group", { name: "Review status" });
   await expect(review.getByRole("button", { name: "Qualified", exact: true })).toHaveAttribute("aria-pressed", "true");
+  // No autosave: the pill only changes the draft; Submit changes saves it.
   await review.getByRole("button", { name: "Pending documents" }).click();
   await expect(review.getByRole("button", { name: "Pending documents" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page.getByText("Treasury entry updated")).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/treasury\/manage\?q=/);
+  await rows().first().click();
+  await expect(review.getByRole("button", { name: "Pending documents" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText(/^Last reviewed/)).toBeVisible();
+  await expect(page.locator("[data-history-item=updated]").first()).toContainText("Review status");
   await review.getByRole("button", { name: "Qualified", exact: true }).click();
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page).toHaveURL(/\/admin\/treasury\/manage\?q=/);
+  await rows().first().click();
   await expect(review.getByRole("button", { name: "Qualified", exact: true })).toHaveAttribute("aria-pressed", "true");
   await axe();
 });

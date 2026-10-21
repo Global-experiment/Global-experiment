@@ -117,6 +117,20 @@ export const SETTINGS = {
     description:
       "Before Wise is connected: sample Balance (per currency, minor units) and Sustainability figures, with their trends, shown on the Treasury page and marked as samples. Set and removed by the sample-treasury commands; ignored once Wise is connected.",
   }),
+  // Decision 11 of 2026-10-19: every opening counts as a view; the history shows one "viewed" per account per window.
+  "history.view_event_window_hours": define({
+    schema: z.number().int().min(1).max(24 * 30),
+    envDefault: () => 24,
+    public: false,
+    description: "A record's history shows \"viewed this page\" at most once per account per this many hours (every opening still counts).",
+  }),
+  // Decision 7: the AI relevance score becomes read-only once an AI fills it.
+  "ai.enabled": define({
+    schema: z.boolean(),
+    envDefault: () => false,
+    public: false,
+    description: "AI features are on: the AI relevance score is filled automatically and read-only in the admin.",
+  }),
   // Scheduled Notion imports (overview §3.3): cron in UTC, or "off". Read when the API starts.
   "imports.taxonomy.schedule": define({
     schema: z.string().regex(CRON_OR_OFF),

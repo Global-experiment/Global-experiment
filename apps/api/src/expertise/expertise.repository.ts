@@ -9,6 +9,8 @@ import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams, taxo
 
 const TABLE = { domain: expertiseDomains, field: expertiseFields, expertise: expertiseItems } as const;
 
+type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
+
 @Injectable()
 export class ExpertiseRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
@@ -191,30 +193,37 @@ export class ExpertiseRepository {
     return row !== undefined;
   }
 
-  async createDomain(name: string) {
-    const [row] = await this.db.insert(expertiseDomains).values({ name }).returning({ id: expertiseDomains.id, name: expertiseDomains.name });
+  async createDomain(name: string, db: Executor = this.db) {
+    const [row] = await db.insert(expertiseDomains).values({ name }).returning({ id: expertiseDomains.id, name: expertiseDomains.name });
     return row!;
   }
 
-  async createField(domainId: string, name: string) {
-    const [row] = await this.db
+  async createField(domainId: string, name: string, db: Executor = this.db) {
+    const [row] = await db
       .insert(expertiseFields)
       .values({ domainId, name })
       .returning({ id: expertiseFields.id, name: expertiseFields.name, domainId: expertiseFields.domainId });
     return row!;
   }
 
-  async createExpertise(fieldId: string, name: string) {
-    const [row] = await this.db
+  async createExpertise(fieldId: string, name: string, db: Executor = this.db) {
+    const [row] = await db
       .insert(expertiseItems)
       .values({ fieldId, name })
       .returning({ id: expertiseItems.id, name: expertiseItems.name, fieldId: expertiseItems.fieldId });
     return row!;
   }
 
-  async rename(level: ExpertiseLevel, id: string, name: string) {
+  /** The node's current name (for its history), undefined when it doesn't exist. */
+  async nameOf(level: ExpertiseLevel, id: string, db: Executor = this.db): Promise<string | undefined> {
     const table = TABLE[level];
-    const [row] = await this.db
+    const [row] = await db.select({ name: table.name }).from(table).where(eq(table.id, id)).limit(1);
+    return row?.name;
+  }
+
+  async rename(level: ExpertiseLevel, id: string, name: string, db: Executor = this.db) {
+    const table = TABLE[level];
+    const [row] = await db
       .update(table)
       .set({ name, updatedAt: new Date() })
       .where(eq(table.id, id))
@@ -242,9 +251,9 @@ export class ExpertiseRepository {
     return (byPeople?.n ?? 0) + (byOrganizations?.n ?? 0);
   }
 
-  async delete(level: ExpertiseLevel, id: string): Promise<boolean> {
+  async delete(level: ExpertiseLevel, id: string, db: Executor = this.db): Promise<boolean> {
     const table = TABLE[level];
-    const removed = await this.db.delete(table).where(eq(table.id, id)).returning({ id: table.id });
+    const removed = await db.delete(table).where(eq(table.id, id)).returning({ id: table.id });
     return removed.length > 0;
   }
 }

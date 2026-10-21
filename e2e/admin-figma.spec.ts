@@ -250,9 +250,9 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(/\/admin\/people$/);
     // Only the existing modules link anywhere.
     const links = await nav(page).getByRole("link").evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
-    expect(links).toEqual(["/admin/home", "/admin/documentation", "/admin/treasury", "/admin/people", "/admin/organizations", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
+    expect(links).toEqual(["/admin/home", "/admin/documentation", "/admin/treasury", "/admin/people", "/admin/organizations", "/admin/history", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
     // Decision 16: these stay "Coming soon" until built.
-    for (const label of ["Waitlist", "Messages", "Cloud", "History", "Analytics", "Technical dashboard", "Emails", "Contracting"]) {
+    for (const label of ["Waitlist", "Messages", "Cloud", "Analytics", "Technical dashboard", "Emails", "Contracting"]) {
       await expect(nav(page).locator("[data-coming-soon]").filter({ hasText: label }), label).toHaveCount(1);
     }
     // One page listed twice is highlighted once.
@@ -368,7 +368,7 @@ test.describe("signed in", () => {
     await page.evaluate(() => localStorage.clear());
   });
 
-  test("person record (p12): layout, pills, toast", async ({ page }) => {
+  test("person record (p12 layout, p14 prototype fields): pills, checkbox, follow-up, Submit goes back", async ({ page }) => {
     await openPerson(page, "lena sample");
     const main = page.locator("[data-record-main]");
 
@@ -383,7 +383,9 @@ test.describe("signed in", () => {
     const submit = await box(page.getByRole("button", { name: "Submit changes" }));
     near(submit.width, 384);
     near(submit.height, 32);
-    await expect(page.locator("[data-record-panel]")).toContainText(/Number\s*PER-\d+/);
+    // The prototype moves the number to the fields' end ("Person ID"); the panel holds actions, counters and history.
+    await expect(main).toContainText(/Person ID\s*PER-\d+/);
+    await expect(page.locator("[data-record-panel]").getByRole("heading", { name: /^History/ })).toBeVisible();
     await expect(main.locator("[data-hint]")).toHaveText(["People can have up to 10 expertise.", "People can have up to 5 organizations."]);
     await capture(page, "p12-person");
 
@@ -398,13 +400,17 @@ test.describe("signed in", () => {
       await state.getByRole("button", { name: "In discussion" }).evaluate((el) => parseFloat(getComputedStyle(el).borderRadius) >= el.getBoundingClientRect().height / 2),
     ).toBe(true);
     await page.getByRole("group", { name: "Source" }).getByRole("button", { name: "Other" }).click();
-    await page.getByRole("group", { name: "Do not contact" }).getByRole("button", { name: "Do not contact" }).click();
+    // Prototype: Do not contact is a checkbox.
+    const doNotContact = page.getByRole("checkbox", { name: "Do not contact" });
+    // A toggle: tick it only if the fixture doesn't already.
+    if (!(await doNotContact.isChecked())) await page.locator("label[for=person-dnc]").click();
+    await expect(doNotContact).toBeChecked();
 
-    // Follow-up date: a field reading "Choose a date" or "Oct 14, 2026" — never the browser's mm/dd/yyyy mask.
+    // Follow-up date and time: "Set a date" or "October 14 at 9:30 AM" — never the browser's mm/dd/yyyy mask.
     const followUp = page.locator("#person-followup");
-    await expect(followUp).toHaveText("Choose a date");
-    await page.locator("input[type=date]").fill("2026-10-14", { force: true });
-    await expect(followUp).toHaveText("Oct 14, 2026");
+    await expect(followUp).toHaveText("Set a date");
+    await page.locator("input[type=datetime-local]").fill("2026-10-14T09:30", { force: true });
+    await expect(followUp).toHaveText("October 14 at 9:30 AM");
     expect(await followUp.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
     // Personal note: no resize handle; it grows with its text.
     const note = page.getByLabel("Personal note");
@@ -414,17 +420,21 @@ test.describe("signed in", () => {
     expect((await box(note)).height).toBeGreaterThan(oneLine + 20);
     await page.getByRole("button", { name: "Submit changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
+    // No autosave: one Submit saves, then the list it came from is back.
+    await expect(page).toHaveURL(/\/admin\/people\?q=lena/);
+    await rows(page).first().getByRole("link").click();
+    await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
 
-    await page.reload();
     await expect(state.getByRole("button", { name: "In discussion" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("group", { name: "Source" }).getByRole("button", { name: "Other" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("group", { name: "Do not contact" }).getByRole("button", { name: "Do not contact" })).toHaveAttribute("aria-pressed", "true");
-    await expect(followUp).toHaveText("Oct 14, 2026");
+    await expect(doNotContact).toBeChecked();
+    await expect(followUp).toHaveText("October 14 at 9:30 AM");
     await expect(note).toHaveValue("First line.\nSecond line.\nThird line.");
     await page.getByRole("button", { name: "Clear Follow-up date" }).click();
-    await expect(followUp).toHaveText("Choose a date");
+    await expect(followUp).toHaveText("Set a date");
+    await page.getByRole("button", { name: "More options" }).click();
     await page.getByRole("button", { name: "Discard changes" }).click();
-    await expect(followUp).toHaveText("Oct 14, 2026");
+    await expect(followUp).toHaveText("October 14 at 9:30 AM");
 
     // Discard changes puts the saved values back.
     await state.getByRole("button", { name: "Rejected" }).click();
@@ -461,10 +471,12 @@ test.describe("signed in", () => {
     await pickUntilFull("Expertise", "expertise", 10);
     await expect(page.getByRole("list", { name: "Expertise results" }).locator("[data-limit-reached]")).toHaveCount(0); // closed
     await clear("organization");
-    await pickUntilFull("Organization", "organization", 5);
+    await pickUntilFull("Organizations", "organization", 5);
     await page.getByRole("button", { name: "Submit changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "People updated" })).toBeVisible();
-    await page.reload();
+    await expect(page).toHaveURL(/\/admin\/people\?q=kai/);
+    await rows(page).first().getByRole("link").click();
+    await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
     await expect(linked("expertise")).toHaveCount(10);
     await expect(linked("organization")).toHaveCount(5);
 
@@ -495,13 +507,13 @@ test.describe("signed in", () => {
   test("duplicate: a copy without Notion page or number, opened", async ({ page }) => {
     await openPerson(page, "pia example");
     const originalUrl = page.url();
-    const originalNumber = await page.locator("[data-record-panel]").getByText(/^PER-\d+$/).innerText();
+    const originalNumber = await page.locator("[data-record-main]").getByText(/^PER-\d+$/).innerText();
     await page.getByRole("button", { name: "Duplicate" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Person duplicated" })).toBeVisible();
     await expect(page).not.toHaveURL(originalUrl);
     await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Pia Example");
-    const copyNumber = await page.locator("[data-record-panel]").getByText(/^PER-\d+$/).innerText();
+    const copyNumber = await page.locator("[data-record-main]").getByText(/^PER-\d+$/).innerText();
     expect(copyNumber).not.toBe(originalNumber);
   });
 

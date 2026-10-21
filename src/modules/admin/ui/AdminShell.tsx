@@ -10,6 +10,7 @@ import { activeModuleKey, ADMIN_MODULES, filterModules } from "../registry";
 import { AdminIcon } from "./adminIcons";
 import { focusRing } from "./controls";
 import { rememberSidebar } from "./sidebarPrefs";
+import { useRememberAdminPage } from "../record/navigationMemory";
 import { ToastProvider } from "./Toast";
 
 /**
@@ -39,6 +40,7 @@ import { ToastProvider } from "./Toast";
  */
 export function AdminShell({ admin, initialCollapsed = false, children }: { admin: AdminPrincipal; initialCollapsed?: boolean; children: ReactNode }) {
   const pathname = usePathname();
+  useRememberAdminPage(pathname);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const searchRef = useRef<HTMLInputElement>(null);

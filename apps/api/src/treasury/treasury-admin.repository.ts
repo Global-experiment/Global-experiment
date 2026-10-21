@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, exists, gte, ilike, inArray, isNull, lte, not, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gte, ilike, inArray, isNotNull, isNull, lte, not, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { containsPattern, groupFilters, type Page } from "../common/listing/list-query.js";
 import { adminUsers } from "../auth/auth.schema.js";
@@ -28,7 +28,10 @@ export class TreasuryAdminRepository {
 
   private where(query: TreasuryListQuery): SQL | undefined {
     const conditions: SQL[] = [];
-    const { anyOf, all } = groupFilters<Filter["field"]>(query.filters);
+    // Archived entries are only in the "Archived" view (decision 12).
+    const archived = query.filters.find((filter) => filter.field === "archived");
+    conditions.push(archived?.value === true ? isNotNull(treasuryEntries.archivedAt) : isNull(treasuryEntries.archivedAt));
+    const { anyOf, all } = groupFilters<Filter["field"]>(query.filters.filter((filter) => filter.field !== "archived"));
     const values = (field: Filter["field"]) => (anyOf.get(field) ?? []).map(String);
     const column = {
       type: treasuryEntries.entryType,
@@ -147,6 +150,7 @@ export class TreasuryAdminRepository {
       managedBy: treasuryEntries.managedBy,
       createdAt: treasuryEntries.createdAt,
       updatedAt: treasuryEntries.updatedAt,
+      archivedAt: treasuryEntries.archivedAt,
       documents: sql<number>`(select count(*)::int from ${treasuryDocuments} where ${treasuryDocuments.entryId} = ${treasuryEntries.id})`,
     };
   }
@@ -204,6 +208,7 @@ export class TreasuryAdminRepository {
       documents: row.documents,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+      archivedAt: iso(row.archivedAt),
     };
   }
 

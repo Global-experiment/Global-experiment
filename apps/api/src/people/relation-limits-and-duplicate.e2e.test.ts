@@ -127,7 +127,9 @@ describe("relationship limits and duplicate", () => {
         personalNote: "Met at the summit",
         doNotContact: true,
         email: "ada@example.org",
-        nextFollowupOn: "2026-11-02",
+        nextFollowupAt: "2026-11-02T08:00:00Z",
+        relevanceScore: 6,
+        contactChannelKeys: ["whatsapp"],
         organizationIds: [org],
         expertiseIds: [skill],
       });
@@ -145,7 +147,9 @@ describe("relationship limits and duplicate", () => {
         personalNote: "Met at the summit",
         doNotContact: true,
         email: "ada@example.org",
-        nextFollowupOn: "2026-11-02",
+        nextFollowupAt: "2026-11-02T08:00:00.000Z",
+        relevanceScore: 6,
+        contactChannels: [{ key: "whatsapp", label: "WhatsApp" }],
         organizations: [{ id: org }],
       });
       expect(copy.expertise.map((item: { id: string }) => item.id)).toEqual([skill]);

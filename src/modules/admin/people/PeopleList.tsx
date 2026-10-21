@@ -6,7 +6,6 @@ import { adminApi, AdminApiError } from "../api/client";
 import type { ExpertiseTree, Organization, Page, PeopleOptions, Person } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { AdminListPage } from "../table/AdminListPage";
-import { ViewTabs } from "../table/ViewTabs";
 import { AdminButton, chipInput, Popover } from "../ui/controls";
 import { useToast } from "../ui/Toast";
 import { NotionImportControl } from "./NotionImportControl";
@@ -89,8 +88,8 @@ export function PeopleList() {
         fields,
         columns: PEOPLE_COLUMNS,
         recordHref: (person) => `/admin/people/${person.id}`,
-        // Only "All" until the client defines the saved views (ViewTabs is ready for them).
-        views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
+        // All and Archived until the client defines the saved views (ViewTabs is ready for them).
+        archivedView: true,
         actions: (
           <>
             <NotionImportControl />

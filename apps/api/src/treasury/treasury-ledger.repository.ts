@@ -1,4 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { recordAuditEvent } from "../audit/audit.service.js";
+import { AUTOMATION, type AuditChange } from "../audit/audit.types.js";
+import { entryLabel, moneyLabel } from "../audit/entity-labels.js";
 import { and, asc, eq, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { zurichDate } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
@@ -137,9 +140,24 @@ export class TreasuryLedgerRepository {
     } as const;
   }
 
+  /** Inserts once per Stripe object; a new entry gets its "created" event (Automation, Stripe) in the same transaction. */
   private async insertOnce(executor: Executor, externalId: string, values: typeof treasuryEntries.$inferInsert): Promise<RecordedEntry> {
-    const inserted = await executor.insert(treasuryEntries).values(values).onConflictDoNothing(ON_CONFLICT).returning({ id: treasuryEntries.id });
-    if (inserted[0]) return { entryId: inserted[0].id, created: true };
+    const inserted = await executor
+      .insert(treasuryEntries)
+      .values(values)
+      .onConflictDoNothing(ON_CONFLICT)
+      .returning({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency });
+    if (inserted[0]) {
+      await recordAuditEvent(executor, {
+        entityType: "treasury_entry",
+        entityId: inserted[0].id,
+        action: "created",
+        actor: AUTOMATION,
+        source: "stripe",
+        meta: { label: entryLabel(inserted[0]), collection: "Treasury", origin: "Stripe" },
+      }, values.createdAt instanceof Date ? values.createdAt : new Date());
+      return { entryId: inserted[0].id, created: true };
+    }
     return { entryId: (await this.findStripeEntry(executor, externalId))!, created: false };
   }
 
@@ -253,12 +271,25 @@ export class TreasuryLedgerRepository {
   /** Fills fee and net once — never overwrites amounts that are already known. */
   async applyAmounts(entryId: string, amounts: LedgerAmounts, now: Date): Promise<boolean> {
     if (amounts.feeAmount === null && amounts.settlementCurrency === null) return false;
-    const updated = await this.db
-      .update(treasuryEntries)
-      .set({ ...amounts, updatedAt: now })
-      .where(and(eq(treasuryEntries.id, entryId), isNull(treasuryEntries.feeAmount), isNull(treasuryEntries.settlementCurrency)))
-      .returning({ id: treasuryEntries.id });
-    return updated.length > 0;
+    return this.db.transaction(async (tx) => {
+      const updated = await tx
+        .update(treasuryEntries)
+        .set({ ...amounts, updatedAt: now })
+        .where(and(eq(treasuryEntries.id, entryId), isNull(treasuryEntries.feeAmount), isNull(treasuryEntries.settlementCurrency)))
+        .returning({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency });
+      const entry = updated[0];
+      if (!entry) return false;
+      // Stripe settled the payment: the fee and the net amount become known (Automation).
+      const money = (minor: number | null) => (minor === null ? null : moneyLabel(minor, entry.currency));
+      const changes: AuditChange[] = [
+        { field: "feeAmount", label: "Fee", kind: "text", before: null, after: money(amounts.feeAmount) },
+        { field: "netAmount", label: "Net", kind: "text", before: null, after: money(amounts.netAmount) },
+      ].filter((change) => change.after !== null) as AuditChange[];
+      if (changes.length > 0) {
+        await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: entry.id, action: "updated", actor: AUTOMATION, source: "stripe", changes, meta: { label: entryLabel(entry) } }, now);
+      }
+      return true;
+    });
   }
 
   /** Published entries of one currency that the public may see (Stripe rows of the public mode only). */

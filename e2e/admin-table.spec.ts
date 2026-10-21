@@ -230,7 +230,10 @@ test("an organization links and unlinks people; the link shows on both records",
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Organization updated" })).toBeVisible();
 
-  await page.reload();
+  // Submit returns to the list it came from; reopen the organization.
+  await expect(page).toHaveURL(/\/admin\/organizations\?q=quarry/);
+  await page.locator("tbody tr").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]{36}$/);
   const personLink = page.getByRole("link", { name: "Juno Demo" });
   await expect(personLink).toBeVisible();
   await personLink.click();
@@ -242,6 +245,11 @@ test("an organization links and unlinks people; the link shows on both records",
   await page.getByRole("button", { name: "Remove Juno Demo" }).click();
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Organization updated" })).toBeVisible();
-  await page.reload();
+  // Back on the person it came from: the organization is gone there too.
+  await expect(page).toHaveURL(/\/admin\/people\/de000000-/);
+  await expect(page.getByRole("link", { name: "Quarry Mobile" })).toHaveCount(0);
+  await page.goto("/admin/organizations?q=quarry");
+  await page.locator("tbody tr").first().getByRole("link").click();
+  await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Quarry Mobile");
   await expect(page.getByRole("link", { name: "Juno Demo" })).toHaveCount(0);
 });

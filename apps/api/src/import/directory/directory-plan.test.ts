@@ -38,7 +38,7 @@ const person = (pageId: string, name: string, extra: Partial<SourcePerson> = {})
   x: null,
   otherContact: null,
   wiseRecipientId: null,
-  nextFollowupOn: null,
+  nextFollowupAt: null,
   organizationPageIds: [],
   expertisePageIds: [],
   expensesCount: 0,
@@ -90,7 +90,7 @@ const dbPerson = (id: string, extra: Partial<DbPerson> = {}): DbPerson => ({
   x: null,
   otherContact: null,
   wiseRecipientId: null,
-  nextFollowupOn: null,
+  nextFollowupAt: null,
   ...extra,
 });
 const dbOrg = (id: string, extra: Partial<DbOrganization> = {}): DbOrganization => ({
@@ -191,11 +191,11 @@ describe("directory import plan", () => {
 
   it("leaves invalid or too long values empty and flags them — the record is imported", () => {
     const plan = planDirectoryImport(
-      source([org("o1", "Civic Lab", { email: "not-an-email", wiseRecipientId: "9".repeat(101) })], [person("p1", "Ada", { nextFollowupOn: "next week", phone: "1".repeat(65) })]),
+      source([org("o1", "Civic Lab", { email: "not-an-email", wiseRecipientId: "9".repeat(101) })], [person("p1", "Ada", { nextFollowupAt: "next week", phone: "1".repeat(65) })]),
       snapshot(),
     );
     expect(plan.organizations[0]!.values).toMatchObject({ email: null, wiseRecipientId: null });
-    expect(plan.people[0]!.values).toMatchObject({ nextFollowupOn: null, phone: null });
+    expect(plan.people[0]!.values).toMatchObject({ nextFollowupAt: null, phone: null });
     expect(plan.issues.map((i) => i.detail)).toEqual([
       'Email "not-an-email" isn\'t valid; left empty.',
       "Wise recipient account ID is 101 characters (max 100); left empty.",

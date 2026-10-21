@@ -1,4 +1,5 @@
 import type { Database } from "../../common/database/database.module.js";
+import { followUpInstant } from "../../import/directory/directory-plan.js";
 import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams } from "../../expertise/expertise.schema.js";
 import { organizationExpertise, organizations } from "../../organizations/organizations.schema.js";
 import { people, peopleExpertise, peopleOrganizations } from "../../people/people.schema.js";
@@ -11,6 +12,7 @@ import { FIXTURE_ORGANIZATIONS, FIXTURE_PEOPLE, FIXTURE_TAXONOMY } from "./direc
  */
 export async function loadDirectoryFixtures(db: Database): Promise<void> {
   const today = new Date();
+  const followUpAt = (day: string) => new Date(followUpInstant(day)!);
   const dayFromToday = (days: number) => new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate() + days)).toISOString().slice(0, 10);
   await db.transaction(async (tx) => {
     for (const domain of FIXTURE_TAXONOMY.domains) {
@@ -49,7 +51,8 @@ export async function loadDirectoryFixtures(db: Database): Promise<void> {
         linkedin: person.linkedin,
         x: person.x,
         otherContact: person.otherContact,
-        nextFollowupOn: person.followUpInDays === null ? null : dayFromToday(person.followUpInDays),
+        // That day at 09:00 in Zurich, as migration 0010 converts dates (07:00 or 08:00 UTC).
+        nextFollowupAt: person.followUpInDays === null ? null : followUpAt(dayFromToday(person.followUpInDays)),
         createdAt: person.createdAt,
         updatedAt: person.createdAt,
       })),

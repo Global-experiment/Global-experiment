@@ -107,7 +107,8 @@ describe("Notion directory records", () => {
       x: "https://x.com/amina",
       otherContact: "Signal",
       wiseRecipientId: "12345678",
-      nextFollowupOn: "2026-11-03",
+      // Notion's value as written (date and time with its offset); the plan turns it into an instant.
+      nextFollowupAt: "2026-11-03T09:30:00.000+01:00",
       organizationPageIds: ["org-1", "org-2"],
       expertisePageIds: null, // no Expertise property in Notion
       expensesCount: 2,
