@@ -46,7 +46,8 @@ export function ArticleAccordionItem({
 
   return (
     // Stroke runs through the 8px gutters, edge to edge of the content area (figma.pdf p15/p17).
-    <div id={article.slug} className="-mx-gutter border-b border-line px-gutter">
+    // A #slug deep link stops under the sticky header (2.5rem), not behind it.
+    <div id={article.slug} className="-mx-gutter scroll-mt-10 border-b border-line px-gutter">
       <h2 className="text-body font-bold text-text-primary">
         <button
           type="button"

@@ -50,7 +50,7 @@ describe("parseConfig — Stripe and donations", () => {
   it("defaults to donations off-flags, USD, no Stripe, local site and web origins", () => {
     const config = parseConfig({ ...base });
     expect(config.stripe).toEqual({ secretKey: undefined, webhookSecret: undefined, livemode: false, customerPortalUrl: undefined, feeReconcileMinutes: 15, fixture: false });
-    expect(config.donationDefaults).toEqual({ enabled: false, monthly: false, extraMethods: false, defaultCurrency: "USD", paypalMonthly: false, checkout: "embedded" });
+    expect(config.donationDefaults).toEqual({ enabled: false, monthly: false, extraMethods: false, defaultCurrency: "USD", paypalMonthly: false, checkout: "hosted" });
     expect(config.donationPreviewToken).toBeUndefined();
     expect(config.publicSiteUrl).toBe("http://localhost:3000");
     expect(config.revalidation).toEqual({ webUrl: "http://127.0.0.1:3000", secret: undefined });
@@ -63,9 +63,9 @@ describe("parseConfig — Stripe and donations", () => {
       DONATIONS_EXTRA_METHODS: "true",
       DONATIONS_DEFAULT_CURRENCY: "CHF",
       DONATIONS_PAYPAL_MONTHLY: "true",
-      DONATIONS_CHECKOUT: "hosted",
+      DONATIONS_CHECKOUT: "embedded",
     });
-    expect(config.donationDefaults).toEqual({ enabled: false, monthly: true, extraMethods: true, defaultCurrency: "CHF", paypalMonthly: true, checkout: "hosted" });
+    expect(config.donationDefaults).toEqual({ enabled: false, monthly: true, extraMethods: true, defaultCurrency: "CHF", paypalMonthly: true, checkout: "embedded" });
     expect(() => parseConfig({ ...base, DONATIONS_CHECKOUT: "popup" })).toThrow(/DONATIONS_CHECKOUT/);
     expect(() => parseConfig({ ...base, DONATIONS_DEFAULT_CURRENCY: "GBP" })).toThrow(/DONATIONS_DEFAULT_CURRENCY/);
   });

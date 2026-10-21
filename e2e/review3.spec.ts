@@ -162,8 +162,9 @@ for (const mode of ["desktop", "mobile"] as const) {
         // Full-width rules: rows run exactly edge to edge of the sheet's content box.
         expect(box.rowLeft).toBeCloseTo(0, 0);
         expect(box.rowRight).toBeCloseTo(0, 0);
-        // Mobile sheet: exactly the viewport width; desktop dialog: Figma's 400px.
-        expect(box.sheetWidth).toBe(viewport.width < 768 ? viewport.width : 400);
+        // Mobile sheet: exactly the viewport width; desktop dialog: Figma's 400px, 25rem (425px at the 17px root).
+        const root = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
+        expect(box.sheetWidth).toBe(viewport.width < 768 ? viewport.width : 25 * root);
         expect(await noPageOverflow(page)).toBe(true);
       });
     }
@@ -190,10 +191,11 @@ test.describe("Documentation deep links (item 7)", () => {
       await expect(row.locator("h2 > button")).toHaveAttribute("aria-expanded", "true");
       await expect(page.locator(`[id="${other}"] h2 > button`)).toHaveAttribute("aria-expanded", "false");
       await expect(page.locator("h2 > button[aria-expanded=true]")).toHaveCount(1);
-      // Still on target once streamed article bodies have changed the layout.
+      // Still on target once streamed article bodies have changed the layout: right under the sticky header.
+      const headerBottom = await page.locator("[data-nav-header]").evaluate((element) => element.getBoundingClientRect().bottom);
       await expect
-        .poll(async () => Math.round((await row.boundingBox())!.y), { timeout: 8000 })
-        .toBe(0);
+        .poll(async () => Math.abs((await row.boundingBox())!.y - headerBottom) <= 1, { timeout: 8000 })
+        .toBe(true);
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
       expect(await noPageOverflow(page)).toBe(true);
     });

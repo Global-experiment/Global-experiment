@@ -361,14 +361,18 @@ describe("embedded card donations (PaymentIntent)", () => {
   afterAll(async () => {
     await t.close();
   });
+  // Hosted Checkout is the default (client review 2026-10-21): these tests switch the embedded form on.
+  beforeEach(async () => {
+    await t.db.insert(settings).values({ key: "donations.checkout", value: "embedded" });
+  });
   afterEach(async () => {
     stripe.createdIntents.length = 0;
     await t.db.delete(settings);
   });
 
-  it("offers the embedded card form with the publishable key; donations.checkout = hosted turns it off", async () => {
+  it("uses hosted Checkout by default even with a publishable key; donations.checkout = embedded offers the card form", async () => {
     expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({ checkout: "embedded", publishableKey: "pk_test_FAKEKEYforapitestsonly" });
-    await t.db.insert(settings).values({ key: "donations.checkout", value: "hosted" });
+    await t.db.delete(settings);
     expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({ checkout: "hosted", publishableKey: null });
     const refused = await intent(attempt()).expect(403);
     expect(refused.body.error.details).toEqual({ reason: "embedded_checkout_off" });

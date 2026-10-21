@@ -22,10 +22,8 @@ import {
 } from "@/shared/treasury/treasuryParams";
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
-import { IconButton } from "@/shared/ui/IconButton";
 import { Icon } from "@/shared/ui/icons";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import { PageActionsMenu } from "@/shared/ui/PageActionsMenu";
 import { Sheet } from "@/shared/ui/Sheet";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 
@@ -96,45 +94,34 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
       <NavHeader
         title={copy.pageTitle}
         backHref="/"
-        actions={
-          toolbar ? (
-          <>
-            {/* Common pages p11: "USD" bold — the currency of the stats and the history — then the chart glyph and ⋮. */}
-            <button
-              type="button"
-              onClick={() => setCurrencyOpen(true)}
-              aria-label={copy.header.currencyLabel(currencyLabel(state.currency))}
-              aria-haspopup="dialog"
-              className={`h-10 shrink-0 cursor-pointer rounded-control px-2 text-body font-bold text-text-primary ${focusRing}`}
-            >
-              {currencyLabel(state.currency)}
-            </button>
-            {/* Same glyph and destination as on Donate (Common pages p11, p28). */}
-            <IconButton href="/treasury" label={copy.header.treasuryLink} icon="leaderboard" />
-            <PageActionsMenu
-              label={copy.header.pageActions}
-              actions={[
-                { label: copy.menu.donate, icon: "volunteer_activism", href: "/donate" },
-                { label: copy.menu.share, icon: "share", share: { url: treasuryHref(state), title: copy.pageTitle } },
-                { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
-                { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
-                { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
-              ]}
-            >
-              {/* Common pages p12: two sentences on consecutive lines. */}
-              <p>
-                {copy.menu.refresh}
-                {lastUpdated ? (
-                  <>
-                    <br />
-                    {copy.menu.lastUpdated(lastUpdated)}
-                  </>
-                ) : null}
-              </p>
-            </PageActionsMenu>
-          </>
-          ) : null
-        }
+        // Exactly Share and ⋮ on the right (client review 2026-10-21); the ⋮ menu is the Common pages p12 one, on every Treasury page.
+        // With the toolbar setting on, the currency switch is its first row (the chart link pointed to this page and is gone).
+        shareUrl={treasuryHref(state)}
+        menu={{
+          label: copy.header.pageActions,
+          actions: [
+            ...(toolbar
+              ? [{ label: copy.header.currencyRow(currencyLabel(state.currency)), icon: "account_balance" as const, onClick: () => setCurrencyOpen(true) }]
+              : []),
+            { label: copy.menu.donate, icon: "volunteer_activism", href: "/donate" },
+            { label: copy.menu.share, icon: "share", share: { url: treasuryHref(state), title: copy.pageTitle } },
+            { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
+            { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
+            { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
+          ],
+          // Common pages p12: two sentences on consecutive lines.
+          note: (
+            <p>
+              {copy.menu.refresh}
+              {lastUpdated ? (
+                <>
+                  <br />
+                  {copy.menu.lastUpdated(lastUpdated)}
+                </>
+              ) : null}
+            </p>
+          ),
+        }}
       />
 
       {toolbar ? (

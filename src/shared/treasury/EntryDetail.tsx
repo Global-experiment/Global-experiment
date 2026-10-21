@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchTreasuryEntry, type PublicTreasuryEntry } from "@/shared/config/publicApi";
-import { ReportLaunchButton } from "@/shared/report/ReportLauncher";
 import { Button } from "@/shared/ui/Button";
 import { Container } from "@/shared/ui/Container";
 import { FullBleedSeparator } from "@/shared/ui/FullBleedSeparator";
-import { IconButton } from "@/shared/ui/IconButton";
+import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { ShareButton } from "@/shared/ui/ShareButton";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { Tag } from "@/shared/ui/Tag";
 import { TREASURY_COPY } from "./copy";
-import { EntryActionsMenu } from "./EntryActionsMenu";
+import { entryMenu } from "./entryMenu";
 import { amountInWords, formatCodeAmount, formatEntryDay, formatEntryMoment, formatEntryTime } from "./format";
 import { entryHref, entryTags } from "./HistoryList";
 
@@ -67,12 +66,8 @@ export function EntryDetail({ entry, route, now }: { entry: PublicTreasuryEntry 
       <NavHeader
         title={title}
         backHref="/treasury"
-        actions={
-          <>
-            <IconButton href="/treasury" label={TREASURY_COPY.header.treasuryLink} icon="leaderboard" />
-            <EntryActionsMenu sentence={sentence} url={url} title={`${title} ${amount}`} />
-          </>
-        }
+        shareUrl={url}
+        menu={entryMenu({ sentence, url, title: `${title} ${amount}` })}
       />
       <Container className="pt-1">
         {/* p22/p26: the time, muted, with Share on the right of the same row. */}
@@ -102,11 +97,8 @@ export function EntryDetail({ entry, route, now }: { entry: PublicTreasuryEntry 
           {entry.amount < 0 && entry.type !== "expense" ? `- ${amount}` : amount}
         </p>
         {entry.description && entry.type === "expense" ? <p className="mt-3.5 text-body text-text-primary">{entry.description}</p> : null}
-        <div className="mt-3">
-          <ReportLaunchButton kind="feedback" icon="lightbulb" size="compact">
-            {copy.feedback}
-          </ReportLaunchButton>
-        </div>
+        {/* Send feedback and Report issue, as under every documentation article (client review 2026-10-21). */}
+        <FeedbackIssueActions className="mt-3" />
 
         {route === "donation" ? (
           <>

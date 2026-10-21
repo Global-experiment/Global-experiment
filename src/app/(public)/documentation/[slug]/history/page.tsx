@@ -7,7 +7,7 @@ import { Tag } from "@/shared/ui/Tag";
 import { getArticleBySlug } from "@/modules/documentation/application/getArticleBySlug";
 import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { DocumentationContent } from "@/modules/documentation/ui/DocumentationContent";
-import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
+import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
 import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
 
@@ -56,7 +56,7 @@ export default async function DocumentationHistoryPage({ params }: HistoryPagePr
         title="Document history"
         backHref={articleHref}
         shareUrl={documentationAnchorHref(article.slug)}
-        actions={<DocumentationPageMenu url={documentationAnchorHref(article.slug)} title={article.title} />}
+        menu={documentationMenu({ url: documentationAnchorHref(article.slug), title: article.title })}
       />
       <Container className="pt-1">
         <p role="status" className="text-body text-text-muted">

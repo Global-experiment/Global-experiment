@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { atFigmaScale } from "./figmaScale";
 import postgres from "postgres";
 import { E2E_DONATIONS_PREVIEW } from "./donations-preview";
 
@@ -23,6 +24,8 @@ import { E2E_DONATIONS_PREVIEW } from "./donations-preview";
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the API isn't running.");
 test.describe.configure({ mode: "serial" });
 test.use({ viewport: { width: 412, height: 900 } });
+// The frames are drawn at a 16px root; the public scale is tested in public-ux.spec.ts.
+test.beforeEach(async ({ page }) => atFigmaScale(page));
 
 const SHOTS = "test-results/figma-donate";
 const CHROME = 104;
@@ -69,18 +72,14 @@ test("p29 default: geometry of the header, segment, amounts and payment rows", a
   await expect(page.locator("[data-stat-label]")).toHaveText(["Donations", "Med. donation", "Monthly donors"]);
   await expect(page.getByRole("button", { name: /Monthly donors/ })).toContainText("1");
 
-  // Header: Common pages p29 has USD (text 326–355.6), the Treasury glyph (365.33–378.67) and ⋮. The
-  // share button the client added on every header (2026-10-19) comes first, left of USD: the controls
-  // are right-aligned, so USD, the glyph and ⋮ keep their Figma positions.
+  // Header (client review 2026-10-21): exactly Share and ⋮ on the right — Common pages p29's USD and Treasury
+  // glyph moved into the ⋮ menu. ⋮ keeps its Figma place (ending 8px from the edge), Share sits 24px before it.
   const share = await box(page.locator("header").getByRole("button", { name: "Share" }).locator("svg"));
-  const usd = await box(page.getByRole("button", { name: /^Currency: USD/ }));
-  near(usd.x + usd.width - 8, 356, "USD text right edge");
-  const treasury = await box(page.getByRole("link", { name: "Treasury" }).locator("svg"));
-  near(treasury.x, 364, "Treasury glyph x");
-  near(treasury.y, fy(116), "Treasury glyph y");
-  expect(share.x + share.width, "share before USD").toBeLessThanOrEqual(usd.x + 8);
   const more = await box(page.locator("header").getByRole("button", { name: "Page actions" }).locator("svg"));
   near(more.x + more.width, 404, "⋮ right edge");
+  near(share.x + share.width, 380, "share glyph right edge");
+  near(share.y, fy(116), "share glyph y");
+  await expect(page.locator("header").getByRole("button", { name: /^Currency/ })).toHaveCount(0);
 
   // Segment 8–404 × 266–306; selected "Once".
   const once = await box(page.getByRole("button", { name: "Once", exact: true }));
@@ -200,7 +199,7 @@ test("p32 'Select an amount': the banner's box, glyphs and the rows pushed down"
   await capture(page, "p32-select-amount");
 });
 
-test("p33 the ⋮ sheet: update line, partners, five actions", async ({ page }) => {
+test("p33 the ⋮ sheet: update line, partners, the five actions plus Currency and Treasury (moved from the header, 2026-10-21)", async ({ page }) => {
   await page.goto("/donate");
   await page.getByRole("button", { name: "Page actions" }).click();
   const sheet = page.getByRole("dialog");
@@ -210,7 +209,7 @@ test("p33 the ⋮ sheet: update line, partners, five actions", async ({ page }) 
   const lead = sheet.locator("p").first();
   await expect(lead).toHaveText(/^This page was updated on [A-Z][a-z]+ \d{1,2} at \d{1,2}:\d{2}(AM|PM)\.Stripe and Wise are the banking partners of the experiment\.$/);
   await expect(lead.locator("br")).toHaveCount(1);
-  await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText(["Stripe", "Wise", "Donate", "Share page", "Send feedback", "Report issue", "Documentation"]);
+  await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText(["Stripe", "Wise", "Currency: USD", "Donate", "Share page", "Send feedback", "Report issue", "Documentation", "Treasury"]);
   await sheet.screenshot({ path: join(SHOTS, "p32-menu.png") });
   await capture(page, "p33-menu-page");
 });

@@ -135,6 +135,8 @@ export function Icon({ name, variant = "outlined", size = 16, className = "", ..
       viewBox="0 0 24 24"
       width={size}
       height={size}
+      // In rem, so icons follow the public scale (16 = 1rem); the attributes are the fallback.
+      style={{ width: `${size / 16}rem`, height: `${size / 16}rem`, ...rest.style }}
       fill="currentColor"
       data-icon={name}
       data-variant={variant === "filled" && hasFilledVariant(name) ? "filled" : "outlined"}

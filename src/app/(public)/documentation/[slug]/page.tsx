@@ -7,7 +7,7 @@ import { Tag } from "@/shared/ui/Tag";
 import { getArticleBySlug } from "@/modules/documentation/application/getArticleBySlug";
 import { FeedbackIssueActions } from "@/shared/ui/FeedbackIssueActions";
 import { DocumentationContent } from "@/modules/documentation/ui/DocumentationContent";
-import { DocumentationPageMenu } from "@/modules/documentation/ui/DocumentationPageMenu";
+import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { formatPublishedAt, formatUpdatedAt } from "@/modules/documentation/ui/formatPublishedAt";
 import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
 
@@ -53,14 +53,12 @@ export default async function DocumentationArticlePage({ params }: Documentation
         title={article.title}
         backHref="/documentation"
         shareUrl={documentationAnchorHref(article.slug)}
-        actions={
-          <DocumentationPageMenu
-            url={documentationAnchorHref(article.slug)}
-            title={article.title}
-            historyHref={`${href}/history`}
-            note={<p>This page was last updated {formatUpdatedAt(article.updatedAt)}.</p>}
-          />
-        }
+        menu={documentationMenu({
+          url: documentationAnchorHref(article.slug),
+          title: article.title,
+          historyHref: `${href}/history`,
+          note: <p>This page was last updated {formatUpdatedAt(article.updatedAt)}.</p>,
+        })}
       />
       <Container className="pt-1">
         <p className="text-meta text-text-muted">Published {formatPublishedAt(article.publishedAt)}</p>

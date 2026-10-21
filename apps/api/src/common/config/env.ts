@@ -96,7 +96,8 @@ const envSchema = z
     DONATIONS_MONTHLY: booleanFromString.default(false),
     DONATIONS_EXTRA_METHODS: booleanFromString.default(false),
     DONATIONS_PAYPAL_MONTHLY: booleanFromString.default(false),
-    DONATIONS_CHECKOUT: z.enum(["embedded", "hosted"]).default("embedded"),
+    // Hosted Stripe Checkout for every donation (client review 2026-10-21); the embedded card form stays behind "embedded".
+    DONATIONS_CHECKOUT: z.enum(["embedded", "hosted"]).default("hosted"),
     DONATIONS_DEFAULT_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
   })
   .transform((env, context) => {

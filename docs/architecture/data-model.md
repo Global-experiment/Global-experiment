@@ -91,9 +91,9 @@ Every change writes an audit event. Declared keys in v0.1:
 | `donations.monthly` | boolean | `DONATIONS_MONTHLY` = false | Monthly donations (Stripe subscriptions) |
 | `donations.extra_methods` | boolean | `DONATIONS_EXTRA_METHODS` = false | PayPal and SEPA rows (Q19) |
 | `donations.paypal_monthly` | boolean | `DONATIONS_PAYPAL_MONTHLY` = false | PayPal also on Monthly (Stripe subscriptions with PayPal; decision 17, 2026-10-19). Needs `donations.monthly` and `donations.extra_methods` |
-| `donations.checkout` | `embedded` | `hosted` | `DONATIONS_CHECKOUT` = embedded | One-off card donations: Stripe card fields on the donate page, no email, a reference on the thank-you page (embedded; needs `STRIPE_PUBLISHABLE_KEY`, otherwise hosted) or Stripe Checkout (hosted). Monthly is always hosted (decision 17) |
+| `donations.checkout` | `embedded` \| `hosted` | `DONATIONS_CHECKOUT` = hosted | One-off card donations: Stripe Checkout (hosted, the default since the client review of 2026-10-21) or Stripe card fields on the donate page with no email and a reference on the thank-you page (embedded; needs `STRIPE_PUBLISHABLE_KEY`). Monthly is always hosted |
 | `donations.default_currency` | `EUR` \| `USD` \| `CHF` | `DONATIONS_DEFAULT_CURRENCY` = USD | Donate page's initial currency |
-| `treasury.stats_currency` | `EUR` | `USD` | `CHF` | `TREASURY_STATS_CURRENCY` = USD | Currency of the public Treasury stats (decision 2, 2026-10-19) |
+| `treasury.stats_currency` | `EUR` \| `USD` \| `CHF` | `TREASURY_STATS_CURRENCY` = USD | Currency of the public Treasury stats (decision 2, 2026-10-19) |
 | `treasury.public_toolbar` | boolean | `TREASURY_PUBLIC_TOOLBAR` = false | Public Treasury search, sort, filter and currency switch; off: the history lists every currency, latest first (decision 2) |
 | `treasury.wise_connected` | boolean | `TREASURY_WISE_CONNECTED` = false | Shows Balance and Sustainability (hidden until Wise) |
 | `treasury.public_recipient_names` | boolean | `TREASURY_PUBLIC_RECIPIENT_NAMES` = false | Public pages show an expense's recipient name; off: only the public description (pending client answer) |

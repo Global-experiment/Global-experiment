@@ -23,6 +23,8 @@ export const DONATE_COPY = {
     currencyNames: { EUR: "Euro (EUR)", USD: "US dollar (USD)", CHF: "Swiss franc (CHF)" },
     treasuryLink: "Treasury",
     pageActions: "Page actions",
+    /** The ⋮ menu row that opens the currency list (the header keeps only Share and ⋮, client review 2026-10-21). */
+    currencyRow: (currency: string) => `Currency: ${currency}`,
   },
 
   /** The ⋮ sheet (p32); "published" reads as the last ledger update — Figma's date is a placeholder. */

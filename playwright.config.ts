@@ -70,10 +70,9 @@ export default defineConfig({
               // Open for the suites; donate-figma.spec closes them with the setting and uses the preview link.
               DONATIONS_ENABLED: "true",
               DONATIONS_PREVIEW_TOKEN: E2E_DONATIONS_PREVIEW,
-              // A stub publishable key (Stripe.js is stubbed in the browser): hosted Checkout stays the
-              // suites' default; donate-embedded.spec switches the embedded card form on.
+              // A stub publishable key (Stripe.js is stubbed in the browser). Hosted Checkout is the code's
+              // default (client review 2026-10-21) even with a key; donate-embedded.spec switches the embedded form on.
               STRIPE_PUBLISHABLE_KEY: "pk_test_e2estubkeynotarealstripekey",
-              DONATIONS_CHECKOUT: "hosted",
               PUBLIC_SITE_URL: `http://localhost:${port}`,
             },
           },

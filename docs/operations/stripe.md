@@ -51,6 +51,29 @@ Every Checkout session the API creates sets: the donation marker
 **`managed_payments.enabled = false`** and **`adaptive_pricing.enabled =
 false`** (see §3.2).
 
+As little donor data as Stripe allows (client review 2026-10-21):
+`billing_address_collection = auto`, `phone_number_collection.enabled =
+false`, `tax_id_collection.enabled = false`,
+`consent_collection.terms_of_service = none` and
+`wallet_options.link.display = never` (no "Save my information with Link"
+box, which is ticked by default and asks for a phone number). No shipping
+address and no custom fields are requested. Two settings are left at
+Stripe's default because Stripe refuses them as "off": `name_collection`
+(only accepted to turn a name field on) and
+`consent_collection.promotions` (not offered to Swiss accounts).
+
+What Checkout still asks for (sandbox, 21 October 2026):
+
+| Method | Fields |
+|---|---|
+| Card, once or monthly | Email; card number, expiry, CVC; cardholder name; country (plus ZIP for United States cards) |
+| Apple Pay / Google Pay | A card session: the wallet button appears on supported devices and the wallet shares the email and card holder details itself |
+| PayPal, once or monthly | Email (the PayPal window handles the rest) |
+| SEPA Direct Debit, once or monthly | Email; IBAN; name on account; full address (required for SEPA mandates) |
+
+Stripe always asks for the email on Checkout; monthly donations need it
+for the subscription.
+
 ## 2. Configuration
 
 | Variable | Where | Notes |

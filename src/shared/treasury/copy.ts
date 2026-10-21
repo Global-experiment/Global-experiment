@@ -12,6 +12,8 @@ export const TREASURY_COPY = {
     allShort: "All",
     pageActions: "Page actions",
     treasuryLink: "Treasury",
+    /** The ⋮ menu row that opens the currency list (toolbar mode; the header keeps only Share and ⋮). */
+    currencyRow: (currency: string) => `Currency: ${currency}`,
   },
   menu: {
     // Figma: "updated every 4 hours". The page now refreshes as soon as an entry changes (on-demand revalidation, 5-minute fallback).
