@@ -1,11 +1,9 @@
 import { Button } from "@/shared/ui/Button";
-import { Container } from "@/shared/ui/Container";
-import { RichText } from "@/shared/ui/RichText";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
-import { HomeSections } from "@/modules/home/ui/HomeSections";
-import { homeActions, homePrimaryAction, homeWordmark } from "./home-navigation";
+import { homePrimaryAction, homeWordmark } from "@/modules/home/ui/homeNavigation";
+import { HomeView } from "@/modules/home/ui/HomeView";
 
 // Editorial content is read live from Notion on every request, so edits in
 // Notion appear on the next refresh with no redeploy. No route cache, no
@@ -29,37 +27,7 @@ export default async function Home() {
     <main className="flex flex-1 flex-col md:pb-6">
       {/* The shared header (client review 2026-10-21): the wordmark, then Share and ⋮ — no theme toggle. */}
       <NavHeader title={homeWordmark.brand} brand={{ name: homeWordmark.brand, eyebrow: homeWordmark.eyebrow }} shareUrl="/" />
-      <Container>
-        <h1 className="mt-3.5 text-center text-lead text-text-primary">
-          <RichText text={content.tagline} />
-        </h1>
-
-        {/*
-          These routes are M1 navigation scaffolds: the route exists and
-          can be reviewed visually. The underlying business action
-          (persistence, payments, external integration) belongs to later
-          milestones — see docs/architecture/decisions/008-route-shells.md.
-        */}
-        <nav aria-label="Main" className="mt-6 grid grid-cols-2 gap-2">
-          <Button
-            href={homePrimaryAction.href}
-            icon={homePrimaryAction.icon}
-            fullWidth
-            className="col-span-2"
-          >
-            {homePrimaryAction.label}
-          </Button>
-          {homeActions.map((action) => (
-            <Button key={action.label} href={action.href} icon={action.icon} fullWidth>
-              {action.label}
-            </Button>
-          ))}
-        </nav>
-
-        <div className="mt-6">
-          <HomeSections content={content} />
-        </div>
-      </Container>
+      <HomeView content={content} />
 
       <StickyActionBar className="md:hidden">
         <Button variant="primary" href={homePrimaryAction.href} icon={homePrimaryAction.icon} fullWidth>

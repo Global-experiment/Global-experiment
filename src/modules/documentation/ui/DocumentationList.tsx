@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Button } from "@/shared/ui/Button";
 import { Icon } from "@/shared/ui/icons";
 import { ArticleAccordionItem } from "./ArticleAccordionItem";
 import { focusRow, initialAccordionState, isExpanded, queryChanged, toggleRow } from "./accordionState";
@@ -42,12 +43,15 @@ export function DocumentationList({
   articles,
   content,
   children,
+  variant = "public",
 }: {
   articles: DocumentationArticleSummary[];
   /** Every article with its body (streamed after the rows). */
   content: Promise<DocumentationArticle[]>;
   /** Page heading + intro, rendered between the search and the list. */
   children?: React.ReactNode;
+  /** "admin": the page inside the admin (admin-desktop.pdf p8) — no search, an "Administrate" action per article. */
+  variant?: "public" | "admin";
 }) {
   const [query, setQuery] = useState("");
   const [accordion, setAccordion] = useState(initialAccordionState);
@@ -142,7 +146,7 @@ export function DocumentationList({
 
   return (
     <div>
-      <div className="relative">
+      <div className="relative" hidden={variant === "admin"}>
         <Icon
           name="search"
           className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-primary"
@@ -196,6 +200,14 @@ export function DocumentationList({
               expanded={isExpanded(accordion, article.slug, searching)}
               onToggle={() => setAccordion((state) => toggleRow(state, article.slug, searching))}
               highlight={searching ? query : undefined}
+              leadingAction={
+                variant === "admin" ? (
+                  // admin-desktop.pdf p8: the article's own "Administrate", to its row in the documentation list.
+                  <Button size="compact" icon="how_to_vote" href={`/admin/documentation/manage?q=${encodeURIComponent(article.title)}`}>
+                    Administrate
+                  </Button>
+                ) : undefined
+              }
             />
           ))}
         </div>

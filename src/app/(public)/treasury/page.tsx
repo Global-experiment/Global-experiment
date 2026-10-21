@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { fetchTreasuryEntries, fetchTreasuryOverview } from "@/shared/config/publicApi";
-import { DEFAULT_TREASURY_STATE, HISTORY_PAGE_SIZE, historyCurrencies, parseTreasuryParams, statsCurrency } from "@/shared/treasury/treasuryParams";
+import { loadTreasuryPage } from "@/shared/treasury/loadTreasuryPage";
 import { TreasuryView } from "./TreasuryView";
 
 export const metadata: Metadata = {
@@ -24,32 +23,5 @@ export const metadata: Metadata = {
  * toolbar's code stays, ready for the setting.
  */
 export default async function TreasuryPage(props: PageProps<"/treasury">) {
-  const fromUrl = parseTreasuryParams(await props.searchParams);
-  let overview = await fetchTreasuryOverview();
-  const toolbar = overview.ok && overview.data.publicToolbar === true;
-  const state = toolbar ? fromUrl : { ...DEFAULT_TREASURY_STATE, type: fromUrl.type, page: fromUrl.page };
-  if (toolbar && overview.ok && statsCurrency(state) !== overview.data.currency) overview = await fetchTreasuryOverview(statsCurrency(state));
-  const [history] = await Promise.all([
-    fetchTreasuryEntries({
-      type: state.type ?? undefined,
-      currency: toolbar ? historyCurrencies(state) : [],
-      from: state.from ?? undefined,
-      to: state.to ?? undefined,
-      expenseType: state.expenseTypes,
-      q: state.q ?? undefined,
-      sort: state.sort,
-      page: state.page,
-      pageSize: HISTORY_PAGE_SIZE,
-    }),
-  ]);
-
-  return (
-    <TreasuryView
-      state={state}
-      toolbar={toolbar}
-      overview={overview.ok ? overview.data : null}
-      history={history.ok ? history.data : null}
-      now={new Date().toISOString()}
-    />
-  );
+  return <TreasuryView {...await loadTreasuryPage(await props.searchParams)} />;
 }

@@ -26,7 +26,7 @@ async function axe() {
 }
 
 async function openRecord(search: string) {
-  await page.goto(`/admin/treasury?q=${encodeURIComponent(search)}`);
+  await page.goto(`/admin/treasury/manage?q=${encodeURIComponent(search)}`);
   await expect(rows()).toHaveCount(1);
   await rows().first().click();
   await expect(page).toHaveURL(/\/admin\/treasury\/[0-9a-f-]{36}$/);
@@ -39,7 +39,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
   for (const state of [...SAVED_SESSIONS.filter((path) => existsSync(path)), undefined]) {
     const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: { width: 1440, height: 900 }, storageState: state });
     page = await context.newPage();
-    await page.goto("/admin/treasury");
+    await page.goto("/admin/treasury/manage");
     // An expired session is sent to the login page by the client after the first load.
     await expect(signIn().or(page.locator("tbody tr").first())).toBeVisible({ timeout: 30_000 });
     if (!(await signIn().isVisible()) || state === undefined) break;
@@ -50,16 +50,18 @@ test.beforeAll(async ({ browser }, testInfo) => {
     await page.getByLabel("Password", { exact: true }).fill(E2E_ADMIN.password);
     await page.getByRole("button", { name: "Sign in" }).click();
   }
-  await expect(page).toHaveURL("/admin/treasury");
+  await expect(page).toHaveURL("/admin/treasury/manage");
 });
 test.afterAll(async () => {
   await page.context().close();
 });
 
-test("the sidebar opens the Treasury list: every entry, its columns, views and search", async () => {
+test("the sidebar opens the public Treasury; Administrate opens the list: every entry, its columns, views and search", async () => {
   await page.goto("/admin");
   await page.getByRole("link", { name: "Treasury" }).click();
   await expect(page).toHaveURL("/admin/treasury");
+  await page.locator("[data-public-view-header]").getByRole("link", { name: "Administrate" }).click();
+  await expect(page).toHaveURL("/admin/treasury/manage");
   await expect(rows()).toHaveCount(10);
   const headers = await page.locator("thead th").allInnerTexts();
   for (const column of ["Number", "Date", "Type", "Amount", "Gross / fee / net", "Recipient", "Expense types", "Review status", "Publication", "Source", "Mode"]) {

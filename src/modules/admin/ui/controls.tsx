@@ -42,10 +42,11 @@ export function AdminButtonLink({
   icon,
   leading,
   children,
+  className = "",
   ...rest
-}: { href: string; icon?: AdminIconName; leading?: ReactNode; children: ReactNode } & Omit<ComponentProps<"a">, "href" | "className">) {
+}: { href: string; icon?: AdminIconName; leading?: ReactNode; children: ReactNode; className?: string } & Omit<ComponentProps<"a">, "href" | "className">) {
   return (
-    <Link href={href} className={buttonClasses} {...rest}>
+    <Link href={href} className={`${buttonClasses} ${className}`} {...rest}>
       {leading ?? (icon ? <AdminIcon name={icon} /> : null)}
       {children}
     </Link>

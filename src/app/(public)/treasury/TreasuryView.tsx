@@ -45,6 +45,12 @@ interface TreasuryViewProps {
    * every currency, latest first.
    */
   toolbar?: boolean;
+  /**
+   * The admin's public view (admin-desktop.pdf p6 pattern): no public header
+   * and no bottom Donate bar — the admin shell has its own header — and the
+   * view's URLs (pills, pages) stay under `basePath`.
+   */
+  embedded?: { basePath: string };
 }
 
 /**
@@ -55,7 +61,7 @@ interface TreasuryViewProps {
  * URL the server renders; the previous view stays on screen (marked busy)
  * until the next one arrives.
  */
-export function TreasuryView({ state, overview, history, now: nowIso, toolbar = false }: TreasuryViewProps) {
+export function TreasuryView({ state, overview, history, now: nowIso, toolbar = false, embedded }: TreasuryViewProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -68,7 +74,8 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
   const now = new Date(nowIso);
 
   // A view change replaces the URL (client feedback 2026-10-19): Back leaves the page, it never steps through its states.
-  const go = (next: TreasuryState) => startTransition(() => router.replace(treasuryHref(next), { scroll: false }));
+  const viewHref = (next: TreasuryState) => (embedded ? embedded.basePath + treasuryHref(next).slice("/treasury".length) : treasuryHref(next));
+  const go = (next: TreasuryState) => startTransition(() => router.replace(viewHref(next), { scroll: false }));
   const chooseCurrency = (currency: TreasuryCurrencyChoice) => {
     setCurrencyOpen(false);
     if (currency !== state.currency) go(withFilters(state, { currency }));
@@ -91,7 +98,7 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
 
   return (
     <main className="flex flex-1 flex-col">
-      <NavHeader
+      {embedded ? null : <NavHeader
         title={copy.pageTitle}
         backHref="/"
         // Exactly Share and ⋮ on the right (client review 2026-10-21); the ⋮ menu is the Common pages p12 one, on every Treasury page.
@@ -122,7 +129,7 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
             </p>
           ),
         }}
-      />
+      />}
 
       {toolbar ? (
       <Sheet open={currencyOpen} onClose={() => setCurrencyOpen(false)} ariaLabel={copy.header.currencySheetLabel}>
@@ -237,6 +244,7 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
         </h2>
         <div aria-busy={pending} aria-live="polite" className={pending ? "opacity-60 transition-opacity" : undefined}>
           <History
+            viewHref={viewHref}
             history={history}
             filters={filters}
             now={now}
@@ -261,11 +269,13 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
         onErase={() => go(clearFilters(state))}
       />
 
-      <StickyActionBar>
-        <Button variant="primary" href="/donate" icon="volunteer_activism" fullWidth>
-          {copy.donateCta}
-        </Button>
-      </StickyActionBar>
+      {embedded ? null : (
+        <StickyActionBar>
+          <Button variant="primary" href="/donate" icon="volunteer_activism" fullWidth>
+            {copy.donateCta}
+          </Button>
+        </StickyActionBar>
+      )}
     </main>
   );
 }
@@ -275,7 +285,21 @@ const currencyLabel = (currency: TreasuryCurrencyChoice) => (currency === "all" 
 
 const sortField = (state: TreasuryState) => (state.sort.startsWith("amount") ? copy.sort.amount : copy.sort.date);
 
-function History({ history, filters, now, onErase, state }: { history: TreasuryEntriesPage | null; filters: number; now: Date; onErase: () => void; state: TreasuryState }) {
+function History({
+  history,
+  filters,
+  now,
+  onErase,
+  state,
+  viewHref,
+}: {
+  history: TreasuryEntriesPage | null;
+  filters: number;
+  now: Date;
+  onErase: () => void;
+  state: TreasuryState;
+  viewHref: (state: TreasuryState) => string;
+}) {
   if (!history) return <p className="mt-3 text-body text-text-muted">{copy.history.unavailable}</p>;
   if (history.total === 0) {
     return filters > 0 || state.q ? (
@@ -295,9 +319,9 @@ function History({ history, filters, now, onErase, state }: { history: TreasuryE
       <HistoryList entries={history.items} now={now} className="mt-[0.6875rem]" />
       {pages > 1 ? (
         <nav aria-label={copy.history.pagination} className="mt-4 flex items-center justify-between gap-2">
-          {history.page > 1 ? <Button href={treasuryHref({ ...state, page: history.page - 1 })} replace>{copy.history.newer}</Button> : <span />}
+          {history.page > 1 ? <Button href={viewHref({ ...state, page: history.page - 1 })} replace>{copy.history.newer}</Button> : <span />}
           <span className="text-meta text-text-muted">{copy.history.page(history.page, pages)}</span>
-          {history.page < pages ? <Button href={treasuryHref({ ...state, page: history.page + 1 })} replace>{copy.history.older}</Button> : <span />}
+          {history.page < pages ? <Button href={viewHref({ ...state, page: history.page + 1 })} replace>{copy.history.older}</Button> : <span />}
         </nav>
       ) : null}
     </>
