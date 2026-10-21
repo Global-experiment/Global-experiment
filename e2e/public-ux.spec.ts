@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -228,4 +229,45 @@ test.describe("size scale (client review 2026-10-21)", () => {
     await page.goto("/admin/login");
     expect(await root()).toBe("16px");
   });
+});
+
+test.describe("every public page from 320 to 1440px, dark and light (client review 2026-10-21)", () => {
+  test.skip(!process.env.E2E_ADMIN_ENABLED, "Treasury and Donate need the API.");
+
+  test("no horizontal scroll at 320, 375, 768 and 1440px", async ({ page }) => {
+    test.setTimeout(180_000);
+    for (const width of [320, 375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const path of PAGES) {
+        await page.goto(path);
+        await page.keyboard.press("Escape");
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${path} @${width}`).toBe(0);
+      }
+    }
+  });
+
+  for (const theme of ["dark", "light"] as const) {
+    test(`axe: no WCAG 2.2 AA violations in ${theme} mode at 375 and 1440px`, async ({ page }) => {
+      test.setTimeout(240_000);
+      if (theme === "light") await page.addInitScript(() => localStorage.setItem("ge-theme", "light"));
+      for (const width of [375, 1440]) {
+        await page.setViewportSize({ width, height: 800 });
+        for (const path of PAGES) {
+          await page.goto(path);
+          if (path === "/feedback" || path === "/issue") {
+            await expect(page.locator("dialog[open]")).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(page.locator("dialog[open]")).toHaveCount(0);
+          }
+          if (theme === "light") await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+          else await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
+          const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+          expect(
+            results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`),
+            `${path} @${width} ${theme}`,
+          ).toEqual([]);
+        }
+      }
+    });
+  }
 });
