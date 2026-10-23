@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Global Experiment security check weekly
+
+[Timer]
+OnCalendar=Mon *-*-* 06:00:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

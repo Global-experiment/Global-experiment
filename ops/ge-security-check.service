@@ -1,0 +1,6 @@
+[Unit]
+Description=Global Experiment weekly security check (docs/operations/security-hardening-2026-10-23.md)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo "=== $(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)" >> /var/log/ge-security-check.log; /usr/local/sbin/ge-security-check >> /var/log/ge-security-check.log 2>&1'
