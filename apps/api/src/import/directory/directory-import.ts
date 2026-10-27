@@ -48,7 +48,7 @@ export async function loadDirectorySnapshot(db: Executor): Promise<DirectorySnap
         name: people.name,
         stateKey: people.stateKey,
         sourceKey: people.sourceKey,
-        personalNote: people.personalNote,
+        description: people.description,
         doNotContact: people.doNotContact,
         email: people.email,
         phone: people.phone,
@@ -217,7 +217,11 @@ async function writeDirectoryPlan(tx: Executor, plan: DirectoryPlan, now: Date):
 
   // Person ↔ Organization.
   const toAdd = plan.personOrganization.add.map((link) => ({ personId: resolve(link.person, personIds), organizationId: resolve(link.organization, organizationIds) }));
-  if (toAdd.length > 0) await tx.insert(peopleOrganizations).values(toAdd).onConflictDoNothing();
+  // New links go after the ones already there, in Notion's order (one row at a time: each takes the next position).
+  for (const link of toAdd) {
+    const position = sql<number>`(select coalesce(max(${peopleOrganizations.position}) + 1, 0) from ${peopleOrganizations} where ${peopleOrganizations.personId} = ${link.personId})`;
+    await tx.insert(peopleOrganizations).values({ ...link, position }).onConflictDoNothing();
+  }
   for (const link of plan.personOrganization.remove) {
     await tx.delete(peopleOrganizations).where(and(eq(peopleOrganizations.personId, link.personId), eq(peopleOrganizations.organizationId, link.organizationId)));
   }
@@ -228,14 +232,20 @@ async function writeDirectoryPlan(tx: Executor, plan: DirectoryPlan, now: Date):
 
   // Expertise (Expertise level only).
   const personTags = plan.personExpertise.add.map((link) => ({ personId: resolve(link.owner, personIds), expertiseId: link.expertiseId }));
-  if (personTags.length > 0) await tx.insert(peopleExpertise).values(personTags).onConflictDoNothing();
+  for (const tag of personTags) {
+    const position = sql<number>`(select coalesce(max(${peopleExpertise.position}) + 1, 0) from ${peopleExpertise} where ${peopleExpertise.personId} = ${tag.personId})`;
+    await tx.insert(peopleExpertise).values({ ...tag, position }).onConflictDoNothing();
+  }
   for (const link of plan.personExpertise.remove) {
     await tx.delete(peopleExpertise).where(and(eq(peopleExpertise.personId, link.ownerId), eq(peopleExpertise.expertiseId, link.expertiseId)));
   }
   for (const link of [...personTags.map((tag) => ({ ownerId: tag.personId })), ...plan.personExpertise.remove]) touchedPeople.add(link.ownerId);
 
   const organizationTags = plan.organizationExpertise.add.map((link) => ({ organizationId: resolve(link.owner, organizationIds), expertiseId: link.expertiseId }));
-  if (organizationTags.length > 0) await tx.insert(organizationExpertise).values(organizationTags).onConflictDoNothing();
+  for (const tag of organizationTags) {
+    const position = sql<number>`(select coalesce(max(${organizationExpertise.position}) + 1, 0) from ${organizationExpertise} where ${organizationExpertise.organizationId} = ${tag.organizationId})`;
+    await tx.insert(organizationExpertise).values({ ...tag, position }).onConflictDoNothing();
+  }
   for (const link of plan.organizationExpertise.remove) {
     await tx
       .delete(organizationExpertise)

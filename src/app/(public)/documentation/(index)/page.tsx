@@ -20,7 +20,7 @@ import { documentationMenu } from "@/modules/documentation/ui/documentationMenu"
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Documentation — Global Experiment",
+  title: "Documentation",
 };
 
 /**

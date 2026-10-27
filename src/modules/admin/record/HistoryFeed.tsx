@@ -9,7 +9,7 @@ import { adminApi, AdminApiError } from "../api/client";
 import type { HistoryChange, HistoryFieldKind, HistoryItem, HistoryValue } from "../api/types";
 import { AdminIcon, type AdminIconName } from "../ui/adminIcons";
 import { AdminButton, focusRing } from "../ui/controls";
-import { historyHeadline, isEmptyValue, PRIVATE_NOTE_TEXT, relationDiff, shortUrl } from "./historyText";
+import { historyHeadline, historyPageHeadline, isEmptyValue, PRIVATE_NOTE_TEXT, relationDiff, shortUrl } from "./historyText";
 
 const KIND_ICON: Record<HistoryFieldKind, AdminIconName> = {
   text: "title",
@@ -65,6 +65,28 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
   }
   if (change.kind === "relation") {
     const { removed, added } = relationDiff(change);
+    // Only the order changed (drag and drop): the old order struck through, then the new one.
+    if (removed.length === 0 && added.length === 0) {
+      const list = (value: HistoryChange["before"]) => (Array.isArray(value) ? value : []);
+      return (
+        <div data-change={change.field} data-reordered>
+          <FieldLabel icon="arrow_outward">{change.label}</FieldLabel>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-meta">
+            {list(change.before).map((item) => (
+              <span key={`-${item.id}`} className={`${chip} text-text-muted line-through`}>
+                {item.label}
+              </span>
+            ))}
+            <span aria-label="changed to" className="text-text-muted">→</span>
+            {list(change.after).map((item) => (
+              <span key={`+${item.id}`} className={chip}>
+                {item.label}
+              </span>
+            ))}
+          </p>
+        </div>
+      );
+    }
     return (
       <div data-change={change.field}>
         <FieldLabel icon="arrow_outward">{change.label}</FieldLabel>
@@ -186,7 +208,7 @@ function CommentBody({ item, onChanged }: { item: HistoryItem; onChanged: () => 
       </p>
       {comment.deleted ? <p className="mt-1 text-meta text-text-muted">Deleted.</p> : null}
       {comment.mine && !editing ? (
-        <p className="mt-2 flex gap-2">
+        <p className="mt-2 flex justify-end gap-2">
           <AdminButton onClick={() => setEditing(true)} disabled={busy}>
             Edit
           </AdminButton>
@@ -243,27 +265,40 @@ export function HistoryEvent({
   entity = "record",
   recordLink,
   onChanged,
-  showEntity,
+  subject,
+  menu,
 }: {
   item: HistoryItem;
   entity?: string;
   recordLink?: (id: string) => string;
   onChanged: () => void;
-  /** On the History page: the record this event is about. */
-  showEntity?: ReactNode;
+  /** On the History page: the record this event is about (its title, linked), named in the sentence. */
+  subject?: ReactNode;
+  /** On the History page: the event's ⋮ menu (Report issue, Send feedback). */
+  menu?: ReactNode;
 }) {
+  const page = subject ? historyPageHeadline(item, entity) : null;
   const timeZone = useViewerTimeZone();
   const oneLine = item.action === "viewed" || item.action === "archived" || item.action === "restored";
   return (
     <li data-history-item={item.action} className={`border-b border-line px-2 ${oneLine ? "py-2" : "pt-2 pb-3"}`}>
-      <p className="flex items-start gap-2 text-meta">
+      {/* A div, not a p: the History page's ⋮ menu (a popover) sits in this line. */}
+      <div className="flex items-start gap-2 text-meta">
         <span aria-hidden="true" className="mt-px size-4 shrink-0 rounded-full bg-avatar" />
         <span className="min-w-0 flex-1">
-          <span className="font-bold text-text-primary">{item.actor.label}</span> <span className="text-text-muted">{historyHeadline(item, entity)}</span>
-          {showEntity ? <> {showEntity}</> : null}
+          <span className="font-bold text-text-primary">{item.actor.label}</span>{" "}
+          {page ? (
+            <>
+              <span className="text-text-muted">{page.before}</span> {subject}
+              {page.after ? <span className="text-text-muted"> {page.after}</span> : null}
+            </>
+          ) : (
+            <span className="text-text-muted">{historyHeadline(item, entity)}</span>
+          )}
         </span>
         <Timestamp value={item.occurredAt} format="short" className="shrink-0 text-text-muted" />
-      </p>
+        {menu}
+      </div>
       {item.comment ? <CommentBody item={item} onChanged={onChanged} /> : null}
       <Context item={item} recordLink={recordLink} />
       {item.changes.map((change) => (

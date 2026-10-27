@@ -38,7 +38,7 @@ const person = (n: number, name: string, extra: Partial<SourcePerson> = {}): Sou
   number: n,
   state: "Collaborating",
   source: "AI",
-  personalNote: "Met at the assembly.",
+  description: "Met at the assembly.",
   doNotContact: false,
   email: `person${n}@ngo.ch`,
   phone: null,

@@ -45,7 +45,7 @@ describe("demo data purge", () => {
       .returning();
     const [person] = await db
       .insert(people)
-      .values({ name: "Real Person", email: "real@example.com", website: "https://notexample.org", personalNote: "Met at a demo day" })
+      .values({ name: "Real Person", email: "real@example.com", website: "https://notexample.org", description: "Met at a demo day" })
       .returning();
     const [organization] = await db
       .insert(organizations)
@@ -59,7 +59,7 @@ describe("demo data purge", () => {
     await insertRealRecords();
     await db.insert(people).values([
       { name: "Imported Sample", email: "imported@sub.example.org" },
-      { name: "Story person", personalNote: "Fictional sample — do not contact" },
+      { name: "Story person", description: "Fictional sample — do not contact" },
       { name: "DEMO-PER-3 Placeholder" },
       { name: "Website only", website: "https://someone.example.org/profile" },
     ]);

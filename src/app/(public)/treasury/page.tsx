@@ -3,7 +3,7 @@ import { loadTreasuryPage } from "@/shared/treasury/loadTreasuryPage";
 import { TreasuryView } from "./TreasuryView";
 
 export const metadata: Metadata = {
-  title: "Treasury — Global Experiment",
+  title: "Treasury",
   description: "Every published donation and expense of the Global Experiment, per currency.",
 };
 

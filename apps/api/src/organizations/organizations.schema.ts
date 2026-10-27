@@ -61,6 +61,8 @@ export const organizationExpertise = pgTable(
     expertiseId: uuid("expertise_id")
       .notNull()
       .references(() => expertiseItems.id, { onDelete: "restrict" }),
+    /** The order shown on the record (drag and drop, 2026-10-22); 0 = first. */
+    position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

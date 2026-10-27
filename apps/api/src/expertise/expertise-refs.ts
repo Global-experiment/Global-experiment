@@ -19,7 +19,8 @@ export interface ExpertiseRefRow {
  */
 export async function expertiseRefsByOwner(
   db: Database,
-  join: { table: PgTable; ownerId: Column; expertiseId: Column },
+  /** `position`: the owner's own order of its links (drag and drop); names order the rest. */
+  join: { table: PgTable; ownerId: Column; expertiseId: Column; position?: Column },
   ownerIds: readonly string[],
 ): Promise<Map<string, ExpertiseRefRow[]>> {
   const result = new Map<string, ExpertiseRefRow[]>();
@@ -44,7 +45,12 @@ export async function expertiseRefsByOwner(
     .innerJoin(expertiseDomains, eq(expertiseDomains.id, expertiseFields.domainId))
     .leftJoin(taxonomyStatuses, eq(taxonomyStatuses.key, expertiseItems.statusKey))
     .where(inArray(join.ownerId, [...ownerIds]))
-    .orderBy(asc(sql`lower(${expertiseDomains.name})`), asc(sql`lower(${expertiseFields.name})`), asc(sql`lower(${expertiseItems.name})`));
+    .orderBy(
+      ...(join.position ? [asc(join.position)] : []),
+      asc(sql`lower(${expertiseDomains.name})`),
+      asc(sql`lower(${expertiseFields.name})`),
+      asc(sql`lower(${expertiseItems.name})`),
+    );
 
   for (const row of rows) {
     const list = result.get(row.ownerId) ?? [];

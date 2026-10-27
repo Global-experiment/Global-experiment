@@ -17,13 +17,16 @@ interface PropertySpec {
   type: PropertyType;
   /** Optional: absent in Notion today (Expertise) or a future module (Expenses, Access grants). */
   optional?: boolean;
+  /** Other names the property may still have in Notion (a rename there needn't break the import). */
+  aliases?: readonly string[];
 }
 
 export const PEOPLE_PROPERTIES = {
   Name: { type: "title" },
   State: { type: "select" },
   Source: { type: "select" },
-  "Personal note": { type: "rich_text" },
+  // Renamed from "Personal note" (client review 2026-10-22): both names are read.
+  Description: { type: "rich_text", aliases: ["Personal note"] },
   "Do not contact": { type: "checkbox" },
   Email: { type: "email" },
   Phone: { type: "phone_number" },
@@ -74,7 +77,7 @@ export function layoutOf(kind: "people" | "organizations", database: Pick<Notion
   const problems: string[] = [];
   const absent: string[] = [];
   for (const [ours, spec] of Object.entries(specs)) {
-    const found = byCanonical.get(canonical(ours));
+    const found = [ours, ...(spec.aliases ?? [])].map((name) => byCanonical.get(canonical(name))).find(Boolean);
     if (!found) {
       if (spec.optional) absent.push(ours);
       else problems.push(`"${ours}" is missing`);
@@ -151,7 +154,7 @@ export interface SourcePerson extends SourceRecordBase {
   kind: "person";
   state: string | null;
   source: string | null;
-  personalNote: string | null;
+  description: string | null;
   doNotContact: boolean;
   phone: string | null;
   linkedin: string | null;
@@ -217,7 +220,7 @@ export async function toSourcePerson(page: NotionPage, layout: DatabaseLayout, r
     number: get("Person ID")?.unique_id?.number ?? null,
     state: text("State"),
     source: text("Source"),
-    personalNote: text("Personal note"),
+    description: text("Description"),
     doNotContact: get("Do not contact")?.checkbox ?? false,
     email: text("Email"),
     phone: text("Phone"),

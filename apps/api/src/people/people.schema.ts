@@ -49,7 +49,7 @@ export const people = pgTable(
     name: text("name").notNull(),
     stateKey: text("state_key").references(() => personStates.key, { onDelete: "restrict", onUpdate: "cascade" }),
     sourceKey: text("source_key").references(() => personSources.key, { onDelete: "restrict", onUpdate: "cascade" }),
-    personalNote: text("personal_note"),
+    description: text("description"),
     doNotContact: boolean("do_not_contact").notNull().default(false),
     email: text("email"),
     phone: text("phone"),
@@ -103,7 +103,7 @@ export const people = pgTable(
     check("people_wise_recipient_id_length", sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`),
     check("people_name_present", sql`length(btrim(${table.name})) between 1 and 200`),
     check("people_email_shape", sql`${table.email} is null or ${table.email} ~ '^[^@\\s]+@[^@\\s]+$'`),
-    check("people_personal_note_length", sql`${table.personalNote} is null or length(${table.personalNote}) <= 5000`),
+    check("people_description_length", sql`${table.description} is null or length(${table.description}) <= 5000`),
     check(
       "people_contact_lengths",
       sql`coalesce(length(${table.email}), 0) <= 320 and coalesce(length(${table.phone}), 0) <= 64
@@ -123,6 +123,8 @@ export const peopleOrganizations = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    /** The order shown on the record (drag and drop, 2026-10-22); 0 = first. */
+    position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -141,6 +143,8 @@ export const peopleExpertise = pgTable(
     expertiseId: uuid("expertise_id")
       .notNull()
       .references(() => expertiseItems.id, { onDelete: "restrict" }),
+    /** The order shown on the record (drag and drop, 2026-10-22); 0 = first. */
+    position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -168,6 +172,8 @@ export const personContactChannels = pgTable(
     channelKey: text("channel_key")
       .notNull()
       .references(() => contactChannels.key, { onDelete: "restrict", onUpdate: "cascade" }),
+    /** The order shown on the record (drag and drop, 2026-10-22); 0 = first. */
+    position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ name: "person_contact_channels_pk", columns: [table.personId, table.channelKey] })],

@@ -11,15 +11,17 @@ export interface FieldSpec<Dto> {
   label: string;
   kind: FieldKind;
   privacy?: FieldPrivacy;
+  /** A relation whose order is the admin's (drag and drop): reordering it is a change. */
+  ordered?: true;
   get: (record: Dto) => FieldValue;
 }
 
 const isRelationList = (value: FieldValue): value is RelationValue[] => Array.isArray(value);
 const isSelect = (value: FieldValue): value is SelectValue => typeof value === "object" && value !== null && !Array.isArray(value) && "key" in value;
 
-/** Values compared for "did it change": relations as sets of ids, selects by key, scalars as-is. */
-function comparable(value: FieldValue): string {
-  if (isRelationList(value)) return JSON.stringify(value.map((item) => item.id).sort());
+/** Values compared for "did it change": relations as sets of ids (lists of ids when ordered), selects by key, scalars as-is. */
+function comparable(value: FieldValue, ordered = false): string {
+  if (isRelationList(value)) return JSON.stringify(ordered ? value.map((item) => item.id) : value.map((item) => item.id).sort());
   if (isSelect(value)) return `select:${value.key}`;
   return JSON.stringify(value ?? null);
 }
@@ -33,7 +35,7 @@ export function diffRecord<Dto>(specs: readonly FieldSpec<Dto>[], before: Dto, a
   for (const spec of specs) {
     const previous = spec.get(before);
     const next = spec.get(after);
-    if (comparable(previous) === comparable(next)) continue;
+    if (comparable(previous, spec.ordered) === comparable(next, spec.ordered)) continue;
     changes.push({
       field: spec.field,
       label: spec.label,

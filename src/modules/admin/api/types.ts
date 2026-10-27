@@ -25,7 +25,7 @@ export interface ExpertiseSearchItem extends ExpertiseRef {
   selectable: boolean;
 }
 
-export type PersonCompletenessField = "State" | "Source" | "Personal note" | "Expertise";
+export type PersonCompletenessField = "State" | "Source" | "Description" | "Expertise";
 export type OrganizationCompletenessField = "Description" | "Website" | "Email" | "Wise recipient ID" | "Expertise";
 
 export interface VocabularyEntry {
@@ -42,7 +42,7 @@ export interface Person {
   name: string;
   state: VocabularyEntry | null;
   source: VocabularyEntry | null;
-  personalNote: string | null;
+  description: string | null;
   doNotContact: boolean;
   email: string | null;
   phone: string | null;
@@ -86,7 +86,7 @@ export interface PersonInput {
   name?: string;
   stateKey?: string | null;
   sourceKey?: string | null;
-  personalNote?: string | null;
+  description?: string | null;
   doNotContact?: boolean;
   email?: string | null;
   phone?: string | null;
@@ -372,5 +372,6 @@ export interface RecordHistory {
 }
 
 export interface HistoryListItem extends HistoryItem {
-  entity: { type: string; id: string; label: string };
+  /** `title`: the record's current title (or its last known one); `exists`: false once it's deleted. */
+  entity: { type: string; id: string; label: string; title: string; exists: boolean };
 }

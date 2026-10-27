@@ -7,7 +7,7 @@ const PEOPLE_SCHEMA = {
   Name: { type: "title" },
   "*State": { type: "select" },
   "*Source": { type: "select" },
-  "*Personal note": { type: "rich_text" },
+  "*Description": { type: "rich_text" },
   "Do not contact": { type: "checkbox" },
   Email: { type: "email" },
   Phone: { type: "phone_number" },
@@ -42,7 +42,7 @@ describe("Notion directory layout", () => {
   it("matches properties ignoring the * marker and reads the starred ones as required for completeness", () => {
     const layout = layoutOf("people", { properties: PEOPLE_SCHEMA });
     expect(layout.names.State).toBe("*State");
-    expect(layout.required).toEqual(["State", "Source", "Personal note"]);
+    expect(layout.required).toEqual(["State", "Source", "Description"]);
     expect(layout.absent).toEqual(["Expertise"]);
     expect(layout.unread).toEqual(["Created", "Updated"]);
 
@@ -70,7 +70,7 @@ describe("Notion directory records", () => {
         Name: { type: "title", title: text(" Amina Diallo ") },
         "*State": { type: "select", select: { name: "In discussion" } },
         "*Source": { type: "select", select: null },
-        "*Personal note": { type: "rich_text", rich_text: text("Met at the assembly.") },
+        "*Description": { type: "rich_text", rich_text: text("Met at the assembly.") },
         "Do not contact": { type: "checkbox", checkbox: true },
         Email: { type: "email", email: "amina@ngo.ch" },
         Phone: { type: "phone_number", phone_number: "+41 79 000 00 00" },
@@ -98,7 +98,7 @@ describe("Notion directory records", () => {
       number: 42,
       state: "In discussion",
       source: null,
-      personalNote: "Met at the assembly.",
+      description: "Met at the assembly.",
       doNotContact: true,
       email: "amina@ngo.ch",
       phone: "+41 79 000 00 00",

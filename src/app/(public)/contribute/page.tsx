@@ -4,7 +4,7 @@ import { NavHeader } from "@/shared/ui/NavHeader";
 import { ContributeEmailLink } from "./ContributeEmailLink";
 
 export const metadata: Metadata = {
-  title: "Contribute — Global Experiment",
+  title: "Contribute",
 };
 
 const CONTRIBUTE_EMAIL = "contribute@globalexperiment.org";

@@ -80,7 +80,7 @@ async function headerGeometry() {
 test("Home (p6): the public page in the shell; Share copies the public address; Administrate → read-only content", async () => {
   await page.locator("#admin-sidebar").getByRole("link", { name: "Home" }).click();
   await expect(page).toHaveURL("/admin/home");
-  await expect(page).toHaveTitle("Home — Admin — Global Experiment");
+  await expect(page).toHaveTitle("Home");
   await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible();
   await expect(page.locator("#admin-sidebar [aria-current=page]")).toHaveText("Home");
   // The public content: wordmark, tagline, the action grid.
@@ -102,7 +102,7 @@ test("Home (p6): the public page in the shell; Share copies the public address; 
 
   await header().getByRole("link", { name: "Administrate" }).click();
   await expect(page).toHaveURL("/admin/home/manage");
-  await expect(page).toHaveTitle("Home content — Admin — Global Experiment");
+  await expect(page).toHaveTitle("Home content");
   await expect(page.locator("[data-managed-in-notion]")).toContainText("Managed in Notion");
   await expect(page.locator("[data-managed-in-notion]").getByRole("link", { name: "Open in Notion" })).toHaveAttribute("href", /^https:\/\/www\.notion\.so\/[0-9a-f]{32}$/);
   await expect(page.getByRole("heading", { name: "Tagline" })).toBeVisible();
@@ -114,7 +114,7 @@ test("Home (p6): the public page in the shell; Share copies the public address; 
 test("Documentation (p8): the public list without its search; each article's Administrate opens its row in the list", async () => {
   await page.locator("#admin-sidebar").getByRole("link", { name: "Documentation" }).click();
   await expect(page).toHaveURL("/admin/documentation");
-  await expect(page).toHaveTitle("Documentation — Admin — Global Experiment");
+  await expect(page).toHaveTitle("Documentation");
   await expect(page.getByRole("heading", { level: 1, name: "Documentation" })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "Search documentation" })).toBeHidden();
   await headerGeometry();
@@ -149,7 +149,7 @@ test("Documentation (p8): the public list without its search; each article's Adm
 test("Treasury: the public view in the shell (pills stay in the admin, no Donate bar); Administrate → the admin list", async () => {
   await page.locator("#admin-sidebar").getByRole("link", { name: "Treasury" }).click();
   await expect(page).toHaveURL("/admin/treasury");
-  await expect(page).toHaveTitle("Treasury — Admin — Global Experiment");
+  await expect(page).toHaveTitle("Treasury");
   await expect(page.getByRole("heading", { level: 1, name: "Treasury" })).toBeVisible();
   await expect(page.locator("[data-amount]").first()).toBeVisible();
   await expect(page.locator("[data-nav-header]")).toHaveCount(0);

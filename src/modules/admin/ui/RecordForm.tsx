@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useLayoutEffect, useRef, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { formatDateOnly, formatFullDateTime, formatReference } from "@/shared/format/dates";
 import { useViewerTimeZone } from "@/shared/format/Timestamp";
 import { Icon } from "@/shared/ui/icons";
 import { AdminIcon, type AdminIconName } from "./adminIcons";
 import { focusRing } from "./controls";
+import { DatePicker } from "./DatePicker";
 
 /**
  * Record pages as drawn on admin-desktop.pdf p12 (measured on the frame):
@@ -18,8 +19,10 @@ import { focusRing } from "./controls";
  *   person-record prototype, 2026-10-21): the value as plain text, with its
  *   placeholder ("Enter a number", "Search", "Set a date") when empty. They
  *   still read as editable (client, 2026-10-14): a 1px rule on hover, white
- *   when focused. Single-line fields stop at 560px, notes at 720px; limits
- *   ("up to 10 expertise") as muted help text under the field;
+ *   when focused. Every field fills the value column (client, 2026-10-22);
+ *   limits ("up to 10 expertise") and tips in an info card under the label;
+ *   an invalid field shows the design system's error state: a white 1px rule
+ *   and, under it, the warning glyph and the message (checked on leaving it);
  * - a right panel (400px at 1440, narrowing to 280px at 1024) behind a 1px
  *   rule: 34px meta rows (label at 24px, value at 176px), then full-width
  *   32px buttons 8px apart. Room is left under them for the History panel.
@@ -27,10 +30,17 @@ import { focusRing } from "./controls";
 
 /** The field look shared by every record value (no text colour or width: callers add them). */
 export const recordField =
-  "h-8 w-full rounded-control bg-transparent px-2 text-body font-normal outline-none ring-1 ring-transparent placeholder:text-text-muted hover:ring-line focus-visible:ring-text-primary";
+  "h-8 w-full rounded-control bg-transparent px-2 text-body font-normal outline-none ring-1 ring-transparent placeholder:text-text-muted hover:ring-line focus-visible:ring-text-primary aria-[invalid=true]:ring-text-primary";
 
-/** A single-line value: a visible field, text at 8px, at most 560px wide. */
-export const recordInput = `${recordField} max-w-[560px] text-text-primary`;
+/** A single-line value: a visible field, text at 8px, the full width of the value column. */
+export const recordInput = `${recordField} text-text-primary`;
+
+/** The id of a field's error message (PropertyRow renders it; the field points at it with aria-describedby). */
+export const errorIdFor = (fieldId: string) => `${fieldId}-error`;
+
+/** aria-invalid / aria-describedby for a field and its error, if any. */
+export const invalidProps = (fieldId: string, error: string | undefined) =>
+  error ? ({ "aria-invalid": true, "aria-describedby": errorIdFor(fieldId) } as const) : ({} as const);
 
 /**
  * Multi-line value in the same borderless style, growing with its text
@@ -44,113 +54,47 @@ export function AutoGrowTextarea({ value, className = "", ...rest }: Omit<Compon
     element.style.height = "auto";
     element.style.height = `${element.scrollHeight}px`;
   }, [value]);
-  return <textarea ref={ref} rows={1} value={value} className={`${recordField} block min-h-8 max-w-[720px] resize-none overflow-hidden py-[7px] text-text-primary ${className}`} {...rest} />;
+  return <textarea ref={ref} rows={1} value={value} className={`${recordField} block min-h-8 resize-none overflow-hidden py-[7px] text-text-primary ${className}`} {...rest} />;
 }
 
 const calendarDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 /** A calendar date (YYYY-MM-DD) as Figma shows dates in tables: "Oct 14, 2026" (the same day in every time zone). */
 export const formatCalendarDay = (day: string) => calendarDay.format(new Date(`${day}T00:00:00Z`));
 
-/**
- * A calendar date in the record's field style: the value reads
- * "Oct 14, 2026" (or a muted "Choose a date"), never the browser's
- * light-grey mm/dd/yyyy mask. Pressing it opens the native picker in its dark
- * scheme; a clear button removes the date.
- */
-export function DateField({
+/** The field that opens the date picker: the value (or "Set a date") with the calendar glyph, and a clear button. */
+function DateTrigger({
   id,
-  value,
-  onChange,
   label,
+  shown,
+  title,
+  open,
+  setOpen,
+  onClear,
+  error,
+  children,
 }: {
   id: string;
-  /** YYYY-MM-DD, or "" for none. */
-  value: string;
-  onChange: (value: string) => void;
   label: string;
+  shown: string | null;
+  title?: string;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  onClear: () => void;
+  error?: string;
+  children: ReactNode;
 }) {
-  const picker = useRef<HTMLInputElement>(null);
-  const open = () => {
-    const input = picker.current;
-    if (!input) return;
-    try {
-      input.showPicker();
-    } catch {
-      input.focus(); // very old browsers: the native field takes the focus instead
-    }
-  };
   return (
-    <span className="relative flex w-full max-w-[280px] items-center">
-      {/* The real date input: invisible, under the button, so the picker opens right there. */}
-      <input
-        ref={picker}
-        type="date"
-        tabIndex={-1}
-        aria-hidden="true"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="pointer-events-none absolute inset-0 opacity-0 [color-scheme:dark]"
-      />
+    <span className="relative flex w-full items-center">
       <button
         id={id}
         type="button"
-        onClick={open}
-        aria-label={`${label}: ${value ? formatDateOnly(value) : "not set"}. Set a date`}
-        className={`${recordField} relative flex cursor-pointer items-center gap-2 text-left ${value ? "text-text-primary" : "text-text-muted"}`}
-      >
-        <AdminIcon name="calendar" />
-        <span data-date-value className="flex-1 truncate">
-          {value ? formatDateOnly(value) : "Set a date"}
-        </span>
-      </button>
-      {value ? (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          aria-label={`Clear ${label}`}
-          className={`relative ml-1 shrink-0 cursor-pointer rounded-control text-text-muted hover:text-text-primary ${focusRing}`}
-        >
-          <AdminIcon name="close" />
-        </button>
-      ) : null}
-    </span>
-  );
-}
-
-/**
- * A date AND time in the record's field style (the follow-up): the value in
- * the client's detail format and the viewer's time zone ("October 14 at
- * 9:24 PM"; the year on hover), or "Set a date"; the native picker works in
- * the browser's time zone. `value` is a datetime-local string or "".
- */
-export function DateTimeField({ id, value, onChange, label }: { id: string; value: string; onChange: (value: string) => void; label: string }) {
-  const picker = useRef<HTMLInputElement>(null);
-  const timeZone = useViewerTimeZone();
-  const instant = value ? new Date(value) : null;
-  const shown = instant && !Number.isNaN(instant.getTime()) ? formatFullDateTime(instant, timeZone) : null;
-  return (
-    <span className="relative flex w-full max-w-[280px] items-center">
-      <input
-        ref={picker}
-        type="datetime-local"
-        tabIndex={-1}
-        aria-hidden="true"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="pointer-events-none absolute inset-0 opacity-0 [color-scheme:dark]"
-      />
-      <button
-        id={id}
-        type="button"
-        onClick={() => {
-          try {
-            picker.current?.showPicker();
-          } catch {
-            picker.current?.focus();
-          }
-        }}
-        title={instant ? formatReference(instant, timeZone) : undefined}
-        aria-label={`${label}: ${shown ?? "not set"}. Set a date and time`}
+        data-date-trigger
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        title={title}
+        aria-label={`${label}: ${shown ?? "not set"}. Choose a date`}
+        {...invalidProps(id, error)}
         className={`${recordField} relative flex cursor-pointer items-center gap-2 text-left ${shown ? "text-text-primary" : "text-text-muted"}`}
       >
         <AdminIcon name="calendar" />
@@ -158,12 +102,78 @@ export function DateTimeField({ id, value, onChange, label }: { id: string; valu
           {shown ?? "Set a date"}
         </span>
       </button>
-      {value ? (
-        <button type="button" onClick={() => onChange("")} aria-label={`Clear ${label}`} className={`relative ml-1 shrink-0 cursor-pointer rounded-control text-text-muted hover:text-text-primary ${focusRing}`}>
+      {shown ? (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Clear ${label}`}
+          className={`relative ml-1 shrink-0 cursor-pointer rounded-control text-text-muted hover:text-text-primary ${focusRing}`}
+        >
           <AdminIcon name="close" />
         </button>
       ) : null}
+      {open ? children : null}
     </span>
+  );
+}
+
+/**
+ * A calendar date (first and last contact): "October 14, 2026" or a muted
+ * "Set a date"; the design-system picker (DatePicker) opens under it. Shown
+ * as stored, never converted between time zones.
+ */
+export function DateField({ id, value, onChange, label, error }: { id: string; value: string; onChange: (value: string) => void; label: string; error?: string }) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(
+    (returnFocus: boolean) => {
+      setOpen(false);
+      if (returnFocus) document.getElementById(id)?.focus();
+    },
+    [id],
+  );
+  return (
+    <DateTrigger id={id} label={label} shown={value ? formatDateOnly(value) : null} open={open} setOpen={setOpen} onClear={() => onChange("")} error={error}>
+      <DatePicker label={label} day={value} onPick={(picked) => onChange(picked?.day ?? "")} onClose={close} />
+    </DateTrigger>
+  );
+}
+
+/**
+ * A date AND time (the follow-up): "October 14 at 9:24 PM" in the viewer's
+ * time zone (the year on hover), or "Set a date". `value` is a local
+ * "YYYY-MM-DDTHH:MM" (the viewer's zone) or "".
+ */
+export function DateTimeField({ id, value, onChange, label, error }: { id: string; value: string; onChange: (value: string) => void; label: string; error?: string }) {
+  const [open, setOpen] = useState(false);
+  const timeZone = useViewerTimeZone();
+  const instant = value ? new Date(value) : null;
+  const shown = instant && !Number.isNaN(instant.getTime()) ? formatFullDateTime(instant, timeZone) : null;
+  const close = useCallback(
+    (returnFocus: boolean) => {
+      setOpen(false);
+      if (returnFocus) document.getElementById(id)?.focus();
+    },
+    [id],
+  );
+  return (
+    <DateTrigger
+      id={id}
+      label={label}
+      shown={shown}
+      title={instant ? formatReference(instant, timeZone) : undefined}
+      open={open}
+      setOpen={setOpen}
+      onClear={() => onChange("")}
+      error={error}
+    >
+      <DatePicker
+        label={label}
+        day={value.slice(0, 10)}
+        time={value.slice(11, 16) || "09:00"}
+        onPick={(picked) => onChange(picked ? `${picked.day}T${picked.time ?? "09:00"}` : "")}
+        onClose={close}
+      />
+    </DateTrigger>
   );
 }
 
@@ -194,12 +204,11 @@ export function PersonChip({ name }: { name: string }) {
 }
 
 /** Same pattern as the admin layout's metadata template, for titles known only in the browser. */
-export const adminTitle = (title: string) => `${title} — Admin — Global Experiment`;
-
 export function useAdminTitle(title: string) {
   useEffect(() => {
     // Empty while loading: the page's own title ("Person") stays until the record arrives.
-    if (title.trim()) document.title = adminTitle(title.trim());
+    // The tab shows the page title only (client, 2026-10-23).
+    if (title.trim()) document.title = title.trim();
   }, [title]);
 }
 
@@ -275,7 +284,9 @@ export function PropertyRow({
       <div className="flex min-h-8 min-w-0 flex-col justify-center text-body">
         {children}
         {error ? (
-          <p role="alert" className="mt-1 px-2 text-meta text-text-primary">
+          // The design system's error state (Profile and account, "Invalid email address"): the warning glyph, then the message.
+          <p role="alert" id={htmlFor ? errorIdFor(htmlFor) : undefined} data-field-error className="mt-1 flex items-center gap-1 text-meta text-text-primary">
+            <AdminIcon name="warning" />
             {error}
           </p>
         ) : null}

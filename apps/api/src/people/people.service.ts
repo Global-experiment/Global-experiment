@@ -214,8 +214,16 @@ export class PeopleService {
       } else if (expenses.some((expense) => expense.recipientOrganizationId !== null || (expense.recipientPersonId !== null && expense.recipientPersonId !== personId))) {
         issues.push({ path: "expenseIds", message: "This expense already has a recipient." });
       }
+      const current = personId ? ((await this.repository.findById(personId))?.expenses ?? []) : [];
+      // Newly linked expenses only: links that already exist stay as they are.
+      const added = expenses.filter((expense) => !current.some((linked) => linked.id === expense.id));
+      if (added.some((expense) => expense.managedBy === "notion")) {
+        // The Treasury import sets these recipients from Notion and would undo the link.
+        issues.push({ path: "expenseIds", message: "This expense is managed in Notion: set its recipient there." });
+      } else if (added.some((expense) => expense.archivedAt !== null)) {
+        issues.push({ path: "expenseIds", message: "This expense is archived: restore it first." });
+      }
       if (personId) {
-        const current = (await this.repository.findById(personId))?.expenses ?? [];
         const removed = current.filter((expense) => !input.expenseIds!.includes(expense.id)).map((expense) => expense.id);
         const qualified = (await this.repository.expensesById(removed)).some((expense) => ["qualified", "not_required"].includes(expense.reviewStatusKey ?? ""));
         if (qualified) issues.push({ path: "expenseIds", message: "A qualified expense keeps its recipient: change it in Treasury." });

@@ -8,6 +8,7 @@ import { ForbiddenError, NotFoundError } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
 import { SettingsService } from "../settings/settings.service.js";
 import { auditEvents, recordComments, recordViews } from "./audit.schema.js";
+import { entityTitles, titleOfLabel } from "./entity-labels.js";
 import type { AuditActor, AuditChange, AuditEventInput } from "./audit.types.js";
 import { visibleChanges, type VisibleChange } from "./record-fields.js";
 
@@ -72,7 +73,8 @@ export interface HistoryListQuery {
 }
 
 export interface HistoryListItemDto extends HistoryItemDto {
-  entity: { type: string; id: string; label: string };
+  /** `title`: the record's current title (or its last known one); `exists`: false once it's deleted (no link). */
+  entity: { type: string; id: string; label: string; title: string; exists: boolean };
 }
 
 /** Comments are supported on these record types (they have detail pages). */
@@ -205,12 +207,19 @@ export class AuditService {
         .offset((query.page - 1) * query.pageSize),
       this.db.select({ total: count() }).from(auditEvents).where(where),
     ]);
-    const comments = await this.commentsFor(rows.map((row) => row.meta));
+    const [comments, titles] = await Promise.all([
+      this.commentsFor(rows.map((row) => row.meta)),
+      entityTitles(this.db, rows.map((row) => ({ type: row.entityType, id: row.entityId }))),
+    ]);
     return {
-      items: rows.map((row) => ({
-        ...this.toItem(row, viewer, comments),
-        entity: { type: row.entityType, id: row.entityId, label: typeof row.meta.label === "string" ? row.meta.label : row.entityId },
-      })),
+      items: rows.map((row) => {
+        const label = typeof row.meta.label === "string" ? row.meta.label : row.entityId;
+        const current = titles.get(`${row.entityType}:${row.entityId}`);
+        return {
+          ...this.toItem(row, viewer, comments),
+          entity: { type: row.entityType, id: row.entityId, label, title: current ?? titleOfLabel(label), exists: current !== undefined },
+        };
+      }),
       page: query.page,
       pageSize: query.pageSize,
       total: total?.total ?? 0,

@@ -30,7 +30,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const article = await loadArticle(slug);
   if (!article) return {};
-  return { title: `${article.title} — Documentation — Global Experiment` };
+  return { title: article.title };
 }
 
 /**

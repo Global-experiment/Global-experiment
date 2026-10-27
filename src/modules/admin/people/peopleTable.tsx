@@ -36,7 +36,7 @@ export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "state", label: "State", icon: "select", width: 130, render: (p) => p.state?.label ?? null },
   { id: "source", label: "Source", icon: "select", width: 124, render: (p) => p.source?.label ?? null },
   { id: "expertise", label: "Expertise", icon: "arrow_outward", width: 228, render: (p, s) => lines(p.expertise.map((e) => e.name), s) },
-  { id: "personal_note", label: "Personal note", icon: "title", width: 337, render: (p, s) => text(p.personalNote, s) },
+  { id: "description", label: "Description", icon: "title", width: 337, render: (p, s) => text(p.description, s) },
   { id: "organization", label: "Organization", icon: "arrow_outward", width: 237, render: (p, s) => lines(p.organizations.map((o) => o.name), s) },
   {
     id: "do_not_contact",
@@ -121,7 +121,7 @@ export function peopleFields(
         { value: "complete", label: "Complete" },
       ],
     },
-    { id: "personal_note", label: "Personal note", icon: "title", operators: ["contains", "not_contains", "is_empty", "is_not_empty"] },
+    { id: "description", label: "Description", icon: "title", operators: ["contains", "not_contains", "is_empty", "is_not_empty"] },
     {
       id: "organization",
       label: "Organization",

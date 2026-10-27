@@ -134,7 +134,7 @@ export interface FixturePerson {
   name: string;
   stateKey: string | null;
   sourceKey: string | null;
-  personalNote: string | null;
+  description: string | null;
   doNotContact: boolean;
   email: string | null;
   phone: string | null;
@@ -185,7 +185,7 @@ export const FIXTURE_PEOPLE: FixturePerson[] = Array.from({ length: 48 }, (_, in
     name: `${first} ${last}`,
     stateKey: STATES[index % STATES.length]!,
     sourceKey: SOURCES[index % SOURCES.length]!,
-    personalNote: NOTES[index % NOTES.length]!,
+    description: NOTES[index % NOTES.length]!,
     doNotContact: index % 11 === 5,
     email: index % 5 === 4 ? null : `${slug}@example.org`,
     phone: index % 3 === 0 ? `+41 00 000 ${String(index).padStart(2, "0")} ${String(index * 3).padStart(2, "0").slice(-2)}` : null,

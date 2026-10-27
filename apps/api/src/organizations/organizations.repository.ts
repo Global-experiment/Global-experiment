@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, eq, exists, ilike, inArray, isNotNull, isNull, not, notIlike, or, sql, type SQL } from "drizzle-orm";
 import { DATABASE, type Database } from "../common/database/database.module.js";
+import { duplicateName } from "../common/duplicate-name.js";
 import { assertBelowLimit, LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
@@ -155,11 +156,11 @@ export class OrganizationsRepository {
       const { name, description, website, email, wiseRecipientId } = source;
       const [created] = await tx
         .insert(organizations)
-        .values({ name, description, website, email, wiseRecipientId })
+        .values({ name: duplicateName(name), description, website, email, wiseRecipientId })
         .returning({ id: organizations.id });
       const copyId = created!.id;
       const expertiseLinks = await tx
-        .select({ expertiseId: organizationExpertise.expertiseId })
+        .select({ expertiseId: organizationExpertise.expertiseId, position: organizationExpertise.position })
         .from(organizationExpertise)
         .where(eq(organizationExpertise.organizationId, id));
       if (expertiseLinks.length > 0) await tx.insert(organizationExpertise).values(expertiseLinks.map((link) => ({ organizationId: copyId, ...link })));
@@ -178,7 +179,9 @@ export class OrganizationsRepository {
         RELATION_LIMITS.expertise,
         { path: "expertiseIds", message: LIMIT_MESSAGES.organizationExpertise },
       );
-      await tx.insert(organizationExpertise).values({ organizationId, expertiseId }).onConflictDoNothing();
+      // A link added on its own goes last.
+      const position = sql<number>`(select coalesce(max(${organizationExpertise.position}) + 1, 0) from ${organizationExpertise} where ${organizationExpertise.organizationId} = ${organizationId})`;
+      await tx.insert(organizationExpertise).values({ organizationId, expertiseId, position }).onConflictDoNothing();
       await tx.update(organizations).set({ updatedAt: new Date() }).where(eq(organizations.id, organizationId));
     }
   }
@@ -217,7 +220,8 @@ export class OrganizationsRepository {
       );
       const added = await tx
         .insert(peopleOrganizations)
-        .values({ personId, organizationId })
+        // Last among the person's organizations (the person's order).
+        .values({ personId, organizationId, position: sql<number>`(select coalesce(max(${peopleOrganizations.position}) + 1, 0) from ${peopleOrganizations} where ${peopleOrganizations.personId} = ${personId})` })
         .onConflictDoNothing()
         .returning({ personId: peopleOrganizations.personId });
       if (added.length > 0) await this.touchBoth(tx, organizationId, personId);
@@ -273,7 +277,7 @@ export class OrganizationsRepository {
     if (expertiseIds === undefined) return;
     await tx.delete(organizationExpertise).where(eq(organizationExpertise.organizationId, organizationId));
     if (expertiseIds.length > 0) {
-      await tx.insert(organizationExpertise).values(expertiseIds.map((expertiseId) => ({ organizationId, expertiseId })));
+      await tx.insert(organizationExpertise).values(expertiseIds.map((expertiseId, position) => ({ organizationId, expertiseId, position })));
     }
   }
 
@@ -360,7 +364,7 @@ export class OrganizationsRepository {
       this.peopleFor(ids, db),
       expertiseRefsByOwner(
         db as Database,
-        { table: organizationExpertise, ownerId: organizationExpertise.organizationId, expertiseId: organizationExpertise.expertiseId },
+        { table: organizationExpertise, ownerId: organizationExpertise.organizationId, expertiseId: organizationExpertise.expertiseId, position: organizationExpertise.position },
         ids,
       ),
     ]);

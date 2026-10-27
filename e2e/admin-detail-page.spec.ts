@@ -26,7 +26,6 @@ const FRAME = { width: 1440, height: 920 };
 /** Sessions the other admin suites saved (same owner, same API), freshest first: logins are rate-limited. */
 const SAVED_SESSIONS = ["admin-treasury", "admin-figma", "admin-table", "admin-directory-v2", "admin"].map((name) => `test-results/.auth/${name}.json`);
 const LEAVE_MESSAGE = "You have changes that aren't submitted. Leave this page and lose them?";
-const PRIVATE_NOTE = "Private note updated.";
 /** The owner as the history names them (no display name: the email's local part). */
 const ACTOR = E2E_ADMIN.email.split("@")[0]!;
 
@@ -86,9 +85,9 @@ test.afterAll(async () => {
 });
 
 test("the panel (p14): Duplicate, Submit changes, More options, Views and Edits, then the history; created and viewed", async () => {
-  const person = await createPerson({ name: "Dana Detail", email: "dana@example.org", website: "https://dana.example", personalNote: "Met at the assembly" });
+  const person = await createPerson({ name: "Dana Detail", email: "dana@example.org", website: "https://dana.example", description: "Met at the assembly" });
   await openPerson("Dana Detail");
-  await expect(page).toHaveTitle("Dana Detail — Admin — Global Experiment");
+  await expect(page).toHaveTitle("Dana Detail");
 
   const top = panel().locator("[data-record-panel-top]");
   await expect(top.getByRole("button")).toHaveText(["Duplicate", "Submit changes", "More options"]);
@@ -120,11 +119,11 @@ test("the panel (p14): Duplicate, Submit changes, More options, Views and Edits,
   await expect(items().filter({ hasText: "viewed this page" })).toHaveCount(1);
 });
 
-test("one Submit = one event: updated N fields, old struck → new, contact masked, private note never shown, relations as chips, selects as pills", async () => {
+test("one Submit = one event: updated N fields, old struck → new, contact masked, the description shown like any field, relations as chips, selects as pills", async () => {
   await openPerson("Dana Detail");
   await page.getByLabel("Name", { exact: true }).fill("Dana Detailed");
   await page.getByLabel("Email", { exact: true }).fill("dana@example.net");
-  await page.getByLabel("Personal note").fill("Prefers email");
+  await page.getByLabel("Description").fill("Prefers email");
   await page.getByRole("group", { name: "State" }).getByRole("button", { name: "Contacted" }).click();
   await page.getByLabel("Search organizations").fill("Harbor");
   await page.getByRole("list", { name: "Organizations results" }).getByRole("button", { name: "Harbor Legal Collective" }).click();
@@ -148,11 +147,10 @@ test("one Submit = one event: updated N fields, old struck → new, contact mask
   await expect(email).toContainText("d•••@example.org");
   await expect(email).toContainText("d•••@example.net");
   await expect(email).not.toContainText("dana@example");
-  // The private note: never its text.
-  const note = updated.locator("[data-change=personalNote]");
-  await expect(note).toContainText(PRIVATE_NOTE);
-  await expect(note).not.toContainText("Prefers email");
-  await expect(note).not.toContainText("Met at the assembly");
+  // The description is shared information (client, 2026-10-22): old struck → new, never masked.
+  const note = updated.locator("[data-change=description]");
+  await expect(note.locator(".line-through")).toHaveText("Met at the assembly");
+  await expect(note).toContainText("Prefers email");
   // A relation as a chip, a select as a pill, a number as text.
   await expect(updated.locator("[data-change=organizations]")).toContainText("Harbor Legal Collective");
   await expect(updated.locator("[data-change=state]")).toContainText("Contacted");
@@ -276,6 +274,10 @@ test("duplicate ('Duplicated from PER-n') and duplicate as a draft (saved only o
   await page.getByRole("button", { name: "Duplicate", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Person duplicated" })).toBeVisible();
   const duplicated = page.locator("[data-history-item=duplicated]");
+  // The copy is named "<name> DUPLICATE" (client, 2026-10-22), so it can't be mistaken for the original.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Dana Detailed DUPLICATE");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dana Detailed DUPLICATE");
+  await expect(page).toHaveTitle("Dana Detailed DUPLICATE");
   await expect(duplicated).toContainText("duplicated a record");
   await expect(duplicated).toContainText("Duplicated from");
   await expect(duplicated).toContainText(number);
@@ -288,7 +290,7 @@ test("duplicate ('Duplicated from PER-n') and duplicate as a draft (saved only o
   await page.getByRole("button", { name: "More options" }).click();
   await page.getByRole("button", { name: "Duplicate as a draft" }).click();
   await expect(page).toHaveURL(/\/admin\/people\/new$/);
-  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dana Detailed (copy)");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dana Detailed DUPLICATE");
   await page.getByLabel("Name", { exact: true }).fill("Dana Draft");
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Person created" })).toBeVisible();
@@ -358,13 +360,14 @@ test("Monitoring → History: every event, filtered by record type, actor, sourc
   await page.goto("/admin/people");
   await page.locator("#admin-sidebar").getByRole("link", { name: "History" }).click();
   await expect(page).toHaveURL(/\/admin\/history$/);
-  await expect(page).toHaveTitle("History — Admin — Global Experiment");
+  await expect(page).toHaveTitle("History");
   await expect(page.locator("#admin-sidebar [aria-current=page]")).toHaveText("History");
   const list = page.getByRole("list", { name: "History, newest first" });
   await expect(list.locator("[data-history-item]").first()).toBeVisible();
-  // The deleted person's event stays, without a link.
+  // The deleted person's event stays, named by its last title, without a link.
   const deleted = list.locator("[data-history-item=deleted]").filter({ hasText: "Dana Draft" });
-  await expect(deleted).toContainText("deleted this person");
+  await expect(deleted).toContainText(`${ACTOR} deleted Dana Draft`);
+  await expect(deleted.locator("[data-history-subject]")).toHaveText("Dana Draft");
   await expect(deleted.getByRole("link")).toHaveCount(0);
 
   await page.getByLabel("Record type").selectOption("organization");
@@ -378,12 +381,18 @@ test("Monitoring → History: every event, filtered by record type, actor, sourc
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   });
-  await page.getByLabel("From", { exact: true }).fill(today);
-  await page.getByLabel("To", { exact: true }).fill(today);
+  // From and To use the design-system date picker: it opens on today; Enter picks it.
+  for (const id of ["history-from", "history-to"]) {
+    await page.locator(`#${id}`).click();
+    await expect(page.locator("[data-date-picker] [aria-current=date]")).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("[data-date-picker]")).toHaveCount(0);
+  }
+  await expect(page).toHaveURL(new RegExp(`from=${today}&to=${today}|to=${today}.*from=${today}|from=${today}.*to=${today}`));
   await expect(list.locator("[data-history-item]").first()).toBeVisible();
   await page.getByLabel("Actor").selectOption("automation");
   await expect(page.getByText("No events match these filters.")).toBeVisible();
-  await page.getByRole("button", { name: "Clear" }).click();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/history$/);
   await page.screenshot({ path: join(SHOTS, "history-page-1440.png") });
 });

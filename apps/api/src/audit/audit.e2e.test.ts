@@ -34,7 +34,7 @@ describe("record history (audit log)", () => {
 
   it("records 'created' with the actor and the record's label; one event per Submit with every changed field", async () => {
     const organization = (await admin.post("/api/admin/organizations", { name: "Civic Lab" }).expect(201)).body;
-    const person = await createPerson({ name: "Stanley Q.", website: "https://stanley.example", personalNote: "Contact through email", email: "stanley@example.org" });
+    const person = await createPerson({ name: "Stanley Q.", website: "https://stanley.example", description: "Contact through email", email: "stanley@example.org" });
 
     let history = await feed("person", person.id);
     expect(history.items).toHaveLength(1);
@@ -46,7 +46,7 @@ describe("record history (audit log)", () => {
       .patch(`/api/admin/people/${person.id}`, {
         name: "Stanley Qiang",
         website: "https://workana.com",
-        personalNote: "Contact through Workana",
+        description: "Contact through Workana",
         email: "stanley@example.net",
         stateKey: "contacted",
         organizationIds: [organization.id],
@@ -60,7 +60,7 @@ describe("record history (audit log)", () => {
     const updated = history.items[0] as Item;
     expect(updated.action).toBe("updated");
     const byField = Object.fromEntries(updated.changes.map((change) => [change.field, change]));
-    expect(Object.keys(byField).sort()).toEqual(["email", "name", "organizations", "personalNote", "relevanceScore", "state", "website"]);
+    expect(Object.keys(byField).sort()).toEqual(["description", "email", "name", "organizations", "relevanceScore", "state", "website"]);
     expect(byField.name).toMatchObject({ kind: "text", before: "Stanley Q.", after: "Stanley Qiang" });
     expect(byField.website).toMatchObject({ kind: "url", before: "https://stanley.example", after: "https://workana.com" });
     expect(byField.state).toMatchObject({ kind: "select", before: null, after: { key: "contacted", label: "Contacted" } });
@@ -68,11 +68,8 @@ describe("record history (audit log)", () => {
     expect(byField.relevanceScore).toMatchObject({ kind: "number", before: null, after: 8 });
     // Contact details are masked in the history (the record itself shows them).
     expect(byField.email).toMatchObject({ before: "s•••@example.org", after: "s•••@example.net", masked: true });
-    // The private note's text is never returned in the history.
-    expect(byField.personalNote).toEqual({ field: "personalNote", label: "Personal note", kind: "text", privacy: "private_note", before: null, after: null, redacted: true });
-    // …but it is in the log, for authorized viewers later.
-    const [stored] = await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, person.id)).orderBy(auditEvents.id).limit(2).offset(1);
-    expect(stored!.changes.find((change) => change.field === "personalNote")).toMatchObject({ before: "Contact through email", after: "Contact through Workana" });
+    // The description is shared information (client, 2026-10-22): shown like any field, never masked.
+    expect(byField.description).toEqual({ field: "description", label: "Description", kind: "text", before: "Contact through email", after: "Contact through Workana" });
     expect(history.lastEditedBy).toMatchObject({ label: "owner", at: "2026-10-16T16:45:00.000Z" });
     // The organization linked by this Submit got its own event (both records show the link).
     const organizationHistory = await feed("organization", organization.id);

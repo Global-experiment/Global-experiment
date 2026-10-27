@@ -11,7 +11,7 @@ import { NavHeader } from "@/shared/ui/NavHeader";
 import { DonationSentToast } from "./DonationSentToast";
 
 export const metadata: Metadata = {
-  title: "Thank you — Global Experiment",
+  title: "Thank you",
   robots: { index: false },
 };
 

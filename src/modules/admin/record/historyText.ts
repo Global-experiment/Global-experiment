@@ -52,7 +52,8 @@ function updateHeadline(changes: HistoryChange[], entity: string): string {
     if (added.length > 0 && removed.length > 0) return "replaced a relation";
     if (added.length === 1) return `linked ${noun}`;
     if (removed.length === 1) return `unlinked ${noun}`;
-    return `updated ${change.label.toLowerCase()}`;
+    if (removed.length === 0 && added.length === 0) return `reordered ${inSentence(change.label)}`;
+    return `updated ${inSentence(change.label)}`;
   }
   if (isEmptyValue(change.before) && !isEmptyValue(change.after)) return `added ${article(inSentence(change.label))}`;
   if (!isEmptyValue(change.before) && isEmptyValue(change.after)) return "cleared a field";
@@ -92,3 +93,29 @@ export const shortUrl = (url: string) => url.replace(/^https?:\/\//i, "").replac
 
 /** The private-note sentence (the text is never shown in the history). */
 export const PRIVATE_NOTE_TEXT = ["Private note updated.", "Previous and new text available to authorized viewers."] as const;
+
+/**
+ * Monitoring → History names the record by its title (client, 2026-10-23:
+ * "'Admin' did action on 'Entry title'"): the headline split around where
+ * the title goes — "updated 3 fields on |Stanley Qiang|", "archived
+ * |EXP-12 Hosting|", "commented on |…|".
+ */
+export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes">, entity = "record"): { before: string; after: string } {
+  switch (item.action) {
+    case "comment_added":
+      return { before: "commented on", after: "" };
+    case "comment_edited":
+      return { before: "edited a comment on", after: "" };
+    case "comment_deleted":
+      return { before: "deleted a comment on", after: "" };
+    case "viewed":
+      return { before: "viewed", after: "" };
+    case "duplicated":
+      return { before: "created", after: "as a duplicate" };
+  }
+  const headline = historyHeadline(item, entity);
+  const marker = `this ${entity}`;
+  const at = headline.indexOf(marker);
+  if (at !== -1) return { before: headline.slice(0, at).trimEnd(), after: headline.slice(at + marker.length).trim() };
+  return { before: `${headline} on`, after: "" };
+}

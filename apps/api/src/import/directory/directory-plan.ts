@@ -48,7 +48,7 @@ export interface DbPerson {
   name: string;
   stateKey: string | null;
   sourceKey: string | null;
-  personalNote: string | null;
+  description: string | null;
   doNotContact: boolean;
   email: string | null;
   phone: string | null;
@@ -212,7 +212,7 @@ export function planDirectoryImport(source: DirectorySource, snapshot: Directory
         texts: [
           record.name,
           record.wiseRecipientId,
-          ...(record.kind === "person" ? [record.personalNote, record.otherContact, record.phone] : [record.description]),
+          ...(record.kind === "person" ? [record.description, record.otherContact, record.phone] : [record.description]),
         ],
       });
       if (markers.length > 0) {
@@ -337,7 +337,7 @@ export function planDirectoryImport(source: DirectorySource, snapshot: Directory
         name: record.name.trim(),
         stateKey,
         sourceKey,
-        personalNote: checked("person", record, "Personal note", record.personalNote, LIMITS.note),
+        description: checked("person", record, "Description", record.description, LIMITS.note),
         doNotContact: record.doNotContact,
         email: checked("person", record, "Email", record.email, LIMITS.email, EMAIL),
         phone: checked("person", record, "Phone", record.phone, LIMITS.phone),
@@ -349,7 +349,7 @@ export function planDirectoryImport(source: DirectorySource, snapshot: Directory
         nextFollowupAt: followUpInstant(checked("person", record, "Follow-up date", record.nextFollowupAt, 40, DATE_OR_DATE_TIME)),
       };
     },
-    ["notionPageId", "name", "stateKey", "sourceKey", "personalNote", "doNotContact", "email", "phone", "website", "linkedin", "x", "otherContact", "wiseRecipientId", "nextFollowupAt"],
+    ["notionPageId", "name", "stateKey", "sourceKey", "description", "doNotContact", "email", "phone", "website", "linkedin", "x", "otherContact", "wiseRecipientId", "nextFollowupAt"],
   );
 
   // Incomplete (empty starred properties) and possible duplicates: imported, flagged.
