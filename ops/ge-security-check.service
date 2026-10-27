@@ -1,5 +1,5 @@
 [Unit]
-Description=Global Experiment weekly security check (docs/operations/security-hardening-2026-10-23.md)
+Description=Global Experiment weekly security check (docs/operations/security-hardening.md)
 
 [Service]
 Type=oneshot

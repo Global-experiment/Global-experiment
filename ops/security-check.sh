@@ -1,5 +1,5 @@
 #!/bin/bash
-# Server security check (docs/operations/security-hardening-2026-10-23.md).
+# Server security check (docs/operations/security-hardening.md).
 #
 # Installed on the VPS as /usr/local/sbin/ge-security-check. Every release
 # runs it first and stops if it fails; a weekly systemd timer

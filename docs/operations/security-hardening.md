@@ -1,4 +1,6 @@
-# Server security hardening — 23 October 2026
+# Server security hardening
+
+Applied 23 October 2026; verified 27 October 2026 (the weekly check of 26 October passed every item).
 
 The VPS (Hetzner Cloud, Nuremberg; `ssh ge-vps`) was still on the hosting
 image's defaults: SSH accepted passwords and root password logins (about
