@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { listQuerySchema } from "../common/listing/list-query.js";
 import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
+import { INVALID_LINK, isWebLink } from "../common/web-link.js";
 import type { EntityRef, ExpertiseRef } from "../people/people.contracts.js";
 
 const optionalText = (max: number) =>
@@ -11,10 +12,20 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
+/** A link field: trimmed, "" clears it, otherwise a valid web address (web-link.ts). */
+const optionalLink = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform((value) => value.trim() || null)
+    .refine((value) => value === null || isWebLink(value), INVALID_LINK)
+    .nullable()
+    .optional();
+
 const organizationFields = {
   name: z.string().trim().min(1, "Name is required.").max(200),
   description: optionalText(5000),
-  website: optionalText(2048),
+  website: optionalLink(2048),
   email: z
     .string()
     .max(320)

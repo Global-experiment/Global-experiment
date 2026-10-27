@@ -18,6 +18,7 @@ import {
 import type { Executor } from "../audit/audit.service.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
+import { duplicateName } from "../common/duplicate-name.js";
 import { assertBelowLimit, LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
@@ -55,7 +56,7 @@ const overdue = (now: Date) =>
 
 const hasAnyExpertise = sql`exists (select 1 from ${peopleExpertise} where ${peopleExpertise.personId} = ${people.id})`;
 /** Incomplete: any of PERSON_COMPLETENESS empty. */
-const incomplete = sql`(${people.stateKey} is null or ${people.sourceKey} is null or ${people.personalNote} is null or not ${hasAnyExpertise})`;
+const incomplete = sql`(${people.stateKey} is null or ${people.sourceKey} is null or ${people.description} is null or not ${hasAnyExpertise})`;
 
 const personColumns = (now: Date) => ({
   id: people.id,
@@ -66,7 +67,7 @@ const personColumns = (now: Date) => ({
   stateLabel: personStates.label,
   sourceKey: people.sourceKey,
   sourceLabel: personSources.label,
-  personalNote: people.personalNote,
+  description: people.description,
   doNotContact: people.doNotContact,
   email: people.email,
   phone: people.phone,
@@ -137,13 +138,13 @@ const hasExpertiseMatching = (db: Executor, condition?: SQL) =>
 
 /** The empty completeness fields of one person (same rule as `incomplete` above). */
 export function personMissing(
-  row: { stateKey: string | null; sourceKey: string | null; personalNote: string | null },
+  row: { stateKey: string | null; sourceKey: string | null; description: string | null },
   hasExpertise: boolean,
 ): PersonCompletenessField[] {
   const missing: PersonCompletenessField[] = [];
   if (!row.stateKey) missing.push("State");
   if (!row.sourceKey) missing.push("Source");
-  if (!row.personalNote) missing.push("Personal note");
+  if (!row.description) missing.push("Description");
   if (!hasExpertise) missing.push("Expertise");
   return missing;
 }
@@ -153,7 +154,7 @@ const COPIED = [
   "name",
   "stateKey",
   "sourceKey",
-  "personalNote",
+  "description",
   "doNotContact",
   "email",
   "phone",
@@ -239,6 +240,8 @@ export class PeopleRepository {
         recipientPersonId: treasuryEntries.recipientPersonId,
         recipientOrganizationId: treasuryEntries.recipientOrganizationId,
         reviewStatusKey: treasuryEntries.reviewStatusKey,
+        managedBy: treasuryEntries.managedBy,
+        archivedAt: treasuryEntries.archivedAt,
       })
       .from(treasuryEntries)
       .where(inArray(treasuryEntries.id, [...ids]));
@@ -274,13 +277,21 @@ export class PeopleRepository {
     const [source] = await tx.select().from(people).where(eq(people.id, id)).limit(1);
     if (!source) return undefined;
     const values = Object.fromEntries(COPIED.map((key) => [key, source[key]])) as Pick<typeof source, (typeof COPIED)[number]>;
+    values.name = duplicateName(source.name);
     const [created] = await tx.insert(people).values(values).returning({ id: people.id });
     const copyId = created!.id;
-    const organizationLinks = await tx.select({ organizationId: peopleOrganizations.organizationId }).from(peopleOrganizations).where(eq(peopleOrganizations.personId, id));
+    // The copy keeps the links in their order.
+    const organizationLinks = await tx
+      .select({ organizationId: peopleOrganizations.organizationId, position: peopleOrganizations.position })
+      .from(peopleOrganizations)
+      .where(eq(peopleOrganizations.personId, id));
     if (organizationLinks.length > 0) await tx.insert(peopleOrganizations).values(organizationLinks.map((link) => ({ personId: copyId, ...link })));
-    const expertiseLinks = await tx.select({ expertiseId: peopleExpertise.expertiseId }).from(peopleExpertise).where(eq(peopleExpertise.personId, id));
+    const expertiseLinks = await tx.select({ expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position }).from(peopleExpertise).where(eq(peopleExpertise.personId, id));
     if (expertiseLinks.length > 0) await tx.insert(peopleExpertise).values(expertiseLinks.map((link) => ({ personId: copyId, ...link })));
-    const channelLinks = await tx.select({ channelKey: personContactChannels.channelKey }).from(personContactChannels).where(eq(personContactChannels.personId, id));
+    const channelLinks = await tx
+      .select({ channelKey: personContactChannels.channelKey, position: personContactChannels.position })
+      .from(personContactChannels)
+      .where(eq(personContactChannels.personId, id));
     if (channelLinks.length > 0) await tx.insert(personContactChannels).values(channelLinks.map((link) => ({ personId: copyId, ...link })));
     return copyId;
   }
@@ -300,7 +311,9 @@ export class PeopleRepository {
         RELATION_LIMITS.organizationsPerPerson,
         { path: "organizationIds", message: LIMIT_MESSAGES.personOrganizations },
       );
-      await tx.insert(peopleOrganizations).values({ personId, organizationId: targetId }).onConflictDoNothing();
+      // A link added on its own goes last.
+      const position = sql<number>`(select coalesce(max(${peopleOrganizations.position}) + 1, 0) from ${peopleOrganizations} where ${peopleOrganizations.personId} = ${personId})`;
+      await tx.insert(peopleOrganizations).values({ personId, organizationId: targetId, position }).onConflictDoNothing();
     } else {
       await assertBelowLimit(
         tx as Database,
@@ -311,7 +324,8 @@ export class PeopleRepository {
         RELATION_LIMITS.expertise,
         { path: "expertiseIds", message: LIMIT_MESSAGES.personExpertise },
       );
-      await tx.insert(peopleExpertise).values({ personId, expertiseId: targetId }).onConflictDoNothing();
+      const position = sql<number>`(select coalesce(max(${peopleExpertise.position}) + 1, 0) from ${peopleExpertise} where ${peopleExpertise.personId} = ${personId})`;
+      await tx.insert(peopleExpertise).values({ personId, expertiseId: targetId, position }).onConflictDoNothing();
     }
     await tx.update(people).set({ updatedAt: this.clock() }).where(eq(people.id, personId));
   }
@@ -355,7 +369,7 @@ export class PeopleRepository {
     if (input.name !== undefined) values.name = input.name;
     if (input.stateKey !== undefined) values.stateKey = input.stateKey;
     if (input.sourceKey !== undefined) values.sourceKey = input.sourceKey;
-    if (input.personalNote !== undefined) values.personalNote = input.personalNote;
+    if (input.description !== undefined) values.description = input.description;
     if (input.doNotContact !== undefined) values.doNotContact = input.doNotContact;
     if (input.email !== undefined) values.email = input.email;
     if (input.phone !== undefined) values.phone = input.phone;
@@ -378,19 +392,21 @@ export class PeopleRepository {
     if (input.organizationIds !== undefined) {
       await tx.delete(peopleOrganizations).where(eq(peopleOrganizations.personId, personId));
       if (input.organizationIds.length > 0) {
-        await tx.insert(peopleOrganizations).values(input.organizationIds.map((organizationId) => ({ personId, organizationId })));
+        // The request's order is the record's order (drag and drop).
+        await tx.insert(peopleOrganizations).values(input.organizationIds.map((organizationId, position) => ({ personId, organizationId, position })));
       }
     }
     if (input.expertiseIds !== undefined) {
       await tx.delete(peopleExpertise).where(eq(peopleExpertise.personId, personId));
       if (input.expertiseIds.length > 0) {
-        await tx.insert(peopleExpertise).values(input.expertiseIds.map((expertiseId) => ({ personId, expertiseId })));
+        await tx.insert(peopleExpertise).values(input.expertiseIds.map((expertiseId, position) => ({ personId, expertiseId, position })));
       }
     }
     if (input.contactChannelKeys !== undefined) {
       await tx.delete(personContactChannels).where(eq(personContactChannels.personId, personId));
       if (input.contactChannelKeys.length > 0) {
-        await tx.insert(personContactChannels).values(input.contactChannelKeys.map((channelKey) => ({ personId, channelKey })));
+        // The first channel is the preferred way of contact.
+        await tx.insert(personContactChannels).values(input.contactChannelKeys.map((channelKey, position) => ({ personId, channelKey, position })));
       }
     }
     if (input.expenseIds !== undefined) {
@@ -424,7 +440,7 @@ export class PeopleRepository {
       conditions.push(
         or(
           ilike(people.name, pattern),
-          ilike(people.personalNote, pattern),
+          ilike(people.description, pattern),
           ilike(people.email, pattern),
           ilike(people.phone, pattern),
           ilike(people.website, pattern),
@@ -493,17 +509,17 @@ export class PeopleRepository {
         case "name:not_contains":
           conditions.push(notIlike(people.name, containsPattern(text)));
           break;
-        case "personal_note:contains":
-          conditions.push(ilike(people.personalNote, containsPattern(text)));
+        case "description:contains":
+          conditions.push(ilike(people.description, containsPattern(text)));
           break;
-        case "personal_note:not_contains":
-          conditions.push(or(isNull(people.personalNote), notIlike(people.personalNote, containsPattern(text))));
+        case "description:not_contains":
+          conditions.push(or(isNull(people.description), notIlike(people.description, containsPattern(text))));
           break;
-        case "personal_note:is_empty":
-          conditions.push(isNull(people.personalNote));
+        case "description:is_empty":
+          conditions.push(isNull(people.description));
           break;
-        case "personal_note:is_not_empty":
-          conditions.push(isNotNull(people.personalNote));
+        case "description:is_not_empty":
+          conditions.push(isNotNull(people.description));
           break;
         case "email:contains":
           conditions.push(ilike(people.email, containsPattern(text)));
@@ -535,7 +551,7 @@ export class PeopleRepository {
     const ids = rows.map((row) => row.id);
     const [organizationsByPerson, expertiseByPerson, channelsByPerson, expensesByPerson] = await Promise.all([
       this.organizationsFor(ids, db),
-      expertiseRefsByOwner(db as Database, { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId }, ids),
+      expertiseRefsByOwner(db as Database, { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position }, ids),
       this.channelsFor(ids, db),
       this.expensesFor(ids, db),
     ]);
@@ -546,7 +562,7 @@ export class PeopleRepository {
       name: row.name,
       state: row.stateKey ? { key: row.stateKey, label: row.stateLabel ?? row.stateKey } : null,
       source: row.sourceKey ? { key: row.sourceKey, label: row.sourceLabel ?? row.sourceKey } : null,
-      personalNote: row.personalNote,
+      description: row.description,
       doNotContact: row.doNotContact,
       email: row.email,
       phone: row.phone,
@@ -582,7 +598,7 @@ export class PeopleRepository {
       .from(peopleOrganizations)
       .innerJoin(organizations, eq(organizations.id, peopleOrganizations.organizationId))
       .where(inArray(peopleOrganizations.personId, personIds))
-      .orderBy(asc(sql`lower(${organizations.name})`), asc(organizations.id));
+      .orderBy(asc(peopleOrganizations.position), asc(sql`lower(${organizations.name})`), asc(organizations.id));
     for (const row of rows) result.set(row.personId, [...(result.get(row.personId) ?? []), { id: row.id, name: row.name }]);
     return result;
   }
@@ -595,7 +611,7 @@ export class PeopleRepository {
       .from(personContactChannels)
       .innerJoin(contactChannels, eq(contactChannels.key, personContactChannels.channelKey))
       .where(inArray(personContactChannels.personId, personIds))
-      .orderBy(asc(contactChannels.sortOrder));
+      .orderBy(asc(personContactChannels.position), asc(contactChannels.sortOrder));
     for (const row of rows) result.set(row.personId, [...(result.get(row.personId) ?? []), { key: row.key, label: row.label }]);
     return result;
   }

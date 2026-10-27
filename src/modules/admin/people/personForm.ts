@@ -1,4 +1,5 @@
 import { formatMoney } from "@/shared/format/numbers";
+import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
 import type { ExpenseRef, Person, PersonInput } from "../api/types";
 import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import type { RelationOption } from "../ui/RelationPicker";
@@ -8,7 +9,7 @@ export interface PersonDraft {
   name: string;
   stateKey: string;
   sourceKey: string;
-  personalNote: string;
+  description: string;
   doNotContact: boolean;
   email: string;
   phone: string;
@@ -60,7 +61,7 @@ export function draftFromPerson(person: Person): PersonDraft {
     name: person.name,
     stateKey: person.state?.key ?? "",
     sourceKey: person.source?.key ?? "",
-    personalNote: person.personalNote ?? "",
+    description: person.description ?? "",
     doNotContact: person.doNotContact,
     email: person.email ?? "",
     phone: person.phone ?? "",
@@ -82,9 +83,16 @@ export function draftFromPerson(person: Person): PersonDraft {
   };
 }
 
-const TEXT_FIELDS = ["personalNote", "email", "phone", "website", "linkedin", "x", "otherSocials", "otherContact", "wiseRecipientId"] as const;
+const TEXT_FIELDS = ["description", "email", "phone", "website", "linkedin", "x", "otherSocials", "otherContact", "wiseRecipientId"] as const;
 const sameIds = (a: RelationOption[], b: RelationOption[]) => a.length === b.length && a.every((option) => b.some((other) => other.id === option.id));
-const sameKeys = (a: string[], b: string[]) => a.length === b.length && a.every((key) => b.includes(key));
+/** Ordered relations (drag and drop): a new order is a change. */
+const sameOrder = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((key, index) => key === b[index]);
+const ids = (options: RelationOption[]) => options.map((option) => option.id);
+
+/** Like the API's email check: something@domain.tld, no spaces. */
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+export const EMAIL_MESSAGE = "Invalid email address.";
+const LINK_FIELDS = ["website", "x", "linkedin", "otherSocials"] as const;
 
 /** A score as typed: a whole number from 0 to 10, or empty. */
 const SCORE = /^(?:[0-9]|10)$/;
@@ -94,6 +102,10 @@ export const SCORE_MESSAGE = "Use a whole number from 0 to 10.";
 export function personDraftErrors(draft: PersonDraft): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!draft.name.trim()) errors.name = "Name is required.";
+  if (draft.email.trim() && !EMAIL.test(draft.email.trim())) errors.email = EMAIL_MESSAGE;
+  for (const field of LINK_FIELDS) {
+    if (draft[field].trim() && !isWebLink(draft[field])) errors[field] = INVALID_LINK;
+  }
   for (const field of ["aiRelevanceScore", "relevanceScore"] as const) {
     if (draft[field].trim() && !SCORE.test(draft[field].trim())) errors[field] = SCORE_MESSAGE;
   }
@@ -121,9 +133,9 @@ export function personPatch(original: PersonDraft, draft: PersonDraft): PersonIn
   if (draft.lastContactOn !== original.lastContactOn) patch.lastContactOn = draft.lastContactOn || null;
   if (draft.aiRelevanceScore.trim() !== original.aiRelevanceScore.trim()) patch.aiRelevanceScore = score(draft.aiRelevanceScore);
   if (draft.relevanceScore.trim() !== original.relevanceScore.trim()) patch.relevanceScore = score(draft.relevanceScore);
-  if (!sameKeys(draft.contactChannelKeys, original.contactChannelKeys)) patch.contactChannelKeys = draft.contactChannelKeys;
-  if (!sameIds(draft.organizations, original.organizations)) patch.organizationIds = draft.organizations.map((option) => option.id);
-  if (!sameIds(draft.expertise, original.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
+  if (!sameOrder(draft.contactChannelKeys, original.contactChannelKeys)) patch.contactChannelKeys = draft.contactChannelKeys;
+  if (!sameOrder(ids(draft.organizations), ids(original.organizations))) patch.organizationIds = ids(draft.organizations);
+  if (!sameOrder(ids(draft.expertise), ids(original.expertise))) patch.expertiseIds = ids(draft.expertise);
   if (!sameIds(draft.expenses, original.expenses)) patch.expenseIds = draft.expenses.map((option) => option.id);
   return patch;
 }
@@ -135,7 +147,7 @@ export function personCreateBody(draft: PersonDraft): PersonInput & { name: stri
     name: "",
     stateKey: "",
     sourceKey: "",
-    personalNote: "",
+    description: "",
     doNotContact: false,
     email: "",
     phone: "",

@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
 import { treasuryEntries } from "../treasury/treasury.schema.js";
@@ -37,4 +38,35 @@ export async function entityLabel(db: Executor, entityType: string, entityId: st
     return row ? entryLabel(row) : undefined;
   }
   return undefined;
+}
+
+/** "PER-81 · Stanley Qiang" → "Stanley Qiang": a stored label without its number. */
+export const titleOfLabel = (label: string) => label.replace(/^(PER|ORG|EXP)-\d+ · /, "");
+
+/**
+ * The current titles of the records a page of events is about (Monitoring →
+ * History: "Candide updated Stanley Qiang", client 2026-10-23), by
+ * "type:id". A record that no longer exists has no entry: the event's own
+ * label stands in for it.
+ */
+export async function entityTitles(db: Executor, refs: readonly { type: string; id: string }[]): Promise<Map<string, string>> {
+  const titles = new Map<string, string>();
+  const idsOf = (type: string) => [...new Set(refs.filter((ref) => ref.type === type && UUID.test(ref.id)).map((ref) => ref.id))];
+  const tables = [
+    ["person", people, people.id, people.name],
+    ["organization", organizations, organizations.id, organizations.name],
+    ["treasury_entry", treasuryEntries, treasuryEntries.id, treasuryEntries.name],
+    ["expertise_domain", expertiseDomains, expertiseDomains.id, expertiseDomains.name],
+    ["expertise_field", expertiseFields, expertiseFields.id, expertiseFields.name],
+    ["expertise_item", expertiseItems, expertiseItems.id, expertiseItems.name],
+  ] as const;
+  await Promise.all(
+    tables.map(async ([type, table, id, name]) => {
+      const ids = idsOf(type);
+      if (ids.length === 0) return;
+      const rows = await db.select({ id, name }).from(table).where(inArray(id, ids));
+      for (const row of rows) titles.set(`${type}:${row.id}`, row.name);
+    }),
+  );
+  return titles;
 }

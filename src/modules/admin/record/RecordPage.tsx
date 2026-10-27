@@ -259,7 +259,8 @@ function CommentBox({ path, onPosted }: { path: string; onPosted: () => void }) 
     }
   }, [path, text, onPosted]);
   return (
-    <div className="flex flex-col gap-2 px-2 pb-3">
+    // 8px around the box and between its parts (client, 2026-10-22), the same as the events below.
+    <div data-comment-box className="flex flex-col gap-2 p-2">
       <label htmlFor={id} className="sr-only">
         Leave a comment
       </label>
@@ -280,7 +281,7 @@ function CommentBox({ path, onPosted }: { path: string; onPosted: () => void }) 
         className="w-full resize-y rounded-control bg-transparent p-2 text-meta text-text-primary ring-1 ring-line outline-none placeholder:text-text-muted hover:ring-text-muted focus-visible:ring-text-primary"
       />
       {text.trim() ? (
-        <p>
+        <p className="flex justify-end">
           <AdminButton onClick={() => void post()} disabled={busy}>
             {busy ? "Posting…" : "Comment"}
           </AdminButton>

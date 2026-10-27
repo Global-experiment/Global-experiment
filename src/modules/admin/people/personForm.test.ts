@@ -9,7 +9,7 @@ const person: Person = {
   name: "Ada Example",
   state: { key: "sourced", label: "Sourced" },
   source: null,
-  personalNote: "Note",
+  description: "Note",
   doNotContact: false,
   email: "ada@example.org",
   phone: null,
@@ -46,8 +46,8 @@ describe("person record form", () => {
 
   it("sends only the changed fields, clearing blanks to null", () => {
     expect(
-      personPatch(original, { ...original, stateKey: "contacted", personalNote: "  ", phone: " +41 1 ", sourceKey: "" }),
-    ).toEqual({ stateKey: "contacted", personalNote: null, phone: "+41 1" });
+      personPatch(original, { ...original, stateKey: "contacted", description: "  ", phone: " +41 1 ", sourceKey: "" }),
+    ).toEqual({ stateKey: "contacted", description: null, phone: "+41 1" });
   });
 
   it("sends relationship sets only when membership changed (order ignored)", () => {
@@ -84,7 +84,7 @@ describe("person record form", () => {
 
   it("a duplicate as a draft sends every filled field, but never the expenses (they keep their recipient)", () => {
     const body = personCreateBody({ ...original, name: "Ada Example (copy)" });
-    expect(body).toMatchObject({ name: "Ada Example (copy)", stateKey: "sourced", personalNote: "Note", email: "ada@example.org", relevanceScore: 7, contactChannelKeys: ["signal"], organizationIds: ["o1"], expertiseIds: ["e1"] });
+    expect(body).toMatchObject({ name: "Ada Example (copy)", stateKey: "sourced", description: "Note", email: "ada@example.org", relevanceScore: 7, contactChannelKeys: ["signal"], organizationIds: ["o1"], expertiseIds: ["e1"] });
     expect(body).not.toHaveProperty("expenseIds");
   });
 

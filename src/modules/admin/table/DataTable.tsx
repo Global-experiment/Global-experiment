@@ -39,11 +39,13 @@ const RESIZE_STEP = 16;
 
 /**
  * The Figma admin table (figma.pdf p40), made a full data table (client,
- * 2026-10-14): a 36px header band (raised surface, bold muted labels with
- * their type glyph), a 1px rule under every row, between all cells and
- * after the last column,
- * 8px cell padding, 14/18 text, rows growing with content, and the row
- * under the pointer highlighted. Clicking a header opens its column menu (Freeze/Hide).
+ * 2026-10-14): a 1px rule under every row, between all cells and after the
+ * last column, 14/18 text, rows growing with content, and the row under the
+ * pointer highlighted. Header paddings as in admin-desktop.pdf p2–p5
+ * ("Scrolling page", client 2026-10-23): a 34px band and its 1px rule, the
+ * type glyph 12px from the top and 4px from the column's edge, the regular
+ * muted label 4px after it; cells start 4px from the edge too (Figma), so
+ * values line up with their header. Cells keep 8px above and below. Clicking a header opens its column menu (Freeze/Hide).
  * Rows link to the record (the first cell is a real link for keyboard and
  * screen-reader users; the rest of the row is a mouse convenience).
  *
@@ -212,7 +214,7 @@ export function DataTable<Row extends { id: string }>({
                   setDragging(null);
                   setDropAt(null);
                 }}
-                className={`sticky top-0 z-10 h-9 border-b border-line bg-surface-base px-2 text-left align-middle font-bold text-text-muted ${
+                className={`sticky top-0 z-10 h-[35px] border-b border-line bg-surface-base px-1 pt-[11px] pb-[5px] text-left align-top font-normal text-text-muted ${
                   index > 0 && index !== frozenCount ? "border-l" : ""
                 } ${index === arranged.length - 1 ? "border-r" : ""} ${frozenEdge(index)} ${
                   dragging === column.id ? "opacity-50" : ""
@@ -309,7 +311,7 @@ export function DataTable<Row extends { id: string }>({
                   key={column.id}
                   data-column={column.id}
                   style={frozenStyle(index, false)}
-                  className={`${index < frozenCount ? "sticky" : ""} border-b border-line bg-surface-base px-2 py-2 align-top break-words text-text-primary group-hover:bg-surface-hover ${
+                  className={`${index < frozenCount ? "sticky" : ""} border-b border-line bg-surface-base px-1 py-2 align-top break-words text-text-primary group-hover:bg-surface-hover ${
                     index > 0 && index !== frozenCount ? "border-l" : ""
                   } ${index === arranged.length - 1 ? "border-r" : ""} ${frozenEdge(index)}`}
                 >

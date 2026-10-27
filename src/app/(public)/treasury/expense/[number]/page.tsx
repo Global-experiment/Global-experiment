@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { EntryDetail, loadEntry } from "@/shared/treasury/EntryDetail";
 
 export const metadata: Metadata = {
-  title: "Expense — Global Experiment Treasury",
+  title: "Expense",
 };
 
 /** An expense (Common pages p22–p23), from the public API; 404 unless it's public. */

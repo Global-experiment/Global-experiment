@@ -62,7 +62,7 @@ export async function planDemoPurge(db: Executor): Promise<PurgePlan> {
     seed: seedId(people.id),
     email: exampleDomain(people.email),
     website: exampleDomain(people.website),
-    fictional: sql<boolean>`${fictional(people.name)} or ${fictional(people.personalNote)} or ${fictional(people.otherContact)}`,
+    fictional: sql<boolean>`${fictional(people.name)} or ${fictional(people.description)} or ${fictional(people.otherContact)}`,
     prefix: demoPrefix(people.name),
   };
   const personRows = await db

@@ -124,7 +124,7 @@ describe("relationship limits and duplicate", () => {
         name: "Ada Example",
         stateKey: "contacted",
         sourceKey: "candide",
-        personalNote: "Met at the summit",
+        description: "Met at the summit",
         doNotContact: true,
         email: "ada@example.org",
         nextFollowupAt: "2026-11-02T08:00:00Z",
@@ -141,10 +141,11 @@ describe("relationship limits and duplicate", () => {
       expect(copy.personNumber).not.toBe(original.personNumber);
       expect(copy.notionPageId).toBeNull();
       expect(copy).toMatchObject({
-        name: "Ada Example",
+        // " DUPLICATE" marks the copy (client, 2026-10-22).
+        name: "Ada Example DUPLICATE",
         state: { key: "contacted" },
         source: { key: "candide" },
-        personalNote: "Met at the summit",
+        description: "Met at the summit",
         doNotContact: true,
         email: "ada@example.org",
         nextFollowupAt: "2026-11-02T08:00:00.000Z",
@@ -164,7 +165,7 @@ describe("relationship limits and duplicate", () => {
 
       const copy = (await admin.post(`/api/admin/organizations/${organization.id}/duplicate`).expect(201)).body;
       expect(copy.orgNumber).not.toBe(organization.orgNumber);
-      expect(copy).toMatchObject({ name: "Lab", website: "https://lab.example.org", notionPageId: null, people: [] });
+      expect(copy).toMatchObject({ name: "Lab DUPLICATE", website: "https://lab.example.org", notionPageId: null, people: [] });
       expect(copy.expertise.map((item: { id: string }) => item.id)).toEqual([skill]);
       expect((await admin.get(`/api/admin/people/${person.id}`).expect(200)).body.organizations).toHaveLength(1);
     });

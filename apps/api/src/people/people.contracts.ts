@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { listQuerySchema } from "../common/listing/list-query.js";
 import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
+import { INVALID_LINK, isWebLink } from "../common/web-link.js";
 
 /** Request contracts (validated) and response shapes (stable JSON) for /api/admin/people. */
 
@@ -15,6 +16,16 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
+/** A link field: trimmed, "" clears it, otherwise a valid web address (web-link.ts). */
+const optionalLink = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform((value) => value.trim() || null)
+    .refine((value) => value === null || isWebLink(value), INVALID_LINK)
+    .nullable()
+    .optional();
+
 const uniqueIds = (max: number, message: string) =>
   z
     .array(z.uuid())
@@ -25,7 +36,7 @@ const personFields = {
   name: z.string().trim().min(1, "Name is required.").max(200),
   stateKey: vocabularyKey.nullable().optional(),
   sourceKey: vocabularyKey.nullable().optional(),
-  personalNote: optionalText(5000),
+  description: optionalText(5000),
   doNotContact: z.boolean().optional(),
   email: z
     .string()
@@ -35,9 +46,9 @@ const personFields = {
     .nullable()
     .optional(),
   phone: optionalText(64),
-  website: optionalText(2048),
-  linkedin: optionalText(2048),
-  x: optionalText(2048),
+  website: optionalLink(2048),
+  linkedin: optionalLink(2048),
+  x: optionalLink(2048),
   otherContact: optionalText(500),
   /** Free text: no Wise ID format is assumed (data-model.md §2). */
   wiseRecipientId: optionalText(100),
@@ -49,7 +60,7 @@ const personFields = {
   /** Whole scores 0–10 (decision 7); the AI score is refused while ai.enabled is on. */
   aiRelevanceScore: z.number().int("Use a whole number from 0 to 10.").min(0, "Use a whole number from 0 to 10.").max(10, "Use a whole number from 0 to 10.").nullable().optional(),
   relevanceScore: z.number().int("Use a whole number from 0 to 10.").min(0, "Use a whole number from 0 to 10.").max(10, "Use a whole number from 0 to 10.").nullable().optional(),
-  otherSocials: optionalText(2048),
+  otherSocials: optionalLink(2048),
   /** The channels this person can be reached on (contact_channels keys). */
   contactChannelKeys: z.array(vocabularyKey).max(20).refine((keys) => new Set(keys).size === keys.length, "Duplicate channels.").optional(),
   /** Expenses paid to this person (Treasury expenses; sets their recipient). */
@@ -76,7 +87,7 @@ export const PeopleListQuery = listQuerySchema({
     state: { operators: ["is", "is_not", "is_empty", "is_not_empty"], value: vocabularyKey },
     source: { operators: ["is", "is_not", "is_empty", "is_not_empty"], value: vocabularyKey },
     name: { operators: ["contains", "not_contains"] },
-    personal_note: { operators: ["contains", "not_contains", "is_empty", "is_not_empty"] },
+    description: { operators: ["contains", "not_contains", "is_empty", "is_not_empty"] },
     email: { operators: ["contains", "is_empty", "is_not_empty"] },
     organization: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
     expertise: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
@@ -101,7 +112,7 @@ export type PeopleListQuery = z.output<typeof PeopleListQuery>;
 export type PeopleFilterField = PeopleListQuery["filters"][number]["field"];
 
 /** What a person needs to be complete (the client's required-for-completeness fields). */
-export const PERSON_COMPLETENESS = ["State", "Source", "Personal note", "Expertise"] as const;
+export const PERSON_COMPLETENESS = ["State", "Source", "Description", "Expertise"] as const;
 export type PersonCompletenessField = (typeof PERSON_COMPLETENESS)[number];
 
 export interface VocabularyEntry {
@@ -130,7 +141,7 @@ export interface PersonDto {
   name: string;
   state: VocabularyEntry | null;
   source: VocabularyEntry | null;
-  personalNote: string | null;
+  description: string | null;
   doNotContact: boolean;
   email: string | null;
   phone: string | null;

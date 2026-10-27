@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { EntryDetail, loadEntry } from "@/shared/treasury/EntryDetail";
 
 export const metadata: Metadata = {
-  title: "Donation — Global Experiment Treasury",
+  title: "Donation",
 };
 
 /**

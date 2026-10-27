@@ -5,11 +5,11 @@ import type { OrganizationCompletenessField, PersonCompletenessField } from "./a
  * the API's `missing`, apps/api …/people.repository.ts and
  * organizations.repository.ts) — computed here from the form as it's edited.
  */
-export function personMissing(draft: { stateKey: string; sourceKey: string; personalNote: string; expertise: readonly unknown[] }): PersonCompletenessField[] {
+export function personMissing(draft: { stateKey: string; sourceKey: string; description: string; expertise: readonly unknown[] }): PersonCompletenessField[] {
   const missing: PersonCompletenessField[] = [];
   if (!draft.stateKey) missing.push("State");
   if (!draft.sourceKey) missing.push("Source");
-  if (!draft.personalNote.trim()) missing.push("Personal note");
+  if (!draft.description.trim()) missing.push("Description");
   if (draft.expertise.length === 0) missing.push("Expertise");
   return missing;
 }

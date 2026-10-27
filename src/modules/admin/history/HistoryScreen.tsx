@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRef, useState } from "react";
+import { reportHref } from "@/shared/navigation/sourcePage";
 import type { Page, HistoryListItem } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { HistoryEvent } from "../record/HistoryFeed";
-import { AdminButton, ChipSelect, chipInput, focusRing, StatusMessage } from "../ui/controls";
+import { AdminIcon } from "../ui/adminIcons";
+import { AdminButton, ChipSelect, focusRing, Popover, StatusMessage } from "../ui/controls";
+import { DateField } from "../ui/RecordForm";
 
 const PAGE_SIZE = 50;
 
@@ -47,6 +51,40 @@ function recordHref(entity: HistoryListItem["entity"], action: string): string |
 }
 
 const NOUN: Record<string, string> = { person: "person", organization: "organization", treasury_entry: "entry" };
+
+/**
+ * An event's ⋮ menu (client, 2026-10-23): Report issue and Send feedback,
+ * the website's own forms, opened with this event as the page they're about.
+ */
+function EventMenu({ eventId, title }: { eventId: string; title: string }) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const source = `/admin/history?event=${encodeURIComponent(eventId)}`;
+  const item = `flex h-8 w-full items-center gap-2 rounded-control px-2 text-body whitespace-nowrap text-text-primary hover:bg-surface-raised ${focusRing}`;
+  return (
+    <span className="relative shrink-0">
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`More options for this event on ${title}`}
+        onClick={() => setOpen((value) => !value)}
+        className={`flex cursor-pointer rounded-control text-text-muted hover:text-text-primary ${focusRing}`}
+      >
+        <AdminIcon name="more_vert" />
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} triggerRef={trigger} label="Event options" className="top-[calc(100%+4px)] right-0 flex min-w-40 flex-col p-1">
+        <Link href={reportHref("issue", source)} onClick={() => setOpen(false)} className={item}>
+          Report issue
+        </Link>
+        <Link href={reportHref("feedback", source)} onClick={() => setOpen(false)} className={item}>
+          Send feedback
+        </Link>
+      </Popover>
+    </span>
+  );
+}
 
 /** A day picked in the viewer's own calendar → the instant it starts there (to = the next day's start, excluded). */
 function dayStart(day: string, plusDays = 0): string {
@@ -130,14 +168,29 @@ export function HistoryScreen() {
             </option>
           ))}
         </ChipSelect>
-        <label className="flex items-center gap-1 text-body text-text-muted">
-          From
-          <input type="date" value={filters.from} max={filters.to || undefined} onChange={(event) => navigate({ from: event.target.value })} className={`${chipInput} [color-scheme:dark]`} />
-        </label>
-        <label className="flex items-center gap-1 text-body text-text-muted">
-          To
-          <input type="date" value={filters.to} min={filters.from || undefined} onChange={(event) => navigate({ to: event.target.value })} className={`${chipInput} [color-scheme:dark]`} />
-        </label>
+        {/* The design-system date picker, as on the records; a range that would be inverted moves the other end along. */}
+        <span className="flex items-center gap-1 text-body text-text-muted">
+          <label htmlFor="history-from">From</label>
+          <span className="w-48 rounded-control ring-1 ring-line">
+            <DateField
+              id="history-from"
+              label="From"
+              value={filters.from}
+              onChange={(from) => navigate({ from, ...(from && filters.to && from > filters.to ? { to: from } : {}) })}
+            />
+          </span>
+        </span>
+        <span className="flex items-center gap-1 text-body text-text-muted">
+          <label htmlFor="history-to">To</label>
+          <span className="w-48 rounded-control ring-1 ring-line">
+            <DateField
+              id="history-to"
+              label="To"
+              value={filters.to}
+              onChange={(to) => navigate({ to, ...(to && filters.from && to < filters.from ? { from: to } : {}) })}
+            />
+          </span>
+        </span>
         {filtered ? <AdminButton onClick={() => navigate({ entityType: "", actor: "", source: "", from: "", to: "" })}>Clear</AdminButton> : null}
       </div>
 
@@ -156,28 +209,29 @@ export function HistoryScreen() {
             <StatusMessage>{filtered ? "No events match these filters." : "Nothing has happened yet."}</StatusMessage>
           </div>
         ) : (
-          <ol aria-label="History, newest first" className="max-w-[880px]">
+          // Full width (client, 2026-10-23).
+          <ol aria-label="History, newest first">
             {list.data.items.map((item) => {
-              const href = recordHref(item.entity, item.action);
-              const label = item.entity.label;
+              const href = item.entity.exists ? recordHref(item.entity, item.action) : undefined;
+              const title = item.entity.title;
               return (
                 <HistoryEvent
                   key={item.id}
                   item={item}
                   entity={NOUN[item.entity.type] ?? "record"}
                   onChanged={list.reload}
-                  showEntity={
-                    <span className="text-text-muted">
-                      {"· "}
-                      {href ? (
-                        <Link href={href} className={`text-text-primary underline underline-offset-2 ${focusRing}`}>
-                          {label}
-                        </Link>
-                      ) : (
-                        <span className="text-text-primary">{label}</span>
-                      )}
-                    </span>
+                  subject={
+                    href ? (
+                      <Link href={href} data-history-subject className={`font-bold text-text-primary hover:underline ${focusRing}`}>
+                        {title}
+                      </Link>
+                    ) : (
+                      <span data-history-subject className="font-bold text-text-primary">
+                        {title}
+                      </span>
+                    )
                   }
+                  menu={<EventMenu eventId={item.id} title={title} />}
                 />
               );
             })}

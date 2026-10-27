@@ -15,7 +15,7 @@ describe("import source", () => {
       ["07.02.fixture_budgeting", "Proposed", ["Treasury"], ["f0000000-0000-4000-8000-000000000011"]],
     ]);
     const directory = await fixtureImportSource(FIXTURE).directory();
-    expect(directory.layouts.people.required).toEqual(["State", "Source", "Personal note"]);
+    expect(directory.layouts.people.required).toEqual(["State", "Source", "Description"]);
   });
 
   it("allows the fixture source only under NODE_ENV=test", () => {

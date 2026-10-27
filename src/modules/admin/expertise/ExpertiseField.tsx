@@ -34,7 +34,7 @@ export function ExpertiseField({
   const { fields, domains } = expertiseRollup(selected);
   return (
     <div className="flex flex-col gap-1">
-      <RelationPicker label="Expertise" selected={selected} onChange={onChange} search={searchExpertise} max={RELATION_LIMITS.expertise} limitMessage={limitMessage} />
+      <RelationPicker label="Expertise" selected={selected} onChange={onChange} search={searchExpertise} max={RELATION_LIMITS.expertise} limitMessage={limitMessage} reorderable />
       {selected.length > 0 ? (
         <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 text-meta text-text-muted" aria-label="Expertise rollup">
           <dt>Fields</dt>

@@ -62,7 +62,7 @@ test.describe("people administration", () => {
     await expect(page.getByRole("status").filter({ hasText: /of 48$/ })).toHaveText("1–48 of 48");
     expect(responses).toContain(200);
 
-    for (const column of ["Name", "State", "Source", "Expertise", "Personal note", "Organization"]) {
+    for (const column of ["Name", "State", "Source", "Expertise", "Description", "Organization"]) {
       await expect(page.getByRole("columnheader", { name: column, exact: true })).toBeVisible();
     }
     // The Import Notion control opens the import page.
@@ -128,7 +128,7 @@ test.describe("people administration", () => {
     const name = page.getByLabel("Name", { exact: true });
     await expect(name).toHaveValue("Bea Demo");
 
-    await page.getByLabel("Personal note").fill("Edited during the E2E run.");
+    await page.getByLabel("Description").fill("Edited during the E2E run.");
     await page.getByRole("group", { name: "State" }).getByRole("button", { name: "Collaborating" }).click();
 
     await page.getByLabel("Search organization").fill("Harbor");
@@ -146,7 +146,7 @@ test.describe("people administration", () => {
 
     await rows(page).first().getByRole("link").click();
     await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
-    await expect(page.getByLabel("Personal note")).toHaveValue("Edited during the E2E run.");
+    await expect(page.getByLabel("Description")).toHaveValue("Edited during the E2E run.");
     await expect(page.getByRole("group", { name: "State" }).getByRole("button", { name: "Collaborating" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Remove Harbor Legal Collective" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Remove Digital rights" })).toBeVisible();

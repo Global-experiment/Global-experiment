@@ -98,7 +98,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|treasury-toolbar|donate-embedded).spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -137,7 +137,7 @@ export default defineConfig({
     {
       name: "chromium-detail",
       dependencies: ["chromium-settings"],
-      testMatch: /admin-detail-page.spec.ts/,
+      testMatch: /admin-detail-(page|review).spec.ts/,
       use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine

@@ -90,14 +90,14 @@ describe("people list: follow-ups, rollups, completeness", () => {
     expect(await names(`filter=expertise_field:is:${participation!.id}&filter=expertise_field:is:${physics!.id}`)).toEqual(["Ada", "Cleo"]); // OR within one
   });
 
-  it("people completeness: State, Source, Personal note, Expertise — in the record and as a filter", async () => {
+  it("people completeness: State, Source, Description, Expertise — in the record and as a filter", async () => {
     const [domain] = await t.db.insert(expertiseDomains).values({ name: "D" }).returning();
     const [field] = await t.db.insert(expertiseFields).values({ name: "F", domainId: domain!.id }).returning();
     const [item] = await t.db.insert(expertiseItems).values({ name: "I", fieldId: field!.id }).returning();
     const [complete] = await t.db
       .insert(people)
       .values([
-        { name: "Complete", stateKey: "sourced", sourceKey: "candide", personalNote: "Met at the assembly." },
+        { name: "Complete", stateKey: "sourced", sourceKey: "candide", description: "Met at the assembly." },
         { name: "Bare" },
       ])
       .returning();
@@ -105,7 +105,7 @@ describe("people list: follow-ups, rollups, completeness", () => {
 
     const all = (await admin.get("/api/admin/people?sort=name:asc").expect(200)).body.items as { name: string; missing: string[] }[];
     expect(all.map((person) => [person.name, person.missing])).toEqual([
-      ["Bare", ["State", "Source", "Personal note", "Expertise"]],
+      ["Bare", ["State", "Source", "Description", "Expertise"]],
       ["Complete", []],
     ]);
     expect(await names("filter=completeness:is:incomplete")).toEqual(["Bare"]);

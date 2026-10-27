@@ -74,7 +74,7 @@ describe("native directory API", () => {
         name: "  Ada Example  ",
         stateKey: "sourced",
         sourceKey: "candide",
-        personalNote: "Met at a civic tech meetup",
+        description: "Met at a civic tech meetup",
         email: "ada@example.org",
         linkedin: "linkedin.com/in/ada-example",
         doNotContact: false,
@@ -98,7 +98,7 @@ describe("native directory API", () => {
           .patch(`/api/admin/people/${created.id}`, {
             stateKey: "contacted",
             phone: "+41 00 000 00 00",
-            personalNote: "",
+            description: "",
             nextFollowupAt: "2026-11-02T09:30:00+01:00",
             firstContactOn: "2026-10-01",
             lastContactOn: "2026-10-12",
@@ -110,13 +110,13 @@ describe("native directory API", () => {
           .expect(200)
       ).body;
       expect(updated.state).toEqual({ key: "contacted", label: "Contacted" });
-      expect(updated.personalNote).toBeNull();
+      expect(updated.description).toBeNull();
       expect(updated.nextFollowupAt).toBe("2026-11-02T08:30:00.000Z");
       expect(updated).toMatchObject({ firstContactOn: "2026-10-01", lastContactOn: "2026-10-12", aiRelevanceScore: 7, relevanceScore: 8, otherSocials: "https://mastodon.example/@ada" });
-      // In the lookup's order, whatever order they were sent in.
+      // In the order sent: the first one is the preferred way of contact (client, 2026-10-22).
       expect(updated.contactChannels).toEqual([
-        { key: "email", label: "Email" },
         { key: "signal", label: "Signal" },
+        { key: "email", label: "Email" },
       ]);
       expect(updated.lastFollowupAtLegacy).toBeNull();
       expect(updated.name).toBe("Ada Example");
@@ -210,8 +210,9 @@ describe("native directory API", () => {
       await admin.put(`/api/admin/people/${person.id}/organizations/${coop.id}`).expect(204); // idempotent
       await admin.put(`/api/admin/people/${person.id}/expertise/${backend.id}`).expect(204);
       let fetched = (await admin.get(`/api/admin/people/${person.id}`)).body;
-      expect(fetched.organizations.map((o: { name: string }) => o.name)).toEqual(["Civic Coop", "Example Lab"]);
-      expect(fetched.expertise.map((e: { name: string }) => e.name)).toEqual(["Backend development", "Web development"]);
+      // A link added on its own goes last (the record's order, set by drag and drop).
+      expect(fetched.organizations.map((o: { name: string }) => o.name)).toEqual(["Example Lab", "Civic Coop"]);
+      expect(fetched.expertise.map((e: { name: string }) => e.name)).toEqual(["Web development", "Backend development"]);
 
       await admin.delete(`/api/admin/people/${person.id}/organizations/${lab.id}`).expect(204);
       await admin.delete(`/api/admin/people/${person.id}/expertise/${web.id}`).expect(204);
@@ -266,7 +267,7 @@ describe("native directory API", () => {
     beforeEach(async () => {
       const { web, backend } = await taxonomy();
       const lab = await createOrganization({ name: "Example Lab" });
-      await createPerson({ name: "Alice Sample", stateKey: "sourced", sourceKey: "candide", personalNote: "First contact" });
+      await createPerson({ name: "Alice Sample", stateKey: "sourced", sourceKey: "candide", description: "First contact" });
       await createPerson({ name: "Bob Sample", stateKey: "contacted", sourceKey: "ai", organizationIds: [lab.id], expertiseIds: [web.id] });
       await createPerson({ name: "Carol Sample", stateKey: "collaborating", sourceKey: "candide", expertiseIds: [backend.id], doNotContact: true });
       await createPerson({ name: "Dan 50%_off", email: "dan@example.org" });
@@ -303,7 +304,7 @@ describe("native directory API", () => {
       expect(names(await q("filter=organization:is_not_empty"))).toEqual(["Bob Sample"]);
       expect(names(await q("filter=expertise:is_empty"))).toEqual(["Alice Sample", "Dan 50%_off"]);
       expect(names(await q("filter=do_not_contact:is:true"))).toEqual(["Carol Sample"]);
-      expect(names(await q("filter=personal_note:is_not_empty"))).toEqual(["Alice Sample"]);
+      expect(names(await q("filter=description:is_not_empty"))).toEqual(["Alice Sample"]);
       await admin.get("/api/admin/people?filter=password:is:x").expect(400);
     });
 

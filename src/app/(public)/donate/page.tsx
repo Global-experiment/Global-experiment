@@ -4,7 +4,7 @@ import { parseDonateParams } from "@/shared/donate/donateParams";
 import { DonateForm } from "./DonateForm";
 
 export const metadata: Metadata = {
-  title: "Donate — Global Experiment",
+  title: "Donate",
 };
 
 /**

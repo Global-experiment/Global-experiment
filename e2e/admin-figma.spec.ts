@@ -218,7 +218,17 @@ test.describe("signed in", () => {
     await expect(rows(page).first()).toBeVisible();
     const header = page.locator("thead th").first();
     await expect(header).toHaveCSS("background-color", "rgb(0, 0, 0)");
-    expect((await box(header)).height).toBe(36);
+    // admin-desktop.pdf p2–p5 ("Scrolling page", client 2026-10-23): a 34px band and its rule, the glyph 12px
+    // from the top and 4px from the column's edge, the regular muted label 4px after it; cells 4px in too.
+    expect((await box(header)).height).toBe(35);
+    await expect(header).toHaveCSS("padding-left", "4px");
+    await expect(header).toHaveCSS("font-weight", "400");
+    const glyph = await box(header.locator("svg").first());
+    const cell = await box(header);
+    expect([glyph.x - cell.x, glyph.y - cell.y]).toEqual([4, 12]);
+    const label = await box(header.locator("button span").first());
+    expect(label.x - (glyph.x + glyph.width)).toBe(4);
+    await expect(rows(page).first().locator("td").first()).toHaveCSS("padding-left", "4px");
     const lastRowCell = rows(page).last().locator("td").first();
     await expect(lastRowCell).toHaveCSS("border-bottom-width", "1px");
     await rows(page).nth(1).hover();
@@ -338,15 +348,15 @@ test.describe("signed in", () => {
 
   test("browser tab titles follow the page header, record names included (client, 2026-10-19)", async ({ page }) => {
     await page.goto("/admin/people");
-    await expect(page).toHaveTitle("People — Admin — Global Experiment");
+    await expect(page).toHaveTitle("People");
     await rows(page).first().locator("a").first().click();
     const name = (await page.getByRole("heading", { level: 1 }).innerText()).trim();
     expect(name).not.toBe("");
-    await expect(page).toHaveTitle(`${name} — Admin — Global Experiment`);
+    await expect(page).toHaveTitle(`${name}`);
     await page.goto("/admin/organizations");
-    await expect(page).toHaveTitle("Organizations — Admin — Global Experiment");
+    await expect(page).toHaveTitle("Organizations");
     await page.goto("/admin/treasury");
-    await expect(page).toHaveTitle("Treasury — Admin — Global Experiment");
+    await expect(page).toHaveTitle("Treasury");
   });
 
   test("column menu (p11): freeze and hide a column; Import Notion button", async ({ page }) => {
@@ -386,7 +396,12 @@ test.describe("signed in", () => {
     // The prototype moves the number to the fields' end ("Person ID"); the panel holds actions, counters and history.
     await expect(main).toContainText(/Person ID\s*PER-\d+/);
     await expect(page.locator("[data-record-panel]").getByRole("heading", { name: /^History/ })).toBeVisible();
-    await expect(main.locator("[data-hint]")).toHaveText(["People can have up to 10 expertise.", "People can have up to 5 organizations."]);
+    await expect(main.locator("[data-hint]")).toHaveText([
+      "People can have up to 10 expertise.",
+      // Info card on Contact channels (client, 2026-10-22).
+      "The first value is the preferred way of contact.",
+      "People can have up to 5 organizations.",
+    ]);
     await capture(page, "p12-person");
 
     // Pills: State and Source single-select, Do not contact as Contact / Do not contact.
@@ -409,11 +424,25 @@ test.describe("signed in", () => {
     // Follow-up date and time: "Set a date" or "October 14 at 9:30 AM" — never the browser's mm/dd/yyyy mask.
     const followUp = page.locator("#person-followup");
     await expect(followUp).toHaveText("Set a date");
-    await page.locator("input[type=datetime-local]").fill("2026-10-14T09:30", { force: true });
+    // The design-system date picker (client, 2026-10-22): a calendar under the field.
+    await followUp.click();
+    const picker = page.locator("[data-date-picker]");
+    await expect(picker).toBeVisible();
+    for (let step = 0; step < 36 && !(await picker.getByRole("heading").innerText()).includes("October 2026"); step++) {
+      const shown = await picker.getByRole("heading").innerText();
+      const [month, year] = shown.replace(/^.*: /, "").split(" ");
+      const later = Number(year) > 2026 || (Number(year) === 2026 && new Date(`${month} 1, 2000`).getMonth() > 9);
+      await picker.getByRole("button", { name: later ? "Previous month" : "Next month" }).click();
+    }
+    await picker.getByRole("button", { name: "Wednesday, October 14, 2026", exact: false }).click();
+    await picker.getByLabel("Time").fill("09:30");
+    await picker.getByRole("button", { name: "Done" }).click();
+    await expect(picker).toHaveCount(0);
+    await expect(followUp).toBeFocused();
     await expect(followUp).toHaveText("October 14 at 9:30 AM");
     expect(await followUp.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-    // Personal note: no resize handle; it grows with its text.
-    const note = page.getByLabel("Personal note");
+    // Description: no resize handle; it grows with its text.
+    const note = page.getByLabel("Description");
     expect(await note.evaluate((el) => getComputedStyle(el).resize)).toBe("none");
     const oneLine = (await box(note)).height;
     await note.fill("First line.\nSecond line.\nThird line.");
@@ -512,7 +541,8 @@ test.describe("signed in", () => {
     await expect(page.getByRole("status").filter({ hasText: "Person duplicated" })).toBeVisible();
     await expect(page).not.toHaveURL(originalUrl);
     await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Pia Example");
+    // The copy is named "<name> DUPLICATE" (client, 2026-10-22).
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Pia Example DUPLICATE");
     const copyNumber = await page.locator("[data-record-main]").getByText(/^PER-\d+$/).innerText();
     expect(copyNumber).not.toBe(originalNumber);
   });

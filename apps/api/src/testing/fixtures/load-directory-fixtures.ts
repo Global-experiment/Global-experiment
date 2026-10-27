@@ -43,7 +43,7 @@ export async function loadDirectoryFixtures(db: Database): Promise<void> {
         name: person.name,
         stateKey: person.stateKey,
         sourceKey: person.sourceKey,
-        personalNote: person.personalNote,
+        description: person.description,
         doNotContact: person.doNotContact,
         email: person.email,
         phone: person.phone,

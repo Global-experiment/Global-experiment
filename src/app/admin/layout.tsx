@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: { default: "Admin — Global Experiment", template: "%s — Admin — Global Experiment" },
+  // The tab shows the page title only (client, 2026-10-23): "People", not "People — Admin — Global Experiment".
+  title: { default: "Admin", template: "%s" },
   robots: { index: false, follow: false },
 };
 

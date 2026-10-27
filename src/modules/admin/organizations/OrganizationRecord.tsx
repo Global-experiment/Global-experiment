@@ -13,7 +13,8 @@ import { CompletenessRow } from "../ui/CompletenessRow";
 import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
 import { AdminButton, StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, PropertyRow, recordInput } from "../ui/RecordForm";
+import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
+import { AutoGrowTextarea, invalidProps, PropertyRow, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 
@@ -50,10 +51,23 @@ function patchFor(base: Draft, draft: Draft): OrganizationInput {
     if (draft[field].trim() !== base[field].trim()) patch[field] = draft[field].trim() || null;
   }
   const ids = (options: RelationOption[]) => options.map((option) => option.id).sort().join(",");
-  if (ids(draft.expertise) !== ids(base.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
+  // Expertise keeps the order given (drag and drop): a new order is a change. People don't have one.
+  const ordered = (options: RelationOption[]) => options.map((option) => option.id).join(",");
+  if (ordered(draft.expertise) !== ordered(base.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
   // People travel in the same PATCH: one Submit, one history event.
   if (ids(draft.people) !== ids(base.people)) patch.personIds = draft.people.map((option) => option.id);
   return patch;
+}
+
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** Field errors found before sending (the API checks the same rules), shown once a field is left. */
+export function organizationDraftErrors(draft: Pick<Draft, "name" | "email" | "website">): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!draft.name.trim()) errors.name = "Name is required.";
+  if (draft.email.trim() && !EMAIL.test(draft.email.trim())) errors.email = "Invalid email address.";
+  if (draft.website.trim() && !isWebLink(draft.website)) errors.website = INVALID_LINK;
+  return errors;
 }
 
 /** People search for the People picker: someone already at 5 organizations can't be added here. */
@@ -88,6 +102,8 @@ export function OrganizationRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
 
   if (organization.error || !organization.data) {
     return (
@@ -112,9 +128,13 @@ export function OrganizationRecord({ id }: { id: string }) {
   const dirty = Object.keys(patch).length > 0;
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
 
+  const found = organizationDraftErrors(draft);
+  const fieldErrors = Object.fromEntries(Object.entries(found).filter(([key]) => touched.has(key)));
+
   async function submit(): Promise<boolean> {
-    if (!draft.name.trim()) {
-      setError("Name is required.");
+    if (Object.keys(found).length > 0) {
+      setTouched(new Set([...touched, ...Object.keys(found)]));
+      setError("Some fields need attention.");
       return false;
     }
     setBusy("saving");
@@ -171,6 +191,7 @@ export function OrganizationRecord({ id }: { id: string }) {
         discard: () => {
           setEdit(null);
           setError(null);
+          setTouched(new Set());
         },
         duplicate,
         archived: loaded.archivedAt !== null,
@@ -189,11 +210,13 @@ export function OrganizationRecord({ id }: { id: string }) {
       }}
     >
       {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-      <PropertyRow icon="title" label="Name" htmlFor="organization-name">
+      <PropertyRow icon="title" label="Name" htmlFor="organization-name" error={fieldErrors.name}>
         <input
           id="organization-name"
           value={draft.name}
           onChange={(e) => set("name", e.target.value)}
+          onBlur={() => touch("name")}
+          {...invalidProps("organization-name", fieldErrors.name)}
           maxLength={200}
           required
           autoComplete="off"
@@ -216,25 +239,29 @@ export function OrganizationRecord({ id }: { id: string }) {
       <PropertyRow icon="arrow_outward" label="People">
         <RelationPicker label="People" selected={draft.people} onChange={(next) => set("people", next)} search={searchPeople} />
       </PropertyRow>
-      <PropertyRow icon="link" label="Website" htmlFor="organization-website">
+      <PropertyRow icon="link" label="Website" htmlFor="organization-website" error={fieldErrors.website}>
         <input
           id="organization-website"
           inputMode="url"
           value={draft.website}
           onChange={(e) => set("website", e.target.value)}
+          onBlur={() => touch("website")}
+          {...invalidProps("organization-website", fieldErrors.website)}
           autoComplete="off"
           spellCheck={false}
           placeholder="https://"
           className={recordInput}
         />
       </PropertyRow>
-      <PropertyRow icon="alternate_email" label="Email" htmlFor="organization-email">
+      <PropertyRow icon="alternate_email" label="Email" htmlFor="organization-email" error={fieldErrors.email}>
         <input
           id="organization-email"
           type="email"
           inputMode="email"
           value={draft.email}
           onChange={(e) => set("email", e.target.value)}
+          onBlur={() => touch("email")}
+          {...invalidProps("organization-email", fieldErrors.email)}
           maxLength={320}
           autoComplete="off"
           spellCheck={false}

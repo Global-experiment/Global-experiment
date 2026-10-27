@@ -7,17 +7,21 @@ import { formatPersonNumber, type Organization, type Page, type PeopleOptions, t
 import { useAdminData } from "../api/useAdminData";
 import { personMissing } from "../completeness";
 import { ExpertiseField } from "../expertise/ExpertiseField";
+import { duplicateName } from "../record/duplicateName";
 import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
 import { LIMIT_HINTS, RELATION_LIMITS } from "../relationLimits";
 import { CompletenessRow } from "../ui/CompletenessRow";
 import { AdminButton, StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, CheckboxField, DateField, DateTimeField, Pills, PropertyRow, ReadOnlyValue, recordInput } from "../ui/RecordForm";
+import { AutoGrowTextarea, CheckboxField, DateField, DateTimeField, invalidProps, Pills, PropertyRow, ReadOnlyValue, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 import { formatDate } from "./peopleTable";
 import { draftFromPerson, expenseOption, hasChanges, personCreateBody, personDraftErrors, personPatch, type PersonDraft } from "./personForm";
 import { PERSON_RECORD_CONFIG } from "./personRecordConfig";
+
+/** The info card on Contact channels (client, 2026-10-22); the order is set by drag and drop. */
+export const PREFERRED_CHANNEL_HINT = "The first value is the preferred way of contact.";
 
 type TextField = "email" | "phone" | "website" | "x" | "linkedin" | "otherSocials" | "wiseRecipientId";
 
@@ -45,14 +49,33 @@ export async function searchOrganizations(text: string, signal: AbortSignal): Pr
   return page.items.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` }));
 }
 
-/** Expenses with no recipient yet (an expense has one recipient). */
-async function searchExpenses(text: string, signal: AbortSignal): Promise<RelationOption[]> {
-  const query = new URLSearchParams({ pageSize: "20", sort: "date:desc" });
+/**
+ * Expenses with no recipient yet (an expense has one recipient), latest
+ * first; search by name or EXP-n. Notion-managed expenses are listed but
+ * can't be picked: the Treasury import sets their recipient from Notion.
+ */
+export async function searchExpenses(text: string, signal: AbortSignal): Promise<RelationOption[]> {
+  const query = new URLSearchParams({ pageSize: "20", sort: "occurred:desc" });
   query.append("filter", "type:is:expense");
   query.append("filter", "recipient:is_empty");
   if (text.trim()) query.set("search", text.trim());
-  const page = await adminApi<Page<{ id: string; number: number; name: string; currency: string; grossAmount: number }>>(`/treasury?${query}`, { signal });
-  return page.items.map((row) => ({ ...expenseOption({ id: row.id, entryNumber: row.number, currency: row.currency, grossAmount: row.grossAmount }), detail: row.name }));
+  const page = await adminApi<Page<{ id: string; number: number; name: string; currency: string; grossAmount: number; managedBy: "notion" | "native" }>>(`/treasury?${query}`, { signal });
+  return page.items.map((row) => {
+    const notion = row.managedBy === "notion";
+    return {
+      ...expenseOption({ id: row.id, entryNumber: row.number, currency: row.currency, grossAmount: row.grossAmount }),
+      detail: notion ? `${row.name} · Managed in Notion` : row.name,
+      disabled: notion,
+      muted: notion,
+      disabledReason: notion ? "Managed in Notion: set its recipient there" : undefined,
+    };
+  });
+}
+
+/** Field errors as shown: the draft's own problems for the fields left (or all, after Submit), then the API's. */
+function shownErrors(draft: PersonDraft, touched: ReadonlySet<string>, server: Record<string, string>) {
+  const found = personDraftErrors(draft);
+  return { ...server, ...Object.fromEntries(Object.entries(found).filter(([key]) => touched.has(key))) };
 }
 
 /** A copy made with "Duplicate as a draft" travels to /admin/people/new in the tab's session storage (never saved until Submit). */
@@ -89,7 +112,9 @@ function ExistingPersonRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ baseId: string; base: PersonDraft; draft: PersonDraft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
+  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
 
   if (person.error || !person.data) {
     return (
@@ -128,7 +153,7 @@ function ExistingPersonRecord({ id }: { id: string }) {
   async function submit(): Promise<boolean> {
     const found = personDraftErrors(draft);
     if (Object.keys(found).length > 0) {
-      setErrors(found);
+      setTouched(new Set([...touched, ...Object.keys(found)]));
       setFormError("Some fields need attention.");
       return false;
     }
@@ -184,12 +209,14 @@ function ExistingPersonRecord({ id }: { id: string }) {
         discard: () => {
           setEdit(null);
           setErrors({});
+          setTouched(new Set());
           setFormError(null);
         },
         duplicate,
         duplicateAsDraft: () => {
           try {
-            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, name: `${draft.name} (copy)`, expenses: [] }));
+            // Like Duplicate: the copy's name ends in DUPLICATE (client, 2026-10-22).
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, name: duplicateName(draft.name), expenses: [] }));
           } catch {
             // Storage blocked: the draft page starts empty instead.
           }
@@ -213,7 +240,8 @@ function ExistingPersonRecord({ id }: { id: string }) {
       <PersonFields
         draft={draft}
         set={set}
-        errors={errors}
+        touch={touch}
+        errors={shownErrors(draft, touched, errors)}
         formError={formError}
         options={options.data}
         meta={{
@@ -236,7 +264,9 @@ function NewPersonRecord() {
   const [draft, setDraft] = useState<PersonDraft | null>(() => (typeof window === "undefined" ? null : readStoredDraft()));
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
+  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
 
   if (!draft) {
     return (
@@ -250,7 +280,7 @@ function NewPersonRecord() {
   async function submit(): Promise<boolean> {
     const found = personDraftErrors(draft!);
     if (Object.keys(found).length > 0) {
-      setErrors(found);
+      setTouched(new Set([...touched, ...Object.keys(found)]));
       setFormError("Some fields need attention.");
       return false;
     }
@@ -293,7 +323,7 @@ function NewPersonRecord() {
       <p role="status" className="px-2 text-meta text-text-muted">
         A draft copy: nothing is saved until “Submit changes”.
       </p>
-      <PersonFields draft={draft} set={set} errors={errors} formError={formError} options={options.data} />
+      <PersonFields draft={draft} set={set} touch={touch} errors={shownErrors(draft, touched, errors)} formError={formError} options={options.data} />
     </RecordPage>
   );
 }
@@ -316,7 +346,7 @@ function showErrors(caught: unknown, setErrors: (errors: Record<string, string>)
 
 /**
  * The person's fields, in the prototype's order (Figma p14 + screenshots):
- * Name, Expertise, Personal note, Source, State, Email, Website, X, LinkedIn,
+ * Name, Expertise, Description, Source, State, Email, Website, X, LinkedIn,
  * Other socials, Other contact details, Contact channels, Do not contact,
  * AI relevance score, Relevance score, Organizations, Expenses, First and
  * Last contact, Follow-up date, then Person ID, Updated, Last edited by,
@@ -327,6 +357,7 @@ function showErrors(caught: unknown, setErrors: (errors: Record<string, string>)
 function PersonFields({
   draft,
   set,
+  touch,
   errors,
   formError,
   options,
@@ -334,6 +365,8 @@ function PersonFields({
 }: {
   draft: PersonDraft;
   set: <Key extends keyof PersonDraft>(key: Key, value: PersonDraft[Key]) => void;
+  /** A field was left: its errors show from now on (client, 2026-10-22: "when clicking out, not on submit"). */
+  touch: (key: string) => void;
   errors: Record<string, string>;
   formError: string | null;
   options?: PeopleOptions;
@@ -345,13 +378,24 @@ function PersonFields({
     <>
       {formError ? <StatusMessage tone="error">{formError}</StatusMessage> : null}
       <PropertyRow icon="title" label="Name" htmlFor="person-name" error={errors.name}>
-        <input id="person-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} required autoComplete="off" placeholder="Full name" className={recordInput} />
+        <input
+          id="person-name"
+          value={draft.name}
+          onChange={(e) => set("name", e.target.value)}
+          onBlur={() => touch("name")}
+          {...invalidProps("person-name", errors.name)}
+          maxLength={200}
+          required
+          autoComplete="off"
+          placeholder="Full name"
+          className={recordInput}
+        />
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Expertise" hint={LIMIT_HINTS.personExpertise} error={errors.expertise}>
         <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.personExpertise} />
       </PropertyRow>
-      <PropertyRow icon="title" label="Personal note" htmlFor="person-note" error={errors.personalNote}>
-        <AutoGrowTextarea id="person-note" value={draft.personalNote} onChange={(e) => set("personalNote", e.target.value)} maxLength={5000} placeholder="Add a note" />
+      <PropertyRow icon="title" label="Description" htmlFor="person-description" error={errors.description}>
+        <AutoGrowTextarea id="person-description" value={draft.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} placeholder="Add a description" />
       </PropertyRow>
       <PropertyRow icon="select" label="Source" error={errors.sourceKey}>
         <Pills label="Source" allowEmpty options={(options?.sources ?? []).map((source) => ({ value: source.key, label: source.label }))} value={draft.sourceKey} onChange={(value) => set("sourceKey", value)} />
@@ -367,6 +411,8 @@ function PersonFields({
             inputMode={inputMode}
             value={draft[field]}
             onChange={(e) => set(field, e.target.value)}
+            onBlur={() => touch(field)}
+            {...invalidProps(`person-${field}`, errors[field])}
             autoComplete="off"
             spellCheck={false}
             placeholder={placeholder}
@@ -377,9 +423,10 @@ function PersonFields({
       <PropertyRow icon="title" label="Other contact details" htmlFor="person-otherContact" error={errors.otherContact}>
         <AutoGrowTextarea id="person-otherContact" value={draft.otherContact} onChange={(e) => set("otherContact", e.target.value)} maxLength={500} placeholder="Another way to reach them" />
       </PropertyRow>
-      <PropertyRow icon="contact_channels" label="Contact channels" error={errors.contactChannels}>
+      <PropertyRow icon="contact_channels" label="Contact channels" hint={PREFERRED_CHANNEL_HINT} error={errors.contactChannels}>
         <RelationPicker
           label="Contact channels"
+          reorderable
           selected={draft.contactChannelKeys.map((key) => ({ id: key, label: channels.find((channel) => channel.key === key)?.label ?? key }))}
           onChange={(next) => set("contactChannelKeys", next.map((option) => option.id))}
           search={async (text) => channels.filter((channel) => channel.label.toLowerCase().includes(text.trim().toLowerCase())).map((channel) => ({ id: channel.key, label: channel.label }))}
@@ -396,19 +443,32 @@ function PersonFields({
           inputMode="numeric"
           value={draft.aiRelevanceScore}
           onChange={(e) => set("aiRelevanceScore", e.target.value)}
+          onBlur={() => touch("aiRelevanceScore")}
+          {...invalidProps("person-ai-score", errors.aiRelevanceScore)}
           readOnly={options?.aiScoreReadOnly}
           title={options?.aiScoreReadOnly ? "Set automatically" : undefined}
           autoComplete="off"
           placeholder="Enter a number"
-          className={`${recordInput} max-w-[240px]`}
+          className={recordInput}
         />
       </PropertyRow>
       <PropertyRow icon="tag" label="Relevance score" htmlFor="person-score" error={errors.relevanceScore}>
-        <input id="person-score" inputMode="numeric" value={draft.relevanceScore} onChange={(e) => set("relevanceScore", e.target.value)} autoComplete="off" placeholder="Enter a number" className={`${recordInput} max-w-[240px]`} />
+        <input
+          id="person-score"
+          inputMode="numeric"
+          value={draft.relevanceScore}
+          onChange={(e) => set("relevanceScore", e.target.value)}
+          onBlur={() => touch("relevanceScore")}
+          {...invalidProps("person-score", errors.relevanceScore)}
+          autoComplete="off"
+          placeholder="Enter a number"
+          className={recordInput}
+        />
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Organizations" hint={LIMIT_HINTS.personOrganizations} error={errors.organizations}>
         <RelationPicker
           label="Organizations"
+          reorderable
           selected={draft.organizations}
           onChange={(next) => set("organizations", next)}
           search={searchOrganizations}
@@ -420,13 +480,31 @@ function PersonFields({
         <RelationPicker label="Expenses" selected={draft.expenses} onChange={(next) => set("expenses", next)} search={searchExpenses} />
       </PropertyRow>
       <PropertyRow icon="calendar" label="First contact" htmlFor="person-first-contact" error={errors.firstContactOn}>
-        <DateField id="person-first-contact" label="First contact" value={draft.firstContactOn} onChange={(value) => set("firstContactOn", value)} />
+        <DateField
+          id="person-first-contact"
+          label="First contact"
+          value={draft.firstContactOn}
+          error={errors.firstContactOn}
+          onChange={(value) => {
+            set("firstContactOn", value);
+            touch("lastContactOn");
+          }}
+        />
       </PropertyRow>
       <PropertyRow icon="calendar" label="Last contact" htmlFor="person-last-contact" error={errors.lastContactOn}>
-        <DateField id="person-last-contact" label="Last contact" value={draft.lastContactOn} onChange={(value) => set("lastContactOn", value)} />
+        <DateField
+          id="person-last-contact"
+          label="Last contact"
+          value={draft.lastContactOn}
+          error={errors.lastContactOn}
+          onChange={(value) => {
+            set("lastContactOn", value);
+            touch("lastContactOn");
+          }}
+        />
       </PropertyRow>
       <PropertyRow icon="calendar" label="Follow-up date" htmlFor="person-followup" error={errors.nextFollowupAt}>
-        <DateTimeField id="person-followup" label="Follow-up date" value={draft.nextFollowupAt} onChange={(value) => set("nextFollowupAt", value)} />
+        <DateTimeField id="person-followup" label="Follow-up date" value={draft.nextFollowupAt} error={errors.nextFollowupAt} onChange={(value) => set("nextFollowupAt", value)} />
       </PropertyRow>
       {meta ? (
         <>

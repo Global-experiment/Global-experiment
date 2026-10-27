@@ -43,6 +43,12 @@ const tag = "inline-flex items-center rounded-control border border-line px-1 te
  *
  * Keyboard: ↓ from the search box into the results, ↑/↓ between them,
  * Enter picks, Esc closes (Enter in the box never submits the record).
+ *
+ * `reorderable` (client, 2026-10-22: contact channels, organizations,
+ * expertise): the chips keep the order given and can be reordered — dragged
+ * with the mouse, or focused and moved with Alt+← / Alt+→ (each move is
+ * announced). The first one comes first everywhere (the preferred contact
+ * channel).
  */
 export function RelationPicker({
   label,
@@ -51,6 +57,7 @@ export function RelationPicker({
   search,
   max,
   limitMessage,
+  reorderable = false,
 }: {
   label: string;
   selected: RelationOption[];
@@ -59,7 +66,23 @@ export function RelationPicker({
   max?: number;
   /** Shown when `max` is reached, e.g. "People can have up to 10 expertise." */
   limitMessage?: string;
+  /** The chips can be reordered (drag and drop, Alt+← / Alt+→). */
+  reorderable?: boolean;
 }) {
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const chips = useRef<HTMLUListElement>(null);
+  /** Moves a chip to another index; announces it and keeps the focus on the moved chip. */
+  const move = (id: string, to: number) => {
+    const from = selected.findIndex((option) => option.id === id);
+    if (from === -1 || to < 0 || to >= selected.length || from === to) return;
+    const next = [...selected];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item!);
+    onChange(next);
+    setAnnouncement(`${item!.label} moved to position ${to + 1} of ${next.length}.`);
+    requestAnimationFrame(() => chips.current?.querySelector<HTMLElement>(`[data-chip="${CSS.escape(id)}"]`)?.focus());
+  };
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -144,7 +167,7 @@ export function RelationPicker({
   return (
     <div ref={root} onKeyDown={onKeyDown} data-relation-picker={noun}>
       <div className="relative">
-        <label className="flex h-8 max-w-[560px] items-center gap-2 rounded-control px-2 text-text-muted ring-1 ring-transparent focus-within:ring-text-primary hover:ring-line">
+        <label className="flex h-8 w-full items-center gap-2 rounded-control px-2 text-text-muted ring-1 ring-transparent focus-within:ring-text-primary hover:ring-line">
           <AdminIcon name="search" />
           <span className="sr-only">Search {noun}</span>
           <input
@@ -173,7 +196,7 @@ export function RelationPicker({
             id={listId}
             aria-label={`${label} results`}
             aria-busy={!atLimit && pending}
-            className="absolute top-full left-0 z-30 mt-1 max-h-80 w-[420px] max-w-full overflow-y-auto rounded-control bg-surface-base text-body ring-1 ring-line"
+            className="absolute top-full right-0 left-0 z-30 mt-1 max-h-80 overflow-y-auto rounded-control bg-surface-base text-body ring-1 ring-line"
           >
             {atLimit ? (
               <li role="status" data-limit-reached className="px-2 py-2 text-text-primary">
@@ -224,13 +247,51 @@ export function RelationPicker({
       </div>
 
       {selected.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap gap-x-2" aria-label={`Linked ${noun}`}>
-          {selected.map((option) => (
+        // 8px between the chips, across and down, and 8px from the search line above (client, 2026-10-22).
+        <ul ref={chips} className="mt-2 flex flex-wrap gap-2" aria-label={`Linked ${noun}`} data-reorderable={reorderable || undefined}>
+          {selected.map((option, index) => (
             <li
               key={option.id}
-              title={option.title}
+              data-chip={option.id}
+              title={option.title ?? (reorderable ? "Drag to reorder, or Alt+← / Alt+→" : undefined)}
               data-muted={option.muted ? "true" : undefined}
-              className={`inline-flex h-8 items-center gap-1 rounded-control pr-2 pl-2 ring-1 ring-line ${option.muted ? "text-text-muted line-through" : ""}`}
+              data-dragging={dragged === option.id || undefined}
+              {...(reorderable
+                ? {
+                    tabIndex: 0,
+                    "aria-roledescription": "reorderable chip",
+                    "aria-label": `${option.label}, ${index + 1} of ${selected.length}. Alt+Left or Alt+Right to move.`,
+                    draggable: true,
+                    onDragStart: (event: React.DragEvent) => {
+                      setDragged(option.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", option.id);
+                    },
+                    onDragOver: (event: React.DragEvent) => {
+                      if (!dragged) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    },
+                    onDrop: (event: React.DragEvent) => {
+                      event.preventDefault();
+                      const id = dragged ?? event.dataTransfer.getData("text/plain");
+                      if (id) move(id, index);
+                      setDragged(null);
+                    },
+                    onDragEnd: () => setDragged(null),
+                    onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
+                      if (!event.altKey || event.target !== event.currentTarget) return;
+                      if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        move(option.id, index - 1);
+                      } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                        event.preventDefault();
+                        move(option.id, index + 1);
+                      }
+                    },
+                  }
+                : {})}
+              className={`inline-flex h-8 items-center gap-1 rounded-control pr-2 pl-2 ring-1 ring-line ${option.muted ? "text-text-muted line-through" : ""} ${reorderable ? `cursor-grab active:cursor-grabbing data-[dragging]:opacity-50 ${focusRing}` : ""}`}
             >
               {option.href ? (
                 <Link href={option.href} className={`hover:underline ${focusRing}`}>
@@ -251,6 +312,11 @@ export function RelationPicker({
             </li>
           ))}
         </ul>
+      ) : null}
+      {reorderable ? (
+        <p aria-live="polite" className="sr-only">
+          {announcement}
+        </p>
       ) : null}
     </div>
   );

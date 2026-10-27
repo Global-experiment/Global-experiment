@@ -29,7 +29,7 @@ const person = (pageId: string, name: string, extra: Partial<SourcePerson> = {})
   number: null,
   state: "Sourced",
   source: "Candide",
-  personalNote: "Met at a civic tech meetup.",
+  description: "Met at a civic tech meetup.",
   doNotContact: false,
   email: `${pageId}@ngo.ch`,
   phone: null,
@@ -81,7 +81,7 @@ const dbPerson = (id: string, extra: Partial<DbPerson> = {}): DbPerson => ({
   name: id,
   stateKey: null,
   sourceKey: null,
-  personalNote: null,
+  description: null,
   doNotContact: false,
   email: null,
   phone: null,
@@ -113,7 +113,7 @@ describe("directory import plan", () => {
         [org("o-demo", "Horizon Open Tools", { wiseRecipientId: "DEMO-RECIPIENT-ORG-20", email: "org20@example.org" }), org("o-real", "Civic Lab")],
         [
           person("p-demo", "Sofia Duarte", { email: "person3@example.org", website: "https://example.org/person-3" }),
-          person("p-story", "Story Person", { personalNote: "Fictional sample — do not contact" }),
+          person("p-story", "Story Person", { description: "Fictional sample — do not contact" }),
           person("p-real", "Amina Diallo"),
         ],
       ),
@@ -163,7 +163,7 @@ describe("directory import plan", () => {
       snapshot({
         people: [
           dbPerson("ADMIN", { personNumber: 5, name: "Admin-made person" }), // holds PER-5, not from Notion
-          dbPerson("CLEO", { notionPageId: "p3", personNumber: 9, name: "Cleo", stateKey: "sourced", sourceKey: "candide", personalNote: "Met at a civic tech meetup.", email: "p3@ngo.ch" }),
+          dbPerson("CLEO", { notionPageId: "p3", personNumber: 9, name: "Cleo", stateKey: "sourced", sourceKey: "candide", description: "Met at a civic tech meetup.", email: "p3@ngo.ch" }),
         ],
       }),
     );
@@ -245,7 +245,7 @@ describe("directory import plan", () => {
   });
 
   it("removes links Notion no longer has between imported records, but never touches manual links", () => {
-    const realPerson = dbPerson("ADA", { notionPageId: "p1", name: "Ada", stateKey: "sourced", sourceKey: "candide", personalNote: "Met at a civic tech meetup.", email: "p1@ngo.ch" });
+    const realPerson = dbPerson("ADA", { notionPageId: "p1", name: "Ada", stateKey: "sourced", sourceKey: "candide", description: "Met at a civic tech meetup.", email: "p1@ngo.ch" });
     const plan = planDirectoryImport(
       source([org("o1", "Civic Lab"), org("o2", "Water Trust")], [person("p1", "Ada", { organizationPageIds: ["o2"], expertisePageIds: ["exp-page-2"] })]),
       snapshot({

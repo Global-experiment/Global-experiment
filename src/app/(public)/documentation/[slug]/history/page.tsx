@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: HistoryPageProps): Promise<Me
   const { slug } = await params;
   const article = await loadArticle(slug);
   if (!article) return {};
-  return { title: `${article.title} — Document history — Global Experiment` };
+  return { title: "Document history" };
 }
 
 /**
