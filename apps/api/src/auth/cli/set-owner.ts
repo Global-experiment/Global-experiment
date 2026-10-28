@@ -8,11 +8,15 @@ import { z } from "zod";
 import type { Database } from "../../common/database/database.module.js";
 import * as schema from "../../common/database/schema.js";
 import { AuthRepository } from "../auth.repository.js";
-import { hashPassword, MIN_PASSWORD_LENGTH } from "../password.js";
+import { hashPassword } from "../password.js";
+import { passwordProblems } from "../password-strength.js";
 
 /**
- * Creates the single owner admin, or replaces its email/password (and logs
- * out every session). There is intentionally no signup endpoint.
+ * Makes the account with this email an active Rootadmin with a new password,
+ * creating it when there's none, and signs it out everywhere. Other accounts
+ * are untouched (there can be several Rootadmins). It's the way in for the
+ * first account and the recovery path; everyone else is invited from
+ * Accounts. There is intentionally no signup endpoint.
  *
  *   npm run build -w @global-experiment/api
  *   npm run admin:set-owner -w @global-experiment/api -- --email=owner@example.org
@@ -52,7 +56,7 @@ async function main() {
     error: () => "DATABASE_URL must be set to a postgres:// connection string",
   });
   const emailArg = process.argv.find((arg) => arg.startsWith("--email="))?.slice("--email=".length);
-  const email = z.email().parse(emailArg, { error: () => "Pass --email=<owner email>" });
+  const email = z.email().parse(emailArg, { error: () => "Pass --email=<Rootadmin email>" });
 
   let password: string;
   if (process.stdin.isTTY) {
@@ -61,13 +65,15 @@ async function main() {
   } else {
     password = await readPipedStdin();
   }
-  if (password.length < MIN_PASSWORD_LENGTH) throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+  // The same rules as the invitation and reset pages.
+  const problems = passwordProblems(password, { email });
+  if (problems.length > 0) throw new Error(problems.join("\n"));
 
   const client = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
   try {
     const db = drizzle(client, { schema }) as unknown as Database;
     const outcome = await new AuthRepository(db).upsertOwner(email, await hashPassword(password));
-    console.log(outcome === "created" ? "Owner admin created." : "Owner admin updated; all sessions revoked.");
+    console.log(outcome === "created" ? "Rootadmin account created." : "The account is an active Rootadmin; its sessions were revoked.");
   } finally {
     await client.end({ timeout: 5 });
   }

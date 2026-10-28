@@ -25,7 +25,7 @@ function stripeFor(publishableKey: string): Promise<Stripe | null> {
 function appearance(): Appearance {
   const style = getComputedStyle(document.documentElement);
   const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
-  // Dark is the site's default; the light theme sets data-theme="light" (ThemeToggle).
+  // Dark is the site's default; the light theme sets data-theme="light" (the appearance chosen in Profile settings, shared/ui/appearance.ts).
   const dark = document.documentElement.dataset.theme !== "light";
   return {
     theme: dark ? "night" : "stripe",

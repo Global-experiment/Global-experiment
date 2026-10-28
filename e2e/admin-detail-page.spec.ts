@@ -109,8 +109,9 @@ test("the panel (p14): Duplicate, Submit changes, More options, Views and Edits,
   const main = page.locator("[data-record-main]");
   await expect(main).toContainText(`Person IDPER-${person.personNumber}`);
   await expect(main).toContainText(`Created by${ACTOR}`);
-  // Permissions and Contracting wait for their modules.
-  await expect(main.getByText("Permissions", { exact: true })).toHaveCount(0);
+  // Permissions shows the person's access (Delivery 2); Contracting waits for its module.
+  await expect(main.getByText("Permissions", { exact: true })).toHaveCount(1);
+  await expect(main).toContainText("No access to any service.");
   await expect(main.getByText("Contracting", { exact: true })).toHaveCount(0);
 
   // A second opening the same day counts as a view but adds no "viewed" row.

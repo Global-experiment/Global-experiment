@@ -26,6 +26,7 @@ const person: Person = {
   relevanceScore: 7,
   contactChannels: [{ key: "signal", label: "Signal" }],
   expenses: [{ id: "x1", entryNumber: 204, currency: "USD", grossAmount: -20000 }],
+  permissions: [],
   lastFollowupAtLegacy: "2026-08-15T09:00:00.000Z",
   followUpOverdue: false,
   archivedAt: null,

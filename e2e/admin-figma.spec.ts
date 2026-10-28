@@ -103,7 +103,7 @@ test.describe("login (p1)", () => {
 
     // No reset flow yet: the button says whom to ask.
     await page.getByRole("button", { name: "Forgot password?" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "contact the administrator" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Ask a Rootadmin for a password reset link" })).toBeVisible();
 
     await page.getByLabel("Email address").fill(E2E_ADMIN.email);
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -260,7 +260,21 @@ test.describe("signed in", () => {
     await expect(page).toHaveURL(/\/admin\/people$/);
     // Only the existing modules link anywhere.
     const links = await nav(page).getByRole("link").evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
-    expect(links).toEqual(["/admin/home", "/admin/documentation", "/admin/treasury", "/admin/people", "/admin/organizations", "/admin/history", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/organizations"]);
+    expect(links).toEqual([
+      "/admin/home",
+      "/admin/documentation",
+      "/admin/treasury",
+      "/admin/people",
+      "/admin/organizations",
+      "/admin/services",
+      "/admin/permissions",
+      "/admin/accounts",
+      "/admin/history",
+      "/admin/expertise",
+      "/admin/fields",
+      "/admin/domains",
+      "/admin/organizations",
+    ]);
     // Decision 16: these stay "Coming soon" until built.
     for (const label of ["Waitlist", "Messages", "Cloud", "Analytics", "Technical dashboard", "Emails", "Contracting"]) {
       await expect(nav(page).locator("[data-coming-soon]").filter({ hasText: label }), label).toHaveCount(1);
@@ -272,7 +286,7 @@ test.describe("signed in", () => {
     await expect(page.locator("li[data-module=organizations] a")).toHaveAttribute("aria-current", "page");
   });
 
-  test("the menu keeps its search and collapse button at the top while it scrolls; light theme from the user card (client, 2026-10-19)", async ({ page }) => {
+  test("the menu keeps its search and collapse button at the top while it scrolls; the light appearance (Profile settings, p18)", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 600 });
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
@@ -281,14 +295,12 @@ test.describe("signed in", () => {
     expect((await box(page.getByRole("searchbox", { name: "Search the menu" }).locator(".."))).y).toBe(8);
     await expect(page.getByRole("button", { name: "Collapse menu" })).toBeInViewport();
 
-    const toggle = page.locator("#admin-sidebar").getByRole("button", { name: "Switch to light preview" });
-    await toggle.click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    // What Appearance → Light applies (shared/ui/appearance.ts); the Profile flow itself is in admin-accounts.spec.ts.
+    await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
     await expect(page.locator("[data-admin]")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await expect.poll(() => page.locator("[data-admin]").evaluate((el) => getComputedStyle(el).color)).toBe("rgb(0, 0, 0)");
     await capture(page, "light-people");
-    await page.locator("#admin-sidebar").getByRole("button", { name: "Switch to dark preview" }).click();
-    await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
+    await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
   });
 
   test("filter popover (p2): add, duplicate, reorder, remove; 'Filters applied' toast", async ({ page }) => {
@@ -578,16 +590,16 @@ test.describe("signed in", () => {
     near(FRAME.height - (pill.y + pill.height), 24);
   });
 
-  test("display name: set on the profile, shown on the user card, cleared back to the email", async ({ page }) => {
+  test("display name: set in Profile settings, shown on the user card, cleared back to the email", async ({ page }) => {
     await page.goto("/admin/profile");
     await page.getByLabel("Display name").fill("Candide Test");
-    await page.getByRole("main").getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Profile updated" })).toBeVisible();
     await expect(page.locator("[data-user-name]")).toHaveText("Candide Test");
     await page.getByLabel("Display name").fill("x".repeat(81));
     await expect(page.getByLabel("Display name")).toHaveValue("x".repeat(80)); // maxLength
     await page.getByLabel("Display name").fill("");
-    await page.getByRole("main").getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.locator("[data-user-name]")).toHaveText("e2e-owner");
   });
 

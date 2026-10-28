@@ -6,6 +6,7 @@ import type { ImportJob, ImportKind, ImportRun, ImportStatus, Page } from "../ap
 import { useAdminData } from "../api/useAdminData";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
 import { useToast } from "../ui/Toast";
+import { usePermissions } from "../session";
 import { canApply, formatWhen, jobLine, KIND_LABEL, MODE_LABEL, runChanges, runKindLabel } from "./importDisplay";
 
 const POLL_MS = 1000;
@@ -20,6 +21,9 @@ const KINDS: ImportKind[] = ["taxonomy", "directory", "treasury"];
  */
 export function ImportsScreen() {
   const toast = useToast();
+  const permissions = usePermissions();
+  // Only the imports this role may run (`<module>.import`); the runs list shows them all.
+  const kinds = KINDS.filter((kind) => !permissions || permissions.has(`${kind}.import`));
   const status = useAdminData<ImportStatus>("/imports/status");
   const runs = useAdminData<Page<ImportRun>>("/imports/runs?pageSize=20");
   const [job, setJob] = useState<ImportJob | null>(null);
@@ -89,7 +93,8 @@ export function ImportsScreen() {
       </p>
 
       <section aria-label="Run an import" className="flex flex-wrap gap-2 px-2">
-        {KINDS.map((kind) => {
+        {kinds.length === 0 ? <p className="text-text-muted">Your role can see the import runs but not start an import.</p> : null}
+        {kinds.map((kind) => {
           const availability = status.data?.[kind];
           return (
             <div key={kind} className="flex w-[340px] flex-col gap-2 rounded-control border border-line p-2">

@@ -2,6 +2,8 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AdminSessionGuard } from "./auth/admin-session.guard.js";
+import { AccountsModule } from "./accounts/accounts.module.js";
+import { PermissionGuard } from "./access-control/permission.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { CsrfOriginGuard } from "./auth/csrf-origin.guard.js";
 import { ClockModule } from "./common/clock/clock.js";
@@ -23,6 +25,7 @@ import { SettingsModule } from "./settings/settings.service.js";
 import { AuditModule } from "./audit/audit.module.js";
 import { StripeModule } from "./stripe/stripe.module.js";
 import { TreasuryModule } from "./treasury/treasury.module.js";
+import { ServicesModule } from "./services/services.module.js";
 
 @Module({})
 export class AppModule {
@@ -51,12 +54,16 @@ export class AppModule {
         TreasuryModule,
         StripeModule,
         DonationsModule,
+        ServicesModule,
+        AccountsModule,
       ],
       providers: [
         // Global guards run in this order.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useExisting: CsrfOriginGuard },
         { provide: APP_GUARD, useExisting: AdminSessionGuard },
+        // Every /api/admin handler declares its permission (access-control/requires.ts); this checks it.
+        { provide: APP_GUARD, useExisting: PermissionGuard },
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
       ],
     };

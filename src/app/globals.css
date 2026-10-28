@@ -10,9 +10,9 @@
  * the UI (gutter, column, control heights, type scale) resolves to one of
  * these tokens. Colors are defined twice: the dark values below (the
  * client's actual design) and a light inversion applied by
- * `[data-theme="light"]` further down — see ThemeToggle.tsx. Dark is the
- * permanent default; light is a temporary review-only preview (item 7 of
- * the M1 client feedback pass).
+ * `[data-theme="light"]` further down — see shared/ui/appearance.ts. Dark
+ * is the default; each admin picks System, Light or Dark in Profile
+ * settings (admin-desktop.pdf p18).
  */
 @theme {
   /* Colors — pixel-sampled from the PDF render (dark, the shipped theme). */
@@ -81,11 +81,11 @@
 }
 
 /*
- * Temporary light-mode preview (client feedback item 7). Overrides only the
- * color custom properties Tailwind reads through `@theme` above — geometry
- * and type scale are unchanged, so layout is identical in both themes. See
- * shared/ui/ThemeToggle.tsx for how `data-theme` gets set; delete this block
- * and the toggle together to remove the feature entirely.
+ * Light appearance (Profile settings, p18). Overrides only the color custom
+ * properties Tailwind reads through `@theme` above — geometry and type
+ * scale are unchanged, so layout is identical in both themes. See
+ * shared/ui/appearance.ts and THEME_INIT_SCRIPT (app/layout.tsx) for how
+ * `data-theme` gets set.
  */
 [data-theme="light"] {
   --color-surface-base: #ffffff;

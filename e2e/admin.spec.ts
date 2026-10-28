@@ -184,8 +184,8 @@ test.describe("people administration", () => {
 
   test("sign out revokes the session", async ({ page }) => {
     await page.goto("/admin/profile");
-    await expect(page.getByRole("main").getByText(E2E_ADMIN.email)).toBeVisible();
-    await page.getByRole("main").getByRole("button", { name: "Sign out" }).click();
+    await expect(page.locator("[data-record-main]").getByText(E2E_ADMIN.email)).toBeVisible();
+    await page.locator("[data-record-panel]").getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/admin\/login$/);
     await page.goto("/admin/people");
     await expect(page).toHaveURL(/\/admin\/login\?next=/);

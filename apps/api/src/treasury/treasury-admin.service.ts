@@ -75,8 +75,9 @@ export class TreasuryAdminService {
     this.logger.setContext(TreasuryAdminService.name);
   }
 
+  /** The route's permission (treasury.*) is checked by the permission guard; here only the session. */
   private assertTreasuryAdmin(admin: AdminPrincipal | undefined): AdminPrincipal {
-    if (!admin || admin.role !== "owner") throw new ForbiddenError("Only the owner can manage the Treasury.");
+    if (!admin) throw new ForbiddenError("Sign in to manage the Treasury.");
     return admin;
   }
 
@@ -188,6 +189,9 @@ export class TreasuryAdminService {
 
   async update(id: string, body: UpdateTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
     const editor = this.assertTreasuryAdmin(admin);
+    // Field by field (overview §3.1): the internal note is treasury.update, the review status treasury.review.
+    if (body.internalNote !== undefined && !editor.permissions.has("treasury.update")) throw new ForbiddenError("Your role doesn't allow editing the internal note.");
+    if (body.reviewStatus !== undefined && !editor.permissions.has("treasury.review")) throw new ForbiddenError("Your role doesn't allow reviewing expenses.");
     const entry = await this.load(id);
     if (entry.managedBy === "notion") throw refused("managed_in_notion", "Managed in Notion: edit this entry there; the importer updates it here.");
     const review = body.reviewStatus === undefined ? null : await this.checkReview(entry, body.reviewStatus);

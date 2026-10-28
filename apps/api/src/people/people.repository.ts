@@ -19,6 +19,8 @@ import type { Executor } from "../audit/audit.service.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { duplicateName } from "../common/duplicate-name.js";
+import { grantRefsByOwner } from "../services/grant-refs.js";
+import { accessGrants } from "../services/services.schema.js";
 import { assertBelowLimit, LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { containsPattern, groupFilters, type Page, type Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
@@ -359,6 +361,11 @@ export class PeopleRepository {
     await tx.delete(people).where(eq(people.id, id));
   }
 
+  async hasGrants(id: string): Promise<boolean> {
+    const [row] = await this.db.select({ id: accessGrants.id }).from(accessGrants).where(eq(accessGrants.personId, id)).limit(1);
+    return row !== undefined;
+  }
+
   async hasExpenses(id: string): Promise<boolean> {
     const [row] = await this.db.select({ id: treasuryEntries.id }).from(treasuryEntries).where(eq(treasuryEntries.recipientPersonId, id)).limit(1);
     return row !== undefined;
@@ -549,11 +556,12 @@ export class PeopleRepository {
 
   private async hydrate(rows: PersonRow[], db: Executor = this.db): Promise<PersonDto[]> {
     const ids = rows.map((row) => row.id);
-    const [organizationsByPerson, expertiseByPerson, channelsByPerson, expensesByPerson] = await Promise.all([
+    const [organizationsByPerson, expertiseByPerson, channelsByPerson, expensesByPerson, grantsByPerson] = await Promise.all([
       this.organizationsFor(ids, db),
       expertiseRefsByOwner(db as Database, { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position }, ids),
       this.channelsFor(ids, db),
       this.expensesFor(ids, db),
+      grantRefsByOwner(db, "person", ids),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -579,6 +587,7 @@ export class PeopleRepository {
       relevanceScore: row.relevanceScore,
       contactChannels: channelsByPerson.get(row.id) ?? [],
       expenses: expensesByPerson.get(row.id) ?? [],
+      permissions: grantsByPerson.get(row.id) ?? [],
       lastFollowupAtLegacy: row.lastFollowupAtLegacy?.toISOString() ?? null,
       followUpOverdue: row.followUpOverdue === true,
       archivedAt: row.archivedAt?.toISOString() ?? null,

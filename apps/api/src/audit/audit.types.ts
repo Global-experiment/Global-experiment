@@ -17,7 +17,20 @@ export type AuditAction =
   | "deleted"
   | "comment_added"
   | "comment_edited"
-  | "comment_deleted";
+  | "comment_deleted"
+  // Access grants, shown on the person, the account and the service (2026-10-28).
+  | "access_granted"
+  | "access_changed"
+  | "access_revoked"
+  // Accounts.
+  | "invited"
+  | "activated"
+  | "link_created"
+  | "password_changed"
+  | "email_changed"
+  | "deactivated"
+  | "reactivated"
+  | "permission_denied";
 
 /** How a field's value is shown in the history (old struck through → new). */
 export type FieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation";

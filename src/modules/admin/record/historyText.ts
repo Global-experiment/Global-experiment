@@ -85,6 +85,28 @@ export function historyHeadline(item: Pick<HistoryItem, "action" | "changes">, e
       return "viewed this page";
     case "updated":
       return updateHeadline(item.changes, entity);
+    case "access_granted":
+      return "granted access";
+    case "access_changed":
+      return "changed access";
+    case "access_revoked":
+      return "revoked access";
+    case "invited":
+      return `invited this ${entity}`;
+    case "activated":
+      return `activated this ${entity}`;
+    case "link_created":
+      return "created a one-time link";
+    case "password_changed":
+      return "changed the password";
+    case "email_changed":
+      return "changed the email";
+    case "deactivated":
+      return `deactivated this ${entity}`;
+    case "reactivated":
+      return `reactivated this ${entity}`;
+    case "permission_denied":
+      return "was refused an action";
   }
 }
 
@@ -112,6 +134,20 @@ export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes"
       return { before: "viewed", after: "" };
     case "duplicated":
       return { before: "created", after: "as a duplicate" };
+    case "access_granted":
+      return { before: "granted access on", after: "" };
+    case "access_changed":
+      return { before: "changed access on", after: "" };
+    case "access_revoked":
+      return { before: "revoked access on", after: "" };
+    case "link_created":
+      return { before: "created a one-time link for", after: "" };
+    case "password_changed":
+      return { before: "changed the password of", after: "" };
+    case "email_changed":
+      return { before: "changed the email of", after: "" };
+    case "permission_denied":
+      return { before: "was refused an action as", after: "" };
   }
   const headline = historyHeadline(item, entity);
   const marker = `this ${entity}`;

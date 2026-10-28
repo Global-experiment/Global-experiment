@@ -16,6 +16,7 @@ import { AdminButton, StatusMessage } from "../ui/controls";
 import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
 import { AutoGrowTextarea, invalidProps, PropertyRow, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { useCan } from "../session";
 import { useToast } from "../ui/Toast";
 
 interface Draft {
@@ -97,6 +98,9 @@ async function searchPeople(text: string, signal: AbortSignal): Promise<Relation
 export function OrganizationRecord({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
+  const canUpdate = useCan("directory.update");
+  const canCreate = useCan("directory.create");
+  const canDelete = useCan("directory.delete");
   const organization = useAdminData<Organization>(`/organizations/${id}`);
   const history = useAdminData<RecordHistory>(`/history/organization/${id}`);
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
@@ -186,6 +190,7 @@ export function OrganizationRecord({ id }: { id: string }) {
       entity={{ type: "organization", id }}
       entityNoun="organization"
       recordLink={(other) => `/admin/organizations/${other}`}
+      readOnly={!canUpdate}
       actions={{
         submit,
         discard: () => {
@@ -193,17 +198,19 @@ export function OrganizationRecord({ id }: { id: string }) {
           setError(null);
           setTouched(new Set());
         },
-        duplicate,
+        duplicate: canCreate ? duplicate : undefined,
         archived: loaded.archivedAt !== null,
         setArchived,
-        remove: {
-          confirmText: loaded.name,
-          run: async (confirm) => {
-            await adminApi(`/organizations/${id}`, { method: "DELETE", body: { confirm } });
-            toast("Organization deleted");
-            router.push("/admin/organizations");
-          },
-        },
+        remove: canDelete
+          ? {
+              confirmText: loaded.name,
+              run: async (confirm) => {
+                await adminApi(`/organizations/${id}`, { method: "DELETE", body: { confirm } });
+                toast("Organization deleted");
+                router.push("/admin/organizations");
+              },
+            }
+          : undefined,
         savedMessage: "Organization updated",
         dirty,
         busy,

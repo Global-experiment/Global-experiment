@@ -1,4 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
+import { adminUsers } from "../auth/auth.schema.js";
+import { accessGrants, accessLevels, services } from "../services/services.schema.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
@@ -37,11 +39,33 @@ export async function entityLabel(db: Executor, entityType: string, entityId: st
       .limit(1);
     return row ? entryLabel(row) : undefined;
   }
+  if (entityType === "service") {
+    const [row] = await db.select({ name: services.name }).from(services).where(eq(services.id, entityId)).limit(1);
+    return row?.name;
+  }
+  if (entityType === "access_grant") {
+    const [row] = await db
+      .select({ grantNumber: accessGrants.grantNumber, title: grantTitle })
+      .from(accessGrants)
+      .innerJoin(services, eq(services.id, accessGrants.serviceId))
+      .leftJoin(accessLevels, eq(accessLevels.key, accessGrants.levelKey))
+      .where(eq(accessGrants.id, entityId))
+      .limit(1);
+    return row ? `#${row.grantNumber} · ${row.title}` : undefined;
+  }
+  if (entityType === "admin_user") {
+    const [row] = await db.select({ name: adminName }).from(adminUsers).where(eq(adminUsers.id, entityId)).limit(1);
+    return row?.name;
+  }
   return undefined;
 }
 
+/** A grant's shown name: its own, else "<service> / <level>" (Figma p17). */
+const grantTitle = sql<string>`coalesce(${accessGrants.name}, ${services.name} || coalesce(' / ' || ${accessLevels.label}, ''))`;
+const adminName = sql<string>`coalesce(${adminUsers.displayName}, split_part(${adminUsers.email}, '@', 1))`;
+
 /** "PER-81 · Stanley Qiang" → "Stanley Qiang": a stored label without its number. */
-export const titleOfLabel = (label: string) => label.replace(/^(PER|ORG|EXP)-\d+ · /, "");
+export const titleOfLabel = (label: string) => label.replace(/^((PER|ORG|EXP)-\d+|#\d+) · /, "");
 
 /**
  * The current titles of the records a page of events is about (Monitoring →
@@ -59,6 +83,7 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
     ["expertise_domain", expertiseDomains, expertiseDomains.id, expertiseDomains.name],
     ["expertise_field", expertiseFields, expertiseFields.id, expertiseFields.name],
     ["expertise_item", expertiseItems, expertiseItems.id, expertiseItems.name],
+    ["service", services, services.id, services.name],
   ] as const;
   await Promise.all(
     tables.map(async ([type, table, id, name]) => {
@@ -68,5 +93,20 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
       for (const row of rows) titles.set(`${type}:${row.id}`, row.name);
     }),
   );
+  const grantIds = idsOf("access_grant");
+  if (grantIds.length > 0) {
+    const rows = await db
+      .select({ id: accessGrants.id, title: grantTitle })
+      .from(accessGrants)
+      .innerJoin(services, eq(services.id, accessGrants.serviceId))
+      .leftJoin(accessLevels, eq(accessLevels.key, accessGrants.levelKey))
+      .where(inArray(accessGrants.id, grantIds));
+    for (const row of rows) titles.set(`access_grant:${row.id}`, row.title);
+  }
+  const accountIds = idsOf("admin_user");
+  if (accountIds.length > 0) {
+    const rows = await db.select({ id: adminUsers.id, name: adminName }).from(adminUsers).where(inArray(adminUsers.id, accountIds));
+    for (const row of rows) titles.set(`admin_user:${row.id}`, row.name);
+  }
   return titles;
 }

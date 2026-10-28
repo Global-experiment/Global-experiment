@@ -30,13 +30,12 @@ export const viewport: Viewport = {
 };
 
 /**
- * Sets `data-theme` before the first paint, from the same localStorage key
- * ThemeToggle writes to — otherwise the page would flash dark (the CSS
- * default) and then swap to a stored light preference. Part of the
- * temporary theme toggle (client feedback item 7); remove alongside
- * ThemeToggle.tsx and the `[data-theme="light"]` block in globals.css.
+ * Sets `data-theme` before the first paint from the appearance saved in
+ * Profile settings (shared/ui/appearance.ts mirrors it in localStorage):
+ * "light", or "system" on a light device. Dark is the default — otherwise
+ * the page would flash dark and then swap.
  */
-const THEME_INIT_SCRIPT = `try{if(localStorage.getItem("ge-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}`;
+const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem("ge-theme");if(t==="light"||(t==="system"&&window.matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.setAttribute("data-theme","light")}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

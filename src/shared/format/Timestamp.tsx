@@ -3,10 +3,26 @@
 import { useSyncExternalStore } from "react";
 import { DEFAULT_TIME_ZONE, formatElapsed, formatFullDateTime, formatReference, formatShortDateTime, type TimestampInput } from "./dates";
 
-/** The viewer's time zone: Europe/Zurich on the server and until hydration, then the browser's. */
-const subscribeNever = () => () => {};
-const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIME_ZONE;
-export const useViewerTimeZone = () => useSyncExternalStore(subscribeNever, browserTimeZone, () => DEFAULT_TIME_ZONE);
+/**
+ * The viewer's time zone: Europe/Zurich on the server and until hydration,
+ * then the one chosen in Profile settings (admin-desktop.pdf p18), else the
+ * browser's.
+ */
+let preferredTimeZone: string | null = null;
+const zoneListeners = new Set<() => void>();
+const subscribeZone = (listener: () => void) => {
+  zoneListeners.add(listener);
+  return () => zoneListeners.delete(listener);
+};
+const viewerTimeZone = () => preferredTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIME_ZONE;
+export const useViewerTimeZone = () => useSyncExternalStore(subscribeZone, viewerTimeZone, () => DEFAULT_TIME_ZONE);
+
+/** The admin's own time zone (null = the browser's); every Timestamp follows at once. */
+export function setPreferredTimeZone(zone: string | null) {
+  if (zone === preferredTimeZone) return;
+  preferredTimeZone = zone;
+  for (const listener of zoneListeners) listener();
+}
 
 /** A clock that ticks every 30 seconds while something on the page shows elapsed time. */
 const listeners = new Set<() => void>();

@@ -23,6 +23,9 @@ const ENTITY_LABELS: Record<string, string> = {
   expertise_item: "Expertise",
   setting: "Settings",
   import_run: "Imports",
+  service: "Services",
+  access_grant: "Permissions",
+  admin_user: "Accounts",
 };
 
 const SOURCE_LABELS: Record<string, string> = { admin: "Admin", import: "Notion import", stripe: "Stripe", system: "System" };
@@ -45,12 +48,18 @@ function recordHref(entity: HistoryListItem["entity"], action: string): string |
       return "/admin/expertise";
     case "import_run":
       return "/admin/imports";
+    case "service":
+      return `/admin/services/${entity.id}`;
+    case "access_grant":
+      return `/admin/permissions/${entity.id}`;
+    case "admin_user":
+      return `/admin/accounts/${entity.id}`;
     default:
       return undefined;
   }
 }
 
-const NOUN: Record<string, string> = { person: "person", organization: "organization", treasury_entry: "entry" };
+const NOUN: Record<string, string> = { person: "person", organization: "organization", treasury_entry: "entry", service: "service", access_grant: "permission", admin_user: "account" };
 
 /**
  * An event's ⋮ menu (client, 2026-10-23): Report issue and Send feedback,

@@ -14,6 +14,7 @@ import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
 import { AdminButton, chipInput, Popover } from "../ui/controls";
+import { useCan } from "../session";
 import { useToast } from "../ui/Toast";
 
 const DEFAULT_SORT: SortRule[] = [{ field: "name", direction: "asc" }];
@@ -97,6 +98,7 @@ function NewOrganizationControl() {
 }
 
 export function OrganizationsList() {
+  const canCreate = useCan("directory.create");
   const tree = useAdminData<ExpertiseTree>("/expertise/tree");
   const fields = useMemo<ListField[]>(
     () => [
@@ -139,8 +141,8 @@ export function OrganizationsList() {
         archivedView: true,
         actions: (
           <>
-            <NotionImportControl />
-            <NewOrganizationControl />
+            <NotionImportControl module="directory" />
+            {canCreate ? <NewOrganizationControl /> : null}
           </>
         ),
       }}

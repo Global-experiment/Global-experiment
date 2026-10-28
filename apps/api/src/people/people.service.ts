@@ -138,15 +138,17 @@ export class PeopleService {
   }
 
   /**
-   * Permanent delete (decision 12): owner only, the person's name typed
+   * Permanent delete (decision 12): directory.delete, the person's name typed
    * exactly, logged before the row goes. Refused while expenses name them
    * as recipient (the ledger keeps its recipients).
    */
   async delete(id: string, confirm: string, actor: AuditActor): Promise<void> {
-    if (actor.type !== "admin" || actor.role !== "owner") throw new ForbiddenError("Only the owner can delete permanently.");
+    // directory.delete is checked by the permission guard (the Rootadmin's, overview §3.1).
+    if (actor.type !== "admin") throw new ForbiddenError("Only an admin can delete permanently.");
     const person = await this.get(id);
     if (confirm.trim() !== person.name) throw new ValidationFailedError([{ path: "confirm", message: "Type the person's name exactly to confirm." }]);
     if (await this.repository.hasExpenses(id)) throw new ConflictError("This person is the recipient of expenses: unlink them first, or archive the person.");
+    if (await this.repository.hasGrants(id)) throw new ConflictError("This person has permissions: delete or reassign them first, or archive the person.");
     await this.db.transaction(async (tx) => {
       await this.audit.record(tx, {
         entityType: ENTITY,
