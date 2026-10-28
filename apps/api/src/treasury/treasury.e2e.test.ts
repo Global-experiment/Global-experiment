@@ -11,7 +11,7 @@ import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
 import { RevalidationService } from "../revalidation/revalidation.service.js";
 import { settings } from "../settings/settings.schema.js";
-import { signedInAdmin, type SignedInAdmin } from "../testing/admin-session.js";
+import { signedInAdmin, signedInAs, testPrincipal, type SignedInAdmin } from "../testing/admin-session.js";
 import { createTestApp, TEST_ORIGIN, type TestApp } from "../testing/test-app.js";
 import { TreasuryListQuery } from "./treasury-admin.contracts.js";
 import { TreasuryAdminService } from "./treasury-admin.service.js";
@@ -469,24 +469,25 @@ describe("Treasury API", () => {
         expect((await send("00000000-0000-4000-8000-000000000000", PDF, "a.pdf")).status).toBe(404);
       });
 
-      it("refuses anonymous visitors and admins without the owner role", async () => {
+      it("refuses anonymous visitors and roles without the Treasury permissions", async () => {
         const entry = await insert(donation({ occurredOn: "2026-10-03", grossAmount: 500 }));
         const uploaded = (await send(entry.id, PDF, "a.pdf").expect(201)).body;
         expect((await anonymous().get(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(401);
         expect((await anonymous().post(`/api/admin/treasury/${entry.id}/documents`).set("origin", TEST_ORIGIN).attach("file", PDF, "a.pdf")).status).toBe(401);
         expect((await anonymous().delete(`/api/admin/treasury/documents/${uploaded.id}`).set("origin", TEST_ORIGIN)).status).toBe(401);
 
-        const service = t.app.get(TreasuryAdminService);
-        const staff = { id: "00000000-0000-4000-8000-000000000002", email: "s@example.org", role: "admin", displayName: null, sessionId: "s" };
-        for (const call of [
-          () => service.download(uploaded.id, staff),
-          () => service.deleteDocument(uploaded.id, staff),
-          () => service.upload(entry.id, { originalname: "a.pdf", size: PDF.length, buffer: PDF }, staff),
-          () => service.publish(entry.id, false, staff),
-          () => service.update(entry.id, { internalNote: "x" }, staff),
-        ]) {
-          await expect(call()).rejects.toMatchObject({ code: "forbidden" });
-        }
+        // A Moderator has no Treasury permission at all; Compliance reads and reviews but never edits or publishes.
+        const moderator = await signedInAs(t, "moderation");
+        expect((await moderator.get(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(403);
+        expect((await moderator.delete(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(403);
+        expect((await moderator.upload(`/api/admin/treasury/${entry.id}/documents`, "file", PDF, "a.pdf")).status).toBe(403);
+        expect((await moderator.post(`/api/admin/treasury/${entry.id}/unpublish`)).status).toBe(403);
+        expect((await moderator.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" })).status).toBe(403);
+        const compliance = await signedInAs(t, "compliance");
+        await compliance.get(`/api/admin/treasury/documents/${uploaded.id}`).expect(200);
+        expect((await compliance.post(`/api/admin/treasury/${entry.id}/unpublish`)).status).toBe(403);
+        // The route allows review or update; the field decides: the internal note is treasury.update.
+        expect((await compliance.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" })).status).toBe(403);
       });
     });
   });
@@ -516,7 +517,7 @@ describe("Treasury API in production", () => {
     await production.db.delete(treasuryEntries);
     await production.db.delete(settings);
   });
-  const owner = { id: "00000000-0000-4000-8000-000000000001", email: "o@example.org", role: "owner", displayName: null, sessionId: "s" } as const;
+  const owner = testPrincipal();
   const showTestDonations = () => production.db.insert(settings).values({ key: "treasury.show_test_donations", value: true });
 
   it("hides Stripe test-mode entries", async () => {

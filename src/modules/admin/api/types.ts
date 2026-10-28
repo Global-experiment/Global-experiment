@@ -62,6 +62,8 @@ export interface Person {
   relevanceScore: number | null;
   contactChannels: VocabularyEntry[];
   expenses: ExpenseRef[];
+  /** Their access grants (Permissions, Figma p14). */
+  permissions: GrantRef[];
   /** The former "last follow-up" value, kept as-is (read-only). */
   lastFollowupAtLegacy: string | null;
   /** The next follow-up has passed, and neither Rejected nor Do not contact. */
@@ -224,12 +226,133 @@ export interface ImportStatus {
   activeJob: ImportJob | null;
 }
 
+/** The signed-in admin (GET /api/admin/auth/session), with what their role allows. */
 export interface AdminPrincipal {
   id: string;
   email: string;
   role: string;
+  /** "Rootadmin", "Treasury admin"… */
+  roleLabel: string;
   /** Null until set on /admin/profile. */
   displayName: string | null;
+  /** "GE-000001". */
+  accountId: string;
+  /** Null = the browser's. */
+  timeZone: string | null;
+  appearance: "system" | "light" | "dark";
+  hasPicture: boolean;
+  /** `module.action` keys (apps/api/src/access-control/permissions.ts). */
+  permissions: string[];
+}
+
+// ---- Accounts, profile (mirrors apps/api/src/accounts/accounts.contracts.ts) ----
+
+export interface GrantRef {
+  id: string;
+  service: string;
+  level: string | null;
+  status: VocabularyEntry | null;
+}
+
+/** "GitHub / admin" in lists (Figma p16–p17), "GitHub · admin" on records and in the history. */
+export const grantListLabel = (grant: Pick<GrantRef, "service" | "level">) => `${grant.service}${grant.level ? ` / ${grant.level}` : ""}`;
+export const grantChipLabel = (grant: Pick<GrantRef, "service" | "level">) => `${grant.service}${grant.level ? ` · ${grant.level}` : ""}`;
+
+export type AccountStatus = "active" | "invited" | "deactivated";
+
+export interface Account {
+  id: string;
+  accountId: string;
+  name: string;
+  displayName: string | null;
+  email: string;
+  role: VocabularyEntry;
+  status: AccountStatus;
+  note: string | null;
+  person: { id: string; name: string } | null;
+  expertise: { id: string; name: string }[];
+  permissions: GrantRef[];
+  hasPicture: boolean;
+  lastLoginAt: string | null;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  pendingLink: { purpose: "invite" | "reset"; expiresAt: string } | null;
+}
+
+export interface Profile extends Account {
+  timeZone: string | null;
+  appearance: "system" | "light" | "dark";
+  permissionKeys: string[];
+}
+
+export interface OneTimeLink {
+  link: string;
+  purpose: "invite" | "reset";
+  expiresAt: string;
+}
+
+/** The roles (overview §3.1), in the order the admin lists them. */
+export const ROLE_OPTIONS: readonly VocabularyEntry[] = [
+  { key: "owner", label: "Rootadmin" },
+  { key: "admin", label: "Admin" },
+  { key: "treasury", label: "Treasury admin" },
+  { key: "communication", label: "Communication admin" },
+  { key: "moderation", label: "Moderator" },
+  { key: "operations", label: "Operation admin" },
+  { key: "tech", label: "Tech admin" },
+  { key: "compliance", label: "Compliance" },
+];
+
+// ---- Services and access grants (mirrors apps/api/src/services/services.contracts.ts) ----
+
+export interface Ref {
+  id: string;
+  name: string;
+}
+
+export interface Service {
+  id: string;
+  serviceNumber: number;
+  name: string;
+  status: VocabularyEntry | null;
+  category: VocabularyEntry | null;
+  hostingModel: VocabularyEntry | null;
+  url: string | null;
+  description: string | null;
+  responsible: Ref | null;
+  permissions: GrantRef[];
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Grant {
+  id: string;
+  grantNumber: number;
+  name: string | null;
+  title: string;
+  person: Ref | null;
+  account: Ref | null;
+  service: Ref;
+  level: VocabularyEntry | null;
+  status: VocabularyEntry | null;
+  resourceScope: string | null;
+  grantedOn: string | null;
+  revokedOn: string | null;
+  expiresOn: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServicesOptions {
+  statuses: VocabularyEntry[];
+  categories: VocabularyEntry[];
+  hostingModels: VocabularyEntry[];
+  levels: VocabularyEntry[];
+  accessStatuses: VocabularyEntry[];
+  accounts: Ref[];
 }
 
 /** The user card's name: the display name, else the part of the email before "@". */
@@ -319,7 +442,7 @@ export interface TreasuryOptions {
 export const formatEntryNumber = (number: number) => `EXP-${number}`;
 
 /** The record types that have a detail page with a history. */
-export type HistoryEntityType = "person" | "organization" | "treasury_entry";
+export type HistoryEntityType = "person" | "organization" | "treasury_entry" | "service" | "access_grant" | "admin_user";
 
 export type HistoryFieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation";
 export type HistoryValue = string | number | boolean | null | { key: string; label: string } | { id: string; label: string }[];
@@ -349,7 +472,19 @@ export type HistoryAction =
   | "comment_added"
   | "comment_edited"
   | "comment_deleted"
-  | "viewed";
+  | "viewed"
+  // Access (on the person, the account and the service) and accounts (Delivery 2).
+  | "access_granted"
+  | "access_changed"
+  | "access_revoked"
+  | "invited"
+  | "activated"
+  | "link_created"
+  | "password_changed"
+  | "email_changed"
+  | "deactivated"
+  | "reactivated"
+  | "permission_denied";
 
 export interface HistoryItem {
   id: string;

@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { adminApi } from "../api/client";
 import { adminDisplayName, type AdminPrincipal } from "../api/types";
-import { ThemeToggle } from "@/shared/ui/ThemeToggle";
-import { activeModuleKey, ADMIN_MODULES, filterModules } from "../registry";
+import { setPreferredTimeZone } from "@/shared/format/Timestamp";
+import { applyAppearance } from "@/shared/ui/appearance";
+import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor } from "../registry";
+import { AdminSessionProvider } from "../session";
+import { AccountAvatar } from "./AccountAvatar";
 import { AdminIcon } from "./adminIcons";
 import { focusRing } from "./controls";
 import { rememberSidebar } from "./sidebarPrefs";
@@ -37,6 +40,10 @@ import { ToastProvider } from "./Toast";
  * each item's name as its tooltip, the search glyph re-opens the menu. The
  * choice is remembered in a cookie (sidebarPrefs.ts) so the server renders
  * the right width from the first paint.
+ *
+ * The signed-in account (Delivery 2): the menu lists only the modules its
+ * role can read, its appearance and time zone (Profile settings, p18)
+ * apply to every page, and the user card shows its picture.
  */
 export function AdminShell({ admin, initialCollapsed = false, children }: { admin: AdminPrincipal; initialCollapsed?: boolean; children: ReactNode }) {
   const pathname = usePathname();
@@ -44,9 +51,13 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const searchRef = useRef<HTMLInputElement>(null);
+  const menu = useMemo(() => modulesFor(ADMIN_MODULES, new Set(admin.permissions)), [admin.permissions]);
   // A collapsed rail shows every item: the search only filters the full menu.
-  const groups = filterModules(ADMIN_MODULES, collapsed ? "" : query);
-  const activeKey = activeModuleKey(ADMIN_MODULES, pathname);
+  const groups = filterModules(menu, collapsed ? "" : query);
+  const activeKey = activeModuleKey(menu, pathname);
+
+  useEffect(() => applyAppearance(admin.appearance), [admin.appearance]);
+  useEffect(() => setPreferredTimeZone(admin.timeZone), [admin.timeZone]);
 
   const setMenu = (next: boolean) => {
     setCollapsed(next);
@@ -54,6 +65,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
   };
 
   return (
+    <AdminSessionProvider admin={admin}>
     <ToastProvider sidebarWidth={collapsed ? 56 : 240}>
       <div
         data-admin
@@ -166,6 +178,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
         </div>
       </div>
     </ToastProvider>
+    </AdminSessionProvider>
   );
 }
 
@@ -198,13 +211,11 @@ function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: bool
           title={collapsed ? `${name} — profile` : "Profile"}
           className={`flex min-w-0 items-center gap-1 rounded-control text-body text-text-muted hover:text-text-primary ${collapsed ? "" : "flex-1"} ${focusRing}`}
         >
-          <span aria-hidden="true" className="size-6 shrink-0 rounded-full bg-avatar" />
+          <AccountAvatar id={admin.id} hasPicture={admin.hasPicture} />
           <span data-user-name className={collapsed ? "sr-only" : "truncate"}>
             {name}
           </span>
         </Link>
-        {/* Temporary light/dark preview (client, 2026-10-19), as on the public Home. */}
-        <ThemeToggle className="size-6 text-text-muted hover:text-text-primary" />
         <button
           type="button"
           onClick={logout}

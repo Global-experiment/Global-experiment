@@ -16,8 +16,9 @@ import { focusRing } from "../ui/controls";
  * in and the placeholder at 28px; two 40px buttons side by side
  * (secondary outlined, primary white) with 8px between them.
  *
- * "Forgot password?" has no flow yet (no email sending exists): it says
- * whom to ask, and stays a real button so the reset flow can plug in.
+ * "Forgot password?": no email is sent yet, so a Rootadmin makes a
+ * one-time reset link from the account (Accounts) and passes it on; the
+ * button says so.
  */
 export function LoginForm({ next }: { next?: string }) {
   const [email, setEmail] = useState("");
@@ -115,7 +116,7 @@ export function LoginForm({ next }: { next?: string }) {
               type="button"
               onClick={() => {
                 setError(null);
-                setNotice("Password resets aren't available yet. Please contact the administrator to reset your password.");
+                setNotice("Ask a Rootadmin for a password reset link. It works once, for 72 hours.");
               }}
               className={`flex h-10 cursor-pointer items-center gap-2 rounded-control px-2 text-body font-bold whitespace-nowrap ring-1 ring-line ${focusRing}`}
             >
@@ -137,7 +138,7 @@ export function LoginForm({ next }: { next?: string }) {
   );
 }
 
-function Field({ icon, children }: { icon: AdminIconName; children: React.ReactNode }) {
+export function Field({ icon, children }: { icon: AdminIconName; children: React.ReactNode }) {
   return (
     <div className="flex h-10 items-center gap-1 rounded-control pr-1 pl-2 ring-1 ring-line focus-within:ring-text-primary">
       <AdminIcon name={icon} className="text-text-muted" />

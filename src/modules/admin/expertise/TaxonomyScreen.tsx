@@ -112,7 +112,7 @@ export function TaxonomyScreen({ level }: { level: TaxonomyLevel }) {
             </Link>
           </>
         ),
-        actions: <NotionImportControl />,
+        actions: <NotionImportControl module="taxonomy" />,
       }}
     />
   );

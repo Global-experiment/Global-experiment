@@ -7,7 +7,8 @@ import { DATABASE, type Database } from "../common/database/database.module.js";
 import { ForbiddenError, NotFoundError } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
 import { SettingsService } from "../settings/settings.service.js";
-import { auditEvents, recordComments, recordViews } from "./audit.schema.js";
+import { AUDITED_ENTITIES, auditEvents, recordComments, recordViews } from "./audit.schema.js";
+import { canReadEntity } from "../access-control/permissions.js";
 import { entityTitles, titleOfLabel } from "./entity-labels.js";
 import type { AuditActor, AuditChange, AuditEventInput } from "./audit.types.js";
 import { visibleChanges, type VisibleChange } from "./record-fields.js";
@@ -78,7 +79,7 @@ export interface HistoryListItemDto extends HistoryItemDto {
 }
 
 /** Comments are supported on these record types (they have detail pages). */
-export const COMMENTABLE = ["person", "organization", "treasury_entry"] as const;
+export const COMMENTABLE = ["person", "organization", "treasury_entry", "service", "access_grant", "admin_user"] as const;
 
 const FEED_LIMIT = 300;
 
@@ -102,6 +103,22 @@ export class AuditService {
 
   async record(tx: Executor, input: AuditEventInput): Promise<void> {
     await recordAuditEvent(tx, input, this.clock());
+  }
+
+  /** A refused request (overview §3.1): logged on the account that tried, with the permission it lacked. */
+  async recordDenied(admin: AdminPrincipal, permission: string, route: string): Promise<void> {
+    await recordAuditEvent(
+      this.db,
+      {
+        entityType: "admin_user",
+        entityId: admin.id,
+        action: "permission_denied",
+        actor: actorFor(admin),
+        source: "admin",
+        meta: { label: admin.displayName ?? admin.email.split("@")[0]!, permission, route },
+      },
+      this.clock(),
+    );
   }
 
   /**
@@ -190,6 +207,11 @@ export class AuditService {
   async list(query: HistoryListQuery, viewer: AdminPrincipal): Promise<Page<HistoryListItemDto>> {
     const conditions: (SQL | undefined)[] = [];
     if (query.entityType) conditions.push(eq(auditEvents.entityType, query.entityType));
+    // Without history.read, only the record types of the modules the role can read (overview §3.1).
+    if (!viewer.permissions.has("history.read")) {
+      const readable = AUDITED_ENTITIES.filter((type) => canReadEntity(viewer.permissions, type));
+      conditions.push(readable.length > 0 ? inArray(auditEvents.entityType, [...readable]) : sql`false`);
+    }
     if (query.actor === "automation") conditions.push(eq(auditEvents.actorType, "automation"));
     else if (query.actor) conditions.push(eq(auditEvents.actorId, query.actor));
     if (query.source) conditions.push(eq(auditEvents.source, query.source));

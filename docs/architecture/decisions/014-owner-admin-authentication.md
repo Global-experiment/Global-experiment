@@ -8,6 +8,10 @@ authentication and no third-party auth provider for now; the
 implementation stays isolated in `apps/api/src/auth` so either can be
 added if explicitly requested later.
 
+Amended by 015 (2026-10-28): several Rootadmins and team roles with
+permissions, invitations and password resets by one-time link. The rest
+of this record (sessions, hashing, CSRF, rate limits) is unchanged.
+
 ## Context
 
 v0.1 has exactly one admin (the owner, Candide): no participant accounts,

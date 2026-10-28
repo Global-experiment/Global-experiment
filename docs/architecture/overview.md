@@ -238,51 +238,72 @@ the API (Step 5); and a minimal Contracting module (contracts CON-n, Step 8).
 
 ### 3.1 Roles and permissions
 
-v0.1 has one owner today ("Rootadmin" in the Figma History panel). The
-sidebar's **Accounts** page implies more admins, and the designs name
-team roles — Rootadmin, Superadmin, Moderator, Treasury admin, Operation
-admin, Tech admin. Proposal — roles follow the experiment's six **teams**
-(already a lookup, `teams`, from the taxonomy), plus the owner and a
-general admin. "Superadmin" (a senior level within a team, which validates
-applications and treasury transfers in the v1.0 designs) is a v1.0 team
-membership level, not a v0.1 role:
+Built in Delivery 2 (migration 0012). Roles follow the experiment's
+**teams**, plus the Rootadmin and a general admin. "Superadmin" (a senior
+level within a team, which validates applications and treasury transfers
+in the v1.0 designs) is a v1.0 team-membership level, not a v0.1 role.
+There can be **several Rootadmins** (admin p15 shows two), never none.
 
-| Role | Who | Notes |
+| Role | Label | Notes |
 |---|---|---|
-| `owner` | Root admin (Candide) | Everything, including accounts and roles. Exactly one (existing partial unique index). |
-| `admin` | General administrators | Everything except accounts/roles and destructive operations. |
-| `treasury` | Treasury team | Treasury, Organizations/People read, Services read. |
-| `communication` | Communication team | CMS, Waitlist, Messages, Emails read. |
-| `moderation` | Moderation team | Feedback and issues, Messages. |
-| `operations` | Operations team | People, Organizations, Services and access grants. |
-| `tech` | Tech team | Technical dashboard, Imports, Services, History read. |
-| `compliance` | Compliance team | Read access everywhere, History, Treasury review. |
+| `owner` | Rootadmin | Everything, including accounts, roles and settings. Several allowed; the last active one can't be deactivated, demoted or deleted (service check plus a deferred constraint trigger). |
+| `admin` | Admin | Everything except accounts, settings and permanent deletes. |
+| `treasury` | Treasury admin | Treasury (including publish and review), read elsewhere. |
+| `communication` | Communication admin | Home and Documentation, Waitlist, Messages. |
+| `moderation` | Moderator | Feedbacks and issues, Messages. |
+| `operations` | Operation admin | People, Organizations, Services and Permissions. |
+| `tech` | Tech admin | Services and Permissions, Taxonomy import, Imports, History. |
+| `compliance` | Compliance | Read access everywhere, Treasury review. |
 
 Permissions are `module.action` keys stored as rows (`admin_permissions`),
-granted to roles in `admin_role_permissions` — so a team's rights change
-without a code release, and v1.0 can attach the same keys to team
-memberships instead of roles. Actions: `read`, `create`, `update`,
-`publish` (makes something public), `delete`, `import`, `manage`
-(settings, vocabularies, accounts).
+granted to roles in `admin_role_permissions`, so a team's rights can change
+without a release, and v1.0 can attach the same keys to team memberships.
+The source is `apps/api/src/access-control/permissions.ts`; migration 0012
+seeds it and a test keeps the two equal. The table below is generated from
+that file:
 
-| Module \ role | owner | admin | treasury | communication | moderation | operations | tech | compliance |
+| Module \ role | Rootadmin | Admin | Treasury admin | Communication admin | Moderator | Operation admin | Tech admin | Compliance |
 |---|---|---|---|---|---|---|---|---|
-| People, Organizations | all | read, create, update, import | read | read | read | read, create, update | read | read |
-| Taxonomy | all | read, import | read | read | read | read | read, import | read |
-| Treasury | all | read, create, update | read, create, update, **publish**, import | read | — | read | read | read, update (review) |
-| CMS | all | all but manage | — | read, create, update, **publish** | read | — | read | read |
-| Feedback and issues | all | read, update | — | read | read, update, **publish** | — | read | read |
-| Waitlist | all | read, update | — | read, update | — | read | — | read |
-| Messages, Emails | all | read, update | read (donations@) | read, update | read, update | read | read | read |
-| Services, Access grants | all | read, create, update | read | — | — | read, create, update | read, create, update | read |
-| Accounts and roles | **manage** | read | — | — | — | — | — | read |
-| History | all | read | read (own module) | read (own module) | read (own module) | read (own module) | read | read |
-| Technical dashboard, Imports | all | read, import | — | — | — | — | read, import | read |
+| People and Organizations | all | read, create, update, import | read | read | read | read, create, update | read | read |
+| Expertise, Fields and Domains | all | read, import | read | read | read | read | read, import | read |
+| Treasury | all | read, create, update, review | read, create, update, review, publish, import | read | — | read | read | read, review |
+| Home and Documentation | all | all | — | read, create, update, publish | read | — | read | read |
+| Feedbacks and issues | all | read, update | — | read | all | — | read | read |
+| Waitlist | all | all | — | all | — | read | — | read |
+| Messages and Emails | all | all | — | all | all | read | read | read |
+| Services | all | read, create, update | read | — | — | read, create, update | read, create, update | read |
+| Permissions | all | read, create, update | read | — | — | read, create, update | read, create, update | read |
+| Accounts and roles | all | read | — | — | — | — | — | read |
+| History | read | read | — | — | — | — | read | read |
+| Imports | read | read | read | — | — | — | read | read |
+| Settings | manage | — | — | — | — | — | — | — |
 
-The API enforces this with one guard (`@Requires('treasury.publish')`),
-the admin hides what a role can't do, and every denied attempt is a 403
-with an audit entry. Whether v0.1 needs more than the owner at all is
-**Q8**; the schema is ready either way.
+"All" is every action the module has. Without `history.read`, Monitoring →
+History and each record's history show the events of the modules the role
+can read. Running an import needs `<module>.import` as well.
+
+**Enforcement.** One global guard (`PermissionGuard`, after the session
+guard) reads each route's declaration — `@Requires(...)`,
+`@RequiresAny(...)`, `@RequiresForParam(...)` for routes whose module is a
+URL parameter (history, imports), or `@SignedIn()` (own profile, sign-out).
+A route that declares nothing is refused (fail closed); a test walks every
+route and checks it against a reviewed table and against every role. A
+denied attempt answers 403 "Your role doesn't allow this." and is recorded
+as a `permission_denied` event on the account. The admin hides what the
+role can't do: menu entries, New / Import / Archive / Delete / Publish /
+Review actions, and records open view-only. The UI never calls an endpoint
+the role can't use, so denials in the log are real attempts.
+
+**Accounts.** "New account" creates an invited account and a one-time
+link (72 h, single use, a newer one cancels it) that the Rootadmin copies
+and sends privately (no email yet, decision 13); the invitee sets their
+own password on `/admin/welcome`. Password reset links work the same way
+(`/admin/reset-password`), made from the account. The token travels in the
+URL fragment (never in a request line, so never in a log) and only its
+SHA-256 is stored. Passwords: 12–128 characters; under 20, three of
+lowercase, uppercase, digits, symbols; not the email or the name; not one
+repeated character; not a common password. Changing the email, the
+password or deactivating one's own account asks for the current password.
 
 ### 3.2 Audit log (History)
 

@@ -7,6 +7,7 @@ import type { ExpertiseTree, Organization, Page, PeopleOptions, Person } from ".
 import { useAdminData } from "../api/useAdminData";
 import { AdminListPage } from "../table/AdminListPage";
 import { AdminButton, chipInput, Popover } from "../ui/controls";
+import { useCan } from "../session";
 import { useToast } from "../ui/Toast";
 import { NotionImportControl } from "./NotionImportControl";
 import { PEOPLE_COLUMNS, PEOPLE_DEFAULT_SORT, peopleFields } from "./peopleTable";
@@ -69,6 +70,7 @@ function NewPersonControl() {
 
 /** /admin/people — PostgreSQL → NestJS → this table; nothing here is hardcoded data. */
 export function PeopleList() {
+  const canCreate = useCan("directory.create");
   const options = useAdminData<PeopleOptions>("/people/options");
   const organizations = useAdminData<Page<Organization>>("/organizations?pageSize=100&sort=name:asc");
   const tree = useAdminData<ExpertiseTree>("/expertise/tree");
@@ -92,8 +94,8 @@ export function PeopleList() {
         archivedView: true,
         actions: (
           <>
-            <NotionImportControl />
-            <NewPersonControl />
+            <NotionImportControl module="directory" />
+            {canCreate ? <NewPersonControl /> : null}
           </>
         ),
       }}

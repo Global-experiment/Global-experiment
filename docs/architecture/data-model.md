@@ -248,11 +248,11 @@ Every module's own diagram and columns follow.
 | Team (items) | — | — | `expertise_teams` → `teams` | |
 | Full path (items) | — | — | — (computed) | Domain > Field > Item, from the joins. |
 
-### 3.5 Relationship limits as database rules (planned: 0011)
+### 3.5 Relationship limits as database rules (planned: 0014)
 
 Today the 10 expertise / 5 organizations limits are enforced by the API
-and the importer (contracts, link endpoints, importer cap). Migration 0011
-(module 2) adds a **deferrable constraint trigger** per link table so no code path —
+and the importer (contracts, link endpoints, importer cap). Migration 0014
+(platform) adds a **deferrable constraint trigger** per link table so no code path —
 present or future, including a manual SQL fix — can exceed them:
 
 | Link table | Owner column | Limit |
@@ -782,69 +782,90 @@ erDiagram
   email_outbox |o--o| mail_messages : "sent as"
 ```
 
-## 9. Services and access grants
+## 9. Services and access grants (built: migration 0013)
 
-Notion "Services" (7 properties, 14 demo rows) and "Access grants" (14
-properties, 20 demo rows).
+Admin p16 (Services) and p17 (Permissions). Both start empty and are
+edited in the admin (decision 6); a Notion importer for them comes later.
+No demo rows are created.
 
 ### 9.1 `services`
 
-| Column | Type | Rules | Notion |
-|---|---|---|---|
-| `id` | uuid PK | | |
-| `service_number` | integer identity | `SVC-n` | Service ID |
-| `notion_page_id` | uuid null | Unique | |
-| `name` | text | 1–200, unique (case-insensitive) | Name |
-| `url` | text null | ≤ 2048, `https://` | URL |
-| `description` | text null | ≤ 5000 | Description |
-| `status` | text | `active`, `retired` (CHECK) | Status |
-| `created_at`, `updated_at` | timestamptz | | Created |
+| Column | Type | Rules |
+|---|---|---|
+| `id` | uuid PK | |
+| `service_number` | integer identity | Unique; "Service ID" |
+| `name` | text | 1–200 (trimmed) |
+| `status_key` | text null → `service_statuses` | `active` Active, `needs_confirmation` Needs confirmation, `planned` Planned, `retired` Retired |
+| `category_key` | text null → `service_categories` | Administration, AI, Banking, Data platform, Design, Documentation, Domains and DNS, Hosting, Payments, Source code |
+| `hosting_model_key` | text null → `service_hosting_models` | `external_service`, `internal_application`, `self_hosted` |
+| `url` | text null | ≤ 2048, a web link |
+| `description` | text null | ≤ 5000 |
+| `responsible_admin_id` | uuid null → admin_users `set null` | "Responsible account" (decision 5) |
+| `archived_at`, `archived_by_id` | | Archive instead of delete (decision 12) |
+| `created_at`, `updated_at` | timestamptz | |
 
-### 9.2 `access_grants`
+Permanent delete (`services.delete`, the name typed) is refused while a
+permission names the service.
 
-| Column | Type | Rules | Notion |
-|---|---|---|---|
-| `id` | uuid PK | | |
-| `grant_number` | integer identity | `ACC-n` | Grant ID |
-| `notion_page_id` | uuid null | Unique | |
-| `name` | text | 1–200 (label) | Name |
-| `person_id` | uuid → people `restrict` | Required | Person |
-| `service_id` | uuid null → services `restrict` | Empty in 6/20 Notion rows | Service |
-| `account_identifier` | text null | Email shape, ≤ 320, *private* | Account identifier |
-| `permission_level` | text null | ≤ 100, free text until Q10 (then a lookup) | Permission level |
-| `resource_scope` | text null | ≤ 500 | Resource scope |
-| `status_key` | text → `access_grant_statuses` | | Status |
-| `granted_on`, `revoked_on`, `expires_on` | date null | `revoked_on` set ⇔ revoked; `expires_on ≥ granted_on`; `expired` needs `expires_on` (CHECKs) | Granted on, Revoked on, Expires on |
-| `notes` | text null | ≤ 5000, *private* | Notes |
-| `created_at`, `updated_at` | timestamptz | | Created, Updated |
+### 9.2 `access_grants` (Permissions)
 
-`access_grant_statuses` lookup: `planned` Planned, `invited` Invited,
-`active` Active, `revoked` Revoked, `expired` Expired. The People list's
-"Access grant" column and the record's "Access grant" chips (Figma p12:
-GitHub, CloudFlare, Notion, Hetzner, …) are the person's active grants'
-service names.
+| Column | Type | Rules |
+|---|---|---|
+| `id` | uuid PK | |
+| `grant_number` | integer identity | Unique; "ID" (`#n` when typed to confirm a delete) |
+| `name` | text null | 1–200; empty = "`<service> / <level>`" |
+| `person_id` | uuid null → people `restrict` | Who holds the access (decision 5); a person with permissions can't be deleted |
+| `admin_user_id` | uuid null → admin_users `set null` | Their admin account, when they have one |
+| `service_id` | uuid → services `restrict` | Required |
+| `level_key` | text null → `access_levels` | `owner`, `rootadmin`, `superadmin`, `admin`, `write`, `read` (labels lowercase, as in Figma) |
+| `status_key` | text null → `access_statuses` | `planned`, `invited`, `active`, `needs_confirmation`, `revoked`, `expired` |
+| `resource_scope` | text null | ≤ 1000 |
+| `granted_on`, `revoked_on`, `expires_on` | date null | Revoked and Expires not before Granted (CHECKs) |
+| `archived_at`, `archived_by_id` | | Archive instead of delete |
+| `created_at`, `updated_at` | timestamptz | |
+
+Views: **Active** = status Active; **Review queue** (Permissions) = needs
+confirmation, planned or invited, or expiring within 30 days; **Access
+review** (Services) = the service needs confirmation, or one of its
+permissions is in the review queue.
+
+**History of access.** Each grant has its own history (created, updated,
+archived…). Granting, changing and revoking access is also recorded — as
+`access_granted`, `access_changed`, `access_revoked`, with the
+"Service · level" chip before and after — on the **person**, the **admin
+account** and the **service** it concerns. A status becoming Revoked or
+Expired, a deletion, or the grant moving to another person counts as
+revoked for the one who loses it.
+
+A person's permissions are Permissions data: a role without `access.read`
+gets them empty on people (the API strips them).
 
 ```mermaid
 erDiagram
-  people ||--o{ access_grants : holds
-  services |o--o{ access_grants : grants
-  access_grants }o--|| access_grant_statuses : status
+  people |o--o{ access_grants : holds
+  admin_users |o--o{ access_grants : "signs in as"
+  services ||--o{ access_grants : grants
+  admin_users |o--o{ services : "responsible for"
 ```
 
-## 10. Accounts and roles
-
-Built: `admin_users` (email, password hash, role, display name, last login)
-and `admin_sessions` (hashed tokens, expiry, revocation). Proposed
-(migration 0012, Q8):
+## 10. Accounts and roles (built: migration 0012)
 
 | Table | Columns | Rules |
 |---|---|---|
-| `admin_roles` | key, label, sort_order | `owner` (Rootadmin), `admin`, `treasury`, `communication`, `moderation`, `operations`, `tech`, `compliance` |
-| `admin_permissions` | key (`module.action`), module, action, label | `action` ∈ read, create, update, publish, delete, import, manage |
-| `admin_role_permissions` | role_key, permission_key, PK both | The matrix of overview §3.1 |
-| `admin_users` (changes) | `role` → admin_roles (replaces the `in ('owner')` CHECK); `person_id` → people `set null` (an admin who is also in the directory); `deactivated_at` | Partial unique index "one owner" kept |
-| `admin_invitations` | id, email, role_key, token_hash, invited_by, expires_at, accepted_at | Only if Q8 adds admins |
-| `admin_password_resets` | id, admin_user_id, token_hash, expires_at, used_at | Single use, 1 h |
+| `admin_roles` | key, label, sort_order | `owner` Rootadmin, `admin` Admin, `treasury` Treasury admin, `communication` Communication admin, `moderation` Moderator, `operations` Operation admin, `tech` Tech admin, `compliance` Compliance |
+| `admin_permissions` | key (`module.action`), module, action, description | Seeded from `apps/api/src/access-control/permissions.ts` (43 keys) |
+| `admin_role_permissions` | role_key, permission_key (PK both) | The matrix of overview §3.1; a test checks the seed against permissions.ts |
+| `admin_users` | adds `account_number` (identity, "GE-000001"), `role` → admin_roles, `status` (active, invited, deactivated), `password_hash` (null only while invited), `picture_key` and `picture_type` (PNG, JPEG, WebP), `time_zone` (IANA; null = the browser's), `appearance` (system, light, dark), `note`, `person_id` → people (unique, `set null`), `invited_by_id`, `deactivated_at` | Several Rootadmins allowed: the "one owner" index is gone |
+| `admin_tokens` | id, admin_user_id, purpose (invite, reset), token_hash (unique), expires_at, used_at, created_by_id | One-time links: 72 h, single use; a new link expires the older ones; only the SHA-256 of the token is stored |
+
+**Never without a Rootadmin** (decision 14): a deferred constraint trigger
+(`admin_users_keep_a_rootadmin`) refuses, at commit, any change or
+deletion of an active Rootadmin that leaves none; the API checks first and
+answers with a sentence. Accounts are deactivated, never deleted.
+
+**The existing owner**: 0012 seeds the roles and permissions before the
+role foreign key, so the existing owner row becomes account GE-000001,
+active, Rootadmin, with its password and sessions unchanged.
 
 v1.0 participant accounts are a **separate** `accounts` table (overview §7):
 staff access and participation are different concerns with different rules.
@@ -951,13 +972,14 @@ files; data steps and triggers are added to the generated file by hand.
 | **0008** | `treasury_sample_entries` | Treasury (built) | `treasury_entries.sample` (sample entries before go-live) |
 | **0009** | `audit_history` | Platform (built, detail page) | `audit_events` (+ append-only trigger), `record_comments`, `record_views` (§11) |
 | **0010** | `record_fields_and_archive` | People, Organizations, Treasury (built, detail page) | `contact_channels` (seeded: Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix, Workana) and `person_contact_channels`; people `do_not_contact`, `relevance_score`, `ai_relevance_score` (0–10), `other_socials`, `first_contact_on`, `last_contact_on`, `next_followup_at` (timestamptz: replaces `next_followup_on`, a date becoming 09:00 Europe/Zurich); `archived_at` / `archived_by_id` on people, organizations and Treasury entries; the public Treasury view leaves archived entries out |
-| **0011** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
-| **0012** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
-| **0013** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
-| **0014** | `waitlist` | Waitlist | `waitlist_entries` |
-| **0015** | `services_access` | Services | `services`, `access_grant_statuses`, `access_grants` |
-| **0016** | `admin_roles` | Accounts and roles | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_users` changes, invitations and password resets (per Q8) |
-| **0017** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| **0011** | `link_order_and_description` | People, Organizations (built, detail-page review) | People and organizations `personal_note` → `description`; `position` on contact channels, organizations and expertise links (backfilled to the order shown) |
+| **0012** | `accounts_and_roles` | Accounts and roles (built, Delivery 2) | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_tokens`; `admin_users` account number, status, picture, time zone, appearance, note, person; the keep-a-Rootadmin trigger (§10) |
+| **0013** | `services_and_access` | Services and Permissions (built, Delivery 2) | Lookups (statuses, categories, hosting models, access levels, access statuses), `services`, `access_grants` (§9) |
+| **0014** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
+| **0015** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
+| **0016** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
+| **0017** | `waitlist` | Waitlist | `waitlist_entries` |
+| **0018** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
 
 Numbers follow the build order (roadmap §2); if a module moves, its
 migration takes the next free number at that time — numbers are never

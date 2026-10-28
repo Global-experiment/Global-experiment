@@ -321,14 +321,12 @@ test("light and dark: the record with an error and an open picker passes axe in 
   await page.locator("#person-email").fill("broken@");
   await page.locator("#person-email").press("Tab");
   await axe();
-  const toggle = page.locator("#admin-sidebar").getByRole("button", { name: "Switch to light preview" });
-  await toggle.click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  // What Appearance → Light applies (Profile settings, p18).
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
   await expect(page.locator("#person-email-error")).toBeVisible();
   await page.screenshot({ path: join(SHOTS, "review-person-light-1440.png") });
   await axe();
-  await page.locator("#admin-sidebar").getByRole("button", { name: /Switch to dark/ }).click();
-  await expect(page.locator("html")).not.toHaveAttribute("data-theme", "light");
+  await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
   await page.getByRole("button", { name: "More options" }).click();
   await page.getByRole("button", { name: "Discard changes" }).click();
 });

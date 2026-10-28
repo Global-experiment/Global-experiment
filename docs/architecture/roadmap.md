@@ -65,6 +65,9 @@ than one module worth delegating; until then the owner is the only admin
 
 ## 3. Modules in detail
 
+Migration numbers below are the original plan's; data-model §14 has the
+numbers as built and the current plan.
+
 ### 1. Donations end-to-end (due 24 Oct, 40 h)
 
 - **Scope:** migration 0006; Stripe Checkout (hosted) for one-off
@@ -200,6 +203,10 @@ export); unsubscribe link.
 
 ### 7. Services and access grants (14 h)
 
+**Built in Delivery 2 (migration 0013)**: Services (p16) and Permissions
+(p17) lists and records, their views, and granted / changed / revoked
+access in the history of the person, the account and the service. The
+Notion importer is still to come. Original plan:
 Migration 0012; Services and Access grants as framework configs (status
 pills Planned / Invited / Active / Revoked / Expired, dates, person,
 service; Notion records read-only for synced fields); the People "Access
@@ -208,6 +215,8 @@ grant" column and record row; Notion importer (14 + 20 demo rows today →
 
 ### 8. Accounts and roles (26 h)
 
+**Built in Delivery 2 (migration 0012)**, with one-time links instead of
+emails (decision 13) and Profile settings (p18). Original plan:
 Migration 0013; roles and permissions (overview §3.1) with one API guard;
 Accounts page (list, invite, change role, deactivate); invitation and
 password-reset emails; audit of every permission change.

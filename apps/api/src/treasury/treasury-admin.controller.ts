@@ -27,12 +27,14 @@ import {
 } from "./treasury-admin.contracts.js";
 import { TreasuryAdminService, type UploadedFile } from "./treasury-admin.service.js";
 import { DOCUMENT_MAX_BYTES } from "./treasury-documents.schema.js";
+import { Requires, RequiresAny } from "../access-control/requires.js";
 
 const IdParam = new ZodValidationPipe(z.uuid("Invalid id."));
 
 /**
- * /api/admin/treasury — behind the global admin guard; changes and documents
- * are owner-only (checked in the service). There is no create or delete of
+ * /api/admin/treasury — each route requires its `treasury.*` permission
+ * (PermissionGuard; the service also checks treasury.update and
+ * treasury.review per field). There is no create or delete of
  * entries: expenses come from Notion, donations from Stripe (data ownership).
  */
 @Controller("admin/treasury")
@@ -40,17 +42,20 @@ export class TreasuryAdminController {
   constructor(private readonly treasury: TreasuryAdminService) {}
 
   @Get()
+  @Requires("treasury.read")
   list(@Query(new ZodValidationPipe(TreasuryListQuery)) query: TreasuryListQuery) {
     return this.treasury.list(query);
   }
 
   /** Expense types, review statuses, currencies and the Treasury settings, for filters and the record page. */
   @Get("options")
+  @Requires("treasury.read")
   options() {
     return this.treasury.options();
   }
 
   @Get("documents/:documentId")
+  @Requires("treasury.read")
   async download(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest, @Res({ passthrough: true }) response: Response) {
     const file = await this.treasury.download(documentId, request.admin);
     response.set({
@@ -65,18 +70,21 @@ export class TreasuryAdminController {
   }
 
   @Delete("documents/:documentId")
+  @Requires("treasury.update")
   @HttpCode(204)
   deleteDocument(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest) {
     return this.treasury.deleteDocument(documentId, request.admin);
   }
 
   @Get(":id")
+  @Requires("treasury.read")
   get(@Param("id", IdParam) id: string) {
     return this.treasury.get(id);
   }
 
   /** Only the internal note, and only on native entries (Notion-managed → 409 managed_in_notion). */
   @Patch(":id")
+  @RequiresAny("treasury.update", "treasury.review")
   update(
     @Param("id", IdParam) id: string,
     @Body(new ZodValidationPipe(UpdateTreasuryEntryRequest)) body: UpdateTreasuryEntryRequest,
@@ -86,18 +94,21 @@ export class TreasuryAdminController {
   }
 
   @Post(":id/publish")
+  @Requires("treasury.publish")
   @HttpCode(200)
   publish(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.publish(id, true, request.admin);
   }
 
   @Post(":id/unpublish")
+  @Requires("treasury.publish")
   @HttpCode(200)
   unpublish(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.publish(id, false, request.admin);
   }
 
   @Post(":id/review")
+  @Requires("treasury.review")
   @HttpCode(200)
   review(
     @Param("id", IdParam) id: string,
@@ -108,12 +119,14 @@ export class TreasuryAdminController {
   }
 
   @Post(":id/archive")
+  @Requires("treasury.update")
   @HttpCode(200)
   archive(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.setArchived(id, true, request.admin);
   }
 
   @Post(":id/restore")
+  @Requires("treasury.update")
   @HttpCode(200)
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.setArchived(id, false, request.admin);
@@ -121,18 +134,21 @@ export class TreasuryAdminController {
 
   /** Permanent delete: owner only, manual entries only, with the entry number typed in `confirm`. */
   @Delete(":id")
+  @Requires("treasury.delete")
   @HttpCode(204)
   remove(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(DeleteTreasuryEntryRequest)) body: DeleteTreasuryEntryRequest, @Req() request: AdminRequest) {
     return this.treasury.delete(id, body.confirm, request.admin);
   }
 
   @Get(":id/documents")
+  @Requires("treasury.read")
   documents(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.documents(id, request.admin);
   }
 
   /** multipart/form-data, one `file` field; held in memory (multer's default, ≤ 20 MB) and type-checked from its bytes. */
   @Post(":id/documents")
+  @Requires("treasury.update")
   @UseInterceptors(
     FileInterceptor("file", { limits: { fileSize: DOCUMENT_MAX_BYTES, files: 1, fields: 0, parts: 2 } }),
   )

@@ -40,6 +40,9 @@ export interface RecordActions {
  * No autosave: nothing is saved until "Submit changes", which then returns
  * to the previous page with a toast. "Discard changes" restores the record;
  * leaving with unsaved changes asks first (useLeaveGuard).
+ *
+ * `readOnly` (a role that can read but not edit, Delivery 2): the panel
+ * keeps the counters and the history, without the edit actions.
  */
 export function RecordPage({
   backHref,
@@ -51,6 +54,8 @@ export function RecordPage({
   panelExtra,
   children,
   recordLink,
+  readOnly = false,
+  revision,
 }: {
   backHref: string;
   backLabel: string;
@@ -63,6 +68,10 @@ export function RecordPage({
   panelExtra?: ReactNode;
   children: ReactNode;
   recordLink?: (id: string) => string;
+  /** Shown without edit actions (the fields should be read-only too). */
+  readOnly?: boolean;
+  /** The record's version (e.g. its updatedAt): when it changes, the history reloads (a publish, a new link…). */
+  revision?: string;
 }) {
   useAdminTitle(title);
   const router = useRouter();
@@ -75,10 +84,17 @@ export function RecordPage({
   useEffect(() => {
     if (archived !== undefined) reload();
   }, [archived, reload]);
+  // …and so is any other change the page made outside "Submit changes".
+  const seenRevision = useRef(revision);
+  useEffect(() => {
+    if (revision === seenRevision.current) return;
+    seenRevision.current = revision;
+    reload();
+  }, [revision, reload]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!actions || !actions.dirty || actions.busy) return;
+    if (readOnly || !actions || !actions.dirty || actions.busy) return;
     if (await actions.submit()) {
       guard.release();
       // Back to where the visitor came from (the list, a linked record…), or the list.
@@ -96,17 +112,34 @@ export function RecordPage({
             <AdminIcon name="arrow_back" />
           </Link>
           {/* Loading (no actions yet): an empty heading, not "Untitled". */}
-          <h1 className="min-w-0 truncate text-body font-bold">{title || (actions ? "Untitled" : "")}</h1>
+          <h1 className="min-w-0 truncate text-body font-bold">{title || (actions || readOnly ? "Untitled" : "")}</h1>
           {actions?.archived ? <span className="rounded-full px-2 text-meta text-text-muted ring-1 ring-line">Archived</span> : null}
         </header>
         <div data-record-main className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-6">
-          <div className="flex flex-col gap-4">{children}</div>
+          {readOnly ? (
+            // Every field inert at once; links (linked records, chips) still open.
+            <fieldset disabled className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+              {children}
+            </fieldset>
+          ) : (
+            <div className="flex flex-col gap-4">{children}</div>
+          )}
         </div>
       </div>
       <>
-        {actions ? (
+        {actions || (readOnly && entity) ? (
           <aside data-record-panel aria-label="Record actions and history" className="flex w-[clamp(280px,calc((100vw-240px)/3),400px)] shrink-0 flex-col shadow-[-1px_0_0_0_var(--color-line)]">
-            <RecordPanelTop actions={actions} history={entity ? history : undefined} panelExtra={panelExtra} />
+            {readOnly ? (
+              <div data-record-panel-top className="shrink-0 px-2 pt-2">
+                <p className="flex h-8 items-center gap-1 text-body text-text-muted">
+                  <AdminIcon name="lock" />
+                  View only — your role can&rsquo;t edit this {entityNoun}.
+                </p>
+                {entity ? <Counters history={history} /> : null}
+              </div>
+            ) : (
+              <RecordPanelTop actions={actions!} history={entity ? history : undefined} panelExtra={panelExtra} />
+            )}
             {entity ? <HistoryList entity={entity} history={history} entityNoun={entityNoun} recordLink={recordLink} /> : null}
           </aside>
         ) : null}

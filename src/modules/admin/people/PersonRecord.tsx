@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatPersonNumber, type Organization, type Page, type PeopleOptions, type Person, type PersonInput, type RecordHistory } from "../api/types";
+import { formatPersonNumber, type GrantRef, type Organization, type Page, type PeopleOptions, type Person, type PersonInput, type RecordHistory } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { personMissing } from "../completeness";
 import { ExpertiseField } from "../expertise/ExpertiseField";
@@ -11,8 +11,10 @@ import { duplicateName } from "../record/duplicateName";
 import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
 import { LIMIT_HINTS, RELATION_LIMITS } from "../relationLimits";
+import { GrantChips } from "../services/accessDisplay";
+import { useCan } from "../session";
 import { CompletenessRow } from "../ui/CompletenessRow";
-import { AdminButton, StatusMessage } from "../ui/controls";
+import { AdminButton, AdminButtonLink, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, CheckboxField, DateField, DateTimeField, invalidProps, Pills, PropertyRow, ReadOnlyValue, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
@@ -106,6 +108,9 @@ export function PersonRecord({ id }: { id: string }) {
 function ExistingPersonRecord({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
+  const canUpdate = useCan("directory.update");
+  const canCreate = useCan("directory.create");
+  const canDelete = useCan("directory.delete");
   const person = useAdminData<Person>(`/people/${id}`);
   const options = useAdminData<PeopleOptions>("/people/options");
   const history = useAdminData<RecordHistory>(`/history/person/${id}`);
@@ -204,6 +209,7 @@ function ExistingPersonRecord({ id }: { id: string }) {
       title={draft.name}
       entity={{ type: "person", id }}
       recordLink={(other) => `/admin/people/${other}`}
+      readOnly={!canUpdate}
       actions={{
         submit,
         discard: () => {
@@ -212,8 +218,8 @@ function ExistingPersonRecord({ id }: { id: string }) {
           setTouched(new Set());
           setFormError(null);
         },
-        duplicate,
-        duplicateAsDraft: () => {
+        duplicate: canCreate ? duplicate : undefined,
+        duplicateAsDraft: !canCreate ? undefined : () => {
           try {
             // Like Duplicate: the copy's name ends in DUPLICATE (client, 2026-10-22).
             sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, name: duplicateName(draft.name), expenses: [] }));
@@ -224,14 +230,16 @@ function ExistingPersonRecord({ id }: { id: string }) {
         },
         archived: loaded.archivedAt !== null,
         setArchived,
-        remove: {
-          confirmText: loaded.name,
-          run: async (confirm) => {
-            await adminApi(`/people/${id}`, { method: "DELETE", body: { confirm } });
-            toast("Person deleted");
-            router.push("/admin/people");
-          },
-        },
+        remove: canDelete
+          ? {
+              confirmText: loaded.name,
+              run: async (confirm) => {
+                await adminApi(`/people/${id}`, { method: "DELETE", body: { confirm } });
+                toast("Person deleted");
+                router.push("/admin/people");
+              },
+            }
+          : undefined,
         savedMessage: "People updated",
         dirty,
         busy,
@@ -244,6 +252,7 @@ function ExistingPersonRecord({ id }: { id: string }) {
         errors={shownErrors(draft, touched, errors)}
         formError={formError}
         options={options.data}
+        access={{ personId: loaded.id, grants: loaded.permissions, archived: loaded.archivedAt !== null }}
         meta={{
           number: formatPersonNumber(loaded.personNumber),
           updatedAt: loaded.updatedAt,
@@ -351,8 +360,9 @@ function showErrors(caught: unknown, setErrors: (errors: Record<string, string>)
  * AI relevance score, Relevance score, Organizations, Expenses, First and
  * Last contact, Follow-up date, then Person ID, Updated, Last edited by,
  * Created, Created by. Hidden by config (personRecordConfig.ts): Phone and
- * the Wise recipient ID (kept in the data), Permissions and Contracting
- * (their modules don't exist yet).
+ * the Wise recipient ID (kept in the data), and Contracting (its module
+ * doesn't exist yet). Permissions (Delivery 2) are the person's access
+ * grants, edited on their own records: chips "Service · level" here.
  */
 function PersonFields({
   draft,
@@ -362,6 +372,7 @@ function PersonFields({
   formError,
   options,
   meta,
+  access,
 }: {
   draft: PersonDraft;
   set: <Key extends keyof PersonDraft>(key: Key, value: PersonDraft[Key]) => void;
@@ -370,9 +381,13 @@ function PersonFields({
   errors: Record<string, string>;
   formError: string | null;
   options?: PeopleOptions;
+  /** The saved person's access grants (none on an unsaved draft). */
+  access?: { personId: string; grants: GrantRef[]; archived: boolean };
   meta?: { number: string; updatedAt: string; createdAt: string; lastEditedBy: string | null; createdBy: string | null; legacyFollowUp: string | null };
 }) {
   const visible = (field: keyof typeof PERSON_RECORD_CONFIG) => !PERSON_RECORD_CONFIG[field].hidden;
+  const canSeeAccess = useCan("access.read");
+  const canGrant = useCan("access.create");
   const channels = options?.contactChannels ?? [];
   return (
     <>
@@ -479,6 +494,18 @@ function PersonFields({
       <PropertyRow icon="arrow_outward" label="Expenses" error={errors.expenses}>
         <RelationPicker label="Expenses" selected={draft.expenses} onChange={(next) => set("expenses", next)} search={searchExpenses} />
       </PropertyRow>
+      {visible("permissions") && access && canSeeAccess ? (
+        <PropertyRow icon="arrow_outward" label="Permissions">
+          <div className="flex flex-col items-start gap-2">
+            <GrantChips grants={access.grants} empty="No access to any service." />
+            {canGrant && !access.archived ? (
+              <AdminButtonLink href={`/admin/permissions/new?person=${access.personId}`} icon="add">
+                Add a permission
+              </AdminButtonLink>
+            ) : null}
+          </div>
+        </PropertyRow>
+      ) : null}
       <PropertyRow icon="calendar" label="First contact" htmlFor="person-first-contact" error={errors.firstContactOn}>
         <DateField
           id="person-first-contact"

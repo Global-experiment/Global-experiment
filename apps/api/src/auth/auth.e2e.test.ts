@@ -110,19 +110,32 @@ describe("owner admin authentication", () => {
     it("authenticates the session and never exposes secrets", async () => {
       const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
       const res = await http().get("/api/admin/auth/session").set("cookie", cookie).expect(200);
-      expect(res.body).toEqual({ admin: { id: expect.any(String), email: OWNER_EMAIL, role: "owner", displayName: null } });
+      expect(res.body).toEqual({
+        admin: {
+          id: expect.any(String),
+          email: OWNER_EMAIL,
+          role: "owner",
+          roleLabel: "Rootadmin",
+          displayName: null,
+          accountId: expect.stringMatching(/^GE-\d{6}$/),
+          timeZone: null,
+          appearance: "system",
+          hasPicture: false,
+          permissions: expect.arrayContaining(["accounts.manage", "directory.delete", "treasury.publish"]),
+        },
+      });
       expect(JSON.stringify(res.body)).not.toMatch(/scrypt|password|token/i);
     });
   });
 
-  describe("display name", () => {
+  describe("display name (Profile settings, admin/profile)", () => {
     const profile = (cookie: string, body: object) =>
-      http().patch("/api/admin/auth/profile").set("cookie", cookie).set("origin", TEST_ORIGIN).send(body);
+      http().patch("/api/admin/profile").set("cookie", cookie).set("origin", TEST_ORIGIN).send(body);
 
     it("is set, trimmed, returned by the session, and cleared by a blank value", async () => {
       const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
       let res = await profile(cookie, { displayName: "  Candide  " }).expect(200);
-      expect(res.body.admin.displayName).toBe("Candide");
+      expect(res.body.displayName).toBe("Candide");
       res = await http().get("/api/admin/auth/session").set("cookie", cookie).expect(200);
       expect(res.body.admin.displayName).toBe("Candide");
 
@@ -135,11 +148,11 @@ describe("owner admin authentication", () => {
     it("refuses more than 80 characters, a wrong type, and an anonymous or cross-site request", async () => {
       const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
       let res = await profile(cookie, { displayName: "x".repeat(81) }).expect(400);
-      expect(res.body.error.details.issues[0]).toEqual({ path: "displayName", message: "Display name must be 80 characters or fewer." });
+      expect(res.body.error.details.issues[0]).toEqual({ path: "displayName", message: "Use at most 80 characters." });
       await profile(cookie, { displayName: "y".repeat(80) }).expect(200);
       await profile(cookie, { displayName: 5 }).expect(400);
-      res = await http().patch("/api/admin/auth/profile").set("origin", TEST_ORIGIN).send({ displayName: "Mallory" }).expect(401);
-      await http().patch("/api/admin/auth/profile").set("cookie", cookie).set("origin", "https://evil.example").send({ displayName: "Mallory" }).expect(403);
+      res = await http().patch("/api/admin/profile").set("origin", TEST_ORIGIN).send({ displayName: "Mallory" }).expect(401);
+      await http().patch("/api/admin/profile").set("cookie", cookie).set("origin", "https://evil.example").send({ displayName: "Mallory" }).expect(403);
       const [owner] = await t.db.select().from(adminUsers);
       expect(owner!.displayName).toBe("y".repeat(80));
     });
@@ -176,10 +189,15 @@ describe("owner admin authentication", () => {
   });
 
   describe("database invariants", () => {
-    it("allows exactly one owner", async () => {
-      await expect(
-        t.db.insert(adminUsers).values({ email: "second@example.org", role: "owner", passwordHash: "x" }),
-      ).rejects.toThrow();
+    it("allows several Rootadmins (Figma p15) but never leaves the active accounts without one", async () => {
+      const [second] = await t.db.insert(adminUsers).values({ email: "second@example.org", role: "owner", passwordHash: "x" }).returning();
+      const [owner] = await t.db.select().from(adminUsers).where(eq(adminUsers.email, OWNER_EMAIL));
+      // One of the two may go…
+      await t.db.update(adminUsers).set({ status: "deactivated" }).where(eq(adminUsers.id, second!.id));
+      // …the last one may not, by status or by role (the constraint trigger checks at commit).
+      await expect(t.db.update(adminUsers).set({ status: "deactivated" }).where(eq(adminUsers.id, owner!.id))).rejects.toMatchObject({ cause: { message: expect.stringMatching(/last active Rootadmin/) } });
+      await expect(t.db.update(adminUsers).set({ role: "admin" }).where(eq(adminUsers.id, owner!.id))).rejects.toMatchObject({ cause: { message: expect.stringMatching(/last active Rootadmin/) } });
+      await t.db.delete(adminUsers).where(eq(adminUsers.id, second!.id));
     });
 
     it("treats emails case-insensitively as unique and rejects unknown roles", async () => {

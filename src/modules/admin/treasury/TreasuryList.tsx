@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, type ReactNode } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
 import { formatEntryNumber, type TreasuryEntryRow, type TreasuryOptions } from "../api/types";
@@ -10,8 +9,8 @@ import { NotionImportControl } from "../people/NotionImportControl";
 import { AdminListPage } from "../table/AdminListPage";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
-import { parseFilter, serializeFilter, type FilterRule, type SortRule } from "../table/listState";
-import { ViewTabs } from "../table/ViewTabs";
+import type { SortRule } from "../table/listState";
+import { SavedViews, type SavedView } from "../table/SavedViews";
 import { formatBreakdown, formatMoney, formatOccurred, managedLabel, modeLabel, PUBLICATION_LABEL, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
 
 const DEFAULT_SORT: SortRule[] = [
@@ -71,7 +70,7 @@ const COLUMNS: TableColumn<TreasuryEntryRow>[] = [
 ];
 
 /** Saved views: each is a set of filters on the same list contract. */
-const VIEWS: { id: string; label: string; filters: FilterRule[] }[] = [
+const VIEWS: SavedView[] = [
   { id: "all", label: "All", filters: [] },
   { id: "expenses", label: "Expenses", filters: [{ field: "type", operator: "is", value: "expense" }] },
   {
@@ -95,29 +94,6 @@ const VIEWS: { id: string; label: string; filters: FilterRule[] }[] = [
   { id: "unpublished", label: "Unpublished", filters: [{ field: "publication", operator: "is", value: "unpublished" }] },
   { id: "test", label: "Test mode", filters: [{ field: "mode", operator: "is", value: "test" }] },
 ];
-
-/** Archived entries (decision 12): a view of its own, not a filter (listState's `view`). */
-const ARCHIVED = { id: "archived", label: "Archived" };
-
-const key = (filters: readonly FilterRule[]) => filters.map(serializeFilter).sort().join("&");
-
-function TreasuryViews() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const current = key(params.getAll("filter").map(parseFilter).filter((rule): rule is FilterRule => rule !== undefined));
-  const archived = params.get("view") === "archived";
-  const active = archived ? (current === "" ? ARCHIVED.id : "") : (VIEWS.find((view) => key(view.filters) === current)?.id ?? "");
-  const select = (id: string) => {
-    const next = new URLSearchParams();
-    if (id === ARCHIVED.id) next.set("view", "archived");
-    else for (const rule of VIEWS.find((candidate) => candidate.id === id)!.filters) next.append("filter", serializeFilter(rule));
-    for (const sort of params.getAll("sort")) next.append("sort", sort);
-    const query = next.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
-  };
-  return <ViewTabs views={[...VIEWS, ARCHIVED]} current={active} onSelect={select} maxVisible={7} />;
-}
 
 /**
  * /admin/treasury — every ledger entry (expenses from Notion, donations,
@@ -186,8 +162,8 @@ export function TreasuryList() {
         columns: COLUMNS,
         recordHref: (row) => `/admin/treasury/${row.id}`,
         subtitle: "Expenses are managed in Notion; donations, refunds and disputes come from Stripe.",
-        views: <TreasuryViews />,
-        actions: <NotionImportControl />,
+        views: <SavedViews views={VIEWS} archived />,
+        actions: <NotionImportControl module="treasury" />,
       }}
     />
   );

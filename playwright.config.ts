@@ -67,6 +67,8 @@ export default defineConfig({
               // Donate: scripted Checkout sessions instead of Stripe (also NODE_ENV=test only),
               // and this Next server as the public site (Checkout return links, origin check).
               STRIPE_FIXTURE: "1",
+              // Every suite signs in from this one IP (the owner, invitees, a reset): room above the 5 per 15 minutes.
+              E2E_LOGIN_LIMIT: "50",
               // Open for the suites; donate-figma.spec closes them with the setting and uses the preview link.
               DONATIONS_ENABLED: "true",
               DONATIONS_PREVIEW_TOKEN: E2E_DONATIONS_PREVIEW,
@@ -94,11 +96,14 @@ export default defineConfig({
   ],
   use: {
     baseURL: `http://localhost:${port}`,
+    // The design is dark; an admin's Appearance defaults to System (Profile settings, p18), so the
+    // browser's scheme decides it. Dark here keeps every suite on the design; light is tested explicitly.
+    colorScheme: "dark",
   },
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|treasury-toolbar|donate-embedded).spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -139,6 +144,13 @@ export default defineConfig({
       dependencies: ["chromium-settings"],
       testMatch: /admin-detail-(page|review).spec.ts/,
       use: { browserName: "chromium" },
+    },
+    // Very last: accounts, roles and the owner's own profile (name, appearance, picture — each put back).
+    {
+      name: "chromium-accounts",
+      dependencies: ["chromium-detail"],
+      testMatch: /admin-accounts.spec.ts/,
+      use: { browserName: "chromium", permissions: ["clipboard-read", "clipboard-write"] },
     },
     // Page centering with classic scrollbars must hold in Safari's engine
     // too (it handles scrollbar-gutter differently): only that spec runs

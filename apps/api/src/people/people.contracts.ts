@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { GrantRef } from "../services/services.contracts.js";
 import { listQuerySchema } from "../common/listing/list-query.js";
 import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 import { INVALID_LINK, isWebLink } from "../common/web-link.js";
@@ -159,6 +160,8 @@ export interface PersonDto {
   contactChannels: VocabularyEntry[];
   /** Expenses paid to this person (their recipient). */
   expenses: ExpenseRef[];
+  /** Their access grants (Permissions, Figma p14): "GitHub · admin" chips. */
+  permissions: GrantRef[];
   /** The former "last follow-up" value, kept as-is (read-only). */
   lastFollowupAtLegacy: string | null;
   /** The next follow-up has passed, and the person is neither Rejected nor Do not contact. */
@@ -189,6 +192,6 @@ export interface PeopleOptionsDto {
   aiScoreReadOnly: boolean;
 }
 
-/** Permanent delete (owner only, decision 12): the person's name typed exactly. */
+/** Permanent delete (directory.delete, decision 12): the person's name typed exactly. */
 export const DeletePersonRequest = z.strictObject({ confirm: z.string().max(200) });
 export type DeletePersonRequest = z.output<typeof DeletePersonRequest>;

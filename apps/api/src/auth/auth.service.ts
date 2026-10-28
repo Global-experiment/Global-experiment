@@ -2,16 +2,13 @@ import { Inject, Injectable } from "@nestjs/common";
 import { APP_CONFIG } from "../common/config/config.module.js";
 import type { AppConfig } from "../common/config/env.js";
 import { UnauthenticatedError } from "../common/errors/api-error.js";
-import { AuthRepository } from "./auth.repository.js";
+import { AuthRepository, type SessionAdmin } from "./auth.repository.js";
 import { dummyPasswordHash, verifyPassword } from "./password.js";
 import { generateSessionToken, hashSessionToken, SESSION_TOKEN_PATTERN } from "./session-token.js";
 
-export interface AdminPrincipal {
-  id: string;
-  email: string;
-  role: string;
-  /** Null until the admin sets one (the UI then shows the email's local part). */
-  displayName: string | null;
+/** The signed-in admin, with what their role allows (access-control/permissions.ts). */
+export interface AdminPrincipal extends Omit<SessionAdmin, "permissions"> {
+  permissions: ReadonlySet<string>;
   sessionId: string;
 }
 
@@ -25,12 +22,16 @@ export class AuthService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** Returns a fresh session token, or throws one uniform error for any failure. */
+  /**
+   * Returns a fresh session token, or throws one uniform error for any
+   * failure — unknown email, wrong password, invited (no password yet) or
+   * deactivated account alike, so nothing reveals which accounts exist.
+   */
   async login(email: string, password: string): Promise<{ token: string; expiresAt: Date }> {
     const admin = await this.repository.findAdminByEmail(email.trim());
     // Always run one scrypt verification so unknown and known emails cost the same.
     const valid = await verifyPassword(password, admin?.passwordHash ?? (await dummyPasswordHash()));
-    if (!admin || !valid) throw new UnauthenticatedError("Invalid email or password.");
+    if (!admin || !valid || admin.status !== "active") throw new UnauthenticatedError("Invalid email or password.");
 
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + this.config.session.maxDays * 24 * 60 * 60 * 1000);
@@ -52,11 +53,7 @@ export class AuthService {
     if (now.getTime() - session.lastSeenAt.getTime() >= TOUCH_INTERVAL_MS) {
       await this.repository.touchSession(session.sessionId, now);
     }
-    return { ...session.admin, sessionId: session.sessionId };
-  }
-
-  async setDisplayName(adminUserId: string, displayName: string | null): Promise<void> {
-    await this.repository.setDisplayName(adminUserId, displayName);
+    return { ...session.admin, permissions: new Set(session.admin.permissions), sessionId: session.sessionId };
   }
 
   async logout(sessionId: string): Promise<void> {

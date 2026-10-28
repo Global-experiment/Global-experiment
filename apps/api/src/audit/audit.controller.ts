@@ -7,6 +7,8 @@ import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import { AUDITED_ENTITIES } from "./audit.schema.js";
 import { AuditService, COMMENTABLE } from "./audit.service.js";
 import { entityLabel } from "./entity-labels.js";
+import { RequiresForParam, SignedIn } from "../access-control/requires.js";
+import { ENTITY_MODULE } from "../access-control/permissions.js";
 
 const RecordType = new ZodValidationPipe(z.enum(COMMENTABLE, "Unknown record type."));
 const IdParam = new ZodValidationPipe(z.uuid("Invalid id."));
@@ -46,16 +48,19 @@ export class AuditController {
   ) {}
 
   @Get("history")
+  @SignedIn()
   list(@Query(new ZodValidationPipe(HistoryListQuery)) query: HistoryListQuery, @Req() request: AdminRequest) {
     return this.audit.list(query, signedIn(request));
   }
 
   @Get("history/actors")
+  @SignedIn()
   actors() {
     return this.audit.actors();
   }
 
   @Get("history/:type/:id")
+  @RequiresForParam("type", ENTITY_MODULE, "read")
   async feed(@Param("type", RecordType) type: string, @Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     await this.label(type, id);
     return this.audit.feed(type, id, signedIn(request));
@@ -63,12 +68,14 @@ export class AuditController {
 
   /** One opening of the record page (every opening counts). */
   @Post("history/:type/:id/views")
+  @RequiresForParam("type", ENTITY_MODULE, "read")
   async view(@Param("type", RecordType) type: string, @Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     await this.label(type, id);
     return this.audit.recordView(type, id, signedIn(request));
   }
 
   @Post("history/:type/:id/comments")
+  @RequiresForParam("type", ENTITY_MODULE, "read")
   @HttpCode(204)
   async comment(
     @Param("type", RecordType) type: string,
@@ -80,12 +87,14 @@ export class AuditController {
   }
 
   @Patch("comments/:id")
+  @SignedIn()
   @HttpCode(204)
   async editComment(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(CommentBody)) body: CommentBody, @Req() request: AdminRequest) {
     await this.audit.editComment(id, signedIn(request), body.body);
   }
 
   @Delete("comments/:id")
+  @SignedIn()
   @HttpCode(204)
   async deleteComment(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     await this.audit.deleteComment(id, signedIn(request));

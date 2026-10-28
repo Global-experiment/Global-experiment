@@ -13,6 +13,7 @@ import { RecordPage } from "../record/RecordPage";
 import { AdminIcon, NotionMark } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, PanelButton, Pills, PropertyRow } from "../ui/RecordForm";
+import { useCan } from "../session";
 import { useToast } from "../ui/Toast";
 import {
   CADENCE_LABEL,
@@ -59,6 +60,10 @@ const message = (caught: unknown, fallback: string) => (caught instanceof AdminA
 export function TreasuryRecord({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
+  const canUpdate = useCan("treasury.update");
+  const canReview = useCan("treasury.review");
+  const canPublish = useCan("treasury.publish");
+  const canDelete = useCan("treasury.delete");
   const entry = useAdminData<TreasuryEntry>(`/treasury/${id}`);
   const history = useAdminData<RecordHistory>(`/history/treasury_entry/${id}`);
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
@@ -81,7 +86,12 @@ export function TreasuryRecord({ id }: { id: string }) {
   }
 
   const loaded = entry.data;
-  const { permissions } = loaded;
+  // What the entry allows (the API's rules), narrowed to what the role allows.
+  const permissions = {
+    ...loaded.permissions,
+    editInternalNote: loaded.permissions.editInternalNote && canUpdate,
+    review: canReview ? loaded.permissions.review : { ...loaded.permissions.review, allowed: false, reason: "Your role can't review expenses." },
+  };
   const version = `${loaded.id}@${loaded.updatedAt}@${loaded.archivedAt}`;
   const base: Draft = { internalNote: loaded.internalNote ?? "", reviewStatus: loaded.review.key };
   const draft = edit?.version === version ? edit.draft : base;
@@ -147,7 +157,9 @@ export function TreasuryRecord({ id }: { id: string }) {
       entity={{ type: "treasury_entry", id }}
       entityNoun="entry"
       recordLink={(other) => `/admin/treasury/${other}`}
-      panelExtra={publishAction}
+      panelExtra={canPublish ? publishAction : null}
+      revision={loaded.updatedAt}
+      readOnly={!canUpdate && !canReview && !canPublish}
       actions={{
         submit,
         discard: () => {
@@ -155,10 +167,10 @@ export function TreasuryRecord({ id }: { id: string }) {
           setError(null);
         },
         archived: loaded.archivedAt !== null,
-        setArchived: (archived) => run(archived ? "archiving" : "restoring", () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }), archived ? "Entry archived" : "Entry restored"),
+        setArchived: !canUpdate ? undefined : (archived) => run(archived ? "archiving" : "restoring", () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }), archived ? "Entry archived" : "Entry restored"),
         // Only manual entries can go: Stripe and Notion entries belong to the ledger and the importer.
         remove:
-          loaded.source === "manual" && !notion
+          loaded.source === "manual" && !notion && canDelete
             ? {
                 confirmText: number,
                 run: async (confirm) => {
@@ -343,6 +355,7 @@ export function TreasuryRecord({ id }: { id: string }) {
       </PropertyRow>
       <PropertyRow icon="insert_drive_file" label="Documents" hint="Invoices and receipts: PDF, PNG or JPEG up to 20 MB. Private: admins only.">
         <Documents
+          editable={canUpdate}
           entryId={id}
           documents={loaded.documentsList}
           onChange={() => {
@@ -370,7 +383,7 @@ export function TreasuryRecord({ id }: { id: string }) {
   );
 }
 
-function Documents({ entryId, documents, onChange }: { entryId: string; documents: TreasuryDocument[]; onChange: () => void }) {
+function Documents({ entryId, documents, onChange, editable }: { entryId: string; documents: TreasuryDocument[]; onChange: () => void; editable: boolean }) {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -424,7 +437,7 @@ function Documents({ entryId, documents, onChange }: { entryId: string; document
                 {document.uploadedBy ? ` · ${document.uploadedBy}` : ""}
               </span>
               <span className="ml-auto flex shrink-0 items-center gap-2">
-                {confirming === document.id ? (
+                {!editable ? null : confirming === document.id ? (
                   <>
                     <span className="text-meta">Delete this file?</span>
                     <AdminButton onClick={() => void remove(document.id)}>Delete</AdminButton>
@@ -454,9 +467,11 @@ function Documents({ entryId, documents, onChange }: { entryId: string; document
           if (file) void upload(file);
         }}
       />
-      <AdminButton icon="add" onClick={() => input.current?.click()} disabled={uploading} className="mt-1 self-start">
-        {uploading ? "Uploading…" : "Upload document"}
-      </AdminButton>
+      {editable ? (
+        <AdminButton icon="add" onClick={() => input.current?.click()} disabled={uploading} className="mt-1 self-start">
+          {uploading ? "Uploading…" : "Upload document"}
+        </AdminButton>
+      ) : null}
       {error ? (
         <p role="alert" className="px-2 text-meta text-text-primary">
           {error}

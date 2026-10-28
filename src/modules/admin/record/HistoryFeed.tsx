@@ -173,6 +173,16 @@ function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: st
   if (item.action === "comment_deleted" && typeof meta.body === "string") {
     return <p className="mt-2 text-meta whitespace-pre-line text-text-muted line-through">{meta.body}</p>;
   }
+  // Accounts and access (Delivery 2): the facts the event carries, never a link or a token.
+  const facts: string[] = [];
+  if (typeof meta.note === "string") facts.push(meta.note);
+  if (item.action === "invited" && typeof meta.role === "string") facts.push(`Role: ${meta.role}.`);
+  if (item.action === "link_created" && typeof meta.purpose === "string") facts.push(`${meta.purpose}, valid 72 hours, single use.`);
+  if ((item.action === "activated" || item.action === "password_changed") && typeof meta.via === "string") facts.push(`With the ${meta.via.toLowerCase()}.`);
+  if (item.action === "deactivated" && meta.self === true) facts.push("Deactivated from Profile settings.");
+  if (item.action === "permission_denied" && typeof meta.route === "string") facts.push(`${meta.route} needs ${String(meta.permission)}.`);
+  if (facts.length > 0 && meta.origin && item.actor.type === "automation") facts.push(`By the ${String(meta.origin)} command.`);
+  if (facts.length > 0) return <p className="mt-2 text-meta text-text-muted">{facts.join(" ")}</p>;
   if (meta.origin && item.actor.type === "automation") {
     return <p className="mt-2 text-meta text-text-muted">{meta.origin === "Stripe" ? "From Stripe." : `By the ${String(meta.origin)} command.`}</p>;
   }

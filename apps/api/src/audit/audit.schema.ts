@@ -7,7 +7,7 @@ import type { AuditChange } from "./audit.types.js";
  * The record types the platform audits (migration 0009). Text, not an
  * enum: a new module adds its type without a migration of this table.
  */
-export const AUDITED_ENTITIES = ["person", "organization", "treasury_entry", "expertise_domain", "expertise_field", "expertise_item", "setting", "import_run"] as const;
+export const AUDITED_ENTITIES = ["person", "organization", "treasury_entry", "expertise_domain", "expertise_field", "expertise_item", "setting", "import_run", "service", "access_grant", "admin_user"] as const;
 export type AuditedEntity = (typeof AUDITED_ENTITIES)[number];
 
 /**
@@ -27,7 +27,11 @@ export const auditEvents = pgTable(
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
     entityType: text("entity_type").notNull(),
     entityId: text("entity_id").notNull(),
-    /** created · imported · duplicated · updated · archived · restored · deleted · comment_added · comment_edited · comment_deleted */
+    /**
+     * created · imported · duplicated · updated · archived · restored · deleted · comment_added · comment_edited · comment_deleted;
+     * since 0012: access_granted · access_changed · access_revoked (on the person, the account and the service) ·
+     * invited · activated · link_created · password_changed · email_changed · deactivated · reactivated (accounts) · permission_denied
+     */
     action: text("action").notNull(),
     /** admin (a person signed in) or automation (imports, Stripe, scheduled jobs). */
     actorType: text("actor_type").notNull(),
@@ -47,7 +51,7 @@ export const auditEvents = pgTable(
     check("audit_events_entity_type_shape", sql`${table.entityType} ~ '^[a-z][a-z_]{1,39}$'`),
     check(
       "audit_events_action_known",
-      sql`${table.action} in ('created', 'imported', 'duplicated', 'updated', 'archived', 'restored', 'deleted', 'comment_added', 'comment_edited', 'comment_deleted')`,
+      sql`${table.action} in ('created', 'imported', 'duplicated', 'updated', 'archived', 'restored', 'deleted', 'comment_added', 'comment_edited', 'comment_deleted', 'access_granted', 'access_changed', 'access_revoked', 'invited', 'activated', 'link_created', 'password_changed', 'email_changed', 'deactivated', 'reactivated', 'permission_denied')`,
     ),
     check("audit_events_actor_type_known", sql`${table.actorType} in ('admin', 'automation')`),
     check("audit_events_actor_label_present", sql`length(btrim(${table.actorLabel})) between 1 and 120`),
