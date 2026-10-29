@@ -1,4 +1,5 @@
 import { eq, inArray, sql } from "drizzle-orm";
+import { importRuns } from "../import/import.schema.js";
 import { adminUsers } from "../auth/auth.schema.js";
 import { accessGrants, accessLevels, services } from "../services/services.schema.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
@@ -102,6 +103,16 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
       .leftJoin(accessLevels, eq(accessLevels.key, accessGrants.levelKey))
       .where(inArray(accessGrants.id, grantIds));
     for (const row of rows) titles.set(`access_grant:${row.id}`, row.title);
+  }
+  // Import runs are never deleted: a CSV run is titled by its file (its report opens from History).
+  const runIds = idsOf("import_run");
+  if (runIds.length > 0) {
+    const rows = await db.select({ id: importRuns.id, kind: importRuns.kind, mode: importRuns.mode, counts: importRuns.counts }).from(importRuns).where(inArray(importRuns.id, runIds));
+    for (const row of rows) {
+      const fileName = (row.counts as { fileName?: unknown }).fileName;
+      const csv = row.kind.endsWith("_csv") ? (row.kind === "people_csv" ? "People" : "Organizations") : null;
+      titles.set(`import_run:${row.id}`, csv && typeof fileName === "string" ? `CSV import of ${csv} · ${fileName}` : `${row.kind} import · ${row.mode.replace("_", " ")}`);
+    }
   }
   const accountIds = idsOf("admin_user");
   if (accountIds.length > 0) {

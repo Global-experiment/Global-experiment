@@ -34,6 +34,12 @@ async function login(t: TestApp, email: string, password: string) {
     call: (method: "get" | "post" | "patch" | "put" | "delete", path: string, body?: object) => withAuth(server()[method](path)).send(body ?? {}),
     /** multipart/form-data with one file field. */
     upload: (path: string, field: string, bytes: Buffer, fileName: string) => withAuth(server().post(path)).attach(field, bytes, fileName),
+    /** multipart/form-data with text fields and, optionally, one file. */
+    form: (path: string, fields: Record<string, string>, file?: { field: string; bytes: Buffer; fileName: string }) => {
+      let req = withAuth(server().post(path));
+      for (const [name, value] of Object.entries(fields)) req = req.field(name, value);
+      return file ? req.attach(file.field, file.bytes, file.fileName) : req;
+    },
   };
 }
 

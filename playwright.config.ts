@@ -103,7 +103,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|treasury-toolbar|donate-embedded).spec.ts/,
+      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|admin-csv-import|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -151,6 +151,13 @@ export default defineConfig({
       dependencies: ["chromium-detail"],
       testMatch: /admin-accounts.spec.ts/,
       use: { browserName: "chromium", permissions: ["clipboard-read", "clipboard-write"] },
+    },
+    // After that: the CSV import adds people to the shared test database (other suites count the fixtures).
+    {
+      name: "chromium-csv",
+      dependencies: ["chromium-accounts"],
+      testMatch: /admin-csv-import.spec.ts/,
+      use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine
     // too (it handles scrollbar-gutter differently): only that spec runs

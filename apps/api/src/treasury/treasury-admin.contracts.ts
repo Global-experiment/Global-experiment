@@ -23,7 +23,6 @@ export const TreasuryListQuery = listQuerySchema({
     source: { operators: ["is", "is_not"], value: z.enum(["stripe", "wise", "manual"]) },
     /** live = real money; test = Stripe test mode. */
     mode: { operators: ["is"], value: z.enum(["live", "test"]) },
-    managed_by: { operators: ["is"], value: z.enum(["notion", "native"]) },
     expense_type: { operators: ["is", "is_empty", "is_not_empty"], value: vocabularyKey },
     recipient: { operators: ["is_empty", "is_not_empty"] },
     occurred_from: { operators: ["is"], value: z.iso.date() },
@@ -96,7 +95,6 @@ export interface TreasuryEntryRowDto {
   livemode: boolean;
   /** Sample data before go-live (marked Test publicly; purge-sample-treasury removes it). */
   sample: boolean;
-  managedBy: "notion" | "native";
   documents: number;
   createdAt: string;
   updatedAt: string;
@@ -113,9 +111,6 @@ export interface TreasuryDocumentDto {
 }
 
 export interface TreasuryEntryDto extends TreasuryEntryRowDto {
-  notionPageId: string | null;
-  /** The Notion page, for Notion-managed entries. */
-  notionUrl: string | null;
   externalTransactionId: string | null;
   sourceAccountId: string | null;
   reviewedAt: string | null;

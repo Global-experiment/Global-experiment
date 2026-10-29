@@ -242,7 +242,6 @@ export class PeopleRepository {
         recipientPersonId: treasuryEntries.recipientPersonId,
         recipientOrganizationId: treasuryEntries.recipientOrganizationId,
         reviewStatusKey: treasuryEntries.reviewStatusKey,
-        managedBy: treasuryEntries.managedBy,
         archivedAt: treasuryEntries.archivedAt,
       })
       .from(treasuryEntries)

@@ -102,6 +102,7 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "GET /api/admin/history": "signed in",
   "GET /api/admin/history/:type/:id": "<:type>.read",
   "GET /api/admin/history/actors": "signed in",
+  "GET /api/admin/imports/csv/runs/:id": "directory.read",
   "GET /api/admin/imports/jobs/:id": "imports.read",
   "GET /api/admin/imports/runs": "imports.read",
   "GET /api/admin/imports/status": "imports.read",
@@ -147,6 +148,8 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "POST /api/admin/history/:type/:id/comments": "<:type>.read",
   "POST /api/admin/history/:type/:id/views": "<:type>.read",
   "POST /api/admin/imports/:kind/apply": "<:kind>.import",
+  "POST /api/admin/imports/csv/:table/confirm": "<:table>.create",
+  "POST /api/admin/imports/csv/:table/preview": "<:table>.create",
   "POST /api/admin/imports/:kind/dry-run": "<:kind>.import",
   "POST /api/admin/organizations": "directory.create",
   "POST /api/admin/organizations/:id/archive": "directory.update",
@@ -177,7 +180,7 @@ const EXPECTED_ROUTES: Record<string, string> = {
 
 const FAKE_ID = "00000000-0000-4000-8000-000000000000";
 /** Real-looking route parameters: a known record type and import kind, unknown ids. */
-const PARAMS: Record<string, string> = { type: "person", kind: "directory" };
+const PARAMS: Record<string, string> = { type: "person", kind: "directory", table: "people" };
 const fill = (path: string) => path.replace(/:([A-Za-z]+)/g, (_, name: string) => PARAMS[name] ?? FAKE_ID);
 const paramsOf = (path: string) => Object.fromEntries([...path.matchAll(/:([A-Za-z]+)/g)].map(([, name]) => [name!, PARAMS[name!] ?? FAKE_ID]));
 

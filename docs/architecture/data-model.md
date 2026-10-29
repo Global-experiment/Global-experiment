@@ -523,6 +523,12 @@ stored. The "Donors" stat is **hidden** (anonymous donors only, decided).
 
 ### 4.5 Notion "Treasury" → native
 
+**Retired on 2026-10-30 (ADR 016):** the Treasury import was removed; the
+Treasury is edited in the admin only, with no import or export. Expenses
+copied before keep `managed_by = notion` and their `notion_page_id` in the
+data, but are ordinary entries everywhere (review, publication, note). The
+mapping below is kept for the record.
+
 Every property maps in §4.1 except: *Expense type → `treasury_entry_expense_types`;
 Reviewed by → reported only (it relates to People, the native reviewer is
 an admin); *Wise transaction number → `external_transaction_id` for
@@ -923,15 +929,19 @@ History).
 
 ## 12. Imports and jobs
 
-- `import_runs` (built): `kind` gains `treasury`, `cms`, `submissions`,
-  `services`, `access_grants` (the CHECK is extended in each module's
-  migration); counts and issues stay JSON in the run.
+- `import_runs` (built): one row per run. Kinds today: `directory` (Notion
+  People and Organizations) and `people_csv` / `organizations_csv` (CSV
+  import, ADR 016: `counts` holds the file name and the counts, `issues`
+  every row's outcome — created with its record id, possible duplicate with
+  the record it matched, or errors). Past `taxonomy` and `treasury` runs
+  stay as history. No other table has an import or an export.
 - Jobs: **pg-boss** keeps its own schema (`pgboss`), created and migrated by
   the library at startup, not by Drizzle. No job table of ours.
 
-## 13. Notion import rules (all modules)
+## 13. Notion import rules (People and Organizations)
 
-Unchanged from the built importers, and applied to every new one:
+Since 2026-10-30 only People and Organizations are imported from Notion
+(ADR 016); the CSV import's rules are in ADR 016. The Notion rules:
 
 1. **Matching** by `notion_page_id` only (taxonomy also by `stable_id`);
    never by name or email.

@@ -131,24 +131,12 @@ export const SETTINGS = {
     public: false,
     description: "AI features are on: the AI relevance score is filled automatically and read-only in the admin.",
   }),
-  // Scheduled Notion imports (overview §3.3): cron in UTC, or "off". Read when the API starts.
-  "imports.taxonomy.schedule": define({
-    schema: z.string().regex(CRON_OR_OFF),
-    envDefault: (config) => config.importSchedules.taxonomy,
-    public: false,
-    description: "Schedule of the taxonomy import (cron, UTC) or off.",
-  }),
+  // The scheduled Notion import of People and Organizations (overview §3.3): cron in UTC, or "off". Read when the API starts.
   "imports.directory.schedule": define({
     schema: z.string().regex(CRON_OR_OFF),
     envDefault: (config) => config.importSchedules.directory,
     public: false,
     description: "Schedule of the People & Organizations import (cron, UTC) or off.",
-  }),
-  "imports.treasury.schedule": define({
-    schema: z.string().regex(CRON_OR_OFF),
-    envDefault: (config) => config.importSchedules.treasury,
-    public: false,
-    description: "Schedule of the Treasury (expenses) import (cron, UTC) or off.",
   }),
 } as const;
 

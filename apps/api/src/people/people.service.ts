@@ -219,10 +219,7 @@ export class PeopleService {
       const current = personId ? ((await this.repository.findById(personId))?.expenses ?? []) : [];
       // Newly linked expenses only: links that already exist stay as they are.
       const added = expenses.filter((expense) => !current.some((linked) => linked.id === expense.id));
-      if (added.some((expense) => expense.managedBy === "notion")) {
-        // The Treasury import sets these recipients from Notion and would undo the link.
-        issues.push({ path: "expenseIds", message: "This expense is managed in Notion: set its recipient there." });
-      } else if (added.some((expense) => expense.archivedAt !== null)) {
+      if (added.some((expense) => expense.archivedAt !== null)) {
         issues.push({ path: "expenseIds", message: "This expense is archived: restore it first." });
       }
       if (personId) {

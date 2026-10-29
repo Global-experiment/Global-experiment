@@ -161,7 +161,8 @@ export class AccountsService {
   async profile(principal: AdminPrincipal): Promise<ProfileDto> {
     const profile = await this.repository.findProfile(principal.id);
     if (!profile) throw new NotFoundError("Account not found.");
-    const { pictureKey: _pictureKey, ...rest } = profile;
+    const rest: Omit<typeof profile, "pictureKey"> & { pictureKey?: string | null } = { ...profile };
+    delete rest.pictureKey;
     return { ...rest, permissionKeys: [...principal.permissions].sort() };
   }
 

@@ -24,9 +24,6 @@ export const CADENCE_LABEL: Record<string, string> = { one_off: "One-off", month
 /** Live = real money; Test = Stripe test mode (public in production only before go-live, with treasury.show_test_donations). */
 export const modeLabel = (row: Pick<TreasuryEntryRow, "livemode" | "sample">) => (row.sample ? "Sample" : row.livemode ? "Live" : "Test");
 
-export const managedLabel = (row: Pick<TreasuryEntryRow, "managedBy" | "source">) =>
-  row.managedBy === "notion" ? "Notion" : row.source === "stripe" ? "Stripe" : "Native";
-
 const amount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** "−USD 5,675.00", "USD 12.50" — the shared rule (formatting.md): exact, signed with a real minus. */

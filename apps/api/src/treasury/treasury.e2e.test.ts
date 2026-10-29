@@ -328,47 +328,39 @@ describe("Treasury API", () => {
       const all = (await admin.get("/api/admin/treasury").expect(200)).body;
       expect(all.total).toBe(2);
       const [gift, spent] = all.items;
-      expect(gift).toMatchObject({ type: "donation", grossAmount: 500, feeAmount: 45, netAmount: 455, source: "stripe", livemode: false, managedBy: "native", publication: "published" });
+      expect(gift).toMatchObject({ type: "donation", grossAmount: 500, feeAmount: 45, netAmount: 455, source: "stripe", livemode: false, publication: "published" });
       expect(spent).toMatchObject({
         type: "expense",
         recipient: { kind: "person", name: "Ada Lovelace" },
         expenseTypes: [{ key: "hosting_and_infrastructure", label: "Hosting and infrastructure" }],
         review: { key: "qualified", label: "Qualified" },
-        managedBy: "notion",
         documents: 0,
       });
 
       const filtered = async (query: string) => (await admin.get(`/api/admin/treasury?${query}`).expect(200)).body.items.map((row: { type: string }) => row.type);
       expect(await filtered("filter=type:is:expense")).toEqual(["expense"]);
       expect(await filtered("filter=mode:is:test")).toEqual(["donation"]);
-      expect(await filtered("filter=managed_by:is:notion")).toEqual(["expense"]);
+      // No "managed by Notion" filter any more (decision of 2026-10-23: the Treasury is edited here only).
+      expect((await admin.get("/api/admin/treasury?filter=managed_by:is:notion")).status).toBe(400);
       expect(await filtered("filter=recipient:is_empty")).toEqual(["donation"]);
       expect(await filtered("search=lovelace")).toEqual(["expense"]);
       expect(await filtered(`search=EXP-${spent.number}`)).toEqual(["expense"]);
       expect(await filtered("sort=amount:asc")).toEqual(["expense", "donation"]);
     });
 
-    it("keeps Notion-managed entries read-only (409 managed_in_notion) and says why", async () => {
+    it("treats an expense copied from Notion like any other: note, review and publication are edited here", async () => {
       const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, recipientPersonId: (await recipient()).id }));
       const record = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
-      expect(record.notionUrl).toBe(`https://www.notion.so/${entry.notionPageId!.replace(/-/g, "")}`);
-      expect(record.permissions).toMatchObject({
-        editInternalNote: false,
-        publish: { allowed: false },
-        unpublish: { allowed: false, reason: "Managed in Notion: unpublish it there." },
-        review: { allowed: false, options: [] },
-        documents: true,
-      });
-      for (const res of [
-        await admin.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" }),
-        await admin.post(`/api/admin/treasury/${entry.id}/unpublish`),
-        await admin.post(`/api/admin/treasury/${entry.id}/review`, { reviewStatus: "pending_documents" }),
-      ]) {
-        expect(res.status).toBe(409);
-        expect(res.body.error.details).toEqual({ reason: "managed_in_notion" });
-      }
-      const [unchanged] = await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, entry.id));
-      expect(unchanged).toMatchObject({ internalNote: null, publicationStatus: "published", reviewStatusKey: "qualified" });
+      expect(record).not.toHaveProperty("notionUrl");
+      expect(record).not.toHaveProperty("managedBy");
+      expect(record.permissions).toMatchObject({ editInternalNote: true, publish: { allowed: false, reason: "Already published." }, unpublish: { allowed: true }, review: { allowed: true }, documents: true });
+      await admin.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "Checked the invoice" }).expect(200);
+      // A published entry stays reviewed (the publication rules): unpublish first, then review.
+      await admin.post(`/api/admin/treasury/${entry.id}/unpublish`).expect(200);
+      await admin.post(`/api/admin/treasury/${entry.id}/review`, { reviewStatus: "pending_documents" }).expect(200);
+      const [changed] = await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, entry.id));
+      // Edited in the admin; what it was copied from stays in the data.
+      expect(changed).toMatchObject({ internalNote: "Checked the invoice", publicationStatus: "unpublished", reviewStatusKey: "pending_documents", managedBy: "notion", notionPageId: entry.notionPageId });
     });
 
     it("lets a native Stripe entry change only its internal note and publication", async () => {

@@ -1,6 +1,6 @@
 import { RELATION_LIMITS } from "../../common/relation-limits.js";
 import { demoMarkers } from "../demo-markers.js";
-import { vocabularyMatcher, type Vocabulary } from "../taxonomy/taxonomy-plan.js";
+import { vocabularyMatcher, type Vocabulary } from "../vocabulary.js";
 import type { DirectorySource, SourceOrganization, SourcePerson } from "./directory-source.js";
 
 /**

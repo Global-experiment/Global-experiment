@@ -39,9 +39,8 @@ export class TreasuryAdminRepository {
       review: treasuryEntries.reviewStatusKey,
       publication: treasuryEntries.publicationStatus,
       source: treasuryEntries.source,
-      managed_by: treasuryEntries.managedBy,
     } as const;
-    for (const field of ["type", "currency", "review", "publication", "source", "managed_by"] as const) {
+    for (const field of ["type", "currency", "review", "publication", "source"] as const) {
       if (values(field).length > 0) conditions.push(inArray(column[field], values(field)));
     }
     if (values("mode").length > 0) {
@@ -147,7 +146,6 @@ export class TreasuryAdminRepository {
       source: treasuryEntries.source,
       livemode: treasuryEntries.livemode,
       sample: treasuryEntries.sample,
-      managedBy: treasuryEntries.managedBy,
       createdAt: treasuryEntries.createdAt,
       updatedAt: treasuryEntries.updatedAt,
       archivedAt: treasuryEntries.archivedAt,
@@ -204,7 +202,6 @@ export class TreasuryAdminRepository {
       source: row.source as TreasuryEntryRowDto["source"],
       livemode: row.livemode,
       sample: row.sample,
-      managedBy: row.managedBy as TreasuryEntryRowDto["managedBy"],
       documents: row.documents,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

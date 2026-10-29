@@ -97,7 +97,9 @@ test("filter overdue follow-ups, and show the optional Completeness column", asy
 
 test("taxonomy screens are read-only, with the list toolbar: domain / status / team filters and search", async ({ page }) => {
   await page.goto("/admin/expertise");
-  await expect(page.getByText("Managed in Notion – updated by the importer.")).toBeVisible();
+  // No Notion import any more for the taxonomy (decision of 2026-10-23): no label, no import button.
+  await expect(page.getByText(/Managed in Notion/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "More options" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Rename|Delete|New/ })).toHaveCount(0);
   const counter = page.getByRole("status").filter({ hasText: / of \d+$/ });
   await expect(counter).toHaveText("1–24 of 24");
@@ -139,27 +141,21 @@ test("taxonomy screens are read-only, with the list toolbar: domain / status / t
   await expect(page.getByRole("status").filter({ hasText: / of \d+$/ })).toHaveText("1–4 of 4");
 });
 
-test("run a taxonomy dry run from the import page", async ({ page }) => {
+test("run a People & organizations dry run from the import page (the only Notion import left)", async ({ page }) => {
   await page.goto("/admin/people");
-  await page.getByRole("link", { name: "Import Notion" }).click();
+  await page.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Import Notion" }).click();
   await expect(page).toHaveURL(/\/admin\/imports$/);
   await expect(page.getByRole("heading", { name: "Notion import", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Dry run/ })).toHaveText(["Dry run people & organizations"]);
 
-  await page.getByRole("button", { name: "Dry run taxonomy" }).click();
+  await page.getByRole("button", { name: "Dry run people & organizations" }).click();
   const status = page.locator("[data-job-status]");
   await expect(status).toHaveAttribute("data-job-status", "succeeded", { timeout: 20_000 });
-  await expect(status).toHaveText(/^Taxonomy dry run finished: \d+ changes\.$/);
-  await expect(page.getByLabel("Import report")).toContainText("TAXONOMY IMPORT — DRY RUN");
-  await expect(page.getByLabel("Import report")).toContainText("Values left out: 0");
-
-  // Apply is behind a confirmation; cancel here (the dry run must not change the shared test database).
-  await page.getByRole("button", { name: "Apply this dry run…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Apply the taxonomy dry run?" });
-  await expect(dialog).toContainText("in one transaction");
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(dialog).toBeHidden();
+  await expect(status).toHaveText(/^People & organizations dry run finished: (no changes|\d+ changes?)\.$/);
+  await expect(page.getByLabel("Import report")).toContainText("DIRECTORY IMPORT — DRY RUN");
 
   const history = page.getByRole("table", { name: "Import history" });
   await expect(history.locator("tbody tr").first()).toContainText("Dry run");
-  await expect(history.locator("tbody tr").first()).toContainText("Taxonomy");
+  await expect(history.locator("tbody tr").first()).toContainText("People & organizations");
 });

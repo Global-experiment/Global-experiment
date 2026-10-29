@@ -9,7 +9,7 @@ import { AdminListPage } from "../table/AdminListPage";
 import { AdminButton, chipInput, Popover } from "../ui/controls";
 import { useCan } from "../session";
 import { useToast } from "../ui/Toast";
-import { NotionImportControl } from "./NotionImportControl";
+import { DirectoryMoreOptions } from "./DirectoryMoreOptions";
 import { PEOPLE_COLUMNS, PEOPLE_DEFAULT_SORT, peopleFields } from "./peopleTable";
 
 function NewPersonControl() {
@@ -94,7 +94,7 @@ export function PeopleList() {
         archivedView: true,
         actions: (
           <>
-            <NotionImportControl module="directory" />
+            <DirectoryMoreOptions table="people" />
             {canCreate ? <NewPersonControl /> : null}
           </>
         ),

@@ -29,17 +29,13 @@ const envSchema = z
     /** Defaults to true in production; only ever false for plain-http local development. */
     COOKIE_SECURE: booleanFromString.optional(),
     /**
-     * Notion "0.1 native" (admin import page). Server-side only: the token
-     * never reaches the browser. Without them the import page says so.
+     * Notion "0.1 native" People and Organizations (the admin's Notion import,
+     * the only one left). Server-side only: the token never reaches the
+     * browser. Without them the import page says so.
      */
     NOTION_API_KEY: z.string().trim().optional(),
-    NOTION_DOMAINS_DB_ID: z.string().trim().optional(),
-    NOTION_FIELDS_DB_ID: z.string().trim().optional(),
-    NOTION_EXPERTISE_DB_ID: z.string().trim().optional(),
     NOTION_PEOPLE_DB_ID: z.string().trim().optional(),
     NOTION_ORGANIZATIONS_DB_ID: z.string().trim().optional(),
-    /** npm run api:import:treasury (roadmap module 1b). */
-    NOTION_TREASURY_DB_ID: z.string().trim().optional(),
     /** Tests only: read the import source from a JSON file instead of Notion. */
     IMPORT_FIXTURE_FILE: z.string().trim().optional(),
 
@@ -75,9 +71,7 @@ const envSchema = z
     TREASURY_STATS_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
     TREASURY_PUBLIC_TOOLBAR: booleanFromString.default(false),
     /** Default schedules of the Notion imports: a 5-field cron expression (server time zone: UTC), or "off". */
-    IMPORT_SCHEDULE_TAXONOMY: cronOrOff.default("off"),
     IMPORT_SCHEDULE_DIRECTORY: cronOrOff.default("off"),
-    IMPORT_SCHEDULE_TREASURY: cronOrOff.default("off"),
     /**
      * Treasury supporting documents (overview §3.4): a private directory
      * outside every web root, owned by the API user, included in backups.
@@ -143,12 +137,8 @@ const envSchema = z
       notion: {
         token: id(env.NOTION_API_KEY),
         databases: {
-          domains: id(env.NOTION_DOMAINS_DB_ID),
-          fields: id(env.NOTION_FIELDS_DB_ID),
-          expertise: id(env.NOTION_EXPERTISE_DB_ID),
           people: id(env.NOTION_PEOPLE_DB_ID),
           organizations: id(env.NOTION_ORGANIZATIONS_DB_ID),
-          treasury: id(env.NOTION_TREASURY_DB_ID),
         },
         fixtureFile: id(env.IMPORT_FIXTURE_FILE),
       },
@@ -177,9 +167,7 @@ const envSchema = z
         publicToolbar: env.TREASURY_PUBLIC_TOOLBAR,
       },
       importSchedules: {
-        taxonomy: env.IMPORT_SCHEDULE_TAXONOMY,
         directory: env.IMPORT_SCHEDULE_DIRECTORY,
-        treasury: env.IMPORT_SCHEDULE_TREASURY,
       },
       fileStorageDir: env.FILE_STORAGE_DIR ?? (production ? "/var/lib/global-experiment/files" : ".data/files"),
       jobsDriver: env.JOBS_DRIVER ?? (env.NODE_ENV === "test" ? "inprocess" : "pgboss"),

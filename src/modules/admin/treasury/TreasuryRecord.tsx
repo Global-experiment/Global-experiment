@@ -10,7 +10,7 @@ import { formatEntryNumber, type RecordHistory, type TreasuryDocument, type Trea
 import { useAdminData } from "../api/useAdminData";
 import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
-import { AdminIcon, NotionMark } from "../ui/adminIcons";
+import { AdminIcon } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, PanelButton, Pills, PropertyRow } from "../ui/RecordForm";
 import { useCan } from "../session";
@@ -22,7 +22,6 @@ import {
   DOCUMENT_TYPES,
   formatBytes,
   formatMoney,
-  managedLabel,
   modeLabel,
   publicationLabel,
   SOURCE_LABEL,
@@ -47,8 +46,8 @@ const message = (caught: unknown, fallback: string) => (caught instanceof AdminA
  * p14's panel and history; the Treasury has no frame of its own).
  *
  * Data ownership (overview §2.1) decides what can change:
- * - Notion-managed expenses: every field is read-only, with the "Managed in
- *   Notion" badge and a link to the page — edit there, then import;
+ * - the Treasury is edited here only (decision of 2026-10-23: no import, no
+ *   export); expenses copied from Notion earlier are ordinary entries;
  * - Stripe entries: amounts and dates come from Stripe; only the internal
  *   note, the review and the publication change here;
  * - the internal note and the review status are saved together by "Submit
@@ -100,7 +99,6 @@ export function TreasuryRecord({ id }: { id: string }) {
   if (permissions.review.allowed && draft.reviewStatus !== base.reviewStatus) patch.reviewStatus = draft.reviewStatus;
   const dirty = Object.keys(patch).length > 0;
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
-  const notion = loaded.managedBy === "notion";
   const number = formatEntryNumber(loaded.number);
 
   async function submit(): Promise<boolean> {
@@ -168,9 +166,9 @@ export function TreasuryRecord({ id }: { id: string }) {
         },
         archived: loaded.archivedAt !== null,
         setArchived: !canUpdate ? undefined : (archived) => run(archived ? "archiving" : "restoring", () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }), archived ? "Entry archived" : "Entry restored"),
-        // Only manual entries can go: Stripe and Notion entries belong to the ledger and the importer.
+        // Only manual entries can go: Stripe entries belong to the ledger.
         remove:
-          loaded.source === "manual" && !notion && canDelete
+          loaded.source === "manual" && canDelete
             ? {
                 confirmText: number,
                 run: async (confirm) => {
@@ -185,21 +183,7 @@ export function TreasuryRecord({ id }: { id: string }) {
         busy,
       }}
     >
-      {notion ? (
-        <div data-managed="notion" className="flex flex-wrap items-center gap-2 pl-1 text-body">
-          <span className="inline-flex h-6 items-center gap-1 rounded-control px-2 font-bold ring-1 ring-line">
-            <NotionMark />
-            Managed in Notion
-          </span>
-          <span className="text-text-muted">Edit it in Notion, then run the Treasury import.</span>
-          {loaded.notionUrl ? (
-            <a href={loaded.notionUrl} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 underline underline-offset-2 ${focusRing}`}>
-              Open in Notion
-              <AdminIcon name="arrow_outward" />
-            </a>
-          ) : null}
-        </div>
-      ) : loaded.source === "stripe" ? (
+      {loaded.source === "stripe" ? (
         <div data-managed="stripe" className="flex flex-wrap items-center gap-2 pl-1 text-body">
           <span className="inline-flex h-6 items-center gap-1 rounded-control px-2 font-bold ring-1 ring-line">
             <AdminIcon name="lock" />
@@ -236,7 +220,7 @@ export function TreasuryRecord({ id }: { id: string }) {
           <span className="tabular-nums">{formatMoney(loaded.grossAmount, loaded.currency)}</span>
         </ReadOnly>
       </PropertyRow>
-      <PropertyRow icon="numbers" label="Fee" hint={notion ? "Imported from Notion: the fee isn't known (recorded as 0, flagged)." : undefined}>
+      <PropertyRow icon="numbers" label="Fee">
         <ReadOnly>
           <span className="tabular-nums">{formatMoney(loaded.feeAmount, loaded.currency)}</span>
         </ReadOnly>
@@ -335,9 +319,6 @@ export function TreasuryRecord({ id }: { id: string }) {
       <PropertyRow icon="select" label="Source">
         <ReadOnly>{`${SOURCE_LABEL[loaded.source]} · ${modeLabel(loaded)}`}</ReadOnly>
       </PropertyRow>
-      <PropertyRow icon="lock" label="Managed by">
-        <ReadOnly>{managedLabel(loaded)}</ReadOnly>
-      </PropertyRow>
       <PropertyRow icon="numbers" label={loaded.source === "stripe" ? "Stripe ID" : "Transaction ID"}>
         <ReadOnly>{loaded.externalTransactionId ? <span className="font-mono text-meta">{loaded.externalTransactionId}</span> : null}</ReadOnly>
       </PropertyRow>
@@ -377,7 +358,7 @@ export function TreasuryRecord({ id }: { id: string }) {
         updatedAt={loaded.updatedAt}
         createdAt={loaded.createdAt}
         lastEditedBy={history.data?.lastEditedBy?.label ?? null}
-        createdBy={history.data?.createdBy?.label ?? (notion || loaded.source === "stripe" ? "Automation" : null)}
+        createdBy={history.data?.createdBy?.label ?? (loaded.source === "stripe" ? "Automation" : null)}
       />
     </RecordPage>
   );

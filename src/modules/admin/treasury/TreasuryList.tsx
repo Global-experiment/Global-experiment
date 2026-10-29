@@ -5,13 +5,12 @@ import { Highlight } from "@/shared/ui/Highlight";
 import { formatEntryNumber, type TreasuryEntryRow, type TreasuryOptions } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { formatDate } from "../people/peopleTable";
-import { NotionImportControl } from "../people/NotionImportControl";
 import { AdminListPage } from "../table/AdminListPage";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
 import { SavedViews, type SavedView } from "../table/SavedViews";
-import { formatBreakdown, formatMoney, formatOccurred, managedLabel, modeLabel, PUBLICATION_LABEL, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
+import { formatBreakdown, formatMoney, formatOccurred, modeLabel, PUBLICATION_LABEL, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
 
 const DEFAULT_SORT: SortRule[] = [
   { field: "occurred", direction: "desc" },
@@ -63,7 +62,6 @@ const COLUMNS: TableColumn<TreasuryEntryRow>[] = [
   { id: "publication", label: "Publication", icon: "select", width: 170, render: (row) => (row.publicNow ? publicationLabel(row) : muted(publicationLabel(row))) },
   { id: "source", label: "Source", icon: "select", width: 100, render: (row) => SOURCE_LABEL[row.source] },
   { id: "mode", label: "Mode", icon: "select", width: 80, render: (row) => (row.livemode && !row.sample ? modeLabel(row) : muted(modeLabel(row))) },
-  { id: "managed_by", label: "Managed by", icon: "lock", width: 120, render: (row) => managedLabel(row) },
   { id: "documents", label: "Documents", icon: "insert_drive_file", width: 110, render: (row) => (row.documents > 0 ? String(row.documents) : muted("0")) },
   { id: "created", label: "Created", icon: "schedule", width: 120, defaultHidden: true, render: (row) => formatDate(row.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, defaultHidden: true, render: (row) => formatDate(row.updatedAt) },
@@ -134,16 +132,6 @@ export function TreasuryList() {
           { value: "test", label: "Test" },
         ],
       },
-      {
-        id: "managed_by",
-        label: "Managed by",
-        icon: "lock",
-        operators: ["is"],
-        options: [
-          { value: "notion", label: "Notion" },
-          { value: "native", label: "Native (Stripe or admin)" },
-        ],
-      },
       { id: "documents", label: "Documents", icon: "insert_drive_file", operators: ["is_empty", "is_not_empty"] },
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
@@ -161,9 +149,8 @@ export function TreasuryList() {
         fields,
         columns: COLUMNS,
         recordHref: (row) => `/admin/treasury/${row.id}`,
-        subtitle: "Expenses are managed in Notion; donations, refunds and disputes come from Stripe.",
+        subtitle: "Donations, refunds and disputes come from Stripe.",
         views: <SavedViews views={VIEWS} archived />,
-        actions: <NotionImportControl module="treasury" />,
       }}
     />
   );

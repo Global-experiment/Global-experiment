@@ -3,19 +3,17 @@ import { desc, eq, sql } from "drizzle-orm";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { ConflictError, NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
 import { JOB_QUEUE, type JobQueue, type JobRecord } from "../jobs/job-queue.js";
-import { PUBLIC_CACHE_TAGS, RevalidationService } from "../revalidation/revalidation.service.js";
 import { SettingsService } from "../settings/settings.service.js";
 import { formatDirectoryReport, runDirectoryImport } from "./directory/directory-import.js";
 import { onlyDemoRefusal } from "./directory/directory-plan.js";
 import { ImportRefusedError } from "./import-run.js";
 import { importRuns } from "./import.schema.js";
-import { IMPORT_KINDS, IMPORT_SOURCE, type ImportKind, type ImportSource } from "./import-source.js";
-import { formatTaxonomyReport, runTaxonomyImport } from "./taxonomy/taxonomy-import.js";
-import { formatTreasuryReport, runTreasuryImport } from "./treasury/treasury-import.js";
-import { treasuryOnlyDemoRefusal } from "./treasury/treasury-plan.js";
+import { IMPORT_KINDS, IMPORT_SOURCE, RETIRED_IMPORT_KINDS, type ImportKind, type ImportSource } from "./import-source.js";
 
 /**
- * Notion imports as background jobs (overview §3.3): the admin's dry runs
+ * The Notion import of People and Organizations — the only Notion import
+ * left (decision of 2026-10-23: Treasury and every other table are edited
+ * in the admin only) — as background jobs (overview §3.3): the admin's dry runs
  * and applies, and the scheduled runs (`imports.<kind>.schedule`), go
  * through ONE job queue that holds at most one import at a time — on
  * pg-boss, so a queued or running import survives an API restart. The
@@ -81,7 +79,6 @@ export class ImportJobsService implements OnModuleInit, OnApplicationBootstrap {
     @Inject(IMPORT_SOURCE) private readonly source: ImportSource,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     private readonly settings: SettingsService,
-    private readonly revalidation: RevalidationService,
   ) {}
 
   onModuleInit(): void {
@@ -94,7 +91,15 @@ export class ImportJobsService implements OnModuleInit, OnApplicationBootstrap {
 
   /** Scheduled imports from the settings (read at start; a change takes effect on the next restart). */
   async onApplicationBootstrap(): Promise<void> {
-    const schedules = await this.settings.getMany(["imports.taxonomy.schedule", "imports.directory.schedule", "imports.treasury.schedule"]);
+    const schedules = await this.settings.getMany(["imports.directory.schedule"]);
+    // The retired Taxonomy and Treasury imports: any schedule left from before is cleared.
+    for (const kind of RETIRED_IMPORT_KINDS) {
+      try {
+        await this.queue.schedule(IMPORT_QUEUE, kind, null, { kind: "directory", mode: "apply", triggeredBy: `schedule:${kind}`, dryRunId: null } satisfies ImportJobData);
+      } catch (error) {
+        this.logger.error(`Couldn't clear the retired ${kind} import schedule: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+    }
     for (const kind of IMPORT_KINDS) {
       const cron = schedules[`imports.${kind}.schedule`];
       const active = cron !== "off" && !this.source.unavailable(kind);
@@ -110,9 +115,7 @@ export class ImportJobsService implements OnModuleInit, OnApplicationBootstrap {
   status() {
     const active = [...this.live.values()].find((job) => job.status === "running") ?? null;
     return {
-      taxonomy: { available: !this.source.unavailable("taxonomy"), reason: this.source.unavailable("taxonomy") ?? null },
       directory: { available: !this.source.unavailable("directory"), reason: this.source.unavailable("directory") ?? null },
-      treasury: { available: !this.source.unavailable("treasury"), reason: this.source.unavailable("treasury") ?? null },
       activeJob: active,
     };
   }
@@ -218,38 +221,19 @@ export class ImportJobsService implements OnModuleInit, OnApplicationBootstrap {
     const options = { apply, triggeredBy: data.triggeredBy, expectCounts: data.expectCounts };
     let output: ImportJobOutput = { status: "succeeded", runId: null, changes: null, applicable: false, report: null, error: null };
     try {
+      // A job queued before the retired imports were removed does nothing.
+      if (data.kind !== "directory") throw new ImportRefusedError(`The ${String(data.kind)} import no longer exists: that table is edited in the admin only.`);
       job.phase = "reading_notion";
-      if (data.kind === "taxonomy") {
-        const source = await this.source.taxonomy();
-        job.phase = apply ? "applying" : "planning";
-        const result = await runTaxonomyImport(this.db, source, options);
-        output = { ...output, runId: result.runId, changes: result.counts.changes, applicable: !apply && result.counts.changes > 0, report: formatTaxonomyReport(result) };
-      } else if (data.kind === "directory") {
-        const source = await this.source.directory();
-        job.phase = apply ? "applying" : "planning";
-        const result = await runDirectoryImport(this.db, source, options);
-        output = {
-          ...output,
-          runId: result.runId,
-          changes: result.counts.changes,
-          applicable: !apply && result.counts.changes > 0 && !onlyDemoRefusal(result.plan),
-          report: formatDirectoryReport(result),
-        };
-      } else {
-        const source = await this.source.treasury();
-        job.phase = apply ? "applying" : "planning";
-        const publishUnqualified = await this.settings.get("treasury.publish_unqualified");
-        const result = await runTreasuryImport(this.db, source, { ...options, publishUnqualified });
-        // The public Treasury pages read these entries: refresh them now rather than in 5 minutes.
-        if (apply && result.counts.changes > 0) await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
-        output = {
-          ...output,
-          runId: result.runId,
-          changes: result.counts.changes,
-          applicable: !apply && result.counts.changes > 0 && !treasuryOnlyDemoRefusal(result.plan),
-          report: formatTreasuryReport(result),
-        };
-      }
+      const source = await this.source.directory();
+      job.phase = apply ? "applying" : "planning";
+      const result = await runDirectoryImport(this.db, source, options);
+      output = {
+        ...output,
+        runId: result.runId,
+        changes: result.counts.changes,
+        applicable: !apply && result.counts.changes > 0 && !onlyDemoRefusal(result.plan),
+        report: formatDirectoryReport(result),
+      };
       Object.assign(job, output);
       return output;
     } catch (error) {

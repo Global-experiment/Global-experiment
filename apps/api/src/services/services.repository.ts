@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { aliasedTable, and, asc, eq, exists, ilike, inArray, isNotNull, isNull, not, notIlike, or, sql, type SQL } from "drizzle-orm";
+import { aliasedTable, and, asc, eq, exists, ilike, isNotNull, isNull, not, notIlike, or, sql, type SQL } from "drizzle-orm";
 import { adminUsers } from "../auth/auth.schema.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import type { Page, Sort } from "../common/listing/list-query.js";

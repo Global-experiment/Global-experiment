@@ -113,11 +113,11 @@ describe("taxonomy screen filters", () => {
     ]);
   });
 
-  it("renders read-only, with the Notion note and no editing controls", () => {
+  it("renders read-only, with no import, no Notion label and no editing controls (decision of 2026-10-23)", () => {
     const html = renderToStaticMarkup(<TaxonomyScreen level="expertise" />);
-    expect(html).toContain("Managed in Notion – updated by the importer.");
-    expect(html).toContain('href="/admin/imports"');
-    expect(html).toContain("Import Notion");
+    expect(html).not.toContain("Managed in Notion");
+    expect(html).not.toContain('href="/admin/imports"');
+    expect(html).not.toMatch(/Import|Export/);
     expect(html).not.toMatch(/Rename|Delete|New expertise/);
   });
 });
