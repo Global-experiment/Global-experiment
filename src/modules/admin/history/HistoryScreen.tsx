@@ -31,7 +31,7 @@ const ENTITY_LABELS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, string> = { admin: "Admin", import: "Notion import", stripe: "Stripe", system: "System" };
 
 /** Where an event's record lives in the admin (none for settings, or a deleted record). */
-function recordHref(entity: HistoryListItem["entity"], action: string): string | undefined {
+function recordHref(entity: HistoryListItem["entity"], action: string, meta: HistoryListItem["meta"] = {}): string | undefined {
   if (action === "deleted") return undefined;
   switch (entity.type) {
     case "person":
@@ -47,7 +47,8 @@ function recordHref(entity: HistoryListItem["entity"], action: string): string |
     case "expertise_item":
       return "/admin/expertise";
     case "import_run":
-      return "/admin/imports";
+      // A CSV import has its own report page (OPS-150); the Notion runs are listed on the Imports page.
+      return typeof meta.kind === "string" && meta.kind.endsWith("_csv") ? `/admin/imports/csv/${entity.id}` : "/admin/imports";
     case "service":
       return `/admin/services/${entity.id}`;
     case "access_grant":
@@ -221,7 +222,7 @@ export function HistoryScreen() {
           // Full width (client, 2026-10-23).
           <ol aria-label="History, newest first">
             {list.data.items.map((item) => {
-              const href = item.entity.exists ? recordHref(item.entity, item.action) : undefined;
+              const href = item.entity.exists ? recordHref(item.entity, item.action, item.meta) : undefined;
               const title = item.entity.title;
               return (
                 <HistoryEvent

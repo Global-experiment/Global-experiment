@@ -53,25 +53,18 @@ export async function searchOrganizations(text: string, signal: AbortSignal): Pr
 
 /**
  * Expenses with no recipient yet (an expense has one recipient), latest
- * first; search by name or EXP-n. Notion-managed expenses are listed but
- * can't be picked: the Treasury import sets their recipient from Notion.
+ * first; search by name or EXP-n.
  */
 export async function searchExpenses(text: string, signal: AbortSignal): Promise<RelationOption[]> {
   const query = new URLSearchParams({ pageSize: "20", sort: "occurred:desc" });
   query.append("filter", "type:is:expense");
   query.append("filter", "recipient:is_empty");
   if (text.trim()) query.set("search", text.trim());
-  const page = await adminApi<Page<{ id: string; number: number; name: string; currency: string; grossAmount: number; managedBy: "notion" | "native" }>>(`/treasury?${query}`, { signal });
-  return page.items.map((row) => {
-    const notion = row.managedBy === "notion";
-    return {
-      ...expenseOption({ id: row.id, entryNumber: row.number, currency: row.currency, grossAmount: row.grossAmount }),
-      detail: notion ? `${row.name} · Managed in Notion` : row.name,
-      disabled: notion,
-      muted: notion,
-      disabledReason: notion ? "Managed in Notion: set its recipient there" : undefined,
-    };
-  });
+  const page = await adminApi<Page<{ id: string; number: number; name: string; currency: string; grossAmount: number }>>(`/treasury?${query}`, { signal });
+  return page.items.map((row) => ({
+    ...expenseOption({ id: row.id, entryNumber: row.number, currency: row.currency, grossAmount: row.grossAmount }),
+    detail: row.name,
+  }));
 }
 
 /** Field errors as shown: the draft's own problems for the fields left (or all, after Submit), then the API's. */

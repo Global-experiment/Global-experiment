@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSchema, toSourceRow } from "../taxonomy/taxonomy-source.js";
-import { NotionApiError, NotionClient, plainText, type NotionPage } from "./notion-client.js";
+import { NotionApiError, NotionClient } from "./notion-client.js";
 
 // No live Notion calls: a scripted fetch stands in for the API.
 const TOKEN = "secret_test_token_never_printed";
@@ -66,44 +65,5 @@ describe("Notion client", () => {
       () => json(200, { results: [], has_more: false, next_cursor: null }),
     ]);
     await expect(client.allPages("db")).resolves.toEqual([]);
-  });
-});
-
-describe("Notion taxonomy rows", () => {
-  // Notion splits an auto-linked Stable ID into segments; the visible text is all of them joined.
-  const page: NotionPage = {
-    id: "item-1",
-    created_time: "2026-09-25T10:00:00.000Z",
-    properties: {
-      Expertise: { type: "title", title: [{ plain_text: "Construction management" }] },
-      "Stable ID": { type: "rich_text", rich_text: [{ plain_text: "04.01.construction" }, { plain_text: "_management" }] },
-      Status: { type: "select", select: { name: "Active" } },
-      Field: { type: "relation", relation: [{ id: "field-1" }] },
-      Domain: { type: "relation", relation: [{ id: "domain-ignored" }] },
-      Team: { type: "multi_select", multi_select: [{ name: "Tech" }, { name: "Operations" }] },
-    },
-  };
-
-  it("joins every text segment (ignoring Notion's auto-links) and reads the Field relation as the parent", () => {
-    expect(plainText(page.properties["Stable ID"])).toBe("04.01.construction_management");
-    expect(toSourceRow("expertise", page)).toEqual({
-      level: "expertise",
-      pageId: "item-1",
-      createdTime: "2026-09-25T10:00:00.000Z",
-      name: "Construction management",
-      rawStableId: "04.01.construction_management",
-      status: "Active",
-      parentPageIds: ["field-1"],
-      teams: ["Tech", "Operations"],
-    });
-  });
-
-  it("refuses to run if Notion's columns were renamed or retyped", () => {
-    expect(() => assertSchema("field", { properties: { Field: { type: "title" }, "Stable ID": { type: "rich_text" }, Status: { type: "status" } } })).toThrow(
-      'The Notion field database changed shape: "Status" should be select, found status; "Domain" should be relation, found nothing.',
-    );
-    expect(() =>
-      assertSchema("domain", { properties: { Domain: { type: "title" }, "Stable ID": { type: "rich_text" }, Status: { type: "select" }, Extra: { type: "url" } } }),
-    ).not.toThrow();
   });
 });

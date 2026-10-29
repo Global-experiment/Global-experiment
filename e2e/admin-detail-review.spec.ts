@@ -255,7 +255,7 @@ test("organizations and expertise keep their order too", async () => {
   expect(await chipLabels("expertise")).toEqual([expertise[1], expertise[0]]);
 });
 
-test("the Expenses search answers on a person; Notion-managed expenses are listed but can't be picked", async () => {
+test("the Expenses search answers on a person; every listed expense can be picked (no Notion-managed state any more)", async () => {
   await openPerson();
   const search = page.locator('[data-relation-picker="expenses"] input[role=combobox]');
   await search.click();
@@ -267,20 +267,10 @@ test("the Expenses search answers on a person; Notion-managed expenses are liste
   const empty = await results.getByText("No matches.").count();
   expect(count > 0 || empty === 1).toBe(true);
   for (let index = 0; index < count; index++) {
-    const option = options.nth(index);
-    if ((await option.innerText()).includes("Managed in Notion")) {
-      await expect(option).toBeDisabled();
-      await expect(option).toHaveAttribute("title", "Managed in Notion: set its recipient there");
-    }
+    await expect(options.nth(index)).toBeEnabled();
+    await expect(options.nth(index)).not.toContainText("Managed in Notion");
   }
   await page.keyboard.press("Escape");
-  // The API refuses a Notion-managed expense too (the Treasury import sets those recipients).
-  const notion = (await (await page.request.get("/api/admin/treasury?filter=type:is:expense&filter=managed_by:is:notion&filter=recipient:is_empty&pageSize=1")).json()) as { items: { id: string }[] };
-  if (notion.items.length > 0) {
-    const refused = await page.request.patch(`/api/admin/people/${personId}`, { data: { expenseIds: [notion.items[0]!.id] }, headers: { origin: origin() } });
-    expect(refused.status()).toBe(400);
-    expect(JSON.stringify(await refused.json())).toContain("managed in Notion");
-  }
 });
 
 test("the design-system date picker: keyboard, Escape, the chosen day", async () => {

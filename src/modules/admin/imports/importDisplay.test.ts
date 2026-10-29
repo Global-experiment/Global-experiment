@@ -4,7 +4,7 @@ import { canApply, jobLine, runChanges, runKindLabel } from "./importDisplay";
 
 const job = (extra: Partial<ImportJob>): ImportJob => ({
   id: "j",
-  kind: "taxonomy",
+  kind: "directory",
   mode: "dry_run",
   status: "running",
   phase: "reading_notion",
@@ -22,11 +22,11 @@ const job = (extra: Partial<ImportJob>): ImportJob => ({
 
 describe("import page display", () => {
   it("describes progress and outcomes", () => {
-    expect(jobLine(job({}))).toBe("Taxonomy dry run: Reading Notion…");
-    expect(jobLine(job({ mode: "apply", phase: "applying" }))).toBe("Taxonomy apply: Writing to the database (one transaction)…");
-    expect(jobLine(job({ status: "succeeded", phase: "done", changes: 1 }))).toBe("Taxonomy dry run finished: 1 change.");
+    expect(jobLine(job({}))).toBe("People & organizations dry run: Reading Notion…");
+    expect(jobLine(job({ mode: "apply", phase: "applying" }))).toBe("People & organizations apply: Writing to the database (one transaction)…");
+    expect(jobLine(job({ status: "succeeded", phase: "done", changes: 1 }))).toBe("People & organizations dry run finished: 1 change.");
     expect(jobLine(job({ kind: "directory", status: "succeeded", phase: "done", changes: 0 }))).toBe("People & organizations dry run finished: no changes.");
-    expect(jobLine(job({ status: "refused", error: "Notion changed." }))).toBe("Taxonomy dry run refused: Notion changed.");
+    expect(jobLine(job({ status: "refused", error: "Notion changed." }))).toBe("People & organizations dry run refused: Notion changed.");
   });
 
   it("offers Apply only for a finished, applicable dry run", () => {
@@ -39,9 +39,13 @@ describe("import page display", () => {
 
   it("summarises history rows", () => {
     expect(runKindLabel("directory")).toBe("People & organizations");
-    expect(runKindLabel("treasury")).toBe("Treasury expenses");
+    // Past runs of the retired imports keep a name; CSV runs have theirs.
+    expect(runKindLabel("treasury")).toBe("Treasury expenses (retired)");
+    expect(runKindLabel("taxonomy")).toBe("Taxonomy (retired)");
+    expect(runKindLabel("people_csv")).toBe("People (CSV)");
     expect(runKindLabel("cms")).toBe("cms");
     expect(runChanges({ counts: { changes: 12 } } as never)).toBe("12");
+    expect(runChanges({ counts: { create: 3 } } as never)).toBe("3 created");
     expect(runChanges({ counts: {} } as never)).toBe("—");
   });
 });

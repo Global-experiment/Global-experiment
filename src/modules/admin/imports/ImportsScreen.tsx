@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
 import type { ImportJob, ImportKind, ImportRun, ImportStatus, Page } from "../api/types";
@@ -10,10 +11,13 @@ import { usePermissions } from "../session";
 import { canApply, formatWhen, jobLine, KIND_LABEL, MODE_LABEL, runChanges, runKindLabel } from "./importDisplay";
 
 const POLL_MS = 1000;
-const KINDS: ImportKind[] = ["taxonomy", "directory", "treasury"];
+const KINDS: ImportKind[] = ["directory"];
 
 /**
- * /admin/imports — the "Notion import" page. Dry runs and applies run as
+ * /admin/imports — the "Notion import" page, for People and Organizations
+ * only (decision of 2026-10-23: every other table is edited in the admin,
+ * with no import or export). It also lists the CSV imports, each with its
+ * report. Dry runs and applies run as
  * background jobs in the API (the request returns at once; this page polls
  * the job). Apply is offered only for the dry run just reviewed, behind a
  * confirmation, and the API refuses it if anything changed since. The
@@ -88,8 +92,9 @@ export function ImportsScreen() {
         <h1 className="text-body font-bold">Notion import</h1>
       </header>
       <p className="max-w-[720px] px-2 text-text-muted">
-        Copies the Notion &ldquo;0.1 native&rdquo; databases into the admin. Always start with a dry run: it reads Notion and reports what
-        would change without writing anything. Apply writes exactly that, in one transaction — never deleting a record.
+        Copies People and Organizations from the Notion &ldquo;0.1 native&rdquo; databases into the admin. Always start with a dry run: it
+        reads Notion and reports what would change without writing anything. Apply writes exactly that, in one transaction — never deleting
+        a record. To import a CSV file, use More options → Import CSV on People or Organizations.
       </p>
 
       <section aria-label="Run an import" className="flex flex-wrap gap-2 px-2">
@@ -191,7 +196,11 @@ export function ImportsScreen() {
                     <td className="border-t border-l border-line px-1 py-1">{MODE_LABEL[run.mode]}</td>
                     <td className="border-t border-l border-line px-1 py-1 tabular-nums">{runChanges(run)}</td>
                     <td className="border-t border-l border-line px-1 py-1">
-                      {run.issues.length === 0 ? (
+                      {run.kind.endsWith("_csv") ? (
+                        <Link href={`/admin/imports/csv/${run.id}`} className={`underline underline-offset-2 ${focusRing}`}>
+                          Report
+                        </Link>
+                      ) : run.issues.length === 0 ? (
                         "0"
                       ) : (
                         <button

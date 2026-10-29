@@ -82,7 +82,7 @@ export class TreasuryAdminController {
     return this.treasury.get(id);
   }
 
-  /** Only the internal note, and only on native entries (Notion-managed → 409 managed_in_notion). */
+  /** The internal note (treasury.update) and the review status (treasury.review). */
   @Patch(":id")
   @RequiresAny("treasury.update", "treasury.review")
   update(

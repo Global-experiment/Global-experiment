@@ -71,18 +71,3 @@ export function PublicPageHeader({ title, administrateHref, publicPath }: { titl
     </header>
   );
 }
-
-/** "Managed in Notion" (cms.mode = notion): the content is edited in Notion and kept in sync by the importer. */
-export function ManagedInNotionBadge({ notionUrl }: { notionUrl?: string }) {
-  return (
-    <p data-managed-in-notion className="flex items-center gap-2 text-meta text-text-muted">
-      <span className="inline-flex h-6 items-center rounded-control px-2 font-bold text-text-primary ring-1 ring-line">Managed in Notion</span>
-      <span>Read-only here: edit in Notion; the importer keeps it in sync.</span>
-      {notionUrl ? (
-        <a href={notionUrl} target="_blank" rel="noopener" className={`underline underline-offset-2 ${focusRing}`}>
-          Open in Notion
-        </a>
-      ) : null}
-    </p>
-  );
-}

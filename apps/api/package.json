@@ -18,9 +18,7 @@
     "purge-test-donations": "node dist/scripts/purge-test-donations.js",
     "seed-sample-treasury": "node dist/scripts/seed-sample-treasury.js",
     "purge-sample-treasury": "node dist/scripts/purge-sample-treasury.js",
-    "import:taxonomy": "node dist/scripts/import-taxonomy.js",
-    "import:directory": "node dist/scripts/import-directory.js",
-    "import:treasury": "node dist/scripts/import-treasury.js"
+    "import:directory": "node dist/scripts/import-directory.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",

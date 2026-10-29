@@ -1,12 +1,12 @@
 import type { Database } from "../common/database/database.module.js";
 import { recordAuditEvent } from "../audit/audit.service.js";
-import { AUTOMATION } from "../audit/audit.types.js";
+import { AUTOMATION, type AuditActor } from "../audit/audit.types.js";
 import { importRuns } from "./import.schema.js";
 
 type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
 /**
- * The shared shape of a Notion import run (taxonomy, directory): plan
+ * The shared shape of an import run (Notion People and Organizations, CSV): plan
  * against the database, then either stop (dry run) or apply — planned and
  * written inside ONE transaction, so it writes exactly what it reports, all
  * or nothing. Every run (dry, applied, failed) leaves an import_runs row.
@@ -15,6 +15,10 @@ export interface ImportRunSpec<Plan> {
   kind: string;
   apply: boolean;
   triggeredBy: string;
+  /** Who the run's own history event names: the admin who ran it (CSV), or Automation (default). */
+  actor?: AuditActor;
+  /** The run's title in the history; "<kind> import · <mode>" by default. */
+  label?: string;
   plan: (db: Executor) => Promise<Plan>;
   write: (tx: Executor, plan: Plan) => Promise<void>;
   counts: (plan: Plan) => object;
@@ -71,9 +75,9 @@ export async function runImport<Plan>(db: Database, spec: ImportRunSpec<Plan>): 
       entityType: "import_run",
       entityId: run!.id,
       action: "created",
-      actor: AUTOMATION,
+      actor: spec.actor ?? AUTOMATION,
       source: "import",
-      meta: { label: `${spec.kind} import · ${mode.replace("_", " ")}`, triggeredBy: spec.triggeredBy },
+      meta: { label: spec.label ?? `${spec.kind} import · ${mode.replace("_", " ")}`, triggeredBy: spec.triggeredBy, kind: spec.kind, mode },
     });
     return run!.id;
   };

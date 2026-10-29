@@ -80,7 +80,7 @@ tables.
 | **Settings and module registry** | Module modes (notion / native), feature flags, import schedules; which modules are enabled | `settings` | `/api/admin/modules`, `/api/admin/settings` (owner), public `/api/config` (public flags only) | Settings (owner, from the user card); drives the sidebar | Donate page reads public flags | Audit |
 | **Analytics** | Visitor statistics | none in PostgreSQL (lives in the analytics tool) | `/api/admin/analytics` (proxy of the tool's stats API) | Monitoring → Analytics | none (v1.0: Statistics page) | Analytics integration |
 | **Technical dashboard** | Health of the stack, jobs, backups, integrations | none (reads health, `job` tables, `import_runs`) | `/api/admin/system` | Monitoring → Technical dashboard | none | all integrations, Jobs |
-| **Imports** | Notion → PostgreSQL copies (dry run, apply, report) | `import_runs` | `/api/admin/imports/*` | People → Import Notion; Imports page | none | the modules it writes into |
+| **Imports** | People and Organizations only (ADR 016): CSV import (check, import, report) and the Notion import (dry run, apply, report) | `import_runs` | `/api/admin/imports/*`, `/api/admin/imports/csv/*` | People / Organizations → More options → Import CSV, Import Notion; Imports page; report pages | none | Directory |
 
 Module notes:
 
@@ -105,6 +105,14 @@ Module notes:
 ### 2.1 Data ownership: Notion in v0.1, native in v1.0
 
 Decided by the client on 2026-10-15 (answers Q1).
+
+**Changed on 2026-10-23 (built 2026-10-30, ADR [016](./decisions/016-imports-csv-only-for-people-and-organizations.md)):**
+only People and Organizations take data from outside — a **CSV import**
+for admins with write access, and the Notion import kept as a secondary
+option. Treasury and every other table are edited **in the admin only**,
+with no import and no export; the Taxonomy and Treasury importers and the
+"Managed in Notion" states outside People and Organizations were removed.
+The text below is the original plan, kept for the record.
 
 - **v0.1:** Notion is the **editing tool** for the Notion-backed modules —
   Directory (People, Organizations), Taxonomy, CMS Documentation and Home,
@@ -252,7 +260,7 @@ There can be **several Rootadmins** (admin p15 shows two), never none.
 | `communication` | Communication admin | Home and Documentation, Waitlist, Messages. |
 | `moderation` | Moderator | Feedbacks and issues, Messages. |
 | `operations` | Operation admin | People, Organizations, Services and Permissions. |
-| `tech` | Tech admin | Services and Permissions, Taxonomy import, Imports, History. |
+| `tech` | Tech admin | Services and Permissions, Imports, History. |
 | `compliance` | Compliance | Read access everywhere, Treasury review. |
 
 Permissions are `module.action` keys stored as rows (`admin_permissions`),
@@ -280,7 +288,10 @@ that file:
 
 "All" is every action the module has. Without `history.read`, Monitoring →
 History and each record's history show the events of the modules the role
-can read. Running an import needs `<module>.import` as well.
+can read. Only People and Organizations have imports (ADR 016): the Notion
+import needs `directory.import`, the CSV import `directory.create` (the
+table's write access). The `taxonomy.import`, `treasury.import` and
+`cms.import` keys remain but no route uses them.
 
 **Enforcement.** One global guard (`PermissionGuard`, after the session
 guard) reads each route's declaration — `@Requires(...)`,
@@ -432,7 +443,7 @@ only, validated at startup).
 
 | Integration | Used by | Direction | Notes |
 |---|---|---|---|
-| **Notion** | Imports (Directory, Taxonomy, Treasury expenses, CMS, Feedback, Services) | read-only | The **editing tool in v0.1** (§2.1): importers on demand and on a schedule, writing only `managed_by = notion` records; switched off per module at the v1.0 cut-over. Dry run → report → apply; demo records skipped; idempotent. Home and Documentation are read live until the CMS module ships. |
+| **Notion** | Import of People and Organizations only since 2026-10-30 (ADR 016); Home and Documentation read live | read-only | The **editing tool in v0.1** (§2.1): importers on demand and on a schedule, writing only `managed_by = notion` records; switched off per module at the v1.0 cut-over. Dry run → report → apply; demo records skipped; idempotent. Home and Documentation are read live until the CMS module ships. |
 | **Stripe** | Treasury (donations) | both | Hosted Checkout, one-off; **monthly behind the `donations.monthly` flag (off)**, no yearly; webhooks with signature check, exactly-once processing, refunds as negative entries, fees from balance transactions; Stripe sends the email receipts. Test mode until the client says otherwise. |
 | **Wise** | Treasury (later) | read | Balance and statement sync into `treasury_entries` (`source = wise`), then payouts in v1.0. Not in v0.1 unless asked. |
 | **Stalwart** | Messages, Emails, Waitlist | both | JMAP inbound, SMTP outbound. |

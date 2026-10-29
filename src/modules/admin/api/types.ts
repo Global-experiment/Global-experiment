@@ -186,7 +186,8 @@ export interface ExpertiseTree {
   domains: ExpertiseDomainNode[];
 }
 
-export type ImportKind = "taxonomy" | "directory" | "treasury";
+/** The Notion import: People and Organizations only (the Taxonomy and Treasury imports were removed, 2026-10-30). */
+export type ImportKind = "directory";
 
 /** An import_runs row (GET /imports/runs). */
 export interface ImportRun {
@@ -220,10 +221,59 @@ export interface ImportJob {
 }
 
 export interface ImportStatus {
-  taxonomy: { available: boolean; reason: string | null };
   directory: { available: boolean; reason: string | null };
-  treasury: { available: boolean; reason: string | null };
   activeJob: ImportJob | null;
+}
+
+// ---- CSV import of People and Organizations (mirrors apps/api/src/import/csv) ----
+
+export type CsvTable = "people" | "organizations";
+
+export interface CsvCounts {
+  fileName: string;
+  rows: number;
+  create: number;
+  duplicates: number;
+  duplicatesIncluded: number;
+  errors: number;
+}
+
+export interface CsvDuplicate {
+  reason: string;
+  existing: { id: string; name: string } | null;
+  line: number | null;
+}
+
+export interface CsvPreviewRow {
+  line: number;
+  name: string;
+  status: "create" | "duplicate" | "error";
+  errors: string[];
+  duplicate: CsvDuplicate | null;
+  included: boolean;
+}
+
+export interface CsvPreview {
+  table: CsvTable;
+  fileName: string;
+  delimiter: "," | ";";
+  headers: string[];
+  samples: string[][];
+  mapping: (string | null)[];
+  fields: { key: string; label: string; required: boolean }[];
+  counts: CsvCounts;
+  rows: CsvPreviewRow[];
+}
+
+export interface CsvReport {
+  id: string;
+  table: CsvTable;
+  mode: "apply" | "failed";
+  startedAt: string;
+  triggeredBy: string;
+  counts: Partial<CsvCounts>;
+  failure: string | null;
+  rows: (Omit<CsvPreviewRow, "status"> & { status: "created" | "not_imported" | "duplicate" | "error"; recordId: string | null })[];
 }
 
 /** The signed-in admin (GET /api/admin/auth/session), with what their role allows. */
@@ -389,7 +439,6 @@ export interface TreasuryEntryRow {
   livemode: boolean;
   /** Sample data before go-live (marked Test publicly; purge-sample-treasury removes it). */
   sample: boolean;
-  managedBy: "notion" | "native";
   documents: number;
   createdAt: string;
   updatedAt: string;
@@ -412,8 +461,6 @@ export interface TreasuryRule {
 }
 
 export interface TreasuryEntry extends TreasuryEntryRow {
-  notionPageId: string | null;
-  notionUrl: string | null;
   externalTransactionId: string | null;
   sourceAccountId: string | null;
   reviewedAt: string | null;

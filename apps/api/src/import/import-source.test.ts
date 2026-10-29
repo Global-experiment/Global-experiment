@@ -7,13 +7,7 @@ const FIXTURE = fileURLToPath(new URL("../../../../e2e/fixtures/notion-import.js
 const base = { DATABASE_URL: "postgres://u@localhost:5432/db_test" };
 
 describe("import source", () => {
-  it("reads the test fixture through the same Notion mapping (segments joined, relations, teams)", async () => {
-    const taxonomy = await fixtureImportSource(FIXTURE).taxonomy();
-    expect(taxonomy.domains.map((row) => row.rawStableId)).toEqual(["domain.07.fixture_government"]);
-    expect(taxonomy.expertise.map((row) => [row.rawStableId, row.status, row.teams, row.parentPageIds])).toEqual([
-      ["07.02.fixture_assemblies", "Active", ["Moderation"], ["f0000000-0000-4000-8000-000000000011"]],
-      ["07.02.fixture_budgeting", "Proposed", ["Treasury"], ["f0000000-0000-4000-8000-000000000011"]],
-    ]);
+  it("reads the test fixture through the same Notion mapping", async () => {
     const directory = await fixtureImportSource(FIXTURE).directory();
     expect(directory.layouts.people.required).toEqual(["State", "Source", "Description"]);
   });
@@ -30,9 +24,6 @@ describe("import source", () => {
   it("names the missing server variables (never their values) when Notion isn't configured", () => {
     const config = parseConfig({ ...base, NODE_ENV: "test", NOTION_API_KEY: "secret_value_never_shown", NOTION_PEOPLE_DB_ID: "p" });
     const source = notionImportSource(config);
-    expect(source.unavailable("taxonomy")).toBe(
-      "Notion import isn't configured on the server (missing NOTION_DOMAINS_DB_ID, NOTION_FIELDS_DB_ID, NOTION_EXPERTISE_DB_ID).",
-    );
     expect(source.unavailable("directory")).toBe("Notion import isn't configured on the server (missing NOTION_ORGANIZATIONS_DB_ID).");
     expect(source.unavailable("directory")).not.toContain("secret_value_never_shown");
   });

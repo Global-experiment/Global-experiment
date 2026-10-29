@@ -160,4 +160,4 @@ export function canReadEntity(permissions: ReadonlySet<string>, entityType: stri
 }
 
 /** An import kind's module: running it needs `<module>.import`. */
-export const IMPORT_MODULES: Readonly<Record<string, Module>> = { directory: "directory", taxonomy: "taxonomy", treasury: "treasury" };
+export const IMPORT_MODULES: Readonly<Record<string, Module>> = { directory: "directory" };

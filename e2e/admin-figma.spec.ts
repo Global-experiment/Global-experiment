@@ -371,9 +371,12 @@ test.describe("signed in", () => {
     await expect(page).toHaveTitle("Treasury");
   });
 
-  test("column menu (p11): freeze and hide a column; Import Notion button", async ({ page }) => {
+  test("column menu (p11): freeze and hide a column; More options with the imports", async ({ page }) => {
     await page.goto("/admin/people");
-    await expect(page.getByRole("link", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
+    await page.getByRole("button", { name: "More options" }).click();
+    await expect(page.getByRole("menuitem", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
+    await expect(page.getByRole("menuitem", { name: "Import CSV" })).toHaveAttribute("href", "/admin/imports/csv?table=people");
+    await page.keyboard.press("Escape");
     const state = page.getByRole("columnheader", { name: "State", exact: true });
     await state.getByRole("button").first().click();
     const menu = page.getByRole("dialog", { name: /State/ });
@@ -560,10 +563,10 @@ test.describe("signed in", () => {
   });
 
   test("toast 'Notion imported' when an apply finishes on the Imports page", async ({ page }) => {
-    // The apply itself is mocked here: a real one would change the shared test taxonomy.
+    // The apply itself is mocked here: a real one would change the shared test directory.
     const job = (status: string) => ({
       id: "11111111-2222-4333-8444-555555555555",
-      kind: "taxonomy",
+      kind: "directory",
       mode: "apply",
       status,
       phase: status === "running" ? "applying" : "done",
@@ -574,7 +577,7 @@ test.describe("signed in", () => {
       dryRunId: null,
       changes: 3,
       applicable: false,
-      report: "TAXONOMY IMPORT — APPLIED (one transaction)",
+      report: "DIRECTORY IMPORT — APPLIED (one transaction)",
     });
     await page.route("**/api/admin/imports/status", async (route) => {
       const response = await route.fetch();

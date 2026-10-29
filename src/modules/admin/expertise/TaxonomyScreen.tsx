@@ -1,17 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
 import type { ExpertiseTree } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
-import { NotionImportControl } from "../people/NotionImportControl";
 import { AdminListPage } from "../table/AdminListPage";
 import type { TableColumn } from "../table/DataTable";
 import type { ListState } from "../table/listState";
 import { applyListState } from "../table/localList";
 import { ViewTabs } from "../table/ViewTabs";
-import { focusRing } from "../ui/controls";
 import { taxonomyFields, taxonomyListSpec, taxonomyRows, type TaxonomyLevel, type TaxonomyRow } from "./taxonomyFilters";
 
 export type { TaxonomyLevel } from "./taxonomyFilters";
@@ -104,15 +101,6 @@ export function TaxonomyScreen({ level }: { level: TaxonomyLevel }) {
         fields,
         columns: config.columns,
         views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
-        subtitle: (
-          <>
-            Managed in Notion – updated by the importer.{" "}
-            <Link href="/admin/imports" className={`underline underline-offset-2 ${focusRing}`}>
-              Import
-            </Link>
-          </>
-        ),
-        actions: <NotionImportControl module="taxonomy" />,
       }}
     />
   );

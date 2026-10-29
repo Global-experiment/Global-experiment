@@ -1,6 +1,15 @@
 import type { ImportJob, ImportKind, ImportRun } from "../api/types";
 
-export const KIND_LABEL: Record<ImportKind, string> = { taxonomy: "Taxonomy", directory: "People & organizations", treasury: "Treasury expenses" };
+export const KIND_LABEL: Record<ImportKind, string> = { directory: "People & organizations" };
+
+/** Every kind of past run, including the retired imports' and the CSV imports'. */
+const RUN_KIND_LABEL: Record<string, string> = {
+  ...KIND_LABEL,
+  people_csv: "People (CSV)",
+  organizations_csv: "Organizations (CSV)",
+  taxonomy: "Taxonomy (retired)",
+  treasury: "Treasury expenses (retired)",
+};
 
 const PHASE: Record<ImportJob["phase"], string> = {
   queued: "Starting…",
@@ -25,11 +34,11 @@ export const canApply = (job: ImportJob | null): job is ImportJob & { runId: str
 
 export const MODE_LABEL: Record<ImportRun["mode"], string> = { dry_run: "Dry run", apply: "Applied", failed: "Failed / refused" };
 
-const KNOWN_KINDS = new Set<string>(["taxonomy", "directory", "treasury"]);
-export const runKindLabel = (kind: string) => (KNOWN_KINDS.has(kind) ? KIND_LABEL[kind as ImportKind] : kind);
+export const runKindLabel = (kind: string) => RUN_KIND_LABEL[kind] ?? kind;
 
 /** "12 changes" / "—" for a run's counts. */
-export const runChanges = (run: ImportRun) => (typeof run.counts.changes === "number" ? String(run.counts.changes) : "—");
+export const runChanges = (run: ImportRun) =>
+  typeof run.counts.changes === "number" ? String(run.counts.changes) : typeof run.counts.create === "number" ? `${run.counts.create} created` : "—";
 
 const dateTime = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 export const formatWhen = (iso: string) => dateTime.format(new Date(iso));

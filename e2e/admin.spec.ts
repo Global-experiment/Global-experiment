@@ -65,8 +65,10 @@ test.describe("people administration", () => {
     for (const column of ["Name", "State", "Source", "Expertise", "Description", "Organization"]) {
       await expect(page.getByRole("columnheader", { name: column, exact: true })).toBeVisible();
     }
-    // The Import Notion control opens the import page.
-    await expect(page.getByRole("link", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
+    // More options → Import Notion opens the import page.
+    await page.getByRole("button", { name: "More options" }).click();
+    await expect(page.getByRole("menuitem", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
+    await page.keyboard.press("Escape");
   });
 
   test("search runs in the API and highlights matches", async ({ page }) => {

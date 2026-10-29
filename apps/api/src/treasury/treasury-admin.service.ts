@@ -46,9 +46,9 @@ const refused = (reason: string, message: string) => new ConflictError(message, 
  * The admin Treasury (roadmap 1b): list, record, review and publication
  * actions, supporting documents. Data ownership (overview §2.1):
  *
- * - Notion-managed expenses: every synced field is read-only here (409
- *   `managed_in_notion`) — they're edited in Notion and re-imported. Only
- *   their supporting documents (native data) are managed here.
+ * - Expenses copied from Notion before the Treasury became in-app only
+ *   (decision of 2026-10-23, no import or export) are ordinary entries
+ *   now: reviewed, published and annotated here like any other.
  * - Native Stripe entries (donations, refunds, disputes): their amounts and
  *   dates come from Stripe and are read-only; the internal note and the
  *   publication can be changed.
@@ -124,10 +124,8 @@ export class TreasuryAdminService {
   private async permissions(entry: Entry): Promise<TreasuryEntryDto["permissions"]> {
     const publishUnqualified = await this.settings.get("treasury.publish_unqualified");
     const { reviewStatuses } = await this.repository.vocabularies();
-    const notion = entry.managedBy === "notion";
-    const publishReason = notion
-      ? "Managed in Notion: publish it there."
-      : entry.publicationStatus === "published"
+    const publishReason =
+      entry.publicationStatus === "published"
         ? "Already published."
         : entry.source === "stripe" && !(await readPublicStripeModes(this.config, this.settings)).includes(entry.livemode)
           ? entry.livemode
@@ -138,15 +136,11 @@ export class TreasuryAdminService {
             : REVIEWED.has(entry.reviewStatusKey) && !entry.publicDescription?.trim()
               ? "A reviewed entry needs a public description before it's published."
               : null;
-    const unpublishReason = notion ? "Managed in Notion: unpublish it there." : entry.publicationStatus !== "published" ? "Not published." : null;
-    const reviewReason = notion
-      ? "Managed in Notion: review it there."
-      : entry.entryType !== "expense"
-        ? "Donations, refunds and disputes need no review."
-        : null;
+    const unpublishReason = entry.publicationStatus !== "published" ? "Not published." : null;
+    const reviewReason = entry.entryType !== "expense" ? "Donations, refunds and disputes need no review." : null;
     const hasRecipient = Boolean(entry.recipientPersonId || entry.recipientOrganizationId);
     return {
-      editInternalNote: !notion,
+      editInternalNote: true,
       publish: { allowed: publishReason === null, reason: publishReason },
       unpublish: { allowed: unpublishReason === null, reason: unpublishReason },
       review: {
@@ -166,8 +160,6 @@ export class TreasuryAdminService {
     const [withPublic] = await this.withPublicNow([row]);
     return {
       ...withPublic!,
-      notionPageId: entry.notionPageId,
-      notionUrl: entry.notionPageId ? `https://www.notion.so/${entry.notionPageId.replace(/-/g, "")}` : null,
       externalTransactionId: entry.externalTransactionId,
       sourceAccountId: entry.sourceAccountId,
       reviewedAt: entry.reviewedAt?.toISOString() ?? null,
@@ -193,7 +185,6 @@ export class TreasuryAdminService {
     if (body.internalNote !== undefined && !editor.permissions.has("treasury.update")) throw new ForbiddenError("Your role doesn't allow editing the internal note.");
     if (body.reviewStatus !== undefined && !editor.permissions.has("treasury.review")) throw new ForbiddenError("Your role doesn't allow reviewing expenses.");
     const entry = await this.load(id);
-    if (entry.managedBy === "notion") throw refused("managed_in_notion", "Managed in Notion: edit this entry there; the importer updates it here.");
     const review = body.reviewStatus === undefined ? null : await this.checkReview(entry, body.reviewStatus);
     const now = this.clock();
     const changes: AuditChange[] = [];
@@ -238,13 +229,13 @@ export class TreasuryAdminService {
 
   /**
    * Permanent delete (decision 12): owner only, the entry number typed
-   * exactly, logged. Only manual entries: Stripe and Notion entries are the
-   * ledger's and the importer's — archive them instead.
+   * exactly, logged. Only manual entries (those copied from Notion
+   * included): Stripe entries are the ledger's record — archive them instead.
    */
   async delete(id: string, confirm: string, admin: AdminPrincipal | undefined): Promise<void> {
     const editor = this.assertTreasuryAdmin(admin);
     const entry = await this.load(id);
-    if (entry.source !== "manual" || entry.managedBy === "notion") throw refused("cannot_delete", "Only manual entries can be deleted; archive Stripe and Notion entries instead.");
+    if (entry.source !== "manual") throw refused("cannot_delete", "Only manual entries can be deleted; archive Stripe entries instead.");
     if (confirm.trim() !== `EXP-${entry.entryNumber}`) throw new ValidationFailedError([{ path: "confirm", message: `Type EXP-${entry.entryNumber} to confirm.` }]);
     await this.db.transaction(async (tx) => {
       await this.recordEntry(tx, entry, editor, "deleted");
@@ -259,7 +250,7 @@ export class TreasuryAdminService {
     const entry = await this.load(id);
     const { publish: canPublish, unpublish: canUnpublish } = await this.permissions(entry);
     const rule = publish ? canPublish : canUnpublish;
-    if (!rule.allowed) throw refused(entry.managedBy === "notion" ? "managed_in_notion" : publish ? "cannot_publish" : "cannot_unpublish", rule.reason!);
+    if (!rule.allowed) throw refused(publish ? "cannot_publish" : "cannot_unpublish", rule.reason!);
     const now = this.clock();
     const editor = this.assertTreasuryAdmin(admin);
     const status = (key: string) => ({ key, label: key === "published" ? "Published" : "Unpublished" });
@@ -285,7 +276,7 @@ export class TreasuryAdminService {
   /** The review rules (overview §2.1): refuses a status the entry can't take; returns the history's before/after. */
   private async checkReview(entry: Entry, reviewStatus: string) {
     const { review } = await this.permissions(entry);
-    if (!review.allowed) throw refused(entry.managedBy === "notion" ? "managed_in_notion" : "cannot_review", review.reason!);
+    if (!review.allowed) throw refused("cannot_review", review.reason!);
     if (!review.options.some((option) => option.key === reviewStatus)) {
       throw new ValidationFailedError([{ path: "reviewStatus", message: "Qualified and Not required need exactly one recipient." }]);
     }

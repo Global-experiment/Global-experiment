@@ -9,7 +9,7 @@ import { completenessLabel } from "../completeness";
 import { useAdminData } from "../api/useAdminData";
 import { expertiseOptions, formatDate } from "../people/peopleTable";
 import { AdminListPage } from "../table/AdminListPage";
-import { NotionImportControl } from "../people/NotionImportControl";
+import { DirectoryMoreOptions } from "../people/DirectoryMoreOptions";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
@@ -141,7 +141,7 @@ export function OrganizationsList() {
         archivedView: true,
         actions: (
           <>
-            <NotionImportControl module="directory" />
+            <DirectoryMoreOptions table="organizations" />
             {canCreate ? <NewOrganizationControl /> : null}
           </>
         ),

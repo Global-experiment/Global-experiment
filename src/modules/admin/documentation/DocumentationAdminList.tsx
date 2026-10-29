@@ -8,7 +8,6 @@ import type { ListField } from "../table/fields";
 import type { ListState } from "../table/listState";
 import { applyListState, type LocalListSpec } from "../table/localList";
 import { ViewTabs } from "../table/ViewTabs";
-import { ManagedInNotionBadge } from "../ui/PublicPageHeader";
 
 export interface DocumentationRow {
   id: string;
@@ -66,7 +65,7 @@ const SPEC: LocalListSpec<DocumentationRow> = {
  * articles are edited in Notion and the site reads them from there. The
  * list toolbar (search, sort, filters, columns) runs in the browser.
  */
-export function DocumentationAdminList({ articles, notionUrl }: { articles: DocumentationRow[]; notionUrl: string }) {
+export function DocumentationAdminList({ articles }: { articles: DocumentationRow[] }) {
   const fields = useMemo<ListField[]>(() => {
     const expertise = [...new Set(articles.flatMap((article) => article.expertise))].sort((a, b) => a.localeCompare(b));
     return [
@@ -90,7 +89,6 @@ export function DocumentationAdminList({ articles, notionUrl }: { articles: Docu
         fields,
         columns: COLUMNS,
         views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
-        actions: <ManagedInNotionBadge notionUrl={notionUrl} />,
       }}
     />
   );

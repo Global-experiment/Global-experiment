@@ -9,7 +9,7 @@ import { E2E_ADMIN } from "./admin-credentials";
  * Documentation and Treasury open on the public view inside the admin
  * shell, with "Administrate", Share and ⋮ at the top right; Administrate
  * leads to the backend view (Home content and the Documentation list are
- * read-only while managed in Notion; Treasury → the admin list). Home and
+ * read-only until the native editor; Treasury → the admin list). Home and
  * Documentation come from live Notion, as on the public site.
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the admin stack isn't running.");
@@ -103,8 +103,8 @@ test("Home (p6): the public page in the shell; Share copies the public address; 
   await header().getByRole("link", { name: "Administrate" }).click();
   await expect(page).toHaveURL("/admin/home/manage");
   await expect(page).toHaveTitle("Home content");
-  await expect(page.locator("[data-managed-in-notion]")).toContainText("Managed in Notion");
-  await expect(page.locator("[data-managed-in-notion]").getByRole("link", { name: "Open in Notion" })).toHaveAttribute("href", /^https:\/\/www\.notion\.so\/[0-9a-f]{32}$/);
+  // No "Managed in Notion" label any more (2026-10-30): read-only shows by nothing being editable.
+  await expect(page.getByText("Managed in Notion")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Tagline" })).toBeVisible();
   // Read-only: nothing to type into.
   await expect(page.locator("main input, main textarea, [data-record-main] input, [data-record-main] textarea")).toHaveCount(0);
@@ -137,7 +137,7 @@ test("Documentation (p8): the public list without its search; each article's Adm
   await expect(page.locator("tbody tr").first()).toContainText(title);
   const columns = (await page.locator("thead th").allInnerTexts()).map((text) => text.trim()).filter(Boolean);
   expect(columns).toEqual(["Title", "Status", "Display order", "Expertise", "Last edited by", "Updated", "Published"]);
-  await expect(page.locator("[data-managed-in-notion]")).toContainText("Managed in Notion");
+  await expect(page.getByText("Managed in Notion")).toHaveCount(0);
   await axe();
 
   // Back to everything: the whole list, in display order.

@@ -1,14 +1,23 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, type PipeTransform } from "@nestjs/common";
 import { z } from "zod";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { ForbiddenError } from "../common/errors/api-error.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import { ImportJobsService } from "./import-jobs.service.js";
-import { IMPORT_KINDS, type ImportKind } from "./import-source.js";
+import { IMPORT_KINDS, RETIRED_IMPORT_KINDS, type ImportKind } from "./import-source.js";
 import { Requires, RequiresForParam } from "../access-control/requires.js";
 import { IMPORT_MODULES } from "../access-control/permissions.js";
 
-const KindParam = new ZodValidationPipe(z.enum(IMPORT_KINDS as [ImportKind, ...ImportKind[]], "Unknown import kind."));
+export const ONLY_DIRECTORY_IMPORTS = "Only People and Organizations can be imported. Treasury and every other table are edited in the admin.";
+
+/** The import kind: the retired Taxonomy and Treasury imports are refused outright (403); anything else unknown is a 400. */
+const kindSchema = z.enum(IMPORT_KINDS as [ImportKind, ...ImportKind[]], "Unknown import kind.");
+const KindParam: PipeTransform<unknown, ImportKind> = {
+  transform(value: unknown) {
+    if ((RETIRED_IMPORT_KINDS as readonly unknown[]).includes(value)) throw new ForbiddenError(ONLY_DIRECTORY_IMPORTS);
+    return new ZodValidationPipe(kindSchema).transform(value) as ImportKind;
+  },
+};
 const JobIdParam = new ZodValidationPipe(z.uuid("Invalid id."));
 const RunsQuery = z.object({
   page: z.coerce.number().int().min(1).max(10_000).default(1),
@@ -18,7 +27,8 @@ const ApplyRequest = z.strictObject({ dryRunId: z.uuid("Invalid dry run id.") })
 
 /**
  * /api/admin/imports — the admin import page: run history, dry runs and
- * applies from Notion (as background jobs), job status. The Notion token
+ * applies of People and Organizations from Notion (as background jobs),
+ * job status. No other table has an import (or an export). The Notion token
  * stays on the server; responses carry reports and counts only. Seeing the
  * page is imports.read; starting a run, the kind's `<module>.import`.
  */

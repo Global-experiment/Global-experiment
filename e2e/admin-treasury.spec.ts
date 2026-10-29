@@ -5,8 +5,8 @@ import { E2E_ADMIN } from "./admin-credentials";
 
 /**
  * Admin Treasury (roadmap 1b) through the real stack, on the test-only
- * fixtures: five Stripe test-mode donations (EXP-1…5), four Notion-managed
- * expenses and one native EUR expense (EXP-6…10). Serial, on one signed-in
+ * fixtures: five Stripe test-mode donations (EXP-1…5), four expenses copied
+ * from Notion earlier and one native EUR expense (EXP-6…10). Serial, on one signed-in
  * page; every change it makes is undone before it ends. Runs after the public
  * suites (playwright.config.ts): publishing changes what they read.
  */
@@ -88,18 +88,17 @@ test("the sidebar opens the public Treasury; Administrate opens the list: every 
   await expect(rows().first()).toContainText("Platform development");
 });
 
-test("a Notion-managed expense is read-only, with the badge and the Notion link", async () => {
+test("an expense copied from Notion earlier is an ordinary entry now: no Notion badge, edited here (decision of 2026-10-23)", async () => {
   await openRecord("Platform development");
-  const badge = page.locator("[data-managed=notion]");
-  await expect(badge).toContainText("Managed in Notion");
-  await expect(badge.getByRole("link", { name: /Open in Notion/ })).toHaveAttribute("href", /^https:\/\/www\.notion\.so\/de0000006000400080000000000/);
-  await expect(page.getByRole("button", { name: "Unpublish" })).toBeDisabled();
-  await expect(page.getByText("Managed in Notion: unpublish it there.")).toBeVisible();
-  // No editable field (the panel's comment box is the history's, not the entry's).
-  await expect(page.locator("[data-record-main]").getByRole("textbox")).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Review status" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Submit changes" })).toBeDisabled();
+  await expect(page.locator("[data-managed=notion]")).toHaveCount(0);
+  await expect(page.getByText(/Managed in Notion|Open in Notion/)).toHaveCount(0);
+  // The Treasury is edited in the admin only: the internal note, the review and the publication.
+  await expect(page.locator("#treasury-note")).toBeEditable();
+  await expect(page.getByRole("group", { name: "Review status" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unpublish" })).toBeEnabled();
   await expect(page.getByRole("heading", { name: /^History/ })).toBeVisible();
+  // No import or export here.
+  await expect(page.getByRole("button", { name: /Import|Export/ })).toHaveCount(0);
   await axe();
 });
 
