@@ -540,7 +540,7 @@ export interface HistoryItem {
   occurredAt: string;
   actor: { type: "admin" | "automation"; label: string };
   changes: HistoryChange[];
-  meta: { label?: string; collection?: string; importSource?: string; duplicatedFrom?: { id: string; label: string }; body?: string; origin?: string; [key: string]: unknown };
+  meta: { label?: string; collection?: string; importSource?: string; duplicatedFrom?: { id: string; label: string }; body?: string; origin?: string; details?: { label: string; value: string }[]; [key: string]: unknown };
   comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
 }
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { moneyLabel } from "../audit/entity-labels.js";
 import { zurichDate } from "../common/clock/clock.js";
 import { FILE_STORAGE, LocalDiskStorage } from "../files/file-storage.js";
 import { organizations } from "../organizations/organizations.schema.js";
@@ -408,6 +409,52 @@ describe("Treasury API", () => {
       // Back to unqualified while public: refused once the setting is off.
       await setting("treasury.publish_unqualified", false);
       expect((await admin.post(`/api/admin/treasury/${unqualified.id}/review`, { reviewStatus: "unqualified" })).body.error.details).toEqual({ reason: "cannot_review" });
+    });
+
+    it("deletes a manual entry permanently (one copied from Notion too): Rootadmin only, its number typed, its details kept in the History", async () => {
+      const person = await recipient("Grace Hopper");
+      const entry = await insert(
+        expense({ source: "manual", name: "Legal advice", occurredOn: "2026-09-15", grossAmount: -12000, currency: "CHF", netAmount: -12000, recipientPersonId: person.id }),
+        ["legal_and_compliance"],
+      );
+      const wise = await insert(expense({ occurredOn: "2026-09-16", grossAmount: -500 }));
+      const number = `EXP-${entry.entryNumber}`;
+      const amount = moneyLabel(-12000, "CHF");
+      const exists = async (id: string) => (await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, id))).length === 1;
+
+      // Every other role is refused, the Treasury and Admin roles included.
+      for (const role of ["admin", "treasury"]) {
+        const other = await signedInAs(t, role);
+        expect((await other.delete(`/api/admin/treasury/${entry.id}`).send({ confirm: number })).status).toBe(403);
+      }
+      // The number must be typed exactly; Stripe and Wise entries are archived, not deleted.
+      expect((await admin.delete(`/api/admin/treasury/${entry.id}`).send({ confirm: "EXP-0" }).expect(400)).body.error.details).toEqual({ issues: [{ path: "confirm", message: `Type ${number} to confirm.` }] });
+      await admin.delete(`/api/admin/treasury/${entry.id}`).send({}).expect(400);
+      expect((await admin.delete(`/api/admin/treasury/${wise.id}`).send({ confirm: `EXP-${wise.entryNumber}` })).body.error.details).toEqual({ reason: "cannot_delete" });
+      expect(await exists(entry.id)).toBe(true);
+      expect(await exists(wise.id)).toBe(true);
+
+      await admin.delete(`/api/admin/treasury/${entry.id}`).send({ confirm: ` ${number} ` }).expect(204);
+      expect(await exists(entry.id)).toBe(false);
+      const history = (await admin.get("/api/admin/history?entityType=treasury_entry&pageSize=200").expect(200)).body.items as {
+        action: string;
+        entity: { id: string; exists: boolean; title: string };
+        actor: { type: string; label: string };
+        meta: { label: string; details: { label: string; value: string }[] };
+      }[];
+      const deleted = history.find((item) => item.entity.id === entry.id && item.action === "deleted");
+      expect(deleted).toMatchObject({ entity: { exists: false }, actor: { type: "admin" }, meta: { label: `${number} · ${amount}` } });
+      expect(Object.fromEntries(deleted!.meta.details.map((detail) => [detail.label, detail.value]))).toEqual({
+        Number: number,
+        Name: "Legal advice",
+        Type: "Expense",
+        Date: "2026-09-15",
+        Amount: amount,
+        Recipient: "Grace Hopper",
+        "Expense types": "Legal and compliance",
+        "Review status": "Qualified",
+        Publication: "Published",
+      });
     });
 
     describe("supporting documents", () => {

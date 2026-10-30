@@ -53,6 +53,12 @@ their organizations by name.
 - "Managed in Notion" is gone everywhere outside People and Organizations.
   Expenses that came from Notion are now ordinary entries: you can review,
   publish and annotate them in the admin.
+- Like any entry entered by hand, one that came from Notion with the
+  source "Manual" can now be **deleted permanently**. Only a Rootadmin
+  can, by typing its number (EXP-12). Its History event keeps what it was:
+  number, name, type, date, amount, recipient, expense types, review
+  status, publication and documents. Stripe and Wise entries can't be
+  deleted, only archived.
 - Nothing already in the admin was changed or deleted.
 
 ## Good to know
