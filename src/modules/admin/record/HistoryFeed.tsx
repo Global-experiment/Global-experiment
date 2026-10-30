@@ -173,6 +173,19 @@ function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: st
   if (item.action === "comment_deleted" && typeof meta.body === "string") {
     return <p className="mt-2 text-meta whitespace-pre-line text-text-muted line-through">{meta.body}</p>;
   }
+  // A permanently deleted Treasury entry: what it was, since its page is gone.
+  if (item.action === "deleted" && Array.isArray(meta.details) && meta.details.length > 0) {
+    return (
+      <dl data-deleted-details className="mt-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 text-meta">
+        {meta.details.map((detail) => (
+          <div key={detail.label} className="contents">
+            <dt className="text-text-muted">{detail.label}</dt>
+            <dd className="text-text-primary">{detail.value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
   // Accounts and access (Delivery 2): the facts the event carries, never a link or a token.
   const facts: string[] = [];
   if (typeof meta.note === "string") facts.push(meta.note);

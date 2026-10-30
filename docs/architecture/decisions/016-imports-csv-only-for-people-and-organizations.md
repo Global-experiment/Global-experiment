@@ -54,10 +54,30 @@ no import and no export.
 ## Consequences
 
 - The taxonomy (Expertise, Fields, Domains) can no longer be changed from
-  Notion and has no editor in the admin yet: it stays as it is until one is
-  built.
-- The `taxonomy.import`, `treasury.import` and `cms.import` permission keys
-  stay in the database but no route uses them; a later migration can drop
-  them.
+  Notion and has no editor in the admin yet: it stays as it is until the
+  Expertise/Fields/Domains detail template is built (client, 2026-10-30).
 - Home and Documentation are still read live from Notion until the native
-  editor ships; their admin views stay read-only, without the label.
+  editor ships (Delivery 4); their admin views stay read-only, without the
+  label.
+- Expenses copied from Notion are ordinary entries. Those whose source is
+  manual can be deleted permanently like any manual entry: `treasury.delete`
+  (Rootadmin only), the entry number typed, and a "deleted" History event
+  that keeps the entry's details (number, name, type, date, amount,
+  recipient, expense types, review status, publication, documents), since
+  its page is gone.
+
+## Later cleanup
+
+- The `taxonomy.import`, `treasury.import` and `cms.import` permission keys
+  stay in `admin_permissions` and `admin_role_permissions` (seeded by 0012)
+  and in `PERMISSIONS`, but no route uses them. The client chose to keep
+  them for now (2026-10-30). A later migration should delete their
+  `admin_role_permissions` rows, then their `admin_permissions` rows, and
+  remove them from `PERMISSIONS` and `ROLE_PERMISSIONS`, with a backup first
+  and the access-control tests updated.
+- The `NOTION_DOMAINS_DB_ID`, `NOTION_FIELDS_DB_ID`,
+  `NOTION_EXPERTISE_DB_ID`, `NOTION_TREASURY_DB_ID`,
+  `IMPORT_SCHEDULE_TAXONOMY` and `IMPORT_SCHEDULE_TREASURY` server variables
+  are ignored and can be removed from the server's environment.
+- The `managed_by` and `notion_page_id` columns of `treasury_entries` remain
+  as a record of where an entry was copied from; nothing reads them.
