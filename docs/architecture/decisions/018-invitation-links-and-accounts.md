@@ -68,4 +68,6 @@ the history.
   the link can use it, once, within 7 days. It is sent privately and can be
   revoked.
 - The email an invitee gives isn't verified (there is no email server).
-  The Rootadmin sees it on the account before giving a role.
+  The Rootadmin sees it on the account before giving a role. Accepted for
+  now (client, 2026-11-03): email verification comes with the email
+  infrastructure (OPS-115).

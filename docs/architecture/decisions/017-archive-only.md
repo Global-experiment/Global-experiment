@@ -30,6 +30,9 @@ permanently options, only archive."
   person's organization or expertise), deleting a comment (kept struck
   through in the history), removing a profile picture, and deleting a
   Treasury supporting document.
+- **Next delivery (client, 2026-11-03):** comments, supporting documents
+  and pictures become archive-only too: removing one hides it but keeps it
+  recoverable, with a History event. Until then they are deleted as above.
 - The `*.delete` permission keys stay in `admin_permissions` and the role
   matrix, unused, until the teams and memberships model replaces the
   fixed roles (Later cleanup of decision 016).
