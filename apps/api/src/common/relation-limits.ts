@@ -10,8 +10,7 @@ type Executor = Pick<Database, "select">;
  * have up to 10 expertise." / "… up to 5 organizations."; accounts too,
  * OPS-135). Checked by every
  * write path — record PATCH/POST, the single link endpoints (either side)
- * and the Notion directory importer, which keeps the first N in Notion
- * order and reports the rest. The web admin mirrors these numbers in
+ * and the CSV import. The web admin mirrors these numbers in
  * src/modules/admin/relationLimits.ts.
  */
 export const RELATION_LIMITS = {

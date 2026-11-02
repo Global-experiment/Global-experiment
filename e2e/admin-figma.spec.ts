@@ -610,11 +610,20 @@ test.describe("signed in", () => {
     }
   });
 
-  test("the user card signs out", async ({ page }) => {
-    await page.goto("/admin/people");
+  test("the user card signs out", async ({ browser, baseURL }) => {
+    // Its own session: signing out ends this one, never the session the other tests share.
+    const context = await browser.newContext({ baseURL, viewport: FRAME, storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    await page.goto("/admin/login");
+    await page.getByLabel("Email address").fill(E2E_ADMIN.email);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_ADMIN.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/\/admin\/people/, { timeout: 15_000 });
+    // The list is still loading when Sign out is pressed: its 401s must not turn the page into "login, then back to People".
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/admin\/login$/);
     expect((await page.request.get("/api/admin/people")).status()).toBe(401);
+    await context.close();
   });
 });
 

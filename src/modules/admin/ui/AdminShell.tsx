@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { adminApi } from "../api/client";
+import { adminApi, endSession } from "../api/client";
 import { adminDisplayName, type AdminPrincipal } from "../api/types";
 import { setPreferredTimeZone } from "@/shared/format/Timestamp";
 import { applyAppearance } from "@/shared/ui/appearance";
@@ -184,7 +184,6 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
 
 /** admin-desktop.pdf p2: 64px card, 24px avatar disc, the name, and a sign-out button at the right. */
 function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: boolean }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const name = adminDisplayName(admin);
@@ -193,8 +192,7 @@ function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: bool
     setPending(true);
     setFailed(false);
     try {
-      await adminApi("/auth/logout", { method: "POST" });
-      router.replace("/admin/login");
+      await endSession(() => adminApi("/auth/logout", { method: "POST" }));
     } catch {
       setPending(false);
       setFailed(true);

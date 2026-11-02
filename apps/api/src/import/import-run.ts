@@ -6,7 +6,7 @@ import { importRuns } from "./import.schema.js";
 type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
 /**
- * The shared shape of an import run (Notion People and Organizations, CSV): plan
+ * The shape of an import run (the CSV import; the Notion ones, removed by OPS-154, ran the same way): plan
  * against the database, then either stop (dry run) or apply — planned and
  * written inside ONE transaction, so it writes exactly what it reports, all
  * or nothing. Every run (dry, applied, failed) leaves an import_runs row.
@@ -33,18 +33,6 @@ export interface ImportRunResult<Plan> {
   runId: string;
   mode: "dry_run" | "apply";
   plan: Plan;
-}
-
-/**
- * Refusal for an apply that must match a reviewed dry run: the fresh plan's
- * counts must equal the dry run's, or something changed in between (in
- * Notion or the database) and the dry run no longer describes the write.
- */
-export function countsChangedRefusal(expected: unknown, actual: unknown): string | undefined {
-  if (expected === undefined) return undefined;
-  return canonicalJson(expected) === canonicalJson(actual)
-    ? undefined
-    : "Notion or the database changed since the dry run: run a new dry run and review it before applying.";
 }
 
 /** JSON with object keys sorted — jsonb doesn't keep key order, so stored counts compare by content. */
