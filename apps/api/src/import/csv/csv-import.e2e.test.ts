@@ -157,36 +157,75 @@ describe("CSV import API", () => {
         { name: "Editing", fieldId: field!.id, stableId: "03.01.editing", statusKey: "active" },
       ])
       .returning();
-    // As Notion exported the client's file: a link after each name, a channel the admin doesn't have.
+    // As Notion exported the client's file: a link after each name; "Pigeon" stands for a channel the admin doesn't have.
     const file = csv(
       "Name,Email,Expertise,Contact channels\n" +
-        'Gil Notion,gil@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Copyediting (https://app.notion.com/p/Copyediting-3d41?pvs=21)","Email, Other"\n' +
-        "Hana Notion,hana@example.net,COPYWRITING,Other\n" +
+        'Gil Notion,gil@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Copyediting (https://app.notion.com/p/Copyediting-3d41?pvs=21)","Email, Pigeon"\n' +
+        "Hana Notion,hana@example.net,COPYWRITING,Pigeon\n" +
         "Ivo Notion,not-an-email,Copywriting,\n",
     );
     const first = (await send(writer, "preview", file).expect(201)).body;
     expect(first.counts).toMatchObject({ create: 2, errors: 1, warnings: 2 });
     expect(first.unknown.map((entry: { field: string; values: { value: string; rows: number }[] }) => [entry.field, entry.values.map((value) => [value.value, value.rows])])).toEqual([
-      ["contactChannels", [["Other", 2]]],
+      ["contactChannels", [["Pigeon", 2]]],
       ["expertise", [["Copyediting", 1]]],
     ]);
     expect(first.unknown[1].options.map((option: { label: string }) => option.label)).toEqual(["Copywriting", "Editing"]);
-    // Copyediting → Editing; "Other" skipped.
-    const choices = { expertise: { copyediting: editing!.id }, contactChannels: { other: null } };
+    // Copyediting → Editing; "Pigeon" skipped.
+    const choices = { expertise: { copyediting: editing!.id }, contactChannels: { pigeon: null } };
     const preview = (await send(writer, "preview", file, { choices }).expect(201)).body;
-    expect(preview.rows.map((row: { warnings: string[] }) => row.warnings)).toEqual([['Contact channels: "Other" skipped.'], ['Contact channels: "Other" skipped.'], []]);
+    expect(preview.rows.map((row: { warnings: string[] }) => row.warnings)).toEqual([['Contact channels: "Pigeon" skipped.'], ['Contact channels: "Pigeon" skipped.'], []]);
     const done = (await send(writer, "confirm", file, { mapping: preview.mapping, choices, expect: preview.counts }).expect(201)).body;
     const gil = (await owner.get("/api/admin/people?search=Gil%20Notion").expect(200)).body.items[0];
     expect(gil.expertise.map((item: { id: string }) => item.id)).toEqual([copywriting!.id, editing!.id]);
     const report = (await owner.get(`/api/admin/imports/csv/runs/${done.runId}`).expect(200)).body;
     expect(report.rows.map((row: { status: string; warnings: string[]; errors: string[] }) => [row.status, row.warnings, row.errors])).toEqual([
-      ["created", ['Contact channels: "Other" skipped.'], []],
-      ["created", ['Contact channels: "Other" skipped.'], []],
+      ["created", ['Contact channels: "Pigeon" skipped.'], []],
+      ["created", ['Contact channels: "Pigeon" skipped.'], []],
       // Real errors still refuse the row, with the reason.
       ["error", [], ["Email: Invalid email address."]],
     ]);
     // Choices only map to what exists.
     await send(writer, "preview", file, { choices: { salary: {} } }).expect(400);
+  });
+
+  it("the client's file of 2026-10-30, imported again: the records already imported are skipped as duplicates, every other row goes through (OPS-153)", async () => {
+    // The two refusal causes of that run: Notion links after each value (both of Notion's link formats), and "Other" as a contact channel.
+    const notionSo = (name: string) => `${name} (https://www.notion.so/${name.replace(/\W+/g, "-")}-3d41dc64fd2881829739dcc486d08b9f)`;
+    const notionApp = (name: string) => `${name} (https://app.notion.com/p/${name.replace(/\W+/g, "-")}-3d41?pvs=21)`;
+    const file = csv(
+      "Name,Email,Expertise,Contact channels,Organizations\n" +
+        // Imported on 2026-10-30 (no expertise, no channel then): already in the admin.
+        "Kai Before,kai@example.net,,,\n" +
+        "Lea Before,lea@example.net,,,\n" +
+        // Refused on 2026-10-30.
+        `Mo Notion,mo@example.net,"${notionApp("Copywriting")}, ${notionSo("Editing")}","Email, Other","${notionSo("Civic Lab")}"\n` +
+        `Nia Notion,nia@example.net,"${notionSo("Copywriting")}",Other,\n` +
+        `Oz Notion,oz@example.net,"${notionApp("Editing")}","${notionApp("Other")}",\n`,
+    );
+    const imported = (await send(writer, "confirm", csv("Name,Email\nKai Before,kai@example.net\nLea Before,lea@example.net\n"), { mapping: ["name", "email"], expect: { fileName: "contacts.csv", rows: 2, create: 2, duplicates: 0, duplicatesIncluded: 0, errors: 0, warnings: 0 } }).expect(201)).body;
+    expect(imported.counts.create).toBe(2);
+    const before = (await owner.get("/api/admin/people?search=Before").expect(200)).body.items;
+
+    const preview = (await send(writer, "preview", file).expect(201)).body;
+    expect(preview.unknown).toEqual([]);
+    expect(preview.counts).toMatchObject({ rows: 5, create: 3, duplicates: 2, errors: 0, warnings: 0 });
+    expect(preview.rows.map((row: { status: string; duplicate: { reason: string } | null }) => [row.status, row.duplicate?.reason ?? null])).toEqual([
+      ["duplicate", "Same email as Kai Before"],
+      ["duplicate", "Same email as Lea Before"],
+      ["create", null],
+      ["create", null],
+      ["create", null],
+    ]);
+    await send(writer, "confirm", file, { mapping: preview.mapping, expect: preview.counts }).expect(201);
+
+    const mo = (await owner.get("/api/admin/people?search=Mo%20Notion").expect(200)).body.items[0];
+    expect(mo.expertise.map((item: { name: string }) => item.name)).toEqual(["Copywriting", "Editing"]);
+    expect(mo.contactChannels.map((channel: { key: string }) => channel.key)).toEqual(["email", "other"]);
+    expect(mo.organizations.map((organization: { name: string }) => organization.name)).toEqual(["Civic Lab"]);
+    expect((await owner.get("/api/admin/people?search=Notion").expect(200)).body.items.filter((person: { name: string }) => /^(Nia|Oz) Notion$/.test(person.name))).toHaveLength(2);
+    // The records already imported are untouched, and not imported twice.
+    expect((await owner.get("/api/admin/people?search=Before").expect(200)).body.items).toEqual(before);
   });
 
   it("imports organizations the same way", async () => {

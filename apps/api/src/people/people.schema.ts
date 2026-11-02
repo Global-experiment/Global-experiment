@@ -156,7 +156,8 @@ export const peopleExpertise = pgTable(
 /**
  * Contact channels (decision 8 of 2026-10-19): an admin-editable lookup,
  * seeded with Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix
- * and Workana; a person lists the channels they can be reached on.
+ * and Workana, then Other (OPS-153, migration 0014); a person lists the
+ * channels they can be reached on.
  */
 export const contactChannels = pgTable("contact_channels", vocabularyColumns, (table) => [
   check("contact_channels_key_shape", sql`${table.key} ~ '^[a-z][a-z0-9_]{0,39}$'`),

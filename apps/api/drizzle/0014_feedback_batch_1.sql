@@ -81,6 +81,9 @@ JOIN "admin_users" u ON u."id" = m."admin_user_id";--> statement-breakpoint
 -- OPS-149: each service's category becomes its first tag.
 INSERT INTO "service_category_tags" ("service_id", "category_key", "position")
 SELECT "id", "category_key", 0 FROM "services" WHERE "category_key" IS NOT NULL;--> statement-breakpoint
+-- OPS-153: "Other" is a contact channel (the client's Notion export uses it). Vocabulary, not demo data.
+INSERT INTO "contact_channels" ("key", "label", "sort_order") VALUES ('other', 'Other', 100)
+ON CONFLICT ("key") DO NOTHING;--> statement-breakpoint
 -- OPS-138: every permission is named "Service / Account / Permission level" (grant-name.ts does the same).
 UPDATE "access_grants" g SET "name" = left(concat_ws(' / ',
 	(SELECT s."name" FROM "services" s WHERE s."id" = g."service_id"),

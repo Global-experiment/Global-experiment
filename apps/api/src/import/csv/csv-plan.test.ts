@@ -111,11 +111,11 @@ describe("CSV import plan (people)", () => {
   });
 
   describe("unknown values (OPS-153)", () => {
-    // As Notion exported the client's file on 2026-10-30: links after each name, "Other" as a channel.
+    // As Notion exported the client's file on 2026-10-30: links after each name. "Pigeon" stands for a channel the admin doesn't have ("Other" is one since migration 0014).
     const notion =
       "Name,Email,Expertise,Contact channels\n" +
-      'Kim Lee,kim@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Other"\n' +
-      'Lou Ray,lou@example.net,"  copywriting ",Other\n' +
+      'Kim Lee,kim@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Pigeon"\n' +
+      'Lou Ray,lou@example.net,"  copywriting ",Pigeon\n' +
       'Max Roe,not-an-email,"Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)",\n' +
       ",nameless@example.net,Copywriting,\n";
 
@@ -129,7 +129,7 @@ describe("CSV import plan (people)", () => {
         [5, "error"],
       ]);
       expect(result.rows[0]!.request).toMatchObject({ expertiseIds: [id(21)], contactChannelKeys: ["email"] });
-      expect(result.rows[0]!.warnings).toEqual(['Expertise: no expertise named "Game design"; imported without it.', 'Contact channels: no contact channel named "Other"; imported without it.']);
+      expect(result.rows[0]!.warnings).toEqual(['Expertise: no expertise named "Game design"; imported without it.', 'Contact channels: no contact channel named "Pigeon"; imported without it.']);
       // Case and extra spaces ignored.
       expect(result.rows[1]!.request).toMatchObject({ expertiseIds: [id(21)] });
       expect(result.rows[2]!.errors).toEqual(["Email: Invalid email address."]);
@@ -140,19 +140,33 @@ describe("CSV import plan (people)", () => {
     it("lists each unknown value once, with its rows and what it can be mapped to", () => {
       const result = plan(notion);
       expect(result.unknown.map((field) => [field.field, field.label, field.values.map((value) => [value.value, value.key, value.rows, value.problem])])).toEqual([
-        ["contactChannels", "Contact channels", [["Other", "other", 2, "unknown"]]],
+        ["contactChannels", "Contact channels", [["Pigeon", "pigeon", 2, "unknown"]]],
         ["expertise", "Expertise", [["Game design", "game design", 2, "unknown"]]],
       ]);
       expect(result.unknown[1]!.options.map((option) => option.label)).toEqual(["Copywriting", "Économie sociale", "Facilitation"]);
     });
 
     it("maps an unknown value to an existing one, or skips it, as the admin chose", () => {
-      const result = plan(notion, { choices: { expertise: { "game design": id(20) }, contactChannels: { other: null } } });
+      const result = plan(notion, { choices: { expertise: { "game design": id(20) }, contactChannels: { pigeon: null } } });
       expect(result.rows[0]!.request).toMatchObject({ expertiseIds: [id(21), id(20)], contactChannelKeys: ["email"] });
-      expect(result.rows[0]!.warnings).toEqual(['Contact channels: "Other" skipped.']);
+      expect(result.rows[0]!.warnings).toEqual(['Contact channels: "Pigeon" skipped.']);
       expect(result.unknown.find((field) => field.field === "expertise")!.values[0]).toMatchObject({ value: "Game design", choice: id(20) });
       // A choice that isn't one of the options changes nothing.
       expect(plan(notion, { choices: { expertise: { "game design": id(99) } } }).rows[0]!.request).toMatchObject({ expertiseIds: [id(21)] });
+    });
+
+    it("removes Notion's links (www.notion.so and app.notion.com) on every value column, then matches the existing values", () => {
+      const notionSo = (name: string) => `${name} (https://www.notion.so/${name.replace(/\W+/g, "-")}-3d41dc64fd2881829739dcc486d08b9f)`;
+      const notionApp = (name: string) => `${name} (https://app.notion.com/p/${name.replace(/\W+/g, "-")}-3d41?pvs=21)`;
+      const csv =
+        "Name,Email,State,Source,Contact channels,Organizations,Expertise\n" +
+        `Uma Link,uma@example.net,"${notionSo("Collaborating")}","${notionApp("Other")}","${notionSo("Email")}, ${notionApp("Signal")}","${notionSo("Acme, Inc.")}","${notionSo("Facilitation")}, ${notionApp("Économie sociale")}"\n`;
+      expect(plan(csv).rows[0]).toMatchObject({
+        status: "create",
+        warnings: [],
+        request: { stateKey: "collaborating", sourceKey: "other", contactChannelKeys: ["email", "signal"], organizationIds: [id(10)], expertiseIds: [id(20), id(22)] },
+      });
+      expect(plan(csv).unknown).toEqual([]);
     });
 
     it("matches accents too", () => {
