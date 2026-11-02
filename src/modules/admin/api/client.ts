@@ -30,6 +30,24 @@ export class AdminApiError extends Error {
   }
 }
 
+/** Set while the viewer ends their own session (sign out, deactivation). */
+let sessionEnding = false;
+
+/**
+ * Ends the viewer's session, then leaves for the login page with a full load
+ * (nothing signed-in stays in memory). Requests still in flight then answer
+ * 401: they no longer send the page to "login, then back here".
+ */
+export async function endSession(request: () => Promise<unknown>): Promise<void> {
+  sessionEnding = true;
+  try {
+    await request();
+  } catch (error) {
+    sessionEnding = false;
+    throw error;
+  }
+  window.location.replace("/admin/login");
+}
 
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
@@ -54,7 +72,7 @@ export async function adminApi<T>(
     throw new AdminApiError(0, "network", "The admin API can't be reached. Check that it is running.");
   }
 
-  if (response.status === 401 && typeof window !== "undefined" && !path.startsWith("/auth/")) {
+  if (response.status === 401 && typeof window !== "undefined" && !path.startsWith("/auth/") && !sessionEnding) {
     // Session ended (expired, revoked, logged out elsewhere): back to login, then here.
     window.location.assign(loginHref(window.location.pathname + window.location.search));
   }

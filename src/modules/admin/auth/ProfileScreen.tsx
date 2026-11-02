@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { applyAppearance, type Appearance } from "@/shared/ui/appearance";
-import { adminApi, AdminApiError } from "../api/client";
+import { adminApi, AdminApiError, endSession } from "../api/client";
 import { adminDisplayName, type AdminPrincipal, type Profile } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { ExpertiseField } from "../expertise/ExpertiseField";
@@ -197,9 +197,10 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
   async function signOut() {
     setBusy("signing-out");
     try {
-      await adminApi("/auth/logout", { method: "POST" });
-      guard.release();
-      router.replace("/admin/login");
+      await endSession(async () => {
+        await adminApi("/auth/logout", { method: "POST" });
+        guard.release();
+      });
     } catch {
       setBusy(null);
       setError("Couldn't sign out. Please try again.");
@@ -372,9 +373,10 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
           }
           onClose={() => setDialog(null)}
           run={async (currentPassword) => {
-            await adminApi("/profile/deactivate", { method: "POST", body: { currentPassword } });
-            guard.release();
-            router.replace("/admin/login");
+            await endSession(async () => {
+              await adminApi("/profile/deactivate", { method: "POST", body: { currentPassword } });
+              guard.release();
+            });
           }}
         />
       ) : null}
