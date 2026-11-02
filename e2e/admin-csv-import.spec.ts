@@ -129,8 +129,10 @@ test("columns matched by name (changeable, or skipped), then the check: to add, 
   await expect(duplicate.getByRole("link", { name: existing.name })).toHaveAttribute("href", /^\/admin\/people\/[0-9a-f-]{36}$/);
   await expect(duplicate.getByRole("checkbox")).not.toBeChecked();
   const error = page.locator("[data-error-row='4']");
-  await expect(error).toContainText('State: "Unknown state" isn\'t one of:');
-  await expect(error).toContainText(`Organizations: no organization named "Nowhere Ltd ${RUN}"`);
+  // A real error refuses the row; its unknown values (OPS-153) are no longer errors of their own.
+  await expect(error).toContainText("Email: Invalid email address.");
+  await expect(error).not.toContainText("Unknown state");
+  await expect(error).not.toContainText(`Nowhere Ltd ${RUN}`);
   await expect(page.getByRole("button", { name: "Import 1 person" })).toBeEnabled();
   for (const viewport of [FRAME, TABLET]) {
     await page.setViewportSize(viewport);
@@ -205,9 +207,9 @@ test("values the admin doesn't have (as in Notion's export): listed once on the 
   await page.screenshot({ path: join(SHOTS, "ops153-check-warnings-1440.png") });
   await page.getByRole("button", { name: "Import 2 people" }).click();
   await expect(page.getByRole("heading", { name: "Imported" })).toBeVisible();
-  await page.getByRole("link", { name: "See the report" }).click();
+  await page.locator("[data-admin-toast]").getByRole("link", { name: "See the report" }).click();
   await expect(page).toHaveURL(/\/admin\/imports\/csv\/[0-9a-f-]{36}$/);
-  await expect(page.locator("main")).toContainText('Contact channels: "Other" skipped.');
+  await expect(page.getByRole("region", { name: "Added (2)" })).toContainText('Contact channels: "Other" skipped.');
   await page.screenshot({ path: join(SHOTS, "ops153-report-warnings-1440.png") });
 
   // The imported person has both expertise: the one named in the file, and the mapped one.

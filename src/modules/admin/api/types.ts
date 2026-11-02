@@ -535,6 +535,7 @@ export type HistoryAction =
   | "invited"
   | "activated"
   | "link_created"
+  | "link_revoked"
   | "password_changed"
   | "email_changed"
   | "deactivated"

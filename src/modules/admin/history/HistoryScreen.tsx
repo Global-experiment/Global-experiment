@@ -61,7 +61,7 @@ function recordHref(entity: HistoryListItem["entity"], action: string, meta: His
   }
 }
 
-const NOUN: Record<string, string> = { person: "person", organization: "organization", treasury_entry: "entry", service: "service", access_grant: "permission", admin_user: "account" };
+const NOUN: Record<string, string> = { person: "person", organization: "organization", treasury_entry: "entry", service: "service", access_grant: "permission", admin_user: "account", admin_invitation: "invitation link" };
 
 /**
  * An event's ⋮ menu (client, 2026-10-23): Report issue and Send feedback,

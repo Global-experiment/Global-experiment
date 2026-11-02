@@ -17,4 +17,11 @@ describe("permission names and their history (OPS-138, OPS-151)", () => {
     // Events from before OPS-151 keep their wording.
     expect(historyHeadline({ action: "access_granted", changes: [], meta: {} })).toBe("granted access");
   });
+
+  it("names an invitation link created or revoked (OPS-141)", () => {
+    expect(historyHeadline({ action: "link_revoked", changes: [] })).toBe("revoked a one-time link");
+    expect(historyPageHeadline({ action: "link_revoked", changes: [] }, "invitation link")).toEqual({ before: "revoked", after: "" });
+    expect(historyPageHeadline({ action: "link_created", changes: [] }, "invitation link")).toEqual({ before: "created", after: "" });
+    expect(historyPageHeadline({ action: "link_created", changes: [] }, "account")).toEqual({ before: "created a one-time link for", after: "" });
+  });
 });

@@ -110,6 +110,8 @@ export function historyHeadline(item: Pick<HistoryItem, "action" | "changes"> & 
       return `activated this ${entity}`;
     case "link_created":
       return "created a one-time link";
+    case "link_revoked":
+      return "revoked a one-time link";
     case "password_changed":
       return "changed the password";
     case "email_changed":
@@ -157,7 +159,10 @@ export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes"
     case "access_revoked":
       return { before: "revoked access on", after: "" };
     case "link_created":
-      return { before: "created a one-time link for", after: "" };
+      // An invitation link (OPS-141) is its own subject: "created |Invitation link|".
+      return { before: entity === "invitation link" ? "created" : "created a one-time link for", after: "" };
+    case "link_revoked":
+      return { before: "revoked", after: "" };
     case "password_changed":
       return { before: "changed the password of", after: "" };
     case "email_changed":
