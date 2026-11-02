@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { aliasedTable, and, asc, eq, exists, ilike, isNotNull, isNull, not, notIlike, or, sql, type SQL } from "drizzle-orm";
+import { aliasedTable, and, asc, eq, exists, ilike, inArray, isNotNull, isNull, not, notExists, notIlike, or, sql, type SQL } from "drizzle-orm";
 import { adminUsers } from "../auth/auth.schema.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import type { Page, Sort } from "../common/listing/list-query.js";
@@ -19,8 +19,9 @@ import type {
   UpdateServiceRequest,
   VocabularyEntry,
 } from "./services.contracts.js";
+import { refreshGrantNames } from "./grant-name.js";
 import { grantRefsByOwner } from "./grant-refs.js";
-import { accessGrants, accessLevels, accessStatuses, serviceCategories, serviceHostingModels, services, serviceStatuses } from "./services.schema.js";
+import { accessGrants, accessLevels, accessStatuses, serviceCategories, serviceCategoryTags, serviceHostingModels, services, serviceStatuses } from "./services.schema.js";
 
 export type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
@@ -35,7 +36,6 @@ const iso = (value: Date | null) => value?.toISOString() ?? null;
 const grantNeedsReview = (table: typeof accessGrants) =>
   sql`(${table.statusKey} in ('needs_confirmation', 'planned', 'invited') or (${table.expiresOn} is not null and ${table.expiresOn} <= current_date + 30 and coalesce(${table.statusKey}, '') not in ('revoked', 'expired')))`;
 
-const responsible = aliasedTable(adminUsers, "responsible");
 const grantAccount = aliasedTable(adminUsers, "grant_account");
 
 @Injectable()
@@ -75,23 +75,17 @@ export class ServicesRepository {
         name: services.name,
         statusKey: services.statusKey,
         statusLabel: serviceStatuses.label,
-        categoryKey: services.categoryKey,
-        categoryLabel: serviceCategories.label,
         hostingKey: services.hostingModelKey,
         hostingLabel: serviceHostingModels.label,
         url: services.url,
         description: services.description,
-        responsibleId: responsible.id,
-        responsibleName: accountName(responsible),
         archivedAt: services.archivedAt,
         createdAt: services.createdAt,
         updatedAt: services.updatedAt,
       })
       .from(services)
       .leftJoin(serviceStatuses, eq(serviceStatuses.key, services.statusKey))
-      .leftJoin(serviceCategories, eq(serviceCategories.key, services.categoryKey))
-      .leftJoin(serviceHostingModels, eq(serviceHostingModels.key, services.hostingModelKey))
-      .leftJoin(responsible, eq(responsible.id, services.responsibleAdminId));
+      .leftJoin(serviceHostingModels, eq(serviceHostingModels.key, services.hostingModelKey));
   }
 
   async listServices(query: ServicesListQuery): Promise<Page<ServiceDto>> {
@@ -100,7 +94,8 @@ export class ServicesRepository {
       name: sql`lower(${services.name})`,
       number: sql`${services.serviceNumber}`,
       status: sql`${serviceStatuses.sortOrder}`,
-      category: sql`lower(${serviceCategories.label})`,
+      // By the first tag.
+      category: sql`(select lower(c.label) from service_category_tags t join service_categories c on c.key = t.category_key where t.service_id = ${services.id} order by t.position, c.sort_order limit 1)`,
       updated: sql`${services.updatedAt}`,
       created: sql`${services.createdAt}`,
     };
@@ -115,7 +110,6 @@ export class ServicesRepository {
         .select({ total: sql<number>`count(*)::int` })
         .from(services)
         .leftJoin(serviceStatuses, eq(serviceStatuses.key, services.statusKey))
-        .leftJoin(serviceCategories, eq(serviceCategories.key, services.categoryKey))
         .where(where),
     ]);
     return { items: await this.hydrateServices(rows), page: query.page, pageSize: query.pageSize, total: count?.total ?? 0 };
@@ -129,7 +123,12 @@ export class ServicesRepository {
       const pattern = contains(query.search.trim());
       conditions.push(or(ilike(services.name, pattern), ilike(services.url, pattern), ilike(services.description, pattern), sql`${services.serviceNumber}::text = ${query.search.trim()}`));
     }
-    const column = { status: services.statusKey, category: services.categoryKey, hosting: services.hostingModelKey, responsible: services.responsibleAdminId } as const;
+    const column = { status: services.statusKey, hosting: services.hostingModelKey } as const;
+    const tagged = (key?: string) =>
+      this.db
+        .select({ one: sql`1` })
+        .from(serviceCategoryTags)
+        .where(and(eq(serviceCategoryTags.serviceId, services.id), key === undefined ? undefined : eq(serviceCategoryTags.categoryKey, key)));
     for (const filter of query.filters) {
       const value = typeof filter.value === "string" ? filter.value : "";
       if (filter.field === "name") {
@@ -141,6 +140,11 @@ export class ServicesRepository {
             exists(this.db.select({ one: sql`1` }).from(accessGrants).where(and(eq(accessGrants.serviceId, services.id), isNull(accessGrants.archivedAt), grantNeedsReview(accessGrants)))),
           ),
         );
+      } else if (filter.field === "category") {
+        // Tags: "is" = has this tag, "is not" = hasn't it, "is empty" = no tag.
+        if (filter.operator === "is") conditions.push(exists(tagged(value)));
+        else if (filter.operator === "is_not") conditions.push(notExists(tagged(value)));
+        else if (filter.operator === "is_empty") conditions.push(notExists(tagged()));
       } else if (filter.field in column) {
         const target = column[filter.field as keyof typeof column];
         if (filter.operator === "is") conditions.push(eq(target, value));
@@ -153,22 +157,35 @@ export class ServicesRepository {
   }
 
   private async hydrateServices(rows: Awaited<ReturnType<ReturnType<ServicesRepository["selectServices"]>["where"]>>, db: Executor = this.db): Promise<ServiceDto[]> {
-    const grants = await this.grantRefsFor(db, "service", rows.map((row) => row.id));
+    const ids = rows.map((row) => row.id);
+    const [grants, tags] = await Promise.all([this.grantRefsFor(db, "service", ids), this.categoriesOf(db, ids)]);
     return rows.map((row) => ({
       id: row.id,
       serviceNumber: row.serviceNumber,
       name: row.name,
       status: vocabulary(row.statusKey, row.statusLabel),
-      category: vocabulary(row.categoryKey, row.categoryLabel),
+      categories: tags.get(row.id) ?? [],
       hostingModel: vocabulary(row.hostingKey, row.hostingLabel),
       url: row.url,
       description: row.description,
-      responsible: row.responsibleId ? { id: row.responsibleId, name: row.responsibleName } : null,
       permissions: grants.get(row.id) ?? [],
       archivedAt: iso(row.archivedAt),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
+  }
+
+  private async categoriesOf(db: Executor, ids: string[]): Promise<Map<string, VocabularyEntry[]>> {
+    const result = new Map<string, VocabularyEntry[]>();
+    if (ids.length === 0) return result;
+    const rows = await db
+      .select({ serviceId: serviceCategoryTags.serviceId, key: serviceCategories.key, label: serviceCategories.label })
+      .from(serviceCategoryTags)
+      .innerJoin(serviceCategories, eq(serviceCategories.key, serviceCategoryTags.categoryKey))
+      .where(inArray(serviceCategoryTags.serviceId, ids))
+      .orderBy(asc(serviceCategoryTags.position), asc(serviceCategories.sortOrder));
+    for (const row of rows) result.set(row.serviceId, [...(result.get(row.serviceId) ?? []), { key: row.key, label: row.label }]);
+    return result;
   }
 
   async findService(id: string, db: Executor = this.db): Promise<ServiceDto | undefined> {
@@ -178,11 +195,20 @@ export class ServicesRepository {
 
   async createService(tx: Executor, input: CreateServiceRequest): Promise<string> {
     const [row] = await tx.insert(services).values({ ...serviceValues(input), name: input.name }).returning({ id: services.id });
+    if (input.categoryKeys) await this.setCategories(tx, row!.id, input.categoryKeys);
     return row!.id;
   }
 
   async updateService(tx: Executor, id: string, input: UpdateServiceRequest): Promise<void> {
     await tx.update(services).set({ ...serviceValues(input), updatedAt: new Date() }).where(eq(services.id, id));
+    if (input.categoryKeys) await this.setCategories(tx, id, input.categoryKeys);
+    // Its permissions' names start with the service's name.
+    if (input.name !== undefined) await refreshGrantNames(tx, { serviceId: id });
+  }
+
+  private async setCategories(tx: Executor, id: string, keys: readonly string[]): Promise<void> {
+    await tx.delete(serviceCategoryTags).where(eq(serviceCategoryTags.serviceId, id));
+    if (keys.length > 0) await tx.insert(serviceCategoryTags).values(keys.map((categoryKey, position) => ({ serviceId: id, categoryKey, position })));
   }
 
   async setServiceArchived(tx: Executor, id: string, adminId: string | null, archived: boolean): Promise<void> {
@@ -190,15 +216,6 @@ export class ServicesRepository {
       .update(services)
       .set(archived ? { archivedAt: new Date(), archivedById: adminId, updatedAt: new Date() } : { archivedAt: null, archivedById: null, updatedAt: new Date() })
       .where(eq(services.id, id));
-  }
-
-  async serviceHasGrants(id: string): Promise<boolean> {
-    const [row] = await this.db.select({ id: accessGrants.id }).from(accessGrants).where(eq(accessGrants.serviceId, id)).limit(1);
-    return row !== undefined;
-  }
-
-  async deleteService(tx: Executor, id: string): Promise<void> {
-    await tx.delete(services).where(eq(services.id, id));
   }
 
   // ---- Access grants ----
@@ -235,8 +252,8 @@ export class ServicesRepository {
       .leftJoin(accessStatuses, eq(accessStatuses.key, accessGrants.statusKey));
   }
 
-  /** The grant's shown name: its own, else "<service> / <level>" (Figma p17). */
-  private titleExpression = sql<string>`coalesce(${accessGrants.name}, ${services.name} || coalesce(' / ' || ${accessLevels.label}, ''))`;
+  /** The grant's name (OPS-138); the service's alone until it is first named. */
+  private titleExpression = sql<string>`coalesce(${accessGrants.name}, ${services.name})`;
 
   async listGrants(query: GrantsListQuery): Promise<Page<GrantDto>> {
     const where = this.grantWhere(query);
@@ -318,11 +335,13 @@ export class ServicesRepository {
 
   async createGrant(tx: Executor, input: CreateGrantRequest): Promise<string> {
     const [row] = await tx.insert(accessGrants).values({ ...grantValues(input), serviceId: input.serviceId }).returning({ id: accessGrants.id });
+    await refreshGrantNames(tx, { grantId: row!.id });
     return row!.id;
   }
 
   async updateGrant(tx: Executor, id: string, input: UpdateGrantRequest): Promise<void> {
     await tx.update(accessGrants).set({ ...grantValues(input), updatedAt: new Date() }).where(eq(accessGrants.id, id));
+    await refreshGrantNames(tx, { grantId: id });
   }
 
   async setGrantArchived(tx: Executor, id: string, adminId: string | null, archived: boolean): Promise<void> {
@@ -330,10 +349,6 @@ export class ServicesRepository {
       .update(accessGrants)
       .set(archived ? { archivedAt: new Date(), archivedById: adminId, updatedAt: new Date() } : { archivedAt: null, archivedById: null, updatedAt: new Date() })
       .where(eq(accessGrants.id, id));
-  }
-
-  async deleteGrant(tx: Executor, id: string): Promise<void> {
-    await tx.delete(accessGrants).where(eq(accessGrants.id, id));
   }
 
   async personExists(id: string): Promise<boolean> {
@@ -356,17 +371,15 @@ function serviceValues(input: UpdateServiceRequest): Partial<typeof services.$in
   const values: Partial<typeof services.$inferInsert> = {};
   if (input.name !== undefined) values.name = input.name;
   if (input.statusKey !== undefined) values.statusKey = input.statusKey;
-  if (input.categoryKey !== undefined) values.categoryKey = input.categoryKey;
   if (input.hostingModelKey !== undefined) values.hostingModelKey = input.hostingModelKey;
   if (input.url !== undefined) values.url = input.url;
   if (input.description !== undefined) values.description = input.description;
-  if (input.responsibleAdminId !== undefined) values.responsibleAdminId = input.responsibleAdminId;
   return values;
 }
 
 function grantValues(input: UpdateGrantRequest): Partial<typeof accessGrants.$inferInsert> {
   const values: Partial<typeof accessGrants.$inferInsert> = {};
-  for (const key of ["name", "personId", "adminUserId", "serviceId", "levelKey", "statusKey", "resourceScope", "grantedOn", "revokedOn", "expiresOn"] as const) {
+  for (const key of ["personId", "adminUserId", "serviceId", "levelKey", "statusKey", "resourceScope", "grantedOn", "revokedOn", "expiresOn"] as const) {
     if (input[key] !== undefined) (values as Record<string, unknown>)[key] = input[key];
   }
   return values;
@@ -400,8 +413,7 @@ function toGrant(row: GrantRow): GrantDto {
   return {
     id: row.id,
     grantNumber: row.grantNumber,
-    name: row.name,
-    title: row.name ?? `${row.serviceName}${level ? ` / ${level.label}` : ""}`,
+    title: row.name ?? row.serviceName,
     person: row.personId ? { id: row.personId, name: row.personName ?? "" } : null,
     account: row.accountId ? { id: row.accountId, name: row.accountName ?? "" } : null,
     service: { id: row.serviceId, name: row.serviceName },

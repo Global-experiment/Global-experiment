@@ -75,7 +75,7 @@ export function CsvReportScreen({ id }: { id: string }) {
         <dt className="text-text-muted">Result</dt>
         <dd>
           {data.mode === "apply"
-            ? `${data.counts.create ?? 0} added · ${data.counts.duplicates ?? 0} not added (already existing) · ${data.counts.errors ?? 0} with errors`
+            ? `${data.counts.create ?? 0} added · ${data.counts.duplicates ?? 0} not added (already existing) · ${data.counts.errors ?? 0} with errors${data.counts.warnings ? ` · ${data.counts.warnings} added without some values` : ""}`
             : "Nothing was imported."}
         </dd>
       </dl>
@@ -85,7 +85,23 @@ export function CsvReportScreen({ id }: { id: string }) {
           {data.failure}
         </p>
       ) : null}
-      <Section title="Added" rows={of("created")} empty="No record was added." render={(row) => (row.recordId ? link(row.recordId, row.name) : row.name)} />
+      <Section
+        title="Added"
+        rows={of("created")}
+        empty="No record was added."
+        render={(row) => (
+          <>
+            {row.recordId ? link(row.recordId, row.name) : row.name}
+            {/* Values left out of the record (OPS-153; runs before it have none). */}
+            {(row.warnings ?? []).map((warning) => (
+              <span key={warning} className="flex w-full items-center gap-1 pl-[72px] text-meta text-text-muted">
+                <AdminIcon name="warning" />
+                {warning}
+              </span>
+            ))}
+          </>
+        )}
+      />
       <Section
         title="Possible duplicates, not added"
         rows={of("duplicate")}

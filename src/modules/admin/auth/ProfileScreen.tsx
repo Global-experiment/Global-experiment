@@ -6,13 +6,17 @@ import { applyAppearance, type Appearance } from "@/shared/ui/appearance";
 import { adminApi, AdminApiError } from "../api/client";
 import { adminDisplayName, type AdminPrincipal, type Profile } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
+import { ExpertiseField } from "../expertise/ExpertiseField";
+import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import { useLeaveGuard } from "../record/useLeaveGuard";
+import { LIMIT_HINTS } from "../relationLimits";
 import { GrantChips } from "../services/accessDisplay";
 import { useCan } from "../session";
 import { AccountAvatar } from "../ui/AccountAvatar";
 import { AdminIcon, type AdminIconName } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
-import { Pills, PropertyRow, ReadOnlyValue, recordInput, RecordLayout } from "../ui/RecordForm";
+import { AutoGrowTextarea, Pills, PropertyRow, ReadOnlyValue, recordInput, RecordLayout } from "../ui/RecordForm";
+import type { RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 import { PasswordChecklist } from "./PasswordChecklist";
 import { passwordAccepted } from "./passwordRules";
@@ -28,11 +32,21 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
 
 interface Draft {
   displayName: string;
+  description: string;
+  expertise: RelationOption[];
   timeZone: string;
   appearance: Appearance;
 }
 
-const toDraft = (profile: Profile): Draft => ({ displayName: profile.displayName ?? "", timeZone: profile.timeZone ?? "", appearance: profile.appearance });
+const toDraft = (profile: Profile): Draft => ({
+  displayName: profile.displayName ?? "",
+  description: profile.description ?? "",
+  expertise: profile.expertise.map(linkedExpertiseOption),
+  timeZone: profile.timeZone ?? "",
+  appearance: profile.appearance,
+});
+
+const ids = (options: RelationOption[]) => options.map((option) => option.id).join();
 
 const failure = (caught: unknown, fallback: string) => (caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : fallback);
 
@@ -51,7 +65,9 @@ function useTimeZones(current: string): string[] {
 
 /**
  * /admin/profile — Profile settings (admin-desktop.pdf p18), for every
- * role: display name, profile picture, time zone, appearance (System,
+ * account, a role or not (an account made from an invitation link lands
+ * here first, OPS-141): display name, description (OPS-144), expertise
+ * (OPS-135), profile picture, time zone, appearance (System,
  * Light, Dark — previewed at once, kept on Save changes), email, the
  * read-only Account ID and the account's service access. The panel:
  * Save changes, then Discard changes, Change email, Change password,
@@ -76,7 +92,14 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
   const base = loaded ? toDraft(loaded) : null;
   const draft = edit?.version === version ? edit.draft : base;
   const zones = useTimeZones(draft?.timeZone ?? "");
-  const dirty = !!base && !!draft && (draft.displayName.trim() !== base.displayName.trim() || draft.timeZone !== base.timeZone || draft.appearance !== base.appearance);
+  const dirty =
+    !!base &&
+    !!draft &&
+    (draft.displayName.trim() !== base.displayName.trim() ||
+      draft.description.trim() !== base.description.trim() ||
+      ids(draft.expertise) !== ids(base.expertise) ||
+      draft.timeZone !== base.timeZone ||
+      draft.appearance !== base.appearance);
   const guard = useLeaveGuard(dirty);
 
   // The appearance previews as soon as it's picked; leaving with it unsaved puts the saved one back.
@@ -117,6 +140,8 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
     setError(null);
     const body: Record<string, unknown> = {};
     if (draft!.displayName.trim() !== base!.displayName.trim()) body.displayName = draft!.displayName.trim() || null;
+    if (draft!.description.trim() !== base!.description.trim()) body.description = draft!.description.trim() || null;
+    if (ids(draft!.expertise) !== ids(base!.expertise)) body.expertiseIds = draft!.expertise.map((option) => option.id);
     if (draft!.timeZone !== base!.timeZone) body.timeZone = draft!.timeZone || null;
     if (draft!.appearance !== base!.appearance) body.appearance = draft!.appearance;
     try {
@@ -232,6 +257,12 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
             placeholder={adminDisplayName({ email: loaded.email, displayName: null })}
             className={recordInput}
           />
+        </PropertyRow>
+        <PropertyRow icon="title" label="Description" htmlFor="profile-description">
+          <AutoGrowTextarea id="profile-description" value={draft.description} onChange={(event) => set("description", event.target.value)} maxLength={5000} placeholder="Add a description" />
+        </PropertyRow>
+        <PropertyRow icon="expertise" label="Expertise">
+          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.accountExpertise} />
         </PropertyRow>
         <PropertyRow icon="image" label="Profile picture">
           <div className="flex flex-wrap items-center gap-2">

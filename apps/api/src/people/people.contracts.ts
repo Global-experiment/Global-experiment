@@ -192,6 +192,3 @@ export interface PeopleOptionsDto {
   aiScoreReadOnly: boolean;
 }
 
-/** Permanent delete (directory.delete, decision 12): the person's name typed exactly. */
-export const DeletePersonRequest = z.strictObject({ confirm: z.string().max(200) });
-export type DeletePersonRequest = z.output<typeof DeletePersonRequest>;

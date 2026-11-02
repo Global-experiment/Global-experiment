@@ -21,20 +21,21 @@ const text = (value: string | null, search: string): ReactNode => (value ? <High
 const day = (value: string | null) => (value ? formatCalendarDay(value) : null);
 
 /**
- * admin-desktop.pdf p17, measured: Name 280, ID 64, Account 154, Service 184, Permission level 148, Status 164, Resource scope 260.
- * "Account" is who holds the access: the person, else the admin account alone.
+ * admin-desktop.pdf p17, measured: Name 280, ID 64, Account 154, Service 184, Permission level 148, Status 164, Scope 260.
+ * The labels of the detail page (OPS-148): Account is the admin account, People the person of the directory.
  */
 const COLUMNS: TableColumn<Grant>[] = [
   { id: "name", label: "Name", icon: "title", width: 280, render: (row, s) => text(row.title, s) },
   { id: "number", label: "ID", icon: "title", width: 64, render: (row) => String(row.grantNumber) },
-  { id: "account", label: "Account", icon: "arrow_outward", width: 154, render: (row, s) => text(row.person?.name ?? row.account?.name ?? null, s) },
+  { id: "account", label: "Account", icon: "arrow_outward", width: 154, render: (row, s) => text(row.account?.name ?? null, s) },
   { id: "service", label: "Service", icon: "arrow_outward", width: 184, render: (row, s) => text(row.service.name, s) },
   { id: "level", label: "Permission level", icon: "select", width: 148, render: (row) => row.level?.label },
   { id: "status", label: "Status", icon: "select", width: 164, render: (row) => row.status?.label },
-  { id: "scope", label: "Resource scope", icon: "title", width: 260, render: (row, s) => text(row.resourceScope, s) },
+  { id: "scope", label: "Scope", icon: "title", width: 260, render: (row, s) => text(row.resourceScope, s) },
   { id: "granted", label: "Granted", icon: "schedule", width: 120, defaultHidden: true, render: (row) => day(row.grantedOn) },
-  { id: "expires", label: "Expires", icon: "schedule", width: 120, defaultHidden: true, render: (row) => day(row.expiresOn) },
   { id: "revoked", label: "Revoked", icon: "schedule", width: 120, defaultHidden: true, render: (row) => day(row.revokedOn) },
+  { id: "expires", label: "Expired", icon: "schedule", width: 120, defaultHidden: true, render: (row) => day(row.expiresOn) },
+  { id: "people", label: "People", icon: "arrow_outward", width: 154, defaultHidden: true, render: (row, s) => text(row.person?.name ?? null, s) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, defaultHidden: true, render: (row) => formatDate(row.updatedAt) },
 ];
 
@@ -62,11 +63,11 @@ export function GrantsList() {
         options: (options.data?.accounts ?? []).map((account) => ({ value: account.id, label: account.name })),
         sort: "text",
       },
-      { id: "person", label: "Person", icon: "arrow_outward", operators: ["is_empty", "is_not_empty"] },
+      { id: "person", label: "People", icon: "arrow_outward", operators: ["is_empty", "is_not_empty"] },
       { id: "level", label: "Permission level", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.levels), sort: "text" },
       { id: "status", label: "Status", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.accessStatuses), sort: "text" },
       { id: "review", label: "Review queue", icon: "check_box", operators: ["is"], options: [{ value: "true", label: "Needs review" }] },
-      { id: "expires", label: "Expires", icon: "schedule", operators: [], sort: "dates" },
+      { id: "expires", label: "Expired", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
     ],

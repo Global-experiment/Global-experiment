@@ -32,10 +32,14 @@ export class AuthService {
     // Always run one scrypt verification so unknown and known emails cost the same.
     const valid = await verifyPassword(password, admin?.passwordHash ?? (await dummyPasswordHash()));
     if (!admin || !valid || admin.status !== "active") throw new UnauthenticatedError("Invalid email or password.");
+    return this.startSession(admin.id);
+  }
 
+  /** A new session for an account that just proved who it is (sign-in, or sign-up with an invitation link). */
+  async startSession(adminUserId: string): Promise<{ token: string; expiresAt: Date }> {
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + this.config.session.maxDays * 24 * 60 * 60 * 1000);
-    await this.repository.createSession(admin.id, hashSessionToken(token), expiresAt);
+    await this.repository.createSession(adminUserId, hashSessionToken(token), expiresAt);
     return { token, expiresAt };
   }
 

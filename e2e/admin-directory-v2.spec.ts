@@ -4,8 +4,7 @@ import { E2E_ADMIN } from "./admin-credentials";
 
 /**
  * Admin directory v2 through the real stack (Next → NestJS → PostgreSQL 17
- * test database with test-only fixtures; the import page reads a Notion-
- * shaped fixture file instead of Notion — IMPORT_FIXTURE_FILE, test only).
+ * test database with test-only fixtures).
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the admin stack isn't running.");
 test.describe.configure({ mode: "serial" });
@@ -141,21 +140,10 @@ test("taxonomy screens are read-only, with the list toolbar: domain / status / t
   await expect(page.getByRole("status").filter({ hasText: / of \d+$/ })).toHaveText("1–4 of 4");
 });
 
-test("run a People & organizations dry run from the import page (the only Notion import left)", async ({ page }) => {
-  await page.goto("/admin/people");
-  await page.getByRole("button", { name: "More options" }).click();
-  await page.getByRole("menuitem", { name: "Import Notion" }).click();
-  await expect(page).toHaveURL(/\/admin\/imports$/);
-  await expect(page.getByRole("heading", { name: "Notion import", level: 1 })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Dry run/ })).toHaveText(["Dry run people & organizations"]);
-
-  await page.getByRole("button", { name: "Dry run people & organizations" }).click();
-  const status = page.locator("[data-job-status]");
-  await expect(status).toHaveAttribute("data-job-status", "succeeded", { timeout: 20_000 });
-  await expect(status).toHaveText(/^People & organizations dry run finished: (no changes|\d+ changes?)\.$/);
-  await expect(page.getByLabel("Import report")).toContainText("DIRECTORY IMPORT — DRY RUN");
-
-  const history = page.getByRole("table", { name: "Import history" });
-  await expect(history.locator("tbody tr").first()).toContainText("Dry run");
-  await expect(history.locator("tbody tr").first()).toContainText("People & organizations");
+test("the Imports page lists past runs; there is no Notion import any more (OPS-154)", async ({ page }) => {
+  await page.goto("/admin/imports");
+  await expect(page.getByRole("heading", { name: "Imports", level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Dry run/ })).toHaveCount(0);
+  await expect(page.getByText(/More options → Import CSV/)).toBeVisible();
+  expect((await page.request.post("/api/admin/imports/directory/dry-run", { headers: { origin: new URL(page.url()).origin } })).status()).toBe(404);
 });

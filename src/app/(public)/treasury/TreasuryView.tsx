@@ -144,98 +144,101 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
       ) : null}
 
       <Container className="pt-1">
-        {/*
-          Common pages p11: a 32px search button, then the sort and filter fields, 8px apart.
-          The search button opens a field in their place (typing searches after a pause, Enter
-          at once); × closes it and clears the search.
-        */}
-        {!toolbar ? null : searchOpen ? (
-          <form
-            role="search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              search(query, 0);
-            }}
-            className="flex gap-2"
-          >
-            <label className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text-primary">
-              <Icon name="search" className="shrink-0 text-text-muted" />
-              <span className="sr-only">{copy.toolbar.searchField}</span>
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  search(event.target.value, 350);
-                }}
-                placeholder={copy.toolbar.searchPlaceholder}
-                maxLength={100}
-                autoFocus={state.q === null}
-                enterKeyHint="search"
-                className="h-full min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={closeSearch}
-              aria-label={copy.toolbar.closeSearch}
-              className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-line text-text-primary ${focusRing}`}
-            >
-              <Icon name="close" />
-            </button>
-          </form>
-        ) : (
-          <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] gap-2">
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              aria-label={copy.toolbar.search}
-              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-control border border-line text-text-primary ${focusRing}`}
-            >
-              <Icon name="search" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSortOpen(true)}
-              aria-haspopup="dialog"
-              aria-label={copy.toolbar.sortLabel(sortField(state), copy.sort.directions[state.sort])}
-              className={`flex h-8 min-w-0 cursor-pointer items-center justify-between gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] text-body text-text-primary ${focusRing}`}
-            >
-              <span className="truncate">{copy.toolbar.sortButton(sortField(state), copy.sort.directions[state.sort])}</span>
-              <Icon name="arrow_downward" className={`shrink-0 ${state.sort.endsWith("_asc") ? "rotate-180" : ""}`} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterOpen(true)}
-              aria-haspopup="dialog"
-              aria-label={copy.toolbar.filterLabel(filters)}
-              className={`flex h-8 min-w-0 cursor-pointer items-center rounded-control border px-[calc(0.5rem-1px)] text-body ${filters > 0 ? "border-text-primary font-bold" : "border-line"} text-text-primary ${focusRing}`}
-            >
-              <span className="truncate">{filters > 0 ? copy.toolbar.filterActive(filters) : copy.toolbar.filter}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Without the toolbar the pills take its place, 4px under the header (Figma's y 148). */}
-        <div role="group" aria-label={copy.pills.label} className={`${toolbar ? "mt-2" : ""} flex gap-2`}>
-          {(["expense", "donation"] as const satisfies HistoryType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => go(withFilters(state, { type: nextTypeFilter(state.type, type) }))}
-              aria-pressed={state.type === type}
-              className={`h-8 cursor-pointer rounded-full border px-[calc(var(--spacing-gutter)-1px)] text-meta ${focusRing} ${
-                state.type === type ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line text-text-primary"
-              }`}
-            >
-              {type === "expense" ? copy.pills.expenses : copy.pills.donations}
-            </button>
-          ))}
-        </div>
-
-        {overview ? <ClickableStatsRow stats={buildStats(overview)} className="mt-4" /> : null}
-        {overview?.sampleFigures && !overview.wiseConnected ? <p className="mt-2 text-center text-meta text-text-muted">{copy.stats.sampleNote}</p> : null}
+        {/* OPS-128 (client, 2026-11-03): the stats first, then the filters, right above the history; no note under the stats. */}
+        {overview ? <ClickableStatsRow stats={buildStats(overview)} /> : null}
         {overview?.donationAppeal ? <DonationAppeal /> : null}
+
+        <div className="mt-4">
+          {/*
+            Common pages p11: a 32px search button, then the sort and filter fields, 8px apart.
+            The search button opens a field in their place (typing searches after a pause, Enter
+            at once); × closes it and clears the search.
+          */}
+          {!toolbar ? null : searchOpen ? (
+            <form
+              role="search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                search(query, 0);
+              }}
+              className="flex gap-2"
+            >
+              <label className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-text-primary">
+                <Icon name="search" className="shrink-0 text-text-muted" />
+                <span className="sr-only">{copy.toolbar.searchField}</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    search(event.target.value, 350);
+                  }}
+                  placeholder={copy.toolbar.searchPlaceholder}
+                  maxLength={100}
+                  autoFocus={state.q === null}
+                  enterKeyHint="search"
+                  className="h-full min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={closeSearch}
+                aria-label={copy.toolbar.closeSearch}
+                className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-control border border-line text-text-primary ${focusRing}`}
+              >
+                <Icon name="close" />
+              </button>
+            </form>
+          ) : (
+            <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] gap-2">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label={copy.toolbar.search}
+                className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-control border border-line text-text-primary ${focusRing}`}
+              >
+                <Icon name="search" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortOpen(true)}
+                aria-haspopup="dialog"
+                aria-label={copy.toolbar.sortLabel(sortField(state), copy.sort.directions[state.sort])}
+                className={`flex h-8 min-w-0 cursor-pointer items-center justify-between gap-1 rounded-control border border-line px-[calc(0.5rem-1px)] text-body text-text-primary ${focusRing}`}
+              >
+                <span className="truncate">{copy.toolbar.sortButton(sortField(state), copy.sort.directions[state.sort])}</span>
+                <Icon name="arrow_downward" className={`shrink-0 ${state.sort.endsWith("_asc") ? "rotate-180" : ""}`} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterOpen(true)}
+                aria-haspopup="dialog"
+                aria-label={copy.toolbar.filterLabel(filters)}
+                className={`flex h-8 min-w-0 cursor-pointer items-center rounded-control border px-[calc(0.5rem-1px)] text-body ${filters > 0 ? "border-text-primary font-bold" : "border-line"} text-text-primary ${focusRing}`}
+              >
+                <span className="truncate">{filters > 0 ? copy.toolbar.filterActive(filters) : copy.toolbar.filter}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Without the toolbar the pills stand alone. */}
+          <div role="group" aria-label={copy.pills.label} className={`${toolbar ? "mt-2" : ""} flex gap-2`}>
+            {(["expense", "donation"] as const satisfies HistoryType[]).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => go(withFilters(state, { type: nextTypeFilter(state.type, type) }))}
+                aria-pressed={state.type === type}
+                className={`h-8 cursor-pointer rounded-full border px-[calc(var(--spacing-gutter)-1px)] text-meta ${focusRing} ${
+                  state.type === type ? "border-inverse-surface bg-inverse-surface text-inverse-content" : "border-line text-text-primary"
+                }`}
+              >
+                {type === "expense" ? copy.pills.expenses : copy.pills.donations}
+              </button>
+            ))}
+          </div>
+
+        </div>
 
         {/* Common pages p11: 14px bold heading, 12px muted count on the same baseline. */}
         <h2 className="mt-4 text-body text-text-primary">
@@ -338,7 +341,7 @@ function buildStats(overview: TreasuryOverview): StatItem[] {
   const stats = copy.stats;
   const items: StatItem[] = [];
   const trends = overview.trends;
-  // Sample figures (before Wise) say so in the sheet's caption and under the row.
+  // Sample figures (before Wise) say so in the sheet's caption (no note under the row since OPS-128).
   const sample = overview.sampleFigures === true && !overview.wiseConnected;
   if (overview.wiseConnected || sample) {
     items.push(

@@ -34,6 +34,8 @@ const rows = () => page.locator("tbody tr");
 const panel = () => page.locator("[data-record-panel]");
 const items = () => page.locator("[data-history-scroll] [data-history-item]");
 const origin = () => new URL(page.url()).origin;
+/** Records are archived, never deleted (OPS-147): a name of its own per run, as the test database keeps them. */
+const DRAFT = `Dana Draft ${Date.now().toString(36)}`;
 
 async function createPerson(data: Record<string, unknown>): Promise<{ id: string; personNumber: number }> {
   const response = await page.request.post("/api/admin/people", { data, headers: { origin: origin() } });
@@ -99,10 +101,11 @@ test("the panel (p14): Duplicate, Submit changes, More options, Views and Edits,
   await expect(items()).toHaveCount(2);
   await expect(items().nth(0)).toContainText("viewed this page");
   await expect(items().nth(1)).toContainText("created this record");
-  // More options: Discard changes, Duplicate as a draft, Archive, Delete permanently.
+  // More options: Discard changes, Duplicate as a draft, Archive — nothing is deleted (OPS-147).
   await page.getByRole("button", { name: "More options" }).click();
   await expect(page.getByRole("button", { name: "Discard changes" })).toBeDisabled();
-  for (const name of ["Duplicate as a draft", "Archive", "Delete permanently"]) await expect(page.getByRole("button", { name })).toBeVisible();
+  for (const name of ["Duplicate as a draft", "Archive"]) await expect(page.getByRole("button", { name })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
   await page.getByRole("button", { name: "More options" }).click();
 
   // The record's own rows: Person ID, Updated, Last edited by, Created, Created by.
@@ -292,51 +295,45 @@ test("duplicate ('Duplicated from PER-n') and duplicate as a draft (saved only o
   await page.getByRole("button", { name: "Duplicate as a draft" }).click();
   await expect(page).toHaveURL(/\/admin\/people\/new$/);
   await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dana Detailed DUPLICATE");
-  await page.getByLabel("Name", { exact: true }).fill("Dana Draft");
+  await page.getByLabel("Name", { exact: true }).fill(DRAFT);
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Person created" })).toBeVisible();
   // The new record opens.
   await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
-  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Dana Draft");
-  await openPerson("Dana Draft");
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(DRAFT);
+  await openPerson(DRAFT);
   await expect(items().filter({ hasText: "created this record" })).toHaveCount(1);
 });
 
-test("archive and restore with the Archived view; permanent delete only with the name typed", async () => {
-  await openPerson("Dana Draft");
+test("archive and restore with the Archived view; nothing is deleted permanently (OPS-147)", async () => {
+  await openPerson(DRAFT);
   await page.getByRole("button", { name: "More options" }).click();
   await page.getByRole("button", { name: "Archive" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Person archived" })).toBeVisible();
   await expect(page.locator("[data-history-item=archived]").first()).toContainText("archived this record");
 
-  await page.goto("/admin/people?q=Dana%20Draft");
+  await page.goto(`/admin/people?q=${encodeURIComponent(DRAFT)}`);
   // Out of the default list…
   await expect(page.getByText("No people match this search or these filters.")).toBeVisible();
   await page.getByRole("button", { name: "Archived", exact: true }).click();
   await expect(page).toHaveURL(/view=archived/);
   await expect(rows()).toHaveCount(1);
   await rows().first().getByRole("link").click();
-  await page.getByRole("button", { name: "More options" }).click();
+  // The record page may still be hydrating: open the menu until it shows.
+  await expect(async () => {
+    if (!(await page.getByRole("button", { name: "Restore" }).isVisible())) await page.getByRole("button", { name: "More options" }).click();
+    await expect(page.getByRole("button", { name: "Restore" })).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
   await page.getByRole("button", { name: "Restore" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Person restored" })).toBeVisible();
   await expect(page.locator("[data-history-item=restored]").first()).toContainText("restored this record");
 
-  await page.getByRole("button", { name: "Delete permanently" }).click();
-  const dialog = page.getByRole("dialog", { name: "Delete permanently?" });
-  await expect(dialog).toBeVisible();
-  const confirm = dialog.getByRole("button", { name: "Delete permanently" });
-  await expect(confirm).toBeDisabled();
-  await dialog.getByLabel("Type Dana Draft to confirm").fill("Dana");
-  await expect(confirm).toBeDisabled();
-  await dialog.getByLabel("Type Dana Draft to confirm").fill("Dana Draft");
-  await confirm.click();
-  await expect(page.getByRole("status").filter({ hasText: "Person deleted" })).toBeVisible();
-  await expect(page).toHaveURL(/\/admin\/people$/);
-  // Gone from both views.
-  for (const query of ["", "&filter=archived:is:true"]) {
-    const found = (await (await page.request.get(`/api/admin/people?search=Dana%20Draft${query}`)).json()) as { total: number };
-    expect(found.total).toBe(0);
-  }
+  // No permanent delete, for the Rootadmin either: the API has no delete route.
+  await expect(page.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
+  const id = page.url().split("/").pop()!;
+  expect((await page.request.delete(`/api/admin/people/${id}`, { data: { confirm: DRAFT }, headers: { origin: origin() } })).status()).toBe(404);
+  const found = (await (await page.request.get(`/api/admin/people?search=${encodeURIComponent(DRAFT)}`)).json()) as { total: number };
+  expect(found.total).toBe(1);
 });
 
 test("organizations and Treasury entries have the same panel and history", async () => {
@@ -365,11 +362,12 @@ test("Monitoring → History: every event, filtered by record type, actor, sourc
   await expect(page.locator("#admin-sidebar [aria-current=page]")).toHaveText("History");
   const list = page.getByRole("list", { name: "History, newest first" });
   await expect(list.locator("[data-history-item]").first()).toBeVisible();
-  // The deleted person's event stays, named by its last title, without a link.
-  const deleted = list.locator("[data-history-item=deleted]").filter({ hasText: "Dana Draft" });
-  await expect(deleted).toContainText(`${ACTOR} deleted Dana Draft`);
-  await expect(deleted.locator("[data-history-subject]")).toHaveText("Dana Draft");
-  await expect(deleted.getByRole("link")).toHaveCount(0);
+  // Nothing is deleted (OPS-147): the archived, then restored person keeps both events, linked to the record.
+  const restored = list.locator("[data-history-item=restored]").filter({ hasText: DRAFT });
+  await expect(restored).toContainText(`${ACTOR} restored ${DRAFT}`);
+  await expect(restored.locator("[data-history-subject]")).toHaveText(DRAFT);
+  await expect(restored.getByRole("link", { name: DRAFT })).toHaveAttribute("href", /^\/admin\/people\/[0-9a-f-]{36}$/);
+  await expect(list.locator("[data-history-item=deleted]").filter({ hasText: DRAFT })).toHaveCount(0);
 
   await page.getByLabel("Record type").selectOption("organization");
   await expect(page).toHaveURL(/entity=organization/);

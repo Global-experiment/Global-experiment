@@ -3,7 +3,7 @@ import { AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditActor } from "../audit/audit.types.js";
 import { diffRecord } from "../audit/record-fields.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
+import { NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
 import { countExistingExpertise } from "../expertise/expertise-refs.js";
 import { labelOfPerson, PERSON_FIELDS } from "../people/people.audit.js";
@@ -134,28 +134,6 @@ export class OrganizationsService {
         meta: { label: labelOfOrganization(before) },
       });
       return (await this.repository.findById(id, tx))!;
-    });
-  }
-
-  /** Permanent delete (decision 12): directory.delete, the name typed exactly, logged; refused while expenses name it as recipient. */
-  async delete(id: string, confirm: string, actor: AuditActor): Promise<void> {
-    // directory.delete is checked by the permission guard (the Rootadmin's, overview §3.1).
-    if (actor.type !== "admin") throw new ForbiddenError("Only an admin can delete permanently.");
-    const organization = await this.get(id);
-    if (confirm.trim() !== organization.name) {
-      throw new ValidationFailedError([{ path: "confirm", message: "Type the organization's name exactly to confirm." }]);
-    }
-    if (await this.repository.hasExpenses(id)) throw new ConflictError("This organization is the recipient of expenses: archive it instead.");
-    await this.db.transaction(async (tx) => {
-      await this.audit.record(tx, {
-        entityType: ENTITY,
-        entityId: id,
-        action: "deleted",
-        actor,
-        source: "admin",
-        meta: { label: labelOfOrganization(organization), number: `ORG-${organization.orgNumber}` },
-      });
-      await this.repository.delete(tx, id);
     });
   }
 

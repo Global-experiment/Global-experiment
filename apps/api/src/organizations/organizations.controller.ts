@@ -6,7 +6,6 @@ import { UnauthenticatedError } from "../common/errors/api-error.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import {
   CreateOrganizationRequest,
-  DeleteOrganizationRequest,
   OrganizationsListQuery,
   UpdateOrganizationRequest,
 } from "./organizations.contracts.js";
@@ -79,14 +78,6 @@ export class OrganizationsController {
   @HttpCode(200)
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.organizations.setArchived(id, false, actor(request));
-  }
-
-  /** Permanent delete: directory.delete, with the organization's name typed in `confirm`. */
-  @Delete(":id")
-  @Requires("directory.delete")
-  @HttpCode(204)
-  remove(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(DeleteOrganizationRequest)) body: DeleteOrganizationRequest, @Req() request: AdminRequest) {
-    return this.organizations.delete(id, body.confirm, actor(request));
   }
 
   @Put(":id/expertise/:expertiseId")

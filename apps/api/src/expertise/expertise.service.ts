@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditActor } from "../audit/audit.types.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
-import { ConflictError, NotFoundError } from "../common/errors/api-error.js";
+import { NotFoundError } from "../common/errors/api-error.js";
 import type { ExpertiseLevel, ExpertiseSearchQuery, ExpertiseTreeDto } from "./expertise.contracts.js";
 import { ExpertiseRepository } from "./expertise.repository.js";
 
@@ -62,17 +62,6 @@ export class ExpertiseService {
         });
       }
       return row;
-    });
-  }
-
-  async delete(level: ExpertiseLevel, id: string, actor: AuditActor): Promise<void> {
-    if (!(await this.repository.exists(level, id))) throw new NotFoundError(`${LABEL[level]} not found.`);
-    const dependants = await this.repository.dependants(level, id);
-    if (dependants > 0) throw new ConflictError(`${LABEL[level]} is still in use and can't be deleted.`, { dependants });
-    await this.db.transaction(async (tx) => {
-      const name = await this.repository.nameOf(level, id, tx);
-      await this.audit.record(tx, { entityType: ENTITY[level], entityId: id, action: "deleted", actor, source: "admin", meta: { label: name ?? id } });
-      await this.repository.delete(level, id, tx);
     });
   }
 

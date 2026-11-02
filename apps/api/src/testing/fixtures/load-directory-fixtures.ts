@@ -1,5 +1,5 @@
 import type { Database } from "../../common/database/database.module.js";
-import { followUpInstant } from "../../import/directory/directory-plan.js";
+import { followUpInstant } from "../../import/follow-up.js";
 import { expertiseDomains, expertiseFields, expertiseItems, expertiseTeams } from "../../expertise/expertise.schema.js";
 import { organizationExpertise, organizations } from "../../organizations/organizations.schema.js";
 import { people, peopleExpertise, peopleOrganizations } from "../../people/people.schema.js";

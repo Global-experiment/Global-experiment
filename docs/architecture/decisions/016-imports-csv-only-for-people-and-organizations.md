@@ -4,7 +4,10 @@
 
 Accepted (2026-10-30), Delivery 3. Decided by the client on 2026-10-23
 (board cards OPS-93, OPS-94, OPS-49, OPS-150). Replaces, for imports, the
-"Notion is the editing tool in v0.1" plan of overview §2.1.
+"Notion is the editing tool in v0.1" plan of overview §2.1. Amended
+2026-11-03, Delivery 4: CSV is the only import (OPS-154), and unknown values
+no longer refuse a row (OPS-153); the Treasury delete of the Consequences
+was withdrawn by decision 017 (archive only).
 
 ## Context
 
@@ -26,7 +29,18 @@ no import and no export.
 - **Same rules as the detail page.** Each row becomes the detail page's own
   create request and is validated by the same schema (email, links, dates,
   scores, lengths, relation limits); relations are found by name
-  (organizations, expertise, contact channels, state, source).
+  (organizations, expertise, contact channels, state, source), ignoring
+  case, accents and extra spaces, with Notion's link suffix removed —
+  "(https://www.notion.so/…)" as well as "(https://app.notion.com/p/…)".
+- **Unknown values don't refuse a row (OPS-153, 2026-11-03).** A value of a
+  relation column the admin doesn't have (or has twice) is listed once on
+  the column step, with the rows it is in, and the admin maps it to an
+  existing value or skips it (the default). A row whose value stays
+  unresolved is imported without it, with a warning on the check step and
+  in the report. Real errors (no name, an invalid email…) still refuse the
+  row, with the reason. Why: the client's first import (2026-10-30)
+  refused 370 of 394 rows only because Notion had changed its link format
+  and "Other" wasn't a contact channel.
 - **Duplicates are never merged or overwritten.** A row is a possible
   duplicate when its record UUID, email, website or name matches an
   existing record (archived ones included) or an earlier row; it is skipped
@@ -42,9 +56,15 @@ no import and no export.
   row's outcome) with its own history event, and a report page lists what
   was added (linked), the duplicates with the existing record (linked) and
   the errors. No file is stored.
-- **Notion import kept for People and Organizations** as a secondary option
-  for admins (`directory.import`), unchanged.
-- **Removed:** the Notion Taxonomy and Treasury importers (code, CLI,
+- **No Notion import at all (OPS-154, 2026-11-03).** The People and
+  Organizations importer that was kept as a secondary option is removed
+  too: its routes, job queue worker, CLI (`import:directory`), schedule
+  (`imports.directory.schedule`) and server variables
+  (`NOTION_PEOPLE_DB_ID`, `NOTION_ORGANIZATIONS_DB_ID`,
+  `IMPORT_SCHEDULE_DIRECTORY`, `IMPORT_FIXTURE_FILE`). Any schedule left
+  in the job queue is cleared at start, a queued job refused. Past runs
+  stay in `import_runs` and the History, listed read-only on Imports.
+- **Removed (Delivery 3):** the Notion Taxonomy and Treasury importers (code, CLI,
   schedules, settings, server variables) and every "Managed in Notion"
   label or read-only state outside People and Organizations. Expenses
   copied from Notion earlier are ordinary in-app entries now. The API
@@ -59,12 +79,9 @@ no import and no export.
 - Home and Documentation are still read live from Notion until the native
   editor ships (Delivery 4); their admin views stay read-only, without the
   label.
-- Expenses copied from Notion are ordinary entries. Those whose source is
-  manual can be deleted permanently like any manual entry: `treasury.delete`
-  (Rootadmin only), the entry number typed, and a "deleted" History event
-  that keeps the entry's details (number, name, type, date, amount,
-  recipient, expense types, review status, publication, documents), since
-  its page is gone.
+- Expenses copied from Notion are ordinary entries. They are archived,
+  never deleted (decision 017); past "deleted" History events keep the
+  entry's details.
 
 ## Later cleanup
 
@@ -78,6 +95,11 @@ no import and no export.
 - The `NOTION_DOMAINS_DB_ID`, `NOTION_FIELDS_DB_ID`,
   `NOTION_EXPERTISE_DB_ID`, `NOTION_TREASURY_DB_ID`,
   `IMPORT_SCHEDULE_TAXONOMY` and `IMPORT_SCHEDULE_TREASURY` server variables
-  are ignored and can be removed from the server's environment.
+  are ignored and can be removed from the server's environment; since
+  OPS-154, so are `NOTION_PEOPLE_DB_ID`, `NOTION_ORGANIZATIONS_DB_ID` and
+  `IMPORT_SCHEDULE_DIRECTORY` (the API no longer reads `NOTION_API_KEY`;
+  the website still does, for Home and Documentation).
+- The `directory.import` and `*.delete` permission keys (decision 017) are
+  unused too and go with the same cleanup.
 - The `managed_by` and `notion_page_id` columns of `treasury_entries` remain
   as a record of where an entry was copied from; nothing reads them.

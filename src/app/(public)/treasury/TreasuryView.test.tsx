@@ -31,13 +31,16 @@ const render = (value: TreasuryOverview) =>
   renderToStaticMarkup(<TreasuryView state={DEFAULT_TREASURY_STATE} overview={value} history={history} now="2026-10-15T12:00:00Z" />);
 
 describe("Treasury stats", () => {
-  it("shows the sample Balance and Sustainability with their trends, and says they are samples", () => {
+  it("shows the sample Balance and Sustainability with their trends, with no note under the stats (OPS-128)", () => {
     const html = render(overview);
     expect(html).toContain("$ 91.3K");
     expect(html).toContain("+2.1%");
     expect(html).toContain("5.8K");
     expect(html).toContain("+1.8%");
-    expect(html).toContain("Balance and Sustainability are sample figures until the Wise account is connected.");
+    expect(html).not.toContain("sample figures until the Wise account is connected");
+    // The stats come before the filters (OPS-128).
+    expect(html).toContain("aria-label=\"Show\"");
+    expect(html.indexOf("Med. donation")).toBeLessThan(html.indexOf("aria-label=\"Show\""));
   });
 
   it("renders an overview from an older API (cached before a deploy: no trends, no sample flag) instead of failing", () => {

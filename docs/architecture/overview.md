@@ -75,12 +75,12 @@ tables.
 | **Messages (Contribute)** | Inbound mail to contribute@ / waitlist@ / donations@, linked to people | `mailboxes`, `mail_threads`, `mail_messages` | `/api/admin/messages` | Admin → Messages | `/contribute` (address only) | Email, People, Audit |
 | **Emails** | Outbound email log and templates | `email_outbox` | internal service; `/api/admin/emails` (read) | Monitoring → Emails | none | Email integration, Jobs |
 | **Services and access grants** | Which person holds which access to which tool | `services`, `access_grants`, `access_grant_statuses` | `/api/admin/services`, `/api/admin/access-grants` | Monitoring → Services, Access grants; People "Access grant" column | none | People, Audit, Imports |
-| **Accounts and roles** | Admin identities, sessions, roles, permissions | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_password_resets` | `/api/admin/auth/*`, `/api/admin/accounts` | Monitoring → Accounts; user card; Profile | `/admin/login` | People (optional link), Email, Audit |
+| **Accounts and roles** | Admin identities, sessions, roles, permissions | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_tokens`, `admin_user_expertise` | `/api/admin/auth/*`, `/api/admin/accounts`, `/api/admin/invitations` | Monitoring → Accounts; user card; Profile | `/admin/login`, `/admin/join` | Expertise, Email, Audit (no People link, decision 018) |
 | **Audit / History** | Who changed what, when; before/after | `audit_events` | written by every module's service; `/api/admin/history` (read) | Monitoring → History; History panel on record pages | none | — (used by all) |
 | **Settings and module registry** | Module modes (notion / native), feature flags, import schedules; which modules are enabled | `settings` | `/api/admin/modules`, `/api/admin/settings` (owner), public `/api/config` (public flags only) | Settings (owner, from the user card); drives the sidebar | Donate page reads public flags | Audit |
 | **Analytics** | Visitor statistics | none in PostgreSQL (lives in the analytics tool) | `/api/admin/analytics` (proxy of the tool's stats API) | Monitoring → Analytics | none (v1.0: Statistics page) | Analytics integration |
 | **Technical dashboard** | Health of the stack, jobs, backups, integrations | none (reads health, `job` tables, `import_runs`) | `/api/admin/system` | Monitoring → Technical dashboard | none | all integrations, Jobs |
-| **Imports** | People and Organizations only (ADR 016): CSV import (check, import, report) and the Notion import (dry run, apply, report) | `import_runs` | `/api/admin/imports/*`, `/api/admin/imports/csv/*` | People / Organizations → More options → Import CSV, Import Notion; Imports page; report pages | none | Directory |
+| **Imports** | People and Organizations only, from CSV (ADR 016; no Notion import since OPS-154): column and value matching, check, import, report | `import_runs` | `/api/admin/imports/runs`, `/api/admin/imports/csv/*` | People / Organizations → More options → Import CSV; Imports page (history); report pages | none | Directory |
 
 Module notes:
 
@@ -108,10 +108,11 @@ Decided by the client on 2026-10-15 (answers Q1).
 
 **Changed on 2026-10-23 (built 2026-10-30, ADR [016](./decisions/016-imports-csv-only-for-people-and-organizations.md)):**
 only People and Organizations take data from outside — a **CSV import**
-for admins with write access, and the Notion import kept as a secondary
-option. Treasury and every other table are edited **in the admin only**,
-with no import and no export; the Taxonomy and Treasury importers and the
-"Managed in Notion" states outside People and Organizations were removed.
+for admins with write access (the Notion import, kept as a secondary
+option at first, was removed on 2026-11-03, OPS-154). Treasury and every
+other table are edited **in the admin only**, with no import and no export;
+the Taxonomy and Treasury importers and the "Managed in Notion" states
+outside People and Organizations were removed.
 The text below is the original plan, kept for the record.
 
 - **v0.1:** Notion is the **editing tool** for the Notion-backed modules —
@@ -218,16 +219,16 @@ later needs no code change. Built in the step named (plan:
 | 1 | Home and Documentation get the native CMS now. `cms.mode` = `notion` (default) \| `native`: while `notion`, "Administrate" opens the list, record and editor read-only with the "Managed in Notion" badge and a link to Notion, and the importer keeps the content in sync; `native` is the documented cut-over (§2.1). | setting `cms.mode` | 5b |
 | 2 | Public Treasury: the header is back, title and share; the stats use `treasury.stats_currency` (USD); the history lists every currency, latest first. Search, sort, filter and the currency switch stay in the code behind `treasury.public_toolbar` (false). | settings | 2 |
 | 3 | Documentation list columns: Title, Status, Display order, Expertise, Last edited by, Updated, Published. | list config | 5b |
-| 4 | Accounts page: "Role" column; views All / Active / Invited / Deactivated; "New account" creates an invitation; rows open a view-only profile; no inline editing. | list config | 7 |
-| 5 | Permissions "Account" = a person of the directory (works for people without an admin login), optionally linked to their admin account. Services "Responsible account" = an admin account. | schema | 8 |
+| 4 | Accounts page: "Role" column; views All / Active / Invited / Deactivated; "New account" creates an invitation; rows open a view-only profile; no inline editing. **Changed 2026-11-03 (decision 018):** "New invitation link" makes a link with no input, used once within 7 days by whoever creates their own account, with no role until a Rootadmin gives one; views All / Active / No role / Deactivated; Description replaces Note. | list config | 7 |
+| 5 | Permissions "Account" = a person of the directory (works for people without an admin login), optionally linked to their admin account. Services "Responsible account" = an admin account. **Changed 2026-11-03 (OPS-148, OPS-130, OPS-138, OPS-151):** a permission's Account is the admin account and People the person; no Responsible account (ownership is the Owner permission); a permission is named "Service / Account / Permission level"; granting is one history event, shown on the account, the service and the person. | schema | 8 |
 | 6 | Services and Permissions start empty, fully editable; a Notion importer for Services and Access grants with the usual dry run (demo rows skipped). | importer | 8 |
 | 7 | Relevance scores: integers 0–10, nullable, editable; `ai_relevance_score` becomes read-only when `ai.enabled` is true (later). | schema + setting `ai.enabled` | 5 |
 | 8 | Contact channels: an admin-editable lookup seeded with Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix, Workana. | lookup `contact_channels` | 5 |
 | 9 | People keep the phone column, hidden in the record (Figma moved it into "Other contact details"); field visibility is config. Sources stay Candide, Contribution email, Other, AI. | record config | 5 |
 | 10 | Any admin with access to a record can comment; authors edit or delete their own comments; edits and deletions are kept in the history. | schema | 5 |
 | 11 | Every opening counts as a view; the feed shows "viewed this page" at most once per account per `history.view_event_window_hours` (24). | setting | 5 |
-| 12 | Archive instead of delete: archived records leave the default views and appear in an "Archived" view; restore is available; permanent delete is owner-only, behind a typed confirmation, and logged. | schema | 5 |
-| 13 | No email server yet: invitations and password resets are one-time links (72 h) the owner copies and sends; "Forgot password?" says "Contact an administrator"; "Change email" needs the current password and is logged. With `email.enabled` the same flows send the links. | setting `email.enabled` | 7 |
+| 12 | Archive instead of delete: archived records leave the default views and appear in an "Archived" view; restore is available; permanent delete is owner-only, behind a typed confirmation, and logged. **Changed 2026-11-03 (decision 017, OPS-147):** no permanent delete at all; past "deleted" events stay readable. | schema | 5 |
+| 13 | No email server yet: invitations and password resets are one-time links (72 h; invitation links 7 days since decision 018) the owner copies and sends; "Forgot password?" says "Contact an administrator"; "Change email" needs the current password and is logged. With `email.enabled` the same flows send the links. | setting `email.enabled` | 7 |
 | 14 | Delete account = deactivate: the login is disabled, history keeps the name; the last Rootadmin can never be deactivated or deleted. | schema rule | 7 |
 | 15 | Accounts to create: those of admin p15; the existing owner is kept; missing ones get a Rootadmin invitation link (never committed or logged). | runbook | 7 |
 | 16 | Sidebar exactly as Figma, Organizations in both Admin and Other (same page); Waitlist, Messages, Cloud, History, Analytics, Technical dashboard and Emails "Coming soon" until built (History is live since the detail page of 2026-10-21: Monitoring → History). | module registry | 3 |
@@ -288,10 +289,12 @@ that file:
 
 "All" is every action the module has. Without `history.read`, Monitoring →
 History and each record's history show the events of the modules the role
-can read. Only People and Organizations have imports (ADR 016): the Notion
-import needs `directory.import`, the CSV import `directory.create` (the
-table's write access). The `taxonomy.import`, `treasury.import` and
-`cms.import` keys remain but no route uses them.
+can read. Only People and Organizations have an import, from CSV (ADR 016):
+it needs `directory.create` (the table's write access). The `*.import` and
+`*.delete` keys remain but no route uses them (no Notion import since
+OPS-154, no permanent delete since decision 017). An account with no role
+(made from an invitation link, decision 018) has no permission: it sees its
+own profile only.
 
 **Enforcement.** One global guard (`PermissionGuard`, after the session
 guard) reads each route's declaration — `@Requires(...)`,
@@ -344,16 +347,14 @@ append-only table serves it and the Monitoring → History page:
 `pgboss` schema, no Redis, FOSS, pinned 12.35.0) runs in the API process
 behind a `JobQueue` interface (`apps/api/src/jobs/`; a separate worker
 process later without code changes; tests use an in-process driver,
-`JOBS_DRIVER=inprocess`). Built on it: Notion imports (one at a time —
-an `exclusive` queue — surviving an API restart, on demand or scheduled
-by `imports.<key>.schedule`, a cron in UTC or `off`, read at start) and
-Stripe fee reconciliation (every `STRIPE_FEE_RECONCILE_MINUTES`). Stripe
+`JOBS_DRIVER=inprocess`). Built on it: the Notion imports until OPS-154
+(removed 2026-11-03: their schedules are cleared at start, a queued job is
+refused) and Stripe fee reconciliation (every `STRIPE_FEE_RECONCILE_MINUTES`). Stripe
 event processing still runs in the webhook request (it is fast and
 idempotent); moving it to a job stays planned. Jobs:
 
 | Job | Trigger | Notes |
 |---|---|---|
-| Notion import (each kind) | Admin action / CLI / **schedule** (`imports.<key>.schedule`) | Replaces the in-memory runner; result still in `import_runs`; refused when the module is `native` (§2.1). |
 | Stripe event processing | Webhook stores the event, job processes it | The webhook answers Stripe fast; processing is idempotent (`stripe_events`). |
 | Stripe fee reconciliation | Every 15 min | Fills fee/net when Stripe's balance transaction wasn't ready. |
 | AI triage of a submission | On submission | Translation, significance score, note, bot score (§4.5). |

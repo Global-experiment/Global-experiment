@@ -60,8 +60,19 @@ function updateHeadline(changes: HistoryChange[], entity: string): string {
   return `updated ${inSentence(change.label)}`;
 }
 
+/**
+ * A permission granted since OPS-151 (one event, client 2026-11-03): who
+ * got which level on which service — "Stanley Superadmin on GitHub".
+ * Undefined for the older events, which named no one.
+ */
+export function grantedWhat(meta: HistoryItem["meta"] | undefined): { who: string; on: string } | undefined {
+  if (!meta || typeof meta.service !== "string") return undefined;
+  const who = [meta.account, meta.level].filter((part): part is string => typeof part === "string" && part !== "").join(" ");
+  return { who: who || "access", on: meta.service };
+}
+
 /** The headline after the actor's name. `entity` names the record ("record", "entry"). */
-export function historyHeadline(item: Pick<HistoryItem, "action" | "changes">, entity = "record"): string {
+export function historyHeadline(item: Pick<HistoryItem, "action" | "changes"> & { meta?: HistoryItem["meta"] }, entity = "record"): string {
   switch (item.action) {
     case "created":
       return `created this ${entity}`;
@@ -85,8 +96,10 @@ export function historyHeadline(item: Pick<HistoryItem, "action" | "changes">, e
       return "viewed this page";
     case "updated":
       return updateHeadline(item.changes, entity);
-    case "access_granted":
-      return "granted access";
+    case "access_granted": {
+      const granted = grantedWhat(item.meta);
+      return granted ? `granted ${granted.who} on ${granted.on}` : "granted access";
+    }
     case "access_changed":
       return "changed access";
     case "access_revoked":
@@ -122,7 +135,7 @@ export const PRIVATE_NOTE_TEXT = ["Private note updated.", "Previous and new tex
  * the title goes — "updated 3 fields on |Stanley Qiang|", "archived
  * |EXP-12 Hosting|", "commented on |…|".
  */
-export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes">, entity = "record"): { before: string; after: string } {
+export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes"> & { meta?: HistoryItem["meta"] }, entity = "record"): { before: string; after: string } {
   switch (item.action) {
     case "comment_added":
       return { before: "commented on", after: "" };
@@ -134,8 +147,11 @@ export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes"
       return { before: "viewed", after: "" };
     case "duplicated":
       return { before: "created", after: "as a duplicate" };
-    case "access_granted":
-      return { before: "granted access on", after: "" };
+    case "access_granted": {
+      // The page names the service, linked to the permission (HistoryScreen).
+      const granted = grantedWhat(item.meta);
+      return { before: granted ? `granted ${granted.who} on` : "granted access on", after: "" };
+    }
     case "access_changed":
       return { before: "changed access on", after: "" };
     case "access_revoked":

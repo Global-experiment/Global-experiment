@@ -4,7 +4,7 @@ import { actorFor } from "../audit/audit.service.js";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { UnauthenticatedError } from "../common/errors/api-error.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
-import { CreatePersonRequest, DeletePersonRequest, PeopleListQuery, UpdatePersonRequest } from "./people.contracts.js";
+import { CreatePersonRequest, PeopleListQuery, UpdatePersonRequest } from "./people.contracts.js";
 import { PeopleService } from "./people.service.js";
 import { HideAccessInterceptor } from "../access-control/hide-access.interceptor.js";
 import { Requires } from "../access-control/requires.js";
@@ -78,14 +78,6 @@ export class PeopleController {
   @HttpCode(200)
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.people.setArchived(id, false, actor(request));
-  }
-
-  /** Permanent delete: directory.delete, with the person's name typed in `confirm`. */
-  @Delete(":id")
-  @Requires("directory.delete")
-  @HttpCode(204)
-  remove(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(DeletePersonRequest)) body: DeletePersonRequest, @Req() request: AdminRequest) {
-    return this.people.delete(id, body.confirm, actor(request));
   }
 
   @Put(":id/organizations/:organizationId")

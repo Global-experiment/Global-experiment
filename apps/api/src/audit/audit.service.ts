@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, desc, eq, gte, inArray, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { AdminPrincipal } from "../auth/auth.service.js";
 import { adminUsers } from "../auth/auth.schema.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
@@ -153,9 +153,11 @@ export class AuditService {
   /** A record's history, newest first, as `viewer` may see it (masked contact values, no private notes). */
   async feed(entityType: string, entityId: string, viewer: AdminPrincipal): Promise<RecordHistoryDto> {
     const forEntity = and(eq(auditEvents.entityType, entityType), eq(auditEvents.entityId, entityId));
+    // Also the events of other records that name this one (a permission's single event on its account, service and person, OPS-151).
+    const shownHere = or(forEntity, sql`${auditEvents.meta} -> 'related' @> ${JSON.stringify([{ type: entityType, id: entityId }])}::jsonb`);
     const viewsOf = and(eq(recordViews.entityType, entityType), eq(recordViews.entityId, entityId));
     const [events, shownViews, [viewCount], [editCount], [eventCount], [shownViewCount], [created], [edited]] = await Promise.all([
-      this.db.select().from(auditEvents).where(forEntity).orderBy(desc(auditEvents.id)).limit(FEED_LIMIT),
+      this.db.select().from(auditEvents).where(shownHere).orderBy(desc(auditEvents.id)).limit(FEED_LIMIT),
       this.db
         .select({ id: recordViews.id, viewedAt: recordViews.viewedAt, label: sql<string | null>`coalesce(${adminUsers.displayName}, split_part(${adminUsers.email}, '@', 1))` })
         .from(recordViews)
@@ -165,7 +167,7 @@ export class AuditService {
         .limit(FEED_LIMIT),
       this.db.select({ total: count() }).from(recordViews).where(viewsOf),
       this.db.select({ total: count() }).from(auditEvents).where(and(forEntity, inArray(auditEvents.action, [...EDIT_ACTIONS]))),
-      this.db.select({ total: count() }).from(auditEvents).where(forEntity),
+      this.db.select({ total: count() }).from(auditEvents).where(shownHere),
       this.db.select({ total: count() }).from(recordViews).where(and(viewsOf, eq(recordViews.inHistory, true))),
       this.db
         .select({ label: auditEvents.actorLabel, at: auditEvents.occurredAt })

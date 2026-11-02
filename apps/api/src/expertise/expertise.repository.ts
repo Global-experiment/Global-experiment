@@ -230,30 +230,4 @@ export class ExpertiseRepository {
       .returning({ id: table.id, name: table.name });
     return row;
   }
-
-  /** Number of direct dependants that block deletion (children, or people/organization tags). */
-  async dependants(level: ExpertiseLevel, id: string): Promise<number> {
-    if (level === "domain") {
-      const [row] = await this.db.select({ n: sql<number>`count(*)::int` }).from(expertiseFields).where(eq(expertiseFields.domainId, id));
-      return row?.n ?? 0;
-    }
-    if (level === "field") {
-      const [row] = await this.db.select({ n: sql<number>`count(*)::int` }).from(expertiseItems).where(eq(expertiseItems.fieldId, id));
-      return row?.n ?? 0;
-    }
-    const [[byPeople], [byOrganizations]] = await Promise.all([
-      this.db.select({ n: sql<number>`count(*)::int` }).from(peopleExpertise).where(eq(peopleExpertise.expertiseId, id)),
-      this.db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(organizationExpertise)
-        .where(eq(organizationExpertise.expertiseId, id)),
-    ]);
-    return (byPeople?.n ?? 0) + (byOrganizations?.n ?? 0);
-  }
-
-  async delete(level: ExpertiseLevel, id: string, db: Executor = this.db): Promise<boolean> {
-    const table = TABLE[level];
-    const removed = await db.delete(table).where(eq(table.id, id)).returning({ id: table.id });
-    return removed.length > 0;
-  }
 }

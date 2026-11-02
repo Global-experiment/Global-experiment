@@ -2,56 +2,56 @@
 
 import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import { ROLE_OPTIONS, type Account, type OneTimeLink, type Page, type Person } from "../api/types";
+import { NO_ROLE_LABEL, ROLE_OPTIONS, type Account, type OneTimeLink } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
+import { ExpertiseField } from "../expertise/ExpertiseField";
+import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import { RecordPage } from "../record/RecordPage";
+import { LIMIT_HINTS } from "../relationLimits";
 import { GrantChips } from "../services/accessDisplay";
 import { useAdmin, useCan } from "../session";
 import { AccountAvatar } from "../ui/AccountAvatar";
 import { AdminButton, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, formatPanelDate, PanelButton, Pills, PropertyRow, ReadOnlyValue } from "../ui/RecordForm";
-import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import type { RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 import { STATUS_LABEL } from "./AccountsList";
 import { OneTimeLinkBox } from "./OneTimeLink";
 
 interface Draft {
+  /** "" = no role yet (OPS-141). */
   role: string;
-  note: string;
-  person: RelationOption[];
+  description: string;
+  expertise: RelationOption[];
 }
 
 const toDraft = (account: Account): Draft => ({
-  role: account.role.key,
-  note: account.note ?? "",
-  person: account.person ? [{ id: account.person.id, label: account.person.name, href: `/admin/people/${account.person.id}` }] : [],
+  role: account.role?.key ?? "",
+  description: account.description ?? "",
+  expertise: account.expertise.map(linkedExpertiseOption),
 });
 
 function patchFor(base: Draft, draft: Draft): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
-  if (draft.role !== base.role) patch.role = draft.role;
-  if (draft.note.trim() !== base.note.trim()) patch.note = draft.note.trim() || null;
-  const person = draft.person[0]?.id ?? null;
-  if (person !== (base.person[0]?.id ?? null)) patch.personId = person;
+  if (draft.role !== base.role && draft.role) patch.role = draft.role;
+  if (draft.description.trim() !== base.description.trim()) patch.description = draft.description.trim() || null;
+  const ids = (options: RelationOption[]) => options.map((option) => option.id).join();
+  if (ids(draft.expertise) !== ids(base.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);
   return patch;
-}
-
-async function searchPeople(text: string, signal: AbortSignal): Promise<RelationOption[]> {
-  const query = new URLSearchParams({ pageSize: "20", sort: "name:asc" });
-  if (text.trim()) query.set("search", text.trim());
-  return (await adminApi<Page<Person>>(`/people?${query}`, { signal })).items.map((person) => ({ id: person.id, label: person.name, href: `/admin/people/${person.id}` }));
 }
 
 const pendingText = (pending: NonNullable<Account["pendingLink"]>) =>
   `${pending.purpose === "invite" ? "Invitation link" : "Password reset link"} waiting, valid until ${formatPanelDate(pending.expiresAt)}.`;
 
 /**
- * /admin/accounts/[id] — an admin account, opened from Accounts (p15). A
- * view-only profile: picture, name, role, email, status, Account ID, the
- * linked person (and through them, expertise) and service access. A role
- * with accounts.manage also changes the role, note and person, makes a new
- * invitation or password reset link (shown once), and deactivates or
- * reactivates the account — never the last active Rootadmin.
+ * /admin/accounts/[id] — an admin account, opened from Accounts (p15): its
+ * profile — picture, name, description (OPS-144), expertise (OPS-135) —
+ * role, email, status, service access, Account ID. A Rootadmin
+ * (accounts.manage) gives it a role (an account made from an invitation
+ * link has none, OPS-141), edits its description and expertise, makes a
+ * password reset link (shown once), and deactivates or reactivates it —
+ * never the last active Rootadmin. No note (OPS-142), no People link
+ * (OPS-136): People is the CRM, accounts are the experiment's participants.
  */
 export function AccountRecord({ id }: { id: string }) {
   const toast = useToast();
@@ -176,11 +176,29 @@ export function AccountRecord({ id }: { id: string }) {
           {loaded.hasPicture ? null : <span className="ml-2 text-body text-text-muted">None</span>}
         </div>
       </PropertyRow>
-      <PropertyRow icon="select" label="Role" hint={loaded.id === me.id && canManage ? "Change your own role from another Rootadmin's account." : undefined}>
-        {loaded.id === me.id ? (
-          <ReadOnlyValue>{loaded.role.label}</ReadOnlyValue>
+      <PropertyRow
+        icon="select"
+        label="Role"
+        hint={loaded.id === me.id && canManage ? "Change your own role from another Rootadmin's account." : !loaded.role ? "No rights until a Rootadmin gives a role." : undefined}
+      >
+        {loaded.id === me.id || !canManage ? (
+          <ReadOnlyValue>{loaded.role?.label ?? NO_ROLE_LABEL}</ReadOnlyValue>
         ) : (
           <Pills label="Role" options={ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label }))} value={draft.role} onChange={(value) => set("role", value)} />
+        )}
+      </PropertyRow>
+      <PropertyRow icon="title" label="Description" htmlFor="account-description">
+        {canManage ? (
+          <AutoGrowTextarea id="account-description" value={draft.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} placeholder="Add a description" />
+        ) : (
+          <ReadOnlyValue>{loaded.description ?? <span className="text-text-muted">No description.</span>}</ReadOnlyValue>
+        )}
+      </PropertyRow>
+      <PropertyRow icon="expertise" label="Expertise">
+        {canManage ? (
+          <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.accountExpertise} />
+        ) : (
+          <ReadOnlyValue>{loaded.expertise.length > 0 ? loaded.expertise.map((item) => item.name).join(", ") : <span className="text-text-muted">No expertise.</span>}</ReadOnlyValue>
         )}
       </PropertyRow>
       <PropertyRow icon="alternate_email" label="Email">
@@ -191,15 +209,6 @@ export function AccountRecord({ id }: { id: string }) {
           {STATUS_LABEL[loaded.status]}
           {loaded.pendingLink ? <span className="block text-meta text-text-muted">{pendingText(loaded.pendingLink)}</span> : null}
         </ReadOnlyValue>
-      </PropertyRow>
-      <PropertyRow icon="title" label="Note" htmlFor="account-note">
-        <AutoGrowTextarea id="account-note" value={draft.note} onChange={(e) => set("note", e.target.value)} maxLength={2000} placeholder="Their part in the experiment" />
-      </PropertyRow>
-      <PropertyRow icon="arrow_outward" label="Person">
-        <RelationPicker label="Person" selected={draft.person} onChange={(next) => set("person", next.slice(-1))} search={searchPeople} max={1} limitMessage="One person per account." />
-      </PropertyRow>
-      <PropertyRow icon="arrow_outward" label="Expertise">
-        <ReadOnlyValue>{loaded.expertise.length > 0 ? loaded.expertise.map((item) => item.name).join(", ") : <span className="text-text-muted">From the linked person.</span>}</ReadOnlyValue>
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Service access">
         <GrantChips grants={loaded.permissions} empty="No service access." />

@@ -49,7 +49,7 @@ export interface AdminListConfig<Row extends { id: string }> {
   recordHref?: (row: Row) => string;
   /** Muted note after the title (e.g. "Managed in Notion – updated by the importer."). */
   subtitle?: ReactNode;
-  /** Right side of the title row (Notion import control, "New …"). */
+  /** Right side of the title row (More options, "New …"). */
   actions?: ReactNode;
   /** Left side of the toolbar row (Figma's saved-view tabs). */
   views?: ReactNode;

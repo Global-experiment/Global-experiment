@@ -124,22 +124,35 @@ describe("record history (audit log)", () => {
     expect((await feed("person", person.id)).items).toHaveLength(3);
   });
 
-  it("permanently deletes only with the name typed exactly; the event stays in the log", async () => {
-    const person = await createPerson({ name: "To Delete" });
-    const wrong = await admin.delete(`/api/admin/people/${person.id}`).send({ confirm: "to delete" }).expect(400);
-    expect(wrong.body.error.details.issues[0]).toMatchObject({ path: "confirm" });
-    await admin.delete(`/api/admin/people/${person.id}`).send({ confirm: "To Delete" }).expect(204);
-    await admin.get(`/api/admin/people/${person.id}`).expect(404);
-    const events = await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, person.id));
-    expect(events.map((event) => event.action)).toEqual(["created", "deleted"]);
-    expect(events[1]!.meta).toMatchObject({ label: `PER-${person.personNumber} · To Delete` });
+  it("deletes nothing (OPS-147): no delete route for people, organizations or Treasury entries — they are archived", async () => {
+    const person = await createPerson({ name: "Not Deleted" });
+    const organization = (await admin.post("/api/admin/organizations", { name: "Not Deleted Either" }).expect(201)).body;
+    const [entry] = await t.db
+      .insert(treasuryEntries)
+      .values({ entryType: "expense", name: "Domain name", currency: "CHF", grossAmount: -1500, source: "manual", managedBy: "native", livemode: true, occurredOn: "2026-10-02" })
+      .returning();
+    expect((await admin.delete(`/api/admin/people/${person.id}`).send({ confirm: "Not Deleted" })).status).toBe(404);
+    expect((await admin.delete(`/api/admin/organizations/${organization.id}`).send({ confirm: "Not Deleted Either" })).status).toBe(404);
+    expect((await admin.delete(`/api/admin/treasury/${entry!.id}`).send({ confirm: `EXP-${entry!.entryNumber}` })).status).toBe(404);
+    await admin.get(`/api/admin/people/${person.id}`).expect(200);
+    await admin.get(`/api/admin/organizations/${organization.id}`).expect(200);
+    await admin.get(`/api/admin/treasury/${entry!.id}`).expect(200);
+    expect((await t.db.select().from(auditEvents).where(eq(auditEvents.action, "deleted"))).length).toBe(0);
   });
 
-  it("refuses to delete a person who is the recipient of an expense (archive instead)", async () => {
-    const person = await createPerson({ name: "Recipient" });
-    await t.db.insert(treasuryEntries).values({ entryType: "expense", name: "Hosting", currency: "USD", grossAmount: -2000, source: "manual", managedBy: "native", livemode: true, occurredOn: "2026-10-01", recipientPersonId: person.id });
-    const refused = await admin.delete(`/api/admin/people/${person.id}`).send({ confirm: "Recipient" }).expect(409);
-    expect(refused.body.error.message).toMatch(/recipient of expenses/);
+  it("keeps past \"deleted\" events readable, with what the record was", async () => {
+    const gone = "00000000-0000-4000-8000-0000000000de";
+    await t.db.insert(auditEvents).values({
+      entityType: "treasury_entry",
+      entityId: gone,
+      action: "deleted",
+      actorType: "admin",
+      actorLabel: "Former account",
+      source: "admin",
+      meta: { label: "EXP-99 · −CHF 15.00", details: [{ label: "Name", value: "Old invoice" }] },
+    });
+    const listed = (await admin.get("/api/admin/history?entityType=treasury_entry&pageSize=200").expect(200)).body.items.find((item: { entity: { id: string } }) => item.entity.id === gone);
+    expect(listed).toMatchObject({ action: "deleted", entity: { exists: false }, meta: { details: [{ label: "Name", value: "Old invoice" }] } });
   });
 
   it("links an expense to a person: both the person and the expense record it", async () => {
@@ -210,8 +223,7 @@ describe("record history (audit log)", () => {
     const organization = (await admin.post("/api/admin/organizations", { name: "To Archive" }).expect(201)).body;
     await admin.post(`/api/admin/organizations/${organization.id}/archive`).expect(200);
     expect(((await admin.get("/api/admin/organizations?pageSize=100").expect(200)).body.items as { id: string }[]).some((item) => item.id === organization.id)).toBe(false);
-    await admin.delete(`/api/admin/organizations/${organization.id}`).send({ confirm: "To Archive" }).expect(204);
-    expect((await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, organization.id))).map((event) => event.action)).toEqual(["created", "archived", "deleted"]);
+    expect((await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, organization.id))).map((event) => event.action)).toEqual(["created", "archived"]);
 
     const [entry] = await t.db
       .insert(treasuryEntries)
@@ -220,8 +232,6 @@ describe("record history (audit log)", () => {
     await admin.post(`/api/admin/treasury/${entry!.id}/archive`).expect(200);
     await admin.post(`/api/admin/treasury/${entry!.id}/restore`).expect(200);
     expect(((await feed("treasury_entry", entry!.id)).items as Item[]).map((item) => item.action)).toEqual(["restored", "archived"]);
-    await admin.delete(`/api/admin/treasury/${entry!.id}`).send({ confirm: "EXP-0" }).expect(400);
-    await admin.delete(`/api/admin/treasury/${entry!.id}`).send({ confirm: `EXP-${entry!.entryNumber}` }).expect(204);
   });
 
   it("an organization's Submit links and unlinks people in one event, and each person records their own", async () => {

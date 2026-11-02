@@ -93,7 +93,11 @@ test("Home (p6): the public page in the shell; Share copies the public address; 
 
   await header().getByRole("button", { name: "Share" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Link copied to clipboard" })).toBeVisible();
+  // OPS-8: the share glyph turns into the check for a moment, as the Contribute copy button.
+  await expect(header().getByRole("button", { name: "Link copied" }).locator("[data-icon=check_circle]")).toBeVisible();
+  await page.screenshot({ path: join(SHOTS, "ops8-share-check-1440.png") });
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(new URL("/", page.url()).toString());
+  await expect(header().getByRole("button", { name: "Share" }).locator("[data-icon=share]")).toBeVisible({ timeout: 5000 });
 
   await header().getByRole("button", { name: "Page actions" }).click();
   const menu = page.getByRole("dialog", { name: "Page actions" });

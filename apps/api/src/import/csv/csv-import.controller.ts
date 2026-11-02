@@ -9,6 +9,7 @@ import { ONLY_DIRECTORY_IMPORTS } from "../imports.controller.js";
 import { CSV_TABLES, type CsvTable } from "./csv-fields.js";
 import { CsvImportService, type CsvOptions } from "./csv-import.service.js";
 import { CSV_MAX_BYTES } from "./csv-parse.js";
+import { VALUE_FIELDS } from "./csv-plan.js";
 
 /** Creating records is the table's write access: the CSV import needs `directory.create`. */
 export const CSV_MODULES = { people: "directory", organizations: "directory" } as const;
@@ -29,12 +30,16 @@ const counts = z.strictObject({
   duplicates: z.number().int().min(0),
   duplicatesIncluded: z.number().int().min(0),
   errors: z.number().int().min(0),
+  warnings: z.number().int().min(0),
 });
+/** Per value field, an unknown value (its comparable form) → an existing id or key, or null to skip it. */
+const choices = z.partialRecord(z.enum(VALUE_FIELDS), z.record(z.string().max(500), z.string().max(60).nullable()));
 /** The multipart "options" field: JSON. */
 const Options = z.strictObject({
   fileName: z.string().max(500).optional(),
   mapping: z.array(z.string().max(40).nullable()).max(100).optional(),
   include: z.array(z.number().int().min(2)).max(10_000).optional(),
+  choices: choices.optional(),
   expect: counts.optional(),
 });
 type Options = z.output<typeof Options>;
@@ -81,7 +86,7 @@ export class CsvImportController {
     if (!request.admin) throw new UnauthenticatedError();
     const options = readOptions(raw);
     if (!options.expect || !options.mapping) throw new ValidationFailedError([{ path: "options", message: "Confirm the preview you reviewed (its column choices and counts)." }]);
-    return this.imports.confirm(table, upload(file, options), { mapping: options.mapping, include: options.include, expect: options.expect }, request.admin);
+    return this.imports.confirm(table, upload(file, options), { mapping: options.mapping, include: options.include, choices: options.choices, expect: options.expect }, request.admin);
   }
 
   @Get("runs/:id")

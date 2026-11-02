@@ -23,8 +23,6 @@ export interface RecordActions {
   duplicateAsDraft?: () => void;
   archived?: boolean;
   setArchived?: (archived: boolean) => Promise<void>;
-  /** Permanent delete, owner only: what to type (the record's name or number) and the call. */
-  remove?: { confirmText: string; run: (confirm: string) => Promise<void> };
   savedMessage: string;
   dirty: boolean;
   busy: string | null;
@@ -152,7 +150,6 @@ type HistoryData = ReturnType<typeof useAdminData<RecordHistory>>;
 
 function RecordPanelTop({ actions, history, panelExtra }: { actions: RecordActions; history?: HistoryData; panelExtra?: ReactNode }) {
   const [more, setMore] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const menuId = useId();
   const busy = actions.busy !== null;
   return (
@@ -189,15 +186,9 @@ function RecordPanelTop({ actions, history, panelExtra }: { actions: RecordActio
               {actions.archived ? "Restore" : "Archive"}
             </PanelButton>
           ) : null}
-          {actions.remove ? (
-            <PanelButton icon="close" onClick={() => setConfirmDelete(true)} disabled={actions.dirty || busy}>
-              Delete permanently
-            </PanelButton>
-          ) : null}
         </div>
       </div>
       {history ? <Counters history={history} /> : null}
-      {confirmDelete && actions.remove ? <DeleteDialog confirmText={actions.remove.confirmText} onCancel={() => setConfirmDelete(false)} onConfirm={actions.remove.run} /> : null}
     </div>
   );
 }
@@ -326,66 +317,5 @@ function CommentBox({ path, onPosted }: { path: string; onPosted: () => void }) 
         </p>
       ) : null}
     </div>
-  );
-}
-
-/** Permanent delete (owner only, decision 12): type the record's name or number to confirm. */
-function DeleteDialog({ confirmText, onCancel, onConfirm }: { confirmText: string; onCancel: () => void; onConfirm: (confirm: string) => Promise<void> }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [typed, setTyped] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputId = useId();
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
-  return (
-    <dialog
-      ref={dialog}
-      aria-labelledby={`${inputId}-title`}
-      onClose={onCancel}
-      className="m-auto w-[420px] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60"
-    >
-      <h2 id={`${inputId}-title`} className="font-bold">
-        Delete permanently?
-      </h2>
-      <p className="mt-2 text-text-muted">This can&rsquo;t be undone. The history keeps a record that it was deleted. To confirm, type:</p>
-      <p className="mt-1 font-bold">{confirmText}</p>
-      <label htmlFor={inputId} className="sr-only">
-        Type {confirmText} to confirm
-      </label>
-      <input
-        id={inputId}
-        value={typed}
-        onChange={(event) => setTyped(event.target.value)}
-        autoComplete="off"
-        className="mt-2 h-8 w-full rounded-control bg-transparent px-2 ring-1 ring-line outline-none focus-visible:ring-text-primary"
-      />
-      {error ? (
-        <p role="alert" className="mt-2 text-meta">
-          {error}
-        </p>
-      ) : null}
-      <p className="mt-3 flex justify-end gap-2">
-        <AdminButton onClick={() => dialog.current?.close()} disabled={busy}>
-          Cancel
-        </AdminButton>
-        <AdminButton
-          disabled={typed.trim() !== confirmText || busy}
-          onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              await onConfirm(typed.trim());
-            } catch (caught) {
-              setError(caught instanceof AdminApiError ? caught.message : "Couldn't delete.");
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Deleting…" : "Delete permanently"}
-        </AdminButton>
-      </p>
-    </dialog>
   );
 }

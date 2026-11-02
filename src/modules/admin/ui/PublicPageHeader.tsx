@@ -1,30 +1,41 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AdminIcon } from "./adminIcons";
 import { AdminButtonLink, focusRing, Popover } from "./controls";
 import { useToast } from "./Toast";
 
 const iconButton = `flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-primary ${focusRing}`;
+/** How long the share glyph stays a check after a copy (the Contribute copy button's 3 seconds). */
+const CONFIRMATION_MS = 3000;
 
 /**
  * The header of a public page shown inside the admin (admin-desktop.pdf p6,
  * p8): the page title, then "Administrate" (the page's backend view), Share
  * and ⋮ — Administrate ends 8px before the share glyph, the glyphs are 24px
  * apart and ⋮ ends 8px from the edge. Sticky at the top of the content
- * column. Share copies the PUBLIC page's address (what visitors see); ⋮
- * opens the public page itself or the backend view.
+ * column. Share copies the PUBLIC page's address (what visitors see), shows
+ * the toast, and turns into the check glyph for a moment (OPS-8, as the
+ * Contribute copy button and the public header do); ⋮ opens the public page
+ * itself or the backend view.
  */
 export function PublicPageHeader({ title, administrateHref, publicPath }: { title: string; administrateHref: string; publicPath: string }) {
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTrigger = useRef<HTMLButtonElement>(null);
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   async function share() {
     try {
       await navigator.clipboard.writeText(new URL(publicPath, window.location.origin).toString());
       toast("Link copied to clipboard");
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), CONFIRMATION_MS);
     } catch {
+      // Never a false success: the glyph stays the share glyph.
       toast("Couldn't copy the link");
     }
   }
@@ -37,8 +48,8 @@ export function PublicPageHeader({ title, administrateHref, publicPath }: { titl
         Administrate
       </AdminButtonLink>
       <div className="relative -ml-1 flex items-center">
-        <button type="button" onClick={() => void share()} aria-label="Share" title="Copy the public page's link" className={iconButton}>
-          <AdminIcon name="share" />
+        <button type="button" onClick={() => void share()} aria-label={copied ? "Link copied" : "Share"} title="Copy the public page's link" data-copied={copied || undefined} className={iconButton}>
+          <AdminIcon name={copied ? "check_circle" : "share"} />
         </button>
         <button
           ref={menuTrigger}

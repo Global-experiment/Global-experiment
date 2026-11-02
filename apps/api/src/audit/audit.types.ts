@@ -1,7 +1,7 @@
 /** Shapes shared by the audit log, the record history feed and the History page. */
 
 /** Who made a change: a signed-in admin, or the platform itself (imports, Stripe, jobs) — "Automation". */
-export type AuditActor = { type: "admin"; id: string; label: string; role: string } | { type: "automation"; label: "Automation" };
+export type AuditActor = { type: "admin"; id: string; label: string; role: string | null } | { type: "automation"; label: "Automation" };
 
 export const AUTOMATION: AuditActor = { type: "automation", label: "Automation" };
 
@@ -18,7 +18,7 @@ export type AuditAction =
   | "comment_added"
   | "comment_edited"
   | "comment_deleted"
-  // Access grants, shown on the person, the account and the service (2026-10-28).
+  // Access grants: one event on the permission, also shown on its account, service and person (meta.related, OPS-151).
   | "access_granted"
   | "access_changed"
   | "access_revoked"
@@ -26,6 +26,8 @@ export type AuditAction =
   | "invited"
   | "activated"
   | "link_created"
+  // Invitation links (OPS-141): revoked from Accounts.
+  | "link_revoked"
   | "password_changed"
   | "email_changed"
   | "deactivated"

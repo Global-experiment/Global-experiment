@@ -33,9 +33,6 @@ export const TreasuryListQuery = listQuerySchema({
   },
 });
 
-/** Permanent delete (treasury.delete, manual entries only, decision 12): the entry number typed exactly ("EXP-12"). */
-export const DeleteTreasuryEntryRequest = z.strictObject({ confirm: z.string().max(40) });
-export type DeleteTreasuryEntryRequest = z.output<typeof DeleteTreasuryEntryRequest>;
 export type TreasuryListQuery = z.output<typeof TreasuryListQuery>;
 
 /** What "Submit changes" sends: the internal note and/or the review status, applied together (one history event). */

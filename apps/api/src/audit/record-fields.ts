@@ -64,8 +64,8 @@ export const HISTORY_FIELD_ACCESS: FieldAccess = {
   viewer: [],
 };
 
-export const canRead = (role: string, privacy: FieldPrivacy | undefined, access: FieldAccess = HISTORY_FIELD_ACCESS) =>
-  privacy === undefined || (privacy !== "private_note" && (access[role] ?? []).includes(privacy));
+export const canRead = (role: string | null, privacy: FieldPrivacy | undefined, access: FieldAccess = HISTORY_FIELD_ACCESS) =>
+  privacy === undefined || (privacy !== "private_note" && (role === null ? [] : (access[role] ?? [])).includes(privacy));
 
 /** "stanley@example.org" → "s•••@example.org"; other values keep their first character: "+41 79…" → "+•••". */
 export function maskText(value: string): string {
@@ -87,7 +87,7 @@ export interface VisibleChange extends AuditChange {
   redacted?: true;
 }
 
-export function visibleChanges(changes: readonly AuditChange[], role: string, access: FieldAccess = HISTORY_FIELD_ACCESS): VisibleChange[] {
+export function visibleChanges(changes: readonly AuditChange[], role: string | null, access: FieldAccess = HISTORY_FIELD_ACCESS): VisibleChange[] {
   return changes.map((change) => {
     if (change.privacy === "private_note") return { ...change, before: null, after: null, redacted: true };
     if (change.privacy && !canRead(role, change.privacy, access)) return { ...change, before: maskValue(change.before), after: maskValue(change.after), masked: true };

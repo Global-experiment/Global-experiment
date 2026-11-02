@@ -1,10 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { AuditService, type Executor } from "../audit/audit.service.js";
-import type { AuditActor, AuditChange } from "../audit/audit.types.js";
+import type { AuditActor } from "../audit/audit.types.js";
 import { diffRecord, type FieldSpec } from "../audit/record-fields.js";
-import type { AdminPrincipal } from "../auth/auth.service.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
+import { NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
 import type {
   CreateGrantRequest,
@@ -25,44 +24,51 @@ const ref = (value: { id: string; name: string } | null) => (value ? { id: value
 export const SERVICE_FIELDS: readonly FieldSpec<ServiceDto>[] = [
   { field: "name", label: "Name", kind: "text", get: (s) => s.name },
   { field: "status", label: "Status", kind: "select", get: (s) => s.status },
-  { field: "category", label: "Category", kind: "select", get: (s) => s.category },
+  { field: "categories", label: "Category", kind: "relation", get: (s) => s.categories.map((category) => ({ id: category.key, label: category.label })) },
   { field: "hostingModel", label: "Hosting model", kind: "select", get: (s) => s.hostingModel },
   { field: "url", label: "URL", kind: "url", get: (s) => s.url },
   { field: "description", label: "Description", kind: "text", get: (s) => s.description },
-  { field: "responsible", label: "Responsible account", kind: "relation", get: (s) => (s.responsible ? [ref(s.responsible)!] : []) },
 ];
 
-/** The grant fields the history records (Figma p17 order). */
+/** The grant fields the history records, in the detail page's order (OPS-148); the name follows them (OPS-138). */
 export const GRANT_FIELDS: readonly FieldSpec<GrantDto>[] = [
-  { field: "name", label: "Name", kind: "text", get: (g) => g.name },
-  { field: "person", label: "Account", kind: "relation", get: (g) => (g.person ? [ref(g.person)!] : []) },
-  { field: "account", label: "Admin account", kind: "relation", get: (g) => (g.account ? [ref(g.account)!] : []) },
   { field: "service", label: "Service", kind: "relation", get: (g) => [ref(g.service)!] },
+  { field: "account", label: "Account", kind: "relation", get: (g) => (g.account ? [ref(g.account)!] : []) },
   { field: "level", label: "Permission level", kind: "select", get: (g) => g.level },
   { field: "status", label: "Status", kind: "select", get: (g) => g.status },
-  { field: "resourceScope", label: "Resource scope", kind: "text", get: (g) => g.resourceScope },
+  { field: "resourceScope", label: "Scope", kind: "text", get: (g) => g.resourceScope },
   { field: "grantedOn", label: "Granted", kind: "date", get: (g) => g.grantedOn },
   { field: "revokedOn", label: "Revoked", kind: "date", get: (g) => g.revokedOn },
-  { field: "expiresOn", label: "Expires", kind: "date", get: (g) => g.expiresOn },
+  { field: "expiresOn", label: "Expired", kind: "date", get: (g) => g.expiresOn },
+  { field: "person", label: "People", kind: "relation", get: (g) => (g.person ? [ref(g.person)!] : []) },
 ];
 
 export const serviceLabel = (service: Pick<ServiceDto, "name">) => service.name;
 export const grantLabel = (grant: Pick<GrantDto, "grantNumber" | "title">) => `#${grant.grantNumber} · ${grant.title}`;
-/** "GitHub · admin", as the person, account and service histories show a grant (prototype p4). */
-export const accessChip = (grant: Pick<GrantDto, "id" | "service" | "level">) => ({ id: grant.id, label: `${grant.service.name}${grant.level ? ` · ${grant.level.label}` : ""}` });
 
-const owners = (grant: GrantDto) =>
-  [
-    ["person", grant.person?.id ?? null, grant.person?.name ?? ""],
-    ["admin_user", grant.account?.id ?? null, grant.account?.name ?? ""],
-    ["service", grant.service.id, grant.service.name],
-  ] as const;
+/** The records a grant's event also shows on (OPS-151): its account, service and person. */
+const related = (...grants: (GrantDto | null)[]) => {
+  const seen = new Map<string, { type: string; id: string }>();
+  for (const grant of grants) {
+    if (!grant) continue;
+    for (const [type, id] of [
+      ["admin_user", grant.account?.id],
+      ["service", grant.service.id],
+      ["person", grant.person?.id],
+    ] as const) {
+      if (id) seen.set(`${type}:${id}`, { type, id });
+    }
+  }
+  return [...seen.values()];
+};
 
 /**
  * Services and access grants (admin-desktop.pdf p16–p17). Every write is one
- * transaction with its history: the grant's own event, and — decision of
- * 2026-10-28 — "granted / changed / revoked access" on its person, its
- * admin account and its service, so each of those records shows it.
+ * transaction with its history. A grant's write is ONE event, on the grant
+ * (OPS-151, client 2026-11-03): "Candide granted Stanley Superadmin on
+ * GitHub"; its account, service and person show that same event in their
+ * histories (meta.related) instead of an event of their own. Nothing is
+ * deleted (OPS-147): services and grants are archived.
  */
 @Injectable()
 export class ServicesService {
@@ -122,24 +128,13 @@ export class ServicesService {
     });
   }
 
-  /** Permanent delete (decision 12): the name typed exactly; refused while grants name the service (archive it instead). */
-  async deleteService(id: string, confirm: string, principal: AdminPrincipal, actor: AuditActor): Promise<void> {
-    if (!principal.permissions.has("services.delete")) throw new ForbiddenError("Your role doesn't allow deleting services.");
-    const service = await this.getService(id);
-    if (confirm.trim() !== service.name) throw new ValidationFailedError([{ path: "confirm", message: "Type the service's name exactly to confirm." }]);
-    if (await this.repository.serviceHasGrants(id)) throw new ConflictError("Permissions name this service: archive it instead.");
-    await this.db.transaction(async (tx) => {
-      await this.audit.record(tx, { entityType: "service", entityId: id, action: "deleted", actor, source: "admin", meta: { label: serviceLabel(service), number: String(service.serviceNumber) } });
-      await this.repository.deleteService(tx, id);
-    });
-  }
-
   private async checkService(input: UpdateServiceRequest) {
     const issues: { path: string; message: string }[] = [];
     if (input.statusKey && !(await this.repository.knownKey("status", input.statusKey))) issues.push({ path: "statusKey", message: "Unknown status." });
-    if (input.categoryKey && !(await this.repository.knownKey("category", input.categoryKey))) issues.push({ path: "categoryKey", message: "Unknown category." });
+    for (const key of input.categoryKeys ?? []) {
+      if (!(await this.repository.knownKey("category", key))) issues.push({ path: "categoryKeys", message: "Unknown category." });
+    }
     if (input.hostingModelKey && !(await this.repository.knownKey("hosting", input.hostingModelKey))) issues.push({ path: "hostingModelKey", message: "Unknown hosting model." });
-    if (input.responsibleAdminId && !(await this.repository.accountExists(input.responsibleAdminId))) issues.push({ path: "responsibleAdminId", message: "Unknown account." });
     if (issues.length > 0) throw new ValidationFailedError(issues);
   }
 
@@ -155,13 +150,27 @@ export class ServicesService {
     return grant;
   }
 
+  /** "Candide granted Stanley Superadmin on GitHub": one event (OPS-151). */
   async createGrant(input: CreateGrantRequest, actor: AuditActor): Promise<GrantDto> {
     await this.checkGrant(input);
     return this.db.transaction(async (tx) => {
       const id = await this.repository.createGrant(tx, input);
       const grant = (await this.repository.findGrant(id, tx))!;
-      await this.audit.record(tx, { entityType: "access_grant", entityId: id, action: "created", actor, source: "admin", meta: { label: grantLabel(grant), collection: "Permissions" } });
-      await this.recordAccess(tx, null, grant, actor);
+      await this.audit.record(tx, {
+        entityType: "access_grant",
+        entityId: id,
+        action: "access_granted",
+        actor,
+        source: "admin",
+        meta: {
+          label: grantLabel(grant),
+          collection: "Permissions",
+          account: grant.account?.name ?? grant.person?.name ?? null,
+          level: grant.level ? capitalized(grant.level.label) : null,
+          service: grant.service.name,
+          related: related(grant),
+        },
+      });
       return grant;
     });
   }
@@ -175,8 +184,7 @@ export class ServicesService {
       const after = (await this.repository.findGrant(id, tx))!;
       const changes = diffRecord(GRANT_FIELDS, before, after);
       if (changes.length === 0) return after;
-      await this.audit.record(tx, { entityType: "access_grant", entityId: id, action: "updated", actor, source: "admin", changes, meta: { label: grantLabel(after) } });
-      await this.recordAccess(tx, before, after, actor);
+      await this.recordGrant(tx, "updated", before, after, actor, { changes });
       return after;
     });
   }
@@ -187,59 +195,22 @@ export class ServicesService {
       if (!before) throw new NotFoundError("Permission not found.");
       if ((before.archivedAt !== null) === archived) return before;
       await this.repository.setGrantArchived(tx, id, actor.type === "admin" ? actor.id : null, archived);
-      await this.audit.record(tx, { entityType: "access_grant", entityId: id, action: archived ? "archived" : "restored", actor, source: "admin", meta: { label: grantLabel(before) } });
+      await this.recordGrant(tx, archived ? "archived" : "restored", before, before, actor);
       return (await this.repository.findGrant(id, tx))!;
     });
   }
 
-  /** Permanent delete: the grant's ID typed ("#12"); its person, account and service record the access as revoked. */
-  async deleteGrant(id: string, confirm: string, principal: AdminPrincipal, actor: AuditActor): Promise<void> {
-    if (!principal.permissions.has("access.delete")) throw new ForbiddenError("Your role doesn't allow deleting permissions.");
-    const grant = await this.getGrant(id);
-    if (confirm.trim() !== `#${grant.grantNumber}`) throw new ValidationFailedError([{ path: "confirm", message: `Type #${grant.grantNumber} to confirm.` }]);
-    await this.db.transaction(async (tx) => {
-      await this.audit.record(tx, { entityType: "access_grant", entityId: id, action: "deleted", actor, source: "admin", meta: { label: grantLabel(grant), number: `#${grant.grantNumber}` } });
-      await this.recordAccess(tx, grant, null, actor, "Permission deleted.");
-      await this.repository.deleteGrant(tx, id);
+  /** A grant's own event, shown on the records it names before and after (OPS-151). */
+  private async recordGrant(tx: Executor, action: "updated" | "archived" | "restored", before: GrantDto, after: GrantDto, actor: AuditActor, extra: { changes?: ReturnType<typeof diffRecord> } = {}) {
+    await this.audit.record(tx, {
+      entityType: "access_grant",
+      entityId: after.id,
+      action,
+      actor,
+      source: "admin",
+      changes: extra.changes ?? [],
+      meta: { label: grantLabel(after), related: related(before, after) },
     });
-  }
-
-  /**
-   * "granted / changed / revoked access" on the grant's person, admin
-   * account and service (prototype p4): a new owner is granted it, a removed
-   * one revoked; on the same owner, a status turning Revoked or Expired is a
-   * revocation, any other change of service, level or status a change.
-   */
-  private async recordAccess(tx: Executor, before: GrantDto | null, after: GrantDto | null, actor: AuditActor, note?: string) {
-    const ended = (grant: GrantDto | null) => grant?.status?.key === "revoked" || grant?.status?.key === "expired";
-    const previous = before ? owners(before) : null;
-    const next = after ? owners(after) : null;
-    for (let index = 0; index < 3; index++) {
-      const [entityType, oldId, oldName] = previous?.[index] ?? [null, null, ""];
-      const [type, newId, newName] = next?.[index] ?? [null, null, ""];
-      const kind = (type ?? entityType)!;
-      const change = (from: GrantDto | null, to: GrantDto | null): AuditChange => ({
-        field: "permissions",
-        label: "Permissions",
-        kind: "relation",
-        before: from ? [accessChip(from)] : [],
-        after: to ? [accessChip(to)] : [],
-      });
-      const record = (entityId: string, label: string, action: "access_granted" | "access_changed" | "access_revoked", changes: AuditChange[], meta: Record<string, unknown> = {}) =>
-        this.audit.record(tx, { entityType: kind, entityId, action, actor, source: "admin", changes, meta: { label, ...meta } });
-      if (oldId && oldId !== newId) await record(oldId, oldName, "access_revoked", [change(before, null)], { note: note ?? "No longer linked to this permission." });
-      if (newId && newId !== oldId) await record(newId, newName, ended(after) ? "access_revoked" : "access_granted", [change(null, after)], ended(after) ? { note: `Status: ${after!.status!.label}.` } : {});
-      if (oldId && newId && oldId === newId && before && after) {
-        const chipChanged = accessChip(before).label !== accessChip(after).label;
-        const statusChanged = before.status?.key !== after.status?.key;
-        if (!chipChanged && !statusChanged) continue;
-        if (!ended(before) && ended(after)) {
-          await record(newId, newName, "access_revoked", [change(before, null)], { note: `Grant status changed to ${after.status!.label}.` });
-        } else {
-          await record(newId, newName, "access_changed", [change(before, after)], statusChanged ? { note: `Status: ${before.status?.label ?? "Not set"} → ${after.status?.label ?? "Not set"}.` } : {});
-        }
-      }
-    }
   }
 
   private async checkGrant(input: UpdateGrantRequest) {
@@ -252,3 +223,6 @@ export class ServicesService {
     if (issues.length > 0) throw new ValidationFailedError(issues);
   }
 }
+
+/** "superadmin" → "Superadmin", as in a permission's name (OPS-138). */
+const capitalized = (label: string) => label.charAt(0).toUpperCase() + label.slice(1);

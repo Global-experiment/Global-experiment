@@ -7,6 +7,7 @@ import { reportHref } from "@/shared/navigation/sourcePage";
 import type { Page, HistoryListItem } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { HistoryEvent } from "../record/HistoryFeed";
+import { grantedWhat } from "../record/historyText";
 import { AdminIcon } from "../ui/adminIcons";
 import { AdminButton, ChipSelect, focusRing, Popover, StatusMessage } from "../ui/controls";
 import { DateField } from "../ui/RecordForm";
@@ -28,7 +29,7 @@ const ENTITY_LABELS: Record<string, string> = {
   admin_user: "Accounts",
 };
 
-const SOURCE_LABELS: Record<string, string> = { admin: "Admin", import: "Notion import", stripe: "Stripe", system: "System" };
+const SOURCE_LABELS: Record<string, string> = { admin: "Admin", import: "Import", stripe: "Stripe", system: "System" };
 
 /** Where an event's record lives in the admin (none for settings, or a deleted record). */
 function recordHref(entity: HistoryListItem["entity"], action: string, meta: HistoryListItem["meta"] = {}): string | undefined {
@@ -223,7 +224,9 @@ export function HistoryScreen() {
           <ol aria-label="History, newest first">
             {list.data.items.map((item) => {
               const href = item.entity.exists ? recordHref(item.entity, item.action, item.meta) : undefined;
-              const title = item.entity.title;
+              // A permission granted (OPS-151): "granted Stanley Superadmin on |GitHub|", the service linked to the permission.
+              const granted = item.action === "access_granted" ? grantedWhat(item.meta) : undefined;
+              const title = granted?.on ?? item.entity.title;
               return (
                 <HistoryEvent
                   key={item.id}

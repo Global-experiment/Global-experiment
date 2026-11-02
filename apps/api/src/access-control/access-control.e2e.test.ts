@@ -76,20 +76,12 @@ function requirementLabel(route: Route): string {
  * endpoint, or a changed permission, must be added here on purpose.
  */
 const EXPECTED_ROUTES: Record<string, string> = {
-  "DELETE /api/admin/access-grants/:id": "access.delete",
   "DELETE /api/admin/comments/:id": "signed in",
-  "DELETE /api/admin/expertise/domains/:id": "taxonomy.delete",
-  "DELETE /api/admin/expertise/fields/:id": "taxonomy.delete",
-  "DELETE /api/admin/expertise/items/:id": "taxonomy.delete",
-  "DELETE /api/admin/organizations/:id": "directory.delete",
   "DELETE /api/admin/organizations/:id/expertise/:expertiseId": "directory.update",
   "DELETE /api/admin/organizations/:id/people/:personId": "directory.update",
-  "DELETE /api/admin/people/:id": "directory.delete",
   "DELETE /api/admin/people/:id/expertise/:expertiseId": "directory.update",
   "DELETE /api/admin/people/:id/organizations/:organizationId": "directory.update",
   "DELETE /api/admin/profile/picture": "signed in",
-  "DELETE /api/admin/services/:id": "services.delete",
-  "DELETE /api/admin/treasury/:id": "treasury.delete",
   "DELETE /api/admin/treasury/documents/:documentId": "treasury.update",
   "GET /api/admin/access-grants": "access.read",
   "GET /api/admin/access-grants/:id": "access.read",
@@ -97,15 +89,14 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "GET /api/admin/accounts/:id": "accounts.read",
   "GET /api/admin/accounts/:id/picture": "signed in",
   "GET /api/admin/auth/session": "signed in",
-  "GET /api/admin/expertise/search": "taxonomy.read",
+  "GET /api/admin/expertise/search": "signed in",
   "GET /api/admin/expertise/tree": "taxonomy.read",
+  "GET /api/admin/invitations": "accounts.manage",
   "GET /api/admin/history": "signed in",
   "GET /api/admin/history/:type/:id": "<:type>.read",
   "GET /api/admin/history/actors": "signed in",
   "GET /api/admin/imports/csv/runs/:id": "directory.read",
-  "GET /api/admin/imports/jobs/:id": "imports.read",
   "GET /api/admin/imports/runs": "imports.read",
-  "GET /api/admin/imports/status": "imports.read",
   "GET /api/admin/organizations": "directory.read",
   "GET /api/admin/organizations/:id": "directory.read",
   "GET /api/admin/people": "directory.read",
@@ -134,12 +125,13 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "POST /api/admin/access-grants": "access.create",
   "POST /api/admin/access-grants/:id/archive": "access.update",
   "POST /api/admin/access-grants/:id/restore": "access.update",
-  "POST /api/admin/accounts": "accounts.manage",
   "POST /api/admin/accounts/:id/deactivate": "accounts.manage",
   "POST /api/admin/accounts/:id/link": "accounts.manage",
   "POST /api/admin/accounts/:id/reactivate": "accounts.manage",
   "POST /api/admin/auth/login": "anonymous",
   "POST /api/admin/auth/logout": "signed in",
+  "POST /api/admin/auth/invitations/accept": "anonymous",
+  "POST /api/admin/auth/invitations/inspect": "anonymous",
   "POST /api/admin/auth/tokens/accept": "anonymous",
   "POST /api/admin/auth/tokens/inspect": "anonymous",
   "POST /api/admin/expertise/domains": "taxonomy.create",
@@ -147,10 +139,10 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "POST /api/admin/expertise/items": "taxonomy.create",
   "POST /api/admin/history/:type/:id/comments": "<:type>.read",
   "POST /api/admin/history/:type/:id/views": "<:type>.read",
-  "POST /api/admin/imports/:kind/apply": "<:kind>.import",
+  "POST /api/admin/invitations": "accounts.manage",
+  "POST /api/admin/invitations/:id/revoke": "accounts.manage",
   "POST /api/admin/imports/csv/:table/confirm": "<:table>.create",
   "POST /api/admin/imports/csv/:table/preview": "<:table>.create",
-  "POST /api/admin/imports/:kind/dry-run": "<:kind>.import",
   "POST /api/admin/organizations": "directory.create",
   "POST /api/admin/organizations/:id/archive": "directory.update",
   "POST /api/admin/organizations/:id/duplicate": "directory.create",
@@ -180,12 +172,12 @@ const EXPECTED_ROUTES: Record<string, string> = {
 
 const FAKE_ID = "00000000-0000-4000-8000-000000000000";
 /** Real-looking route parameters: a known record type and import kind, unknown ids. */
-const PARAMS: Record<string, string> = { type: "person", kind: "directory", table: "people" };
+const PARAMS: Record<string, string> = { type: "person", table: "people" };
 const fill = (path: string) => path.replace(/:([A-Za-z]+)/g, (_, name: string) => PARAMS[name] ?? FAKE_ID);
 const paramsOf = (path: string) => Object.fromEntries([...path.matchAll(/:([A-Za-z]+)/g)].map(([, name]) => [name!, PARAMS[name!] ?? FAKE_ID]));
 
-/** Calls that would do real work when allowed (sign out, start an import): only checked where a refusal is expected. */
-const SIDE_EFFECTS = [/\/auth\/logout$/, /\/imports\/:kind\/(dry-run|apply)$/, /\/profile\/(deactivate|password|email)$/];
+/** Calls that would do real work when allowed (sign out, deactivate): only checked where a refusal is expected. */
+const SIDE_EFFECTS = [/\/auth\/logout$/, /\/profile\/(deactivate|password|email)$/];
 
 describe("access control", () => {
   let t: TestApp;
@@ -203,7 +195,13 @@ describe("access control", () => {
     const undeclared = routes.filter((route) => !route.anonymous && !route.requirement).map((route) => `${route.method.toUpperCase()} ${route.path}`);
     expect(undeclared).toEqual([]);
     const anonymous = routes.filter((route) => route.anonymous).map((route) => `${route.method.toUpperCase()} ${route.path}`).sort();
-    expect(anonymous).toEqual(["POST /api/admin/auth/login", "POST /api/admin/auth/tokens/accept", "POST /api/admin/auth/tokens/inspect"]);
+    expect(anonymous).toEqual([
+      "POST /api/admin/auth/invitations/accept",
+      "POST /api/admin/auth/invitations/inspect",
+      "POST /api/admin/auth/login",
+      "POST /api/admin/auth/tokens/accept",
+      "POST /api/admin/auth/tokens/inspect",
+    ]);
     // Every permission named by a route exists.
     for (const route of routes) {
       const requirement = route.requirement;

@@ -17,7 +17,7 @@ import { canonicalJson, ImportRefusedError, runImport } from "../import-run.js";
 import { importRuns } from "../import.schema.js";
 import { autoMapping, CSV_FIELDS, CSV_TABLES, type CsvTable } from "./csv-fields.js";
 import { CsvFileError, parseCsv } from "./csv-parse.js";
-import { CsvMappingError, csvCounts, planCsvImport, type CsvCounts, type CsvPlan, type CsvPlanRow, type CsvSnapshot } from "./csv-plan.js";
+import { CsvMappingError, csvCounts, planCsvImport, type CsvCounts, type CsvPlan, type CsvPlanRow, type CsvSnapshot, type ValueChoices } from "./csv-plan.js";
 
 type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
@@ -32,6 +32,8 @@ export interface CsvOptions {
   mapping?: (string | null)[];
   /** Lines of possible duplicates to import anyway. */
   include?: number[];
+  /** Unknown values mapped to existing ones, or skipped (OPS-153). */
+  choices?: ValueChoices;
 }
 
 /** One row of the report (stored in import_runs.issues). */
@@ -41,6 +43,8 @@ export interface CsvReportRow {
   /** "not_imported": a valid row of a run that was refused or rolled back. */
   status: "created" | "not_imported" | "duplicate" | "error";
   errors: string[];
+  /** Values left out of the record (OPS-153; absent in runs before it). */
+  warnings: string[];
   duplicate: CsvPlanRow["duplicate"];
   included: boolean;
   recordId: string | null;
@@ -58,7 +62,7 @@ const cleanFileName = (name: string) => (name.split(/[\\/]/).pop() ?? "").trim()
 
 /**
  * CSV import of People and Organizations (decision of 2026-10-23; the only
- * import besides Notion's, for admins with write access to that table):
+ * import since OPS-154, for admins with write access to that table):
  * preview (nothing written), then confirm — the plan is made again from the
  * same file and choices inside ONE transaction and must match what the
  * admin saw, or nothing is written. Each created record gets an "imported"
@@ -86,7 +90,10 @@ export class CsvImportService {
   private plan(table: CsvTable, upload: CsvUpload, options: CsvOptions, snapshot: CsvSnapshot): CsvPlan {
     const parsed = this.parse(upload);
     try {
-      return planCsvImport({ table, fileName: cleanFileName(upload.fileName), parsed, mapping: options.mapping ?? autoMapping(table, parsed.headers), include: options.include }, snapshot);
+      return planCsvImport(
+        { table, fileName: cleanFileName(upload.fileName), parsed, mapping: options.mapping ?? autoMapping(table, parsed.headers), include: options.include, choices: options.choices },
+        snapshot,
+      );
     } catch (error) {
       if (error instanceof CsvMappingError) throw new ValidationFailedError([{ path: "mapping", message: error.message }]);
       throw error;
@@ -124,8 +131,10 @@ export class CsvImportService {
       mapping: plan.mapping,
       fields: CSV_FIELDS[table].map(({ key, label, required }) => ({ key, label, required: required ?? false })),
       counts: csvCounts(plan),
+      /** Values the admin doesn't have, each once, to map or skip on the Columns step (OPS-153). */
+      unknown: plan.unknown,
       // The rows without their create requests (the page shows outcomes, not payloads).
-      rows: plan.rows.map((row) => ({ line: row.line, name: row.name, status: row.status, errors: row.errors, duplicate: row.duplicate, included: row.included })),
+      rows: plan.rows.map((row) => ({ line: row.line, name: row.name, status: row.status, errors: row.errors, warnings: row.warnings, duplicate: row.duplicate, included: row.included })),
     };
   }
 
@@ -190,7 +199,7 @@ export class CsvImportService {
   private reportRow(row: CsvPlanRow, recordId: string | null): CsvReportRow {
     // Only a written record counts as created (a refused or rolled-back run writes nothing).
     const status = row.status === "create" ? (recordId ? "created" : "not_imported") : row.status;
-    return { line: row.line, name: row.name, status, errors: row.errors, duplicate: row.duplicate, included: row.included, recordId };
+    return { line: row.line, name: row.name, status, errors: row.errors, warnings: row.warnings, duplicate: row.duplicate, included: row.included, recordId };
   }
 
   /** The report page (OPS-150): who, when, which file, the counts, and every row with links. */
@@ -210,7 +219,7 @@ export class CsvImportService {
       triggeredBy: run.triggeredBy.replace(/^admin:/, ""),
       counts: run.counts as Partial<CsvCounts>,
       failure: issues.find((issue): issue is { kind: "error"; code: string; detail: string } => "kind" in issue)?.detail ?? null,
-      rows: issues.filter((issue): issue is CsvReportRow => "line" in issue),
+      rows: issues.filter((issue): issue is CsvReportRow => "line" in issue).map((row) => ({ ...row, warnings: row.warnings ?? [] })),
     };
   }
 }

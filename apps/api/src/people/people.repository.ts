@@ -355,11 +355,6 @@ export class PeopleRepository {
     return row !== undefined;
   }
 
-  /** Permanent delete: links go with the person (cascade); expenses paid to them block it (their recipient). */
-  async delete(tx: Executor, id: string): Promise<void> {
-    await tx.delete(people).where(eq(people.id, id));
-  }
-
   async hasGrants(id: string): Promise<boolean> {
     const [row] = await this.db.select({ id: accessGrants.id }).from(accessGrants).where(eq(accessGrants.personId, id)).limit(1);
     return row !== undefined;
