@@ -13,11 +13,14 @@ import type { AppConfig } from "../common/config/env.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
+import { countExistingExpertise } from "../expertise/expertise-refs.js";
 import { FILE_STORAGE, sniffContentType, type FileStorage } from "../files/file-storage.js";
+import { refreshGrantNames } from "../services/grant-name.js";
 import type {
   AccountDto,
   AccountsListQuery,
-  InviteRequest,
+  InvitationDto,
+  NewInvitationDto,
   OneTimeLinkDto,
   ProfileDto,
   ProfileRequest,
@@ -25,8 +28,10 @@ import type {
 } from "./accounts.contracts.js";
 import { AccountsRepository } from "./accounts.repository.js";
 
-/** One-time links last 72 hours (decision 13). */
+/** One-time links of an account (password reset) last 72 hours (decision 13). */
 export const LINK_HOURS = 72;
+/** Invitation links last 7 days (OPS-141, client 2026-11-03). */
+export const INVITATION_DAYS = 7;
 /** Profile pictures: PNG, JPEG or WebP, at most 2 MB (never SVG: it can carry script). */
 export const PICTURE_MAX_BYTES = 2 * 1024 * 1024;
 const LINK_GONE = "This link has expired or was already used.";
@@ -35,8 +40,8 @@ const LINK_GONE = "This link has expired or was already used.";
 export const ACCOUNT_FIELDS: readonly FieldSpec<AccountDto & { timeZone?: string | null; appearance?: string }>[] = [
   { field: "displayName", label: "Display name", kind: "text", get: (a) => a.displayName },
   { field: "role", label: "Role", kind: "select", get: (a) => a.role },
-  { field: "person", label: "Person", kind: "relation", get: (a) => (a.person ? [{ id: a.person.id, label: a.person.name }] : []) },
-  { field: "note", label: "Note", kind: "text", get: (a) => a.note },
+  { field: "description", label: "Description", kind: "text", get: (a) => a.description },
+  { field: "expertise", label: "Expertise", kind: "relation", get: (a) => a.expertise.map((item) => ({ id: item.id, label: item.name })) },
   { field: "timeZone", label: "Time zone", kind: "text", get: (a) => a.timeZone ?? null },
   { field: "appearance", label: "Appearance", kind: "text", get: (a) => a.appearance ?? null },
 ];
@@ -49,10 +54,12 @@ function sniffPicture(bytes: Buffer): "image/png" | "image/jpeg" | "image/webp" 
 }
 
 /**
- * Admin accounts (admin-desktop.pdf p15, p18): invitations and reset links
- * the Rootadmin copies (decision 13), roles, deactivation instead of
- * deletion (decision 14), the last active Rootadmin always kept, and each
- * admin's own profile. Every change is in the account's history.
+ * Admin accounts (admin-desktop.pdf p15, p18): invitation links anyone
+ * can sign up with (OPS-141) and reset links the Rootadmin copies (decision
+ * 13), roles, deactivation instead of deletion (decision 14), the last
+ * active Rootadmin always kept, and each admin's own profile — description
+ * and expertise included (OPS-144, OPS-135), which a Rootadmin can also set
+ * for other accounts. Every change is in the account's history.
  */
 @Injectable()
 export class AccountsService {
@@ -76,27 +83,49 @@ export class AccountsService {
     return account;
   }
 
-  // ---- Managing accounts (accounts.manage) ----
+  // ---- Invitation links (OPS-141, accounts.manage) ----
 
-  /** "New account": an invited account and its one-time link, returned once. */
-  async invite(input: InviteRequest, principal: AdminPrincipal): Promise<{ account: AccountDto } & OneTimeLinkDto> {
-    if (await this.repository.emailTaken(input.email)) throw new ConflictError("An account with this email already exists.");
-    await this.checkPerson(input.personId);
+  /**
+   * "New invitation link": no email, no role asked. The link is returned
+   * once (only its hash is stored), works once, for 7 days, until revoked.
+   */
+  async createInvitation(principal: AdminPrincipal): Promise<NewInvitationDto> {
+    const token = generateSessionToken();
+    const now = this.clock();
+    const expiresAt = new Date(now.getTime() + INVITATION_DAYS * 86_400_000);
     return this.db.transaction(async (tx) => {
-      const id = await this.repository.createInvited(tx, {
-        email: input.email,
-        displayName: input.displayName ?? null,
-        role: input.role,
-        personId: input.personId ?? null,
-        note: input.note ?? null,
-        invitedById: principal.id,
+      const id = await this.repository.createInvitation(tx, { tokenHash: hashSessionToken(token), expiresAt, createdById: principal.id, createdAt: now });
+      await this.audit.record(tx, {
+        entityType: "admin_invitation",
+        entityId: id,
+        action: "link_created",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: "Invitation link", purpose: "Invitation link", expiresAt: expiresAt.toISOString() },
       });
-      const link = await this.issueLink(tx, id, "invite", principal.id);
-      const account = (await this.repository.find(id, tx))!;
-      await this.audit.record(tx, { entityType: "admin_user", entityId: id, action: "invited", actor: actorFor(principal), source: "admin", meta: { label: account.name, role: account.role.label, collection: "Accounts" } });
-      return { account, ...link };
+      // The token rides in the fragment: browsers never send it, so no server or proxy log records it.
+      return { invitation: (await this.repository.findInvitation(id, now, tx))!, link: `${this.config.publicSiteUrl}/admin/join#${token}` };
     });
   }
+
+  listInvitations(): Promise<InvitationDto[]> {
+    return this.repository.listInvitations(this.clock());
+  }
+
+  async revokeInvitation(id: string, principal: AdminPrincipal): Promise<InvitationDto> {
+    const now = this.clock();
+    const invitation = await this.repository.findInvitation(id, now);
+    if (!invitation) throw new NotFoundError("Invitation link not found.");
+    if (invitation.status === "used") throw new ConflictError("This invitation link was already used.");
+    if (invitation.status === "revoked") return invitation;
+    return this.db.transaction(async (tx) => {
+      if (!(await this.repository.revokeInvitation(tx, id, principal.id, now))) throw new ConflictError("This invitation link was already used.");
+      await this.audit.record(tx, { entityType: "admin_invitation", entityId: id, action: "link_revoked", actor: actorFor(principal), source: "admin", meta: { label: "Invitation link" } });
+      return (await this.repository.findInvitation(id, now, tx))!;
+    });
+  }
+
+  // ---- Managing accounts (accounts.manage) ----
 
   /** A fresh link for an account: an invitation while invited, a password reset when active. */
   async createLink(id: string, principal: AdminPrincipal): Promise<OneTimeLinkDto> {
@@ -110,25 +139,36 @@ export class AccountsService {
     });
   }
 
+  /** A Rootadmin on any account: its role (a new account has none, OPS-141), and its profile's name, description and expertise. */
   async update(id: string, input: UpdateAccountRequest, principal: AdminPrincipal): Promise<AccountDto> {
     const before = await this.get(id);
-    if (input.role !== undefined && input.role !== "owner" && before.role.key === "owner" && before.status === "active" && (await this.repository.otherActiveOwners(id)) === 0) {
+    if (input.role !== undefined && input.role !== "owner" && before.role?.key === "owner" && before.status === "active" && (await this.repository.otherActiveOwners(id)) === 0) {
       throw new ConflictError("This is the last active Rootadmin: make another account Rootadmin first.");
     }
-    if (input.personId) await this.checkPerson(input.personId, id);
+    await this.checkExpertise(input.expertiseIds);
     return this.db.transaction(async (tx) => {
       const values: Record<string, unknown> = {};
       if (input.role !== undefined) values.role = input.role;
-      if (input.note !== undefined) values.note = input.note;
-      if (input.personId !== undefined) values.personId = input.personId;
-      if (input.displayName !== undefined) values.displayName = input.displayName;
-      await this.repository.update(tx, id, values);
+      await this.writeProfile(tx, id, input, values);
       const after = (await this.repository.find(id, tx))!;
       await this.recordChanges(tx, before, after, actorFor(principal));
       // A new role applies at once: the account signs in again with its new rights.
-      if (input.role !== undefined && input.role !== before.role.key) await this.auth.revokeSessionsOf(tx, id);
+      if (input.role !== undefined && input.role !== before.role?.key) await this.auth.revokeSessionsOf(tx, id);
       return after;
     });
+  }
+
+  /** The profile fields an account holder and a Rootadmin both change; a new name renames the account's permissions (OPS-138). */
+  private async writeProfile(tx: Executor, id: string, input: Pick<ProfileRequest, "displayName" | "description" | "expertiseIds">, values: Record<string, unknown>) {
+    if (input.displayName !== undefined) values.displayName = input.displayName;
+    if (input.description !== undefined) values.description = input.description;
+    await this.repository.update(tx, id, values);
+    if (input.expertiseIds !== undefined) await this.repository.setExpertise(tx, id, input.expertiseIds);
+    if (input.displayName !== undefined) await refreshGrantNames(tx, { adminUserId: id });
+  }
+
+  private async checkExpertise(ids: readonly string[] | undefined) {
+    if (ids?.length && (await countExistingExpertise(this.db, ids)) !== ids.length) throw new ValidationFailedError([{ path: "expertiseIds", message: "Unknown expertise." }]);
   }
 
   async deactivate(id: string, principal: AdminPrincipal): Promise<AccountDto> {
@@ -168,14 +208,14 @@ export class AccountsService {
 
   async updateProfile(principal: AdminPrincipal, input: ProfileRequest): Promise<ProfileDto> {
     const before = await this.profile(principal);
+    await this.checkExpertise(input.expertiseIds);
     await this.db.transaction(async (tx) => {
       const values: Record<string, unknown> = {};
-      if (input.displayName !== undefined) values.displayName = input.displayName;
       if (input.timeZone !== undefined) values.timeZone = input.timeZone;
       if (input.appearance !== undefined) values.appearance = input.appearance;
-      await this.repository.update(tx, principal.id, values);
-      // Compare with the values written (no read outside this transaction while it's open).
-      await this.recordChanges(tx, before, { ...before, ...values } as ProfileDto, actorFor(principal));
+      await this.writeProfile(tx, principal.id, input, values);
+      const after = (await this.repository.findProfile(principal.id, tx))!;
+      await this.recordChanges(tx, before, after, actorFor(principal));
     });
     return this.profile(principal);
   }
@@ -307,6 +347,48 @@ export class AccountsService {
     return { email: found.email };
   }
 
+  // ---- Invitation links, used without a session (OPS-141) ----
+
+  async inspectInvitation(token: string): Promise<{ expiresAt: string }> {
+    const found = await this.liveInvitation(token);
+    return { expiresAt: found.expiresAt.toISOString() };
+  }
+
+  /**
+   * Whoever holds a live invitation link makes their own account: active,
+   * no role and no permissions until a Rootadmin gives it a role. The link
+   * is used in the same transaction, so two sign-ups with one link can't
+   * both succeed. Returns the new account's id (the controller signs it in).
+   */
+  async signUp(token: string, email: string, password: string): Promise<{ id: string }> {
+    const found = await this.liveInvitation(token);
+    const problems = passwordProblems(password, { email, name: null });
+    if (problems.length > 0) throw new ValidationFailedError(problems.map((message) => ({ path: "password", message })));
+    if (await this.repository.emailTaken(email)) throw new ConflictError("An account with this email already exists: sign in instead.");
+    const passwordHash = await hashPassword(password);
+    const now = this.clock();
+    return this.db.transaction(async (tx) => {
+      const id = await this.repository.createSignedUp(tx, { email, passwordHash, invitedById: found.createdById });
+      if (!(await this.repository.useInvitation(tx, found.id, id, now))) throw new NotFoundError(LINK_GONE);
+      const label = email.split("@")[0]!;
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: id,
+        action: "created",
+        actor: { type: "admin", id, label, role: null },
+        source: "admin",
+        meta: { label, collection: "Accounts", via: "Invitation link", invitationId: found.id },
+      });
+      return { id };
+    });
+  }
+
+  private async liveInvitation(token: string) {
+    const found = await this.repository.findInvitationByToken(hashSessionToken(token));
+    if (!found || found.usedAt || found.revokedAt || found.expiresAt.getTime() <= this.clock().getTime()) throw new NotFoundError(LINK_GONE);
+    return found;
+  }
+
   // ---- Helpers ----
 
   private async liveToken(token: string) {
@@ -331,15 +413,9 @@ export class AccountsService {
   }
 
   private async keepARootadmin(account: AccountDto) {
-    if (account.role.key === "owner" && account.status === "active" && (await this.repository.otherActiveOwners(account.id)) === 0) {
+    if (account.role?.key === "owner" && account.status === "active" && (await this.repository.otherActiveOwners(account.id)) === 0) {
       throw new ConflictError("This is the last active Rootadmin: it can't be deactivated.");
     }
-  }
-
-  private async checkPerson(personId: string | null | undefined, exceptAccountId?: string) {
-    if (!personId) return;
-    if (!(await this.repository.personExists(personId))) throw new ValidationFailedError([{ path: "personId", message: "Unknown person." }]);
-    if (await this.repository.personTaken(personId, exceptAccountId)) throw new ValidationFailedError([{ path: "personId", message: "Another account is linked to this person." }]);
   }
 
   private async checkCurrentPassword(id: string, password: string) {

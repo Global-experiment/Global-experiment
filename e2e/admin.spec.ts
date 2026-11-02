@@ -65,9 +65,9 @@ test.describe("people administration", () => {
     for (const column of ["Name", "State", "Source", "Expertise", "Description", "Organization"]) {
       await expect(page.getByRole("columnheader", { name: column, exact: true })).toBeVisible();
     }
-    // More options → Import Notion opens the import page.
+    // More options → Import CSV, the only import (OPS-154).
     await page.getByRole("button", { name: "More options" }).click();
-    await expect(page.getByRole("menuitem", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
+    await expect(page.getByRole("menu", { name: "More options" }).getByRole("menuitem")).toHaveText(["Import CSV"]);
     await page.keyboard.press("Escape");
   });
 

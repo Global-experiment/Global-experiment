@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { auditEvents } from "../../audit/audit.schema.js";
+import { expertiseDomains, expertiseFields, expertiseItems } from "../../expertise/expertise.schema.js";
 import { organizations } from "../../organizations/organizations.schema.js";
 import { PeopleRepository } from "../../people/people.repository.js";
 import { people } from "../../people/people.schema.js";
@@ -51,7 +52,8 @@ describe("CSV import API", () => {
     const before = await t.db.$count(people);
     const preview = (await send(writer, "preview", PEOPLE).expect(201)).body;
     expect(preview).toMatchObject({ fileName: "contacts.csv", delimiter: ";", headers: ["Name", "Email", "Organizations", "State", "Person ID"], mapping: ["name", "email", "organizations", "state", null] });
-    expect(preview.counts).toEqual({ fileName: "contacts.csv", rows: 4, create: 2, duplicates: 1, duplicatesIncluded: 0, errors: 1 });
+    expect(preview.counts).toEqual({ fileName: "contacts.csv", rows: 4, create: 2, duplicates: 1, duplicatesIncluded: 0, errors: 1, warnings: 0 });
+    expect(preview.unknown).toEqual([]);
     expect(preview.rows.map((row: { line: number; status: string; errors: string[]; duplicate: { reason: string } | null }) => [row.line, row.status, row.errors, row.duplicate?.reason ?? null])).toEqual([
       [2, "create", [], null],
       [3, "duplicate", [], "Same name as Ada Existing"],
@@ -145,6 +147,48 @@ describe("CSV import API", () => {
     expect(report.rows.map((row: { status: string }) => row.status)).toEqual(["not_imported", "not_imported", "not_imported"]);
   });
 
+  it("imports rows with values the admin doesn't have, without them and with a warning; the admin maps or skips each one (OPS-153)", async () => {
+    const [domain] = await t.db.insert(expertiseDomains).values({ name: "Communication", stableId: "domain.03.communication", statusKey: "active" }).returning();
+    const [field] = await t.db.insert(expertiseFields).values({ name: "Writing", domainId: domain!.id, stableId: "field.03.01.writing", statusKey: "active" }).returning();
+    const [copywriting, editing] = await t.db
+      .insert(expertiseItems)
+      .values([
+        { name: "Copywriting", fieldId: field!.id, stableId: "03.01.copywriting", statusKey: "active" },
+        { name: "Editing", fieldId: field!.id, stableId: "03.01.editing", statusKey: "active" },
+      ])
+      .returning();
+    // As Notion exported the client's file: a link after each name, a channel the admin doesn't have.
+    const file = csv(
+      "Name,Email,Expertise,Contact channels\n" +
+        'Gil Notion,gil@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Copyediting (https://app.notion.com/p/Copyediting-3d41?pvs=21)","Email, Other"\n' +
+        "Hana Notion,hana@example.net,COPYWRITING,Other\n" +
+        "Ivo Notion,not-an-email,Copywriting,\n",
+    );
+    const first = (await send(writer, "preview", file).expect(201)).body;
+    expect(first.counts).toMatchObject({ create: 2, errors: 1, warnings: 2 });
+    expect(first.unknown.map((entry: { field: string; values: { value: string; rows: number }[] }) => [entry.field, entry.values.map((value) => [value.value, value.rows])])).toEqual([
+      ["contactChannels", [["Other", 2]]],
+      ["expertise", [["Copyediting", 1]]],
+    ]);
+    expect(first.unknown[1].options.map((option: { label: string }) => option.label)).toEqual(["Copywriting", "Editing"]);
+    // Copyediting → Editing; "Other" skipped.
+    const choices = { expertise: { copyediting: editing!.id }, contactChannels: { other: null } };
+    const preview = (await send(writer, "preview", file, { choices }).expect(201)).body;
+    expect(preview.rows.map((row: { warnings: string[] }) => row.warnings)).toEqual([['Contact channels: "Other" skipped.'], ['Contact channels: "Other" skipped.'], []]);
+    const done = (await send(writer, "confirm", file, { mapping: preview.mapping, choices, expect: preview.counts }).expect(201)).body;
+    const gil = (await owner.get("/api/admin/people?search=Gil%20Notion").expect(200)).body.items[0];
+    expect(gil.expertise.map((item: { id: string }) => item.id)).toEqual([copywriting!.id, editing!.id]);
+    const report = (await owner.get(`/api/admin/imports/csv/runs/${done.runId}`).expect(200)).body;
+    expect(report.rows.map((row: { status: string; warnings: string[]; errors: string[] }) => [row.status, row.warnings, row.errors])).toEqual([
+      ["created", ['Contact channels: "Other" skipped.'], []],
+      ["created", ['Contact channels: "Other" skipped.'], []],
+      // Real errors still refuse the row, with the reason.
+      ["error", [], ["Email: Invalid email address."]],
+    ]);
+    // Choices only map to what exists.
+    await send(writer, "preview", file, { choices: { salary: {} } }).expect(400);
+  });
+
   it("imports organizations the same way", async () => {
     const file = csv("Name,Website\nGreen Commons,green.test\nCivic Lab,\n");
     const preview = (await send(writer, "preview", file, {}, "organizations").expect(201)).body;
@@ -155,12 +199,13 @@ describe("CSV import API", () => {
   });
 
   it("has no import or export for Treasury or any other table — refused for every role, Rootadmin included", async () => {
-    const message = "Only People and Organizations can be imported. Treasury and every other table are edited in the admin.";
+    const message = "Only People and Organizations can be imported, from a CSV file. Treasury and every other table are edited in the admin.";
     for (const table of ["treasury", "expertise", "services", "access-grants", "accounts"]) {
       expect((await send(owner, "preview", PEOPLE, {}, table).expect(403)).body.error.message, table).toBe(message);
       await send(owner, "confirm", PEOPLE, {}, table).expect(403);
     }
-    for (const kind of ["treasury", "taxonomy"]) expect((await owner.post(`/api/admin/imports/${kind}/dry-run`).expect(403)).body.error.message).toBe(message);
+    // No Notion import any more (OPS-154): CSV is the only import.
+    for (const kind of ["directory", "treasury", "taxonomy"]) expect((await owner.post(`/api/admin/imports/${kind}/dry-run`)).status).toBe(404);
     // No export route exists anywhere.
     for (const path of ["/api/admin/treasury/export", "/api/admin/treasury/export.csv", "/api/admin/people/export", "/api/admin/organizations/export", "/api/admin/exports/treasury"]) {
       const status = (await owner.get(path)).status;

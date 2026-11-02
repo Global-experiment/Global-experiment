@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
 import { adminApi, AdminApiError } from "../api/client";
@@ -11,37 +10,35 @@ import { RecordPage } from "../record/RecordPage";
 import { useCan } from "../session";
 import { AdminButton, AdminButtonLink, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, invalidProps, Pills, PropertyRow, recordInput } from "../ui/RecordForm";
-import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { RelationPicker } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 import { GrantChips } from "./accessDisplay";
 
 interface Draft {
   name: string;
   statusKey: string;
-  categoryKey: string;
+  /** Tags (OPS-149), in order. */
+  categoryKeys: string[];
   hostingModelKey: string;
   url: string;
   description: string;
-  responsible: RelationOption[];
 }
 
 const toDraft = (service: Service): Draft => ({
   name: service.name,
   statusKey: service.status?.key ?? "",
-  categoryKey: service.category?.key ?? "",
+  categoryKeys: service.categories.map((category) => category.key),
   hostingModelKey: service.hostingModel?.key ?? "",
   url: service.url ?? "",
   description: service.description ?? "",
-  responsible: service.responsible ? [{ id: service.responsible.id, label: service.responsible.name, href: `/admin/accounts/${service.responsible.id}` }] : [],
 });
 
 function patchFor(base: Draft, draft: Draft): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   if (draft.name.trim() !== base.name.trim()) patch.name = draft.name;
-  for (const field of ["statusKey", "categoryKey", "hostingModelKey"] as const) if (draft[field] !== base[field]) patch[field] = draft[field] || null;
+  for (const field of ["statusKey", "hostingModelKey"] as const) if (draft[field] !== base[field]) patch[field] = draft[field] || null;
+  if (draft.categoryKeys.join() !== base.categoryKeys.join()) patch.categoryKeys = draft.categoryKeys;
   for (const field of ["url", "description"] as const) if (draft[field].trim() !== base[field].trim()) patch[field] = draft[field].trim() || null;
-  const responsible = draft.responsible[0]?.id ?? null;
-  if (responsible !== (base.responsible[0]?.id ?? null)) patch.responsibleAdminId = responsible;
   return patch;
 }
 
@@ -57,14 +54,14 @@ const pills = (entries: { key: string; label: string }[] | undefined) => (entrie
 /**
  * /admin/services/[id] — a service (p16) on the standard record page:
  * fields, right panel, history. Its Permissions are the access grants
- * that name it; "Add a permission" opens a new one for this service. A
- * role without services.update sees it view-only.
+ * that name it; "Add a permission" opens a new one for this service —
+ * who is in charge of it is its Owner permission (OPS-130). Category takes
+ * several tags (OPS-149). Archived, never deleted (OPS-147). A role
+ * without services.update sees it view-only.
  */
 export function ServiceRecord({ id }: { id: string }) {
-  const router = useRouter();
   const toast = useToast();
   const canUpdate = useCan("services.update");
-  const canDelete = useCan("services.delete");
   const canGrant = useCan("access.create");
   const service = useAdminData<Service>(`/services/${id}`);
   const options = useAdminData<ServicesOptions>("/services/options");
@@ -134,11 +131,7 @@ export function ServiceRecord({ id }: { id: string }) {
     }
   }
 
-  const accounts = options.data?.accounts ?? [];
-  const searchAccounts = async (text: string): Promise<RelationOption[]> =>
-    accounts
-      .filter((account) => account.name.toLowerCase().includes(text.trim().toLowerCase()))
-      .map((account) => ({ id: account.id, label: account.name, href: `/admin/accounts/${account.id}` }));
+  const categories = options.data?.categories ?? [];
 
   return (
     <RecordPage
@@ -158,16 +151,6 @@ export function ServiceRecord({ id }: { id: string }) {
         },
         archived: loaded.archivedAt !== null,
         setArchived,
-        remove: canDelete
-          ? {
-              confirmText: loaded.name,
-              run: async (confirm) => {
-                await adminApi(`/services/${id}`, { method: "DELETE", body: { confirm } });
-                toast("Service deleted");
-                router.push("/admin/services");
-              },
-            }
-          : undefined,
         savedMessage: "Service updated",
         dirty,
         busy,
@@ -192,7 +175,13 @@ export function ServiceRecord({ id }: { id: string }) {
         <Pills label="Status" allowEmpty options={pills(options.data?.statuses)} value={draft.statusKey} onChange={(value) => set("statusKey", value)} />
       </PropertyRow>
       <PropertyRow icon="select" label="Category">
-        <Pills label="Category" allowEmpty options={pills(options.data?.categories)} value={draft.categoryKey} onChange={(value) => set("categoryKey", value)} />
+        <RelationPicker
+          label="Category"
+          reorderable
+          selected={draft.categoryKeys.map((key) => ({ id: key, label: categories.find((category) => category.key === key)?.label ?? key }))}
+          onChange={(next) => set("categoryKeys", next.map((option) => option.id))}
+          search={async (text) => categories.filter((category) => category.label.toLowerCase().includes(text.trim().toLowerCase())).map((category) => ({ id: category.key, label: category.label }))}
+        />
       </PropertyRow>
       <PropertyRow icon="select" label="Hosting model">
         <Pills label="Hosting model" allowEmpty options={pills(options.data?.hostingModels)} value={draft.hostingModelKey} onChange={(value) => set("hostingModelKey", value)} />
@@ -213,9 +202,6 @@ export function ServiceRecord({ id }: { id: string }) {
       </PropertyRow>
       <PropertyRow icon="title" label="Description" htmlFor="service-description">
         <AutoGrowTextarea id="service-description" value={draft.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} placeholder="What it's used for…" />
-      </PropertyRow>
-      <PropertyRow icon="arrow_outward" label="Responsible account">
-        <RelationPicker label="Responsible account" selected={draft.responsible} onChange={(next) => set("responsible", next.slice(-1))} search={searchAccounts} max={1} limitMessage="One responsible account." />
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Permissions">
         <div className="flex flex-col items-start gap-2">

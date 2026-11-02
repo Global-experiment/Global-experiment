@@ -1,11 +1,11 @@
 import type { ZodType } from "zod";
-import { followUpInstant } from "../directory/directory-plan.js";
+import { followUpInstant } from "../follow-up.js";
 import { vocabularyMatcher, type Vocabulary } from "../vocabulary.js";
 import { CreateOrganizationRequest } from "../../organizations/organizations.contracts.js";
 import { CreatePersonRequest } from "../../people/people.contracts.js";
 import { CSV_FIELDS, type CsvField, type CsvTable } from "./csv-fields.js";
 import type { ParsedCsv } from "./csv-parse.js";
-import { comparable, comparableUrl, DISPLAY_NUMBER, parseBoolean, parseDate, parseInstant, splitNames, UUID } from "./csv-values.js";
+import { comparable, comparableUrl, DISPLAY_NUMBER, parseBoolean, parseDate, parseInstant, splitNames, UUID, withoutNotionLink } from "./csv-values.js";
 
 /**
  * A CSV import's plan, as one pure function (no I/O): each row mapped,
@@ -18,7 +18,41 @@ import { comparable, comparableUrl, DISPLAY_NUMBER, parseBoolean, parseDate, par
  * row): the same record UUID, email, website or name as an existing record
  * — or as an earlier row of the file. Display numbers (PER-n, ORG-n, GE-n)
  * are never compared.
+ *
+ * Unknown values (OPS-153): a State, Source, Contact channel, Organization
+ * or Expertise the admin doesn't have (or has twice) never refuses a row.
+ * The plan lists each such value once (`unknown`), the admin maps it to an
+ * existing one or skips it (`choices`), and a row whose value stays
+ * unresolved is imported without it, with a warning. Names match ignoring
+ * case, accents and extra spaces. Real errors (no name, an invalid email…)
+ * still refuse the row.
  */
+
+/** The columns whose values must name something that exists. */
+export const VALUE_FIELDS = ["state", "source", "contactChannels", "organizations", "expertise"] as const;
+export type ValueField = (typeof VALUE_FIELDS)[number];
+/** Per field: an unknown value (its comparable form) → an existing key or id, or null to skip it. */
+export type ValueChoices = Partial<Record<ValueField, Record<string, string | null>>>;
+
+export interface CsvUnknownValue {
+  /** As first written in the file (Notion's link suffix removed). */
+  value: string;
+  /** Its comparable form: the key of `choices`. */
+  key: string;
+  rows: number;
+  /** "several" when more than one record has this name. */
+  problem: "unknown" | "several";
+  /** The admin's choice: an option's id, null = skip, undefined = not chosen. */
+  choice?: string | null;
+}
+
+export interface CsvUnknownField {
+  field: ValueField;
+  label: string;
+  values: CsvUnknownValue[];
+  /** What each value can be mapped to. */
+  options: { id: string; label: string }[];
+}
 
 export interface Ref {
   id: string;
@@ -48,6 +82,8 @@ export interface CsvPlanRow {
   name: string;
   status: "create" | "duplicate" | "error";
   errors: string[];
+  /** Values left out of the record (OPS-153). */
+  warnings: string[];
   duplicate: CsvDuplicate | null;
   /** A possible duplicate the admin chose to import anyway. */
   included: boolean;
@@ -60,6 +96,7 @@ export interface CsvPlan {
   fileName: string;
   mapping: (string | null)[];
   rows: CsvPlanRow[];
+  unknown: CsvUnknownField[];
 }
 
 export class CsvMappingError extends Error {
@@ -137,8 +174,29 @@ function findDuplicate(indexes: Indexes, keys: { id: string | null; email: strin
   return null;
 }
 
+/** Each value field's options (what an unknown value can be mapped to) and how a name finds them. */
+function valueLookups(snapshot: CsvSnapshot) {
+  const vocabulary = (entries: Vocabulary[]) => {
+    const match = vocabularyMatcher(entries);
+    return { options: entries.map((entry) => ({ id: entry.key, label: entry.label })), find: (name: string) => (match(name) ? [match(name)!] : []) };
+  };
+  const named = (refs: readonly Ref[]) => {
+    const map = byName(refs);
+    return { options: [...refs].sort((a, b) => a.name.localeCompare(b.name)).map((ref) => ({ id: ref.id, label: ref.name })), find: (name: string) => map.get(comparable(name)) ?? [] };
+  };
+  return {
+    state: vocabulary(snapshot.states),
+    source: vocabulary(snapshot.sources),
+    contactChannels: vocabulary(snapshot.channels),
+    organizations: named(snapshot.organizations),
+    expertise: named(snapshot.expertise),
+  } satisfies Record<ValueField, { options: { id: string; label: string }[]; find: (name: string) => string[] }>;
+}
+
+const WHAT: Record<ValueField, string> = { state: "state", source: "source", contactChannels: "contact channel", organizations: "organization", expertise: "expertise" };
+
 export function planCsvImport(
-  input: { table: CsvTable; fileName: string; parsed: ParsedCsv; mapping: readonly (string | null)[]; include?: readonly number[] },
+  input: { table: CsvTable; fileName: string; parsed: ParsedCsv; mapping: readonly (string | null)[]; include?: readonly number[]; choices?: ValueChoices },
   snapshot: CsvSnapshot,
 ): CsvPlan {
   const { table, parsed, mapping } = input;
@@ -146,11 +204,10 @@ export function planCsvImport(
   const fields = new Map(CSV_FIELDS[table].map((field) => [field.key, field]));
   const columns = mapping.map((key, column) => (key ? { column, field: fields.get(key)! } : null)).filter((entry): entry is { column: number; field: CsvField } => entry !== null);
   const include = new Set(input.include ?? []);
-  const state = vocabularyMatcher(snapshot.states);
-  const source = vocabularyMatcher(snapshot.sources);
-  const channel = vocabularyMatcher(snapshot.channels);
-  const organizations = byName(snapshot.organizations);
-  const expertise = byName(snapshot.expertise);
+  const lookups = valueLookups(snapshot);
+  const choices = input.choices ?? {};
+  /** field → comparable value → what the plan lists about it. */
+  const unknown = new Map<ValueField, Map<string, CsvUnknownValue & { lines: Set<number> }>>();
   const existing = emptyIndexes();
   for (const record of snapshot.records) index(existing, record, { id: record.id, email: record.email, website: record.website });
   const inFile = emptyIndexes();
@@ -158,6 +215,7 @@ export function planCsvImport(
 
   const rows = parsed.rows.map((row): CsvPlanRow => {
     const errors: string[] = [];
+    const warnings: string[] = [];
     const body: Record<string, unknown> = {};
     let recordId: string | null = null;
     const nameColumn = columns.find((entry) => entry.field.key === "name");
@@ -170,39 +228,50 @@ export function planCsvImport(
       const value = row.cells[column]!;
       if (value === "") continue;
       const fail = (message: string) => errors.push(`${field.label}: ${message}`);
-      const names = (lookup: Map<string, string[]>, what: string) => {
+      /** One value of a value field: its id, or null (left out, with a warning) when unknown and not mapped. */
+      const resolve = (key: ValueField, item: string): string | null => {
+        const lookup = lookups[key];
+        const found = lookup.find(item);
+        if (found.length === 1) return found[0]!;
+        const comparableItem = comparable(item);
+        const listed = unknown.get(key) ?? new Map();
+        unknown.set(key, listed);
+        const entry = listed.get(comparableItem) ?? { value: item, key: comparableItem, rows: 0, problem: found.length > 1 ? "several" : "unknown", lines: new Set<number>() };
+        entry.lines.add(row.line);
+        entry.rows = entry.lines.size;
+        listed.set(comparableItem, entry);
+        const choice = choices[key]?.[comparableItem];
+        if (choice !== undefined) entry.choice = choice;
+        if (choice && lookup.options.some((option) => option.id === choice)) return choice;
+        if (choice === null) warnings.push(`${field.label}: "${item}" skipped.`);
+        else if (found.length > 1) warnings.push(`${field.label}: several are named "${item}"; imported without it.`);
+        else warnings.push(`${field.label}: no ${WHAT[key]} named "${item}"; imported without it.`);
+        return null;
+      };
+      const known = (key: ValueField) => (candidate: string) => lookups[key].find(candidate).length === 1 || choices[key]?.[comparable(candidate)] !== undefined;
+      const many = (key: ValueField) => {
         const ids: string[] = [];
-        for (const item of splitNames(value, (candidate) => lookup.has(comparable(candidate)))) {
-          const found = lookup.get(comparable(item));
-          if (!found) fail(`no ${what} named "${item}"${what === "organization" ? " (import or create it first)" : ""}.`);
-          else if (found.length > 1) fail(`several ${what === "expertise" ? "expertise items" : `${what}s`} are named "${item}": link this one on the record.`);
-          else if (!ids.includes(found[0]!)) ids.push(found[0]!);
+        for (const item of splitNames(value, known(key))) {
+          const id = resolve(key, item);
+          if (id && !ids.includes(id)) ids.push(id);
         }
         return ids;
       };
       switch (field.key) {
         case "state":
         case "source": {
-          const key = (field.key === "state" ? state : source)(value);
-          if (!key) fail(`"${value}" isn't one of: ${(field.key === "state" ? snapshot.states : snapshot.sources).map((entry) => entry.label).join(", ")}.`);
-          else body[`${field.key}Key`] = key;
+          const key = resolve(field.key, withoutNotionLink(value));
+          if (key) body[`${field.key}Key`] = key;
           break;
         }
-        case "contactChannels": {
-          const keys: string[] = [];
-          for (const item of splitNames(value, (candidate) => channel(candidate) !== undefined)) {
-            const key = channel(item);
-            if (!key) fail(`"${item}" isn't one of: ${snapshot.channels.map((entry) => entry.label).join(", ")}.`);
-            else if (!keys.includes(key)) keys.push(key);
-          }
-          body.contactChannelKeys = keys;
+        case "contactChannels":
+          body.contactChannelKeys = many("contactChannels");
           break;
-        }
         case "organizations":
-          body.organizationIds = names(organizations, "organization");
+          body.organizationIds = many("organizations");
           break;
         case "expertise":
-          body.expertiseIds = names(expertise, "expertise");
+          body.expertiseIds = many("expertise");
           break;
         case "doNotContact": {
           const flag = parseBoolean(value);
@@ -252,7 +321,7 @@ export function planCsvImport(
         Object.assign(body, checked.data);
       }
     }
-    if (errors.length > 0) return { line: row.line, name, status: "error", errors, duplicate: null, included: false, request: null };
+    if (errors.length > 0) return { line: row.line, name, status: "error", errors, warnings, duplicate: null, included: false, request: null };
 
     const keys = { id: recordId, email: (body.email as string | null | undefined) ?? null, website: (body.website as string | null | undefined) ?? null, name: String(body.name) };
     const known = findDuplicate(existing, keys);
@@ -266,10 +335,22 @@ export function planCsvImport(
     lineOf.set(rowRef.id, row.line);
     index(inFile, rowRef, { id: recordId, email: keys.email, website: keys.website });
     const included = duplicate !== null && include.has(row.line);
-    return { line: row.line, name, status: duplicate && !included ? "duplicate" : "create", errors: [], duplicate, included, request: body };
+    return { line: row.line, name, status: duplicate && !included ? "duplicate" : "create", errors: [], warnings, duplicate, included, request: body };
   });
 
-  return { table, fileName: input.fileName, mapping: [...mapping], rows };
+  const listed = VALUE_FIELDS.flatMap((key): CsvUnknownField[] => {
+    const values = unknown.get(key);
+    if (!values) return [];
+    return [
+      {
+        field: key,
+        label: fields.get(key)!.label,
+        values: [...values.values()].map(({ value, key, rows, problem, choice }) => ({ value, key, rows, problem, ...(choice !== undefined ? { choice } : {}) })).sort((a, b) => b.rows - a.rows || a.value.localeCompare(b.value)),
+        options: lookups[key].options,
+      },
+    ];
+  });
+  return { table, fileName: input.fileName, mapping: [...mapping], rows, unknown: listed };
 }
 
 export interface CsvCounts {
@@ -282,6 +363,8 @@ export interface CsvCounts {
   /** Possible duplicates imported anyway. */
   duplicatesIncluded: number;
   errors: number;
+  /** Rows imported (or to import) with a value left out (OPS-153). */
+  warnings: number;
 }
 
 export function csvCounts(plan: CsvPlan): CsvCounts {
@@ -293,5 +376,6 @@ export function csvCounts(plan: CsvPlan): CsvCounts {
     duplicates: count((row) => row.status === "duplicate"),
     duplicatesIncluded: count((row) => row.included),
     errors: count((row) => row.status === "error"),
+    warnings: count((row) => row.status !== "error" && row.warnings.length > 0),
   };
 }

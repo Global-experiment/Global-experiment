@@ -5,8 +5,6 @@ const booleanFromString = z
   .transform((value) => value === "true" || value === "1");
 
 /** A 5-field cron expression (minute hour day month weekday) or "off"; checked again by the job runner. */
-export const CRON_OR_OFF = /^(off|(\S+\s+){4}\S+)$/;
-const cronOrOff = z.string().trim().regex(CRON_OR_OFF, 'must be a 5-field cron expression or "off"');
 
 const originList = z
   .string()
@@ -28,16 +26,6 @@ const envSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     /** Defaults to true in production; only ever false for plain-http local development. */
     COOKIE_SECURE: booleanFromString.optional(),
-    /**
-     * Notion "0.1 native" People and Organizations (the admin's Notion import,
-     * the only one left). Server-side only: the token never reaches the
-     * browser. Without them the import page says so.
-     */
-    NOTION_API_KEY: z.string().trim().optional(),
-    NOTION_PEOPLE_DB_ID: z.string().trim().optional(),
-    NOTION_ORGANIZATIONS_DB_ID: z.string().trim().optional(),
-    /** Tests only: read the import source from a JSON file instead of Notion. */
-    IMPORT_FIXTURE_FILE: z.string().trim().optional(),
 
     /**
      * Stripe (donations). Server-side only. Test keys (sk_test_/rk_test_) are
@@ -70,8 +58,6 @@ const envSchema = z
     TREASURY_SHOW_TEST_DONATIONS: booleanFromString.default(false),
     TREASURY_STATS_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
     TREASURY_PUBLIC_TOOLBAR: booleanFromString.default(false),
-    /** Default schedules of the Notion imports: a 5-field cron expression (server time zone: UTC), or "off". */
-    IMPORT_SCHEDULE_DIRECTORY: cronOrOff.default("off"),
     /**
      * Treasury supporting documents (overview §3.4): a private directory
      * outside every web root, owned by the API user, included in backups.
@@ -102,9 +88,6 @@ const envSchema = z
     if (production && env.COOKIE_SECURE === false) {
       context.addIssue({ code: "custom", path: ["COOKIE_SECURE"], message: "cannot be false in production" });
     }
-    if (env.IMPORT_FIXTURE_FILE && env.NODE_ENV !== "test") {
-      context.addIssue({ code: "custom", path: ["IMPORT_FIXTURE_FILE"], message: "is only allowed when NODE_ENV is test" });
-    }
     if (env.STRIPE_FIXTURE && env.NODE_ENV !== "test") {
       context.addIssue({ code: "custom", path: ["STRIPE_FIXTURE"], message: "is only allowed when NODE_ENV is test" });
     }
@@ -134,14 +117,6 @@ const envSchema = z
       },
       trustProxyHops: env.TRUST_PROXY_HOPS,
       cookieSecure: env.COOKIE_SECURE ?? production,
-      notion: {
-        token: id(env.NOTION_API_KEY),
-        databases: {
-          people: id(env.NOTION_PEOPLE_DB_ID),
-          organizations: id(env.NOTION_ORGANIZATIONS_DB_ID),
-        },
-        fixtureFile: id(env.IMPORT_FIXTURE_FILE),
-      },
       stripe: {
         secretKey: id(env.STRIPE_SECRET_KEY),
         webhookSecret: id(env.STRIPE_WEBHOOK_SECRET),
@@ -165,9 +140,6 @@ const envSchema = z
         showTestDonations: env.TREASURY_SHOW_TEST_DONATIONS,
         statsCurrency: env.TREASURY_STATS_CURRENCY,
         publicToolbar: env.TREASURY_PUBLIC_TOOLBAR,
-      },
-      importSchedules: {
-        directory: env.IMPORT_SCHEDULE_DIRECTORY,
       },
       fileStorageDir: env.FILE_STORAGE_DIR ?? (production ? "/var/lib/global-experiment/files" : ".data/files"),
       jobsDriver: env.JOBS_DRIVER ?? (env.NODE_ENV === "test" ? "inprocess" : "pgboss"),

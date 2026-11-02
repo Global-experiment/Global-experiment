@@ -103,6 +103,3 @@ export interface OrganizationDto {
   expertise: ExpertiseRef[];
 }
 
-/** Permanent delete (directory.delete, decision 12): the organization's name typed exactly. */
-export const DeleteOrganizationRequest = z.strictObject({ confirm: z.string().max(200) });
-export type DeleteOrganizationRequest = z.output<typeof DeleteOrganizationRequest>;

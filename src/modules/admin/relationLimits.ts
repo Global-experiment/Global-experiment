@@ -12,4 +12,5 @@ export const LIMIT_HINTS = {
   personExpertise: `People can have up to ${RELATION_LIMITS.expertise} expertise.`,
   personOrganizations: `People can have up to ${RELATION_LIMITS.organizationsPerPerson} organizations.`,
   organizationExpertise: `Organizations can have up to ${RELATION_LIMITS.expertise} expertise.`,
+  accountExpertise: `Accounts can have up to ${RELATION_LIMITS.expertise} expertise.`,
 } as const;

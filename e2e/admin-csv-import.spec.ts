@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { E2E_ADMIN } from "./admin-credentials";
 
 /**
- * The CSV import of People (Delivery 3) through the real stack: More
+ * The CSV import of People (Delivery 3, OPS-153 in Delivery 4) through the real stack: More
  * options → Import CSV, a file it can't read (the error modal), the column
  * matching, the check (to add, possible duplicates linked to the existing
  * record, rows with errors and why), the import with its toast, the report
@@ -72,7 +72,8 @@ test("More options → Import CSV (p11), the upload step, and the error modal fo
   await page.goto("/admin/people");
   await page.getByRole("button", { name: "More options" }).click();
   const menu = page.getByRole("menu", { name: "More options" });
-  await expect(menu.getByRole("menuitem")).toHaveText(["Import CSV", "Import Notion"]);
+  // CSV is the only import (OPS-154).
+  await expect(menu.getByRole("menuitem")).toHaveText(["Import CSV"]);
   await page.screenshot({ path: join(SHOTS, "csv-p11-more-options-1440.png") });
   await axe();
   await menu.getByRole("menuitem", { name: "Import CSV" }).click();
@@ -128,8 +129,10 @@ test("columns matched by name (changeable, or skipped), then the check: to add, 
   await expect(duplicate.getByRole("link", { name: existing.name })).toHaveAttribute("href", /^\/admin\/people\/[0-9a-f-]{36}$/);
   await expect(duplicate.getByRole("checkbox")).not.toBeChecked();
   const error = page.locator("[data-error-row='4']");
-  await expect(error).toContainText('State: "Unknown state" isn\'t one of:');
-  await expect(error).toContainText(`Organizations: no organization named "Nowhere Ltd ${RUN}"`);
+  // A real error refuses the row; its unknown values (OPS-153) are no longer errors of their own.
+  await expect(error).toContainText("Email: Invalid email address.");
+  await expect(error).not.toContainText("Unknown state");
+  await expect(error).not.toContainText(`Nowhere Ltd ${RUN}`);
   await expect(page.getByRole("button", { name: "Import 1 person" })).toBeEnabled();
   for (const viewport of [FRAME, TABLET]) {
     await page.setViewportSize(viewport);
@@ -168,6 +171,50 @@ test("import: the toast with the counts and the report link, then the report and
   await expect(history).toContainText("imported this record");
   await expect(history).toContainText("CSV import");
   await page.screenshot({ path: join(SHOTS, "csv-imported-person-1440.png") });
+});
+
+test("values the admin doesn't have (as in Notion's export): listed once on the Columns step, mapped or skipped, the rows imported without them, with warnings (OPS-153)", async () => {
+  const notion = `Nils Notion ${RUN}`;
+  const other = `Ola Notion ${RUN}`;
+  const csv =
+    "Name,Email,Expertise,Contact channels\n" +
+    `${notion},nils-${RUN}@example.net,"Interaction design (https://app.notion.com/p/Interaction-design-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Other"\n` +
+    `${other},ola-${RUN}@example.net,"  ux RESEARCH ",Other\n` +
+    `Broken ${RUN},not-an-email,Game design,\n`;
+  await page.goto("/admin/imports/csv?table=people");
+  await page.locator("input[type=file]").setInputFiles(file("notion-export.csv", csv));
+  await expect(page.getByRole("heading", { name: /Match the columns/ })).toBeVisible();
+  const unknown = page.locator("[data-unknown-values]");
+  await expect(unknown.getByRole("heading", { name: "Values not found (2)" })).toBeVisible();
+  // Each once, with its rows; Notion's link removed, case and spaces ignored ("ux RESEARCH" matched).
+  await expect(unknown.getByRole("rowheader", { name: "Game design" })).toBeVisible();
+  await expect(unknown.getByRole("rowheader", { name: "Other" })).toBeVisible();
+  await expect(unknown.getByRole("rowheader", { name: /Interaction design|UX research/ })).toHaveCount(0);
+  // Game design → Visual design; "Other" skipped (the default).
+  await unknown.getByLabel("Import Game design as").selectOption({ label: "Visual design" });
+  await axe();
+  await page.screenshot({ path: join(SHOTS, "ops153-columns-unknown-values-1440.png") });
+  await page.getByRole("button", { name: "Check the rows" }).click();
+
+  await expect(page.getByRole("heading", { name: "Check before importing" })).toBeVisible();
+  await expect(page.locator("[data-counts]")).toContainText("2 to add");
+  await expect(page.locator("[data-counts]")).toContainText("1 with an error");
+  await expect(page.locator("[data-counts]")).toContainText("2 without some values");
+  await expect(page.locator("[data-create-row]").filter({ hasText: notion })).toContainText('Contact channels: "Other" skipped.');
+  // A real error still refuses its row.
+  await expect(page.locator("[data-error-row]")).toContainText("Email: Invalid email address.");
+  await axe();
+  await page.screenshot({ path: join(SHOTS, "ops153-check-warnings-1440.png") });
+  await page.getByRole("button", { name: "Import 2 people" }).click();
+  await expect(page.getByRole("heading", { name: "Imported" })).toBeVisible();
+  await page.locator("[data-admin-toast]").getByRole("link", { name: "See the report" }).click();
+  await expect(page).toHaveURL(/\/admin\/imports\/csv\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("region", { name: "Added (2)" })).toContainText('Contact channels: "Other" skipped.');
+  await page.screenshot({ path: join(SHOTS, "ops153-report-warnings-1440.png") });
+
+  // The imported person has both expertise: the one named in the file, and the mapped one.
+  const found = (await (await page.request.get(`/api/admin/people?search=${encodeURIComponent(notion)}`)).json()) as { items: { expertise: { name: string }[] }[] };
+  expect(found.items[0]!.expertise.map((item) => item.name).sort()).toEqual(["Interaction design", "Visual design"]);
 });
 
 test("Treasury and every other list offer no import or export", async () => {

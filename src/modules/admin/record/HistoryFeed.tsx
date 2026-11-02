@@ -125,6 +125,12 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
   );
 }
 
+/** How long a one-time link was valid: 72 hours for the account links, 7 days for an invitation link (OPS-141). */
+function linkValidity(occurredAt: string, expiresAt: unknown): string {
+  const hours = typeof expiresAt === "string" ? Math.round((Date.parse(expiresAt) - Date.parse(occurredAt)) / 3_600_000) : NaN;
+  return Number.isFinite(hours) && hours > 72 ? `${Math.round(hours / 24)} days` : "72 hours";
+}
+
 function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: string) => string }) {
   const { meta } = item;
   if (item.action === "created" && meta.collection) {
@@ -190,7 +196,7 @@ function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: st
   const facts: string[] = [];
   if (typeof meta.note === "string") facts.push(meta.note);
   if (item.action === "invited" && typeof meta.role === "string") facts.push(`Role: ${meta.role}.`);
-  if (item.action === "link_created" && typeof meta.purpose === "string") facts.push(`${meta.purpose}, valid 72 hours, single use.`);
+  if (item.action === "link_created" && typeof meta.purpose === "string") facts.push(`${meta.purpose}, valid ${linkValidity(item.occurredAt, meta.expiresAt)}, single use.`);
   if ((item.action === "activated" || item.action === "password_changed") && typeof meta.via === "string") facts.push(`With the ${meta.via.toLowerCase()}.`);
   if (item.action === "deactivated" && meta.self === true) facts.push("Deactivated from Profile settings.");
   if (item.action === "permission_denied" && typeof meta.route === "string") facts.push(`${meta.route} needs ${String(meta.permission)}.`);

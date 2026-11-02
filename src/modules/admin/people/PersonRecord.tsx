@@ -103,7 +103,6 @@ function ExistingPersonRecord({ id }: { id: string }) {
   const toast = useToast();
   const canUpdate = useCan("directory.update");
   const canCreate = useCan("directory.create");
-  const canDelete = useCan("directory.delete");
   const person = useAdminData<Person>(`/people/${id}`);
   const options = useAdminData<PeopleOptions>("/people/options");
   const history = useAdminData<RecordHistory>(`/history/person/${id}`);
@@ -223,16 +222,6 @@ function ExistingPersonRecord({ id }: { id: string }) {
         },
         archived: loaded.archivedAt !== null,
         setArchived,
-        remove: canDelete
-          ? {
-              confirmText: loaded.name,
-              run: async (confirm) => {
-                await adminApi(`/people/${id}`, { method: "DELETE", body: { confirm } });
-                toast("Person deleted");
-                router.push("/admin/people");
-              },
-            }
-          : undefined,
         savedMessage: "People updated",
         dirty,
         busy,

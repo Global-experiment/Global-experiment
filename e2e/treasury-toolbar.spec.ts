@@ -63,6 +63,8 @@ test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
     await expect(page).toHaveURL("/treasury?sort=amount_desc");
     await expect.poll(async () => (await amountsShown(page))[0]).toBe("- USD 5,675");
     await expect(page.getByRole("button", { name: /^Sort: Amount, Largest first/ })).toBeVisible();
+    // The first sheet has slid away before the next one opens.
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
 
     await page.getByRole("button", { name: /^Sort: Amount/ }).click();
     await page.getByRole("dialog", { name: "Sort by" }).getByRole("button", { name: /Amount/ }).click();

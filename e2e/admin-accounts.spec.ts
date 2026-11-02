@@ -5,12 +5,16 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { E2E_ADMIN } from "./admin-credentials";
 
 /**
- * Delivery 2 through the real stack: Accounts (p15) with an invitation the
- * invitee accepts on /admin/welcome, a role's menu, Services (p16) and
- * Permissions (p17) with their views and the access history on the
- * person, Profile settings (p18) with the appearance, the time zone and a
- * picture, and a password reset link — at 1440 and 1024, dark and light,
- * with axe. Side-by-side Figma comparisons when FIGMA_PNG_DIR is set.
+ * Accounts, Services, Permissions and Profile settings through the real
+ * stack, after Candide's first feedback (Delivery 4, 2026-11-03): a "New
+ * invitation link" anyone signs up with, landing on an empty profile with
+ * no role (OPS-141); description and expertise on the profile and the
+ * account (OPS-144, OPS-135); no note, no People link (OPS-142, OPS-136);
+ * service categories as tags, no responsible account (OPS-149, OPS-130);
+ * a permission's fields in Candide's order, its name made for it, ONE
+ * history event when granted (OPS-148, OPS-138, OPS-151); archive only
+ * (OPS-147). At 1440 and 1024, dark and light, with axe; side-by-side
+ * Figma comparisons (p15–p18) when FIGMA_PNG_DIR is set.
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the admin stack isn't running.");
 test.describe.configure({ mode: "serial" });
@@ -20,9 +24,10 @@ mkdirSync(SHOTS, { recursive: true });
 const FRAME = { width: 1440, height: 920 };
 const TABLET = { width: 1024, height: 768 };
 const RUN = Date.now().toString(36);
-const INVITEE = { email: `moderator-${RUN}@example.org`, name: `Mona Moderator ${RUN}`, password: "Quiet rivers keep 4 gardens" };
+const NEWCOMER = { email: `newcomer-${RUN}@example.org`, name: `Nina Newcomer ${RUN}`, password: "Quiet rivers keep 4 gardens" };
 const PERSON = `Pat Access ${RUN}`;
 const SERVICE = `Repo host ${RUN}`;
+const OWNER_NAME = E2E_ADMIN.email.split("@")[0]!;
 // A 1×1 PNG.
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
 
@@ -31,6 +36,12 @@ let inviteLink = "";
 const consoleIssues: string[] = [];
 const rows = () => page.locator("tbody tr");
 const origin = () => new URL(page.url()).origin;
+/** The record's property labels, in order, once the record has rendered. */
+async function properties(target: Page) {
+  const rows = target.locator("[data-record-main] [data-property]");
+  await expect(rows.first()).toBeVisible();
+  return rows.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-property")));
+}
 
 async function axe(target = page) {
   const results = await new AxeBuilder({ page: target }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -38,13 +49,13 @@ async function axe(target = page) {
 }
 
 /** Dark (the default) and light, each checked with axe and captured. */
-async function bothThemes(name: string) {
-  await axe();
-  await page.screenshot({ path: join(SHOTS, `${name}-dark.png`) });
-  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
-  await axe();
-  await page.screenshot({ path: join(SHOTS, `${name}-light.png`) });
-  await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
+async function bothThemes(name: string, target = page) {
+  await axe(target);
+  await target.screenshot({ path: join(SHOTS, `${name}-dark.png`) });
+  await target.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await axe(target);
+  await target.screenshot({ path: join(SHOTS, `${name}-light.png`) });
+  await target.evaluate(() => document.documentElement.removeAttribute("data-theme"));
 }
 
 async function signIn(target: Page, email: string, password: string) {
@@ -54,11 +65,11 @@ async function signIn(target: Page, email: string, password: string) {
   await target.getByRole("button", { name: "Sign in" }).click();
 }
 
-async function pick(picker: string, label: string) {
-  const search = page.locator(`[data-relation-picker="${picker}"] input[role=combobox]`);
+async function pick(target: Page, picker: string, label: string) {
+  const search = target.locator(`[data-relation-picker="${picker}"] input[role=combobox]`);
   await search.fill(label);
-  await page.locator(`[data-relation-picker="${picker}"] ul[aria-label$="results"]`).getByRole("button", { name: label, exact: false }).first().click();
-  await page.keyboard.press("Escape");
+  await target.locator(`[data-relation-picker="${picker}"] ul[aria-label$="results"]`).getByRole("button", { name: label, exact: false }).first().click();
+  await target.keyboard.press("Escape");
 }
 
 async function newContext(browser: Browser, baseURL: string | undefined) {
@@ -83,37 +94,31 @@ test.afterAll(async () => {
   await page.context().close();
 });
 
-test("Accounts (p15): the columns, the four views, and New account → a one-time link shown once", async () => {
+test("Accounts (p15): the columns, the views, and \"New invitation link\" — made at once, shown once, with a copy button (OPS-141)", async () => {
   await page.goto("/admin/accounts");
   await expect(page).toHaveTitle("Accounts");
-  await expect(page.locator("thead th")).toContainText(["Name", "Role", "Email", "Note", "Expertise", "Permissions"]);
+  // Description in place of Note (OPS-142, OPS-144).
+  await expect(page.locator("thead th")).toContainText(["Name", "Role", "Email", "Description", "Expertise", "Permissions"]);
+  await expect(page.locator("thead th").filter({ hasText: /^Note$/ })).toHaveCount(0);
   const views = page.getByRole("group", { name: "Views" });
-  for (const view of ["All", "Active", "Invited", "Deactivated"]) await expect(views.getByRole("button", { name: view, exact: true })).toBeVisible();
+  for (const view of ["All", "Active", "No role", "Deactivated"]) await expect(views.getByRole("button", { name: view, exact: true })).toBeVisible();
   await expect(rows().filter({ hasText: E2E_ADMIN.email })).toContainText("Rootadmin");
+  await expect(page.getByRole("button", { name: "New account" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "New account" }).click();
-  const dialog = page.getByRole("dialog", { name: "New account" });
-  await dialog.getByLabel("Email").fill(INVITEE.email);
-  await dialog.getByLabel("Name").fill(INVITEE.name);
-  await dialog.getByRole("group", { name: "Role" }).getByRole("button", { name: "Moderator" }).click();
-  await dialog.getByLabel("Note").fill("Moderates the feedback");
-  await axe();
-  await dialog.getByRole("button", { name: "Create the invitation link" }).click();
-  const link = dialog.getByRole("textbox", { name: /invitation link/ });
-  await expect(link).toHaveValue(/\/admin\/welcome#[A-Za-z0-9_-]{43}$/);
+  await page.getByRole("button", { name: "New invitation link" }).click();
+  const dialog = page.getByRole("dialog", { name: "New invitation link" });
+  // No field to fill: the link is there.
+  await expect(dialog.getByRole("textbox")).toHaveCount(1);
+  const link = dialog.getByRole("textbox", { name: "Invitation link" });
+  await expect(link).toHaveValue(/\/admin\/join#[A-Za-z0-9_-]{43}$/);
   inviteLink = await link.inputValue();
   await expect(dialog).toContainText("Shown only now");
+  await expect(dialog.getByRole("button", { name: "Copy" })).toBeVisible();
   await axe();
+  await page.screenshot({ path: join(SHOTS, "ops141-new-invitation-link-1440.png") });
   await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toBeHidden();
 
-  await views.getByRole("button", { name: "Invited", exact: true }).click();
-  await expect(rows()).toHaveCount(1);
-  await expect(rows().first()).toContainText(INVITEE.name);
-  await views.getByRole("button", { name: "Active", exact: true }).click();
-  await expect(rows().filter({ hasText: INVITEE.email })).toHaveCount(0);
-  await views.getByRole("button", { name: "All", exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/accounts$/);
-  await expect(page).toHaveTitle("Accounts");
   for (const viewport of [FRAME, TABLET]) {
     await page.setViewportSize(viewport);
     await expect(rows().first()).toBeVisible();
@@ -122,79 +127,138 @@ test("Accounts (p15): the columns, the four views, and New account → a one-tim
   await page.setViewportSize(FRAME);
 });
 
-test("an account opens view-only details; its history shows the invitation and the link (never the link itself)", async () => {
-  await page.goto("/admin/accounts?view=&filter=status%3Ais%3Ainvited");
-  await rows().filter({ hasText: INVITEE.name }).getByRole("link").first().click();
-  await expect(page).toHaveURL(/\/admin\/accounts\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(INVITEE.name);
-  await expect(page.locator("[data-record-main]")).toContainText("Invitation link waiting");
-  await expect(page.locator("[data-record-main]")).toContainText(INVITEE.email);
-  const history = page.locator("[data-record-panel]");
-  await expect(history).toContainText("invited this account");
-  await expect(history).toContainText("Role: Moderator.");
-  await expect(history).not.toContainText("#");
-  await bothThemes("account-record-1440");
-});
-
-test("the invitee sets a password that meets the rules (live checklist), then signs in; the link works once", async ({ browser }, testInfo) => {
-  const invitee = await newContext(browser, testInfo.project.use.baseURL);
-  await invitee.goto(inviteLink);
-  await expect(invitee.getByRole("heading", { name: "Welcome to the Global experiment" })).toBeVisible();
+test("whoever opens the invitation link makes an account (email + password), lands on an empty profile with no role, and fills in description and expertise (OPS-141, OPS-144, OPS-135)", async ({ browser }, testInfo) => {
+  const newcomer = await newContext(browser, testInfo.project.use.baseURL);
+  await newcomer.goto(inviteLink);
+  await expect(newcomer.getByRole("heading", { name: "Join the Global experiment" })).toBeVisible();
   // The token leaves the address bar at once.
-  await expect.poll(() => new URL(invitee.url()).hash).toBe("");
-  await expect(invitee.locator("main")).toContainText(INVITEE.email);
-  const newPassword = invitee.getByLabel("New password", { exact: true });
-  await newPassword.fill("short");
-  await expect(invitee.locator('[data-rule="length"]')).toHaveAttribute("data-met", "false");
-  await newPassword.fill("mona moderator was here");
-  await expect(invitee.locator('[data-rule="length"]')).toHaveAttribute("data-met", "true");
-  await newPassword.fill(INVITEE.password);
-  for (const rule of ["length", "mix", "personal", "repeat", "common"]) await expect(invitee.locator(`[data-rule="${rule}"]`)).toHaveAttribute("data-met", "true");
-  await invitee.getByLabel("Repeat the new password").fill(INVITEE.password);
-  await axe(invitee);
-  await invitee.screenshot({ path: join(SHOTS, "welcome-1440-dark.png") });
-  await invitee.getByRole("button", { name: "Set my password" }).click();
-  await expect(invitee.locator("main").getByRole("status")).toContainText("Your account is ready.");
+  await expect.poll(() => new URL(newcomer.url()).hash).toBe("");
+  await newcomer.getByLabel("Email address").fill(NEWCOMER.email);
+  await newcomer.getByLabel("Password", { exact: true }).fill("short");
+  await expect(newcomer.locator('[data-rule="length"]')).toHaveAttribute("data-met", "false");
+  await newcomer.getByLabel("Password", { exact: true }).fill(NEWCOMER.password);
+  await newcomer.getByLabel("Repeat the password").fill(NEWCOMER.password);
+  await axe(newcomer);
+  await newcomer.screenshot({ path: join(SHOTS, "ops141-join-1440-dark.png") });
+  await newcomer.getByRole("button", { name: "Create my account" }).click();
 
-  // The same link again (a fresh page load): refused, in one sentence.
-  await invitee.goto("/admin/login");
-  await invitee.goto(inviteLink);
-  await expect(invitee.locator("main").getByRole("alert")).toHaveText("This link has expired or was already used.");
+  // Signed in, on an empty profile; no role, so no module with data in the menu.
+  await expect(newcomer).toHaveURL(/\/admin\/profile$/, { timeout: 30_000 });
+  await expect(newcomer.getByRole("heading", { name: "Profile settings" })).toBeVisible();
+  await expect(newcomer.getByLabel("Display name")).toHaveValue("");
+  await expect(newcomer.getByLabel("Description")).toHaveValue("");
+  await expect(newcomer.locator("[data-record-main]")).toContainText("No role");
+  // Only the "Coming soon" placeholders, which need no permission; no module with data.
+  for (const hidden of ["people", "organizations", "treasury", "services", "permissions", "accounts", "history", "expertise"]) {
+    await expect(newcomer.locator(`#admin-sidebar nav li[data-module=${hidden}]`), hidden).toHaveCount(0);
+  }
+  await newcomer.screenshot({ path: join(SHOTS, "ops141-empty-profile-1440-dark.png") });
 
-  // A Moderator sees only what the role can read.
-  await signIn(invitee, INVITEE.email, INVITEE.password);
-  await expect(invitee.locator("#admin-sidebar nav")).toBeVisible({ timeout: 60_000 });
-  const menu = invitee.locator("#admin-sidebar nav");
-  for (const hidden of ["treasury", "services", "permissions", "accounts"]) await expect(menu.locator(`li[data-module=${hidden}]`), hidden).toHaveCount(0);
-  for (const shown of ["people", "history", "expertise"]) await expect(menu.locator(`li[data-module=${shown}]`), shown).toHaveCount(1);
-  await invitee.goto("/admin/people");
-  await expect(invitee.getByRole("button", { name: "New person" })).toHaveCount(0);
-  await expect(invitee.getByRole("link", { name: "Import Notion" })).toHaveCount(0);
-  await invitee.context().close();
+  // OPS-144 and OPS-135: the holder sets their description and expertise.
+  await newcomer.getByLabel("Display name").fill(NEWCOMER.name);
+  await newcomer.getByLabel("Description").fill("Facilitates the citizen assemblies.");
+  await pick(newcomer, "expertise", "Interaction design");
+  await axe(newcomer);
+  await newcomer.getByRole("button", { name: "Save changes" }).click();
+  await expect(newcomer.getByRole("status").filter({ hasText: "Profile updated" })).toBeVisible();
+  await newcomer.reload();
+  await expect(newcomer.getByLabel("Description")).toHaveValue("Facilitates the citizen assemblies.");
+  await expect(newcomer.getByRole("button", { name: "Remove Interaction design" })).toBeVisible();
+  await bothThemes("ops144-ops135-profile-1440", newcomer);
+  await newcomer.context().close();
+
+  // The link worked once.
+  const again = await newContext(browser, testInfo.project.use.baseURL);
+  await again.goto(inviteLink);
+  await expect(again.locator("main").getByRole("alert")).toHaveText("This link has expired or was already used.");
+  await again.context().close();
 });
 
-test("Services (p16): New service, its record, and the views All services / Active services / Access review", async () => {
+test("Invitation links: the used one names its account; a pending one is revoked and stops working (OPS-141)", async ({ browser }, testInfo) => {
+  await page.goto("/admin/accounts");
+  await page.getByRole("button", { name: "New invitation link" }).click();
+  const made = page.getByRole("dialog", { name: "New invitation link" });
+  const spare = await made.getByRole("textbox", { name: "Invitation link" }).inputValue();
+  await made.getByRole("button", { name: "Done" }).click();
+
+  await page.getByRole("button", { name: "Invitation links" }).click();
+  const list = page.getByRole("dialog", { name: "Invitation links" });
+  await expect(list.locator("[data-invitation=used]").first()).toContainText(NEWCOMER.name);
+  // The list never shows a link again.
+  await expect(list).not.toContainText("/admin/join#");
+  await list.locator("[data-invitation=pending]").first().getByRole("button", { name: /^Revoke/ }).click();
+  await expect(list.locator("[data-invitation=revoked]").first()).toBeVisible();
+  await axe();
+  await page.screenshot({ path: join(SHOTS, "ops141-invitation-links-1440.png") });
+  await list.getByRole("button", { name: "Close" }).click();
+
+  const visitor = await newContext(browser, testInfo.project.use.baseURL);
+  await visitor.goto(spare);
+  await expect(visitor.locator("main").getByRole("alert")).toHaveText("This link has expired or was already used.");
+  await visitor.context().close();
+});
+
+test("a Rootadmin gives the new account a role, edits its description and expertise; no Note, no Person (OPS-141, OPS-144, OPS-135, OPS-142, OPS-136)", async ({ browser }, testInfo) => {
+  await page.goto("/admin/accounts?view=no_role");
+  await page.getByRole("group", { name: "Views" }).getByRole("button", { name: "No role", exact: true }).click();
+  await rows().filter({ hasText: NEWCOMER.email }).getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/admin\/accounts\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(NEWCOMER.name);
+  const fields = await properties(page);
+  expect(fields).toEqual(expect.arrayContaining(["Role", "Description", "Expertise", "Service access"]));
+  expect(fields).not.toContain("Note");
+  expect(fields).not.toContain("Person");
+  await expect(page.getByLabel("Description")).toHaveValue("Facilitates the citizen assemblies.");
+  await page.getByLabel("Description").fill("Facilitates the citizen assemblies and the follow-ups.");
+  await pick(page, "expertise", "UX research");
+  await page.getByRole("group", { name: "Role" }).getByRole("button", { name: "Moderator" }).click();
+  await axe();
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Account updated" })).toBeVisible();
+  await page.goto(`/admin/accounts?q=${encodeURIComponent(NEWCOMER.email)}`);
+  await expect(rows().first()).toContainText("Moderator");
+  await expect(rows().first()).toContainText("and the follow-ups");
+  await rows().first().getByRole("link").first().click();
+  await bothThemes("ops144-account-record-1440");
+
+  // The role applies at the next sign-in: the Moderator's menu.
+  const newcomer = await newContext(browser, testInfo.project.use.baseURL);
+  await signIn(newcomer, NEWCOMER.email, NEWCOMER.password);
+  const menu = newcomer.locator("#admin-sidebar nav");
+  await expect(menu).toBeVisible({ timeout: 60_000 });
+  for (const shown of ["people", "history"]) await expect(menu.locator(`li[data-module=${shown}]`), shown).toHaveCount(1);
+  for (const hidden of ["accounts", "services"]) await expect(menu.locator(`li[data-module=${hidden}]`), hidden).toHaveCount(0);
+  await newcomer.context().close();
+});
+
+test("Services (p16): categories as tags, no responsible account; archive, never delete (OPS-149, OPS-130, OPS-147)", async () => {
   await page.goto("/admin/services");
   await page.getByRole("button", { name: "New service" }).click();
   await page.locator("#new-service-name").fill(SERVICE);
   await page.getByRole("dialog", { name: "New service" }).getByRole("button", { name: "Create" }).click();
   await expect(page).toHaveURL(/\/admin\/services\/[0-9a-f-]{36}$/);
+  expect(await properties(page)).not.toContain("Responsible account");
   await page.getByRole("group", { name: "Status" }).getByRole("button", { name: "Needs confirmation" }).click();
-  await page.getByRole("group", { name: "Category" }).getByRole("button", { name: "Source code" }).click();
+  await pick(page, "category", "Source code");
+  await pick(page, "category", "Hosting");
   await page.getByRole("group", { name: "Hosting model" }).getByRole("button", { name: "External service" }).click();
   await page.locator("#service-url").fill("github.com/Global-experiment");
+  // The tab shows the record's name once it has loaded (axe checks the page has a title).
+  await expect(page).toHaveTitle(SERVICE);
+  await axe();
+  await page.screenshot({ path: join(SHOTS, "ops149-service-categories-1440.png") });
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page).toHaveURL(/\/admin\/services(\?|$)/);
 
   const views = page.getByRole("group", { name: "Views" });
   for (const view of ["All services", "Active services", "Access review"]) await expect(views.getByRole("button", { name: view })).toBeVisible();
-  await expect(page.locator("thead th")).toContainText(["Name", "Service ID", "Status", "Category", "Hosting model", "Responsible account", "Permissions"]);
+  await expect(page.locator("thead th")).toContainText(["Name", "Service ID", "Status", "Category", "Hosting model", "Permissions"]);
+  await expect(page.locator("thead th").filter({ hasText: "Responsible account" })).toHaveCount(0);
+  await expect(rows().filter({ hasText: SERVICE })).toContainText("Source code");
+  await expect(rows().filter({ hasText: SERVICE })).toContainText("Hosting");
   await views.getByRole("button", { name: "Access review" }).click();
   await expect(rows().filter({ hasText: SERVICE })).toHaveCount(1);
-  await views.getByRole("button", { name: "Active services" }).click();
-  await expect(rows().filter({ hasText: SERVICE })).toHaveCount(0);
   await views.getByRole("button", { name: "All services" }).click();
-  await expect(page).toHaveURL(/\/admin\/services$/);
   await expect(page).toHaveTitle("Services");
   for (const viewport of [FRAME, TABLET]) {
     await page.setViewportSize(viewport);
@@ -202,36 +266,69 @@ test("Services (p16): New service, its record, and the views All services / Acti
     await bothThemes(`services-p16-${viewport.width}`);
   }
   await page.setViewportSize(FRAME);
+
+  // OPS-147: More options has Archive, not Delete permanently.
+  await rows().filter({ hasText: SERVICE }).getByRole("link").first().click();
+  await page.getByRole("button", { name: "More options" }).click();
+  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
+  await page.getByRole("button", { name: "More options" }).click();
 });
 
-test("Permissions (p17): a permission from the service, the Review queue, and granted / changed access in the person's history", async () => {
-  await page.goto(`/admin/services?search=${encodeURIComponent(SERVICE)}`);
+test("Permissions (p17): Candide's field order, a name made from service / account / level, ONE history event when granted (OPS-148, OPS-138, OPS-151)", async () => {
+  await page.goto(`/admin/services?q=${encodeURIComponent(SERVICE)}`);
   await rows().filter({ hasText: SERVICE }).getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/admin\/services\/[0-9a-f-]{36}$/);
+  const serviceUrl = page.url();
   await page.getByRole("link", { name: "Add a permission" }).click();
   await expect(page).toHaveURL(/\/admin\/permissions\/new\?service=/);
+  expect(await properties(page)).toEqual(["Service", "Account", "Permission level", "Status", "Scope", "Granted", "Revoked", "Expired", "People", "Name"]);
   await expect(page.locator('[data-relation-picker="service"]')).toContainText(SERVICE);
-  await pick("person", PERSON);
+  await pick(page, "account", OWNER_NAME);
+  await pick(page, "people", PERSON);
   await page.getByRole("group", { name: "Permission level" }).getByRole("button", { name: "admin", exact: true }).click();
   await page.getByRole("group", { name: "Status" }).getByRole("button", { name: "Needs confirmation" }).click();
   await page.locator("#grant-scope").fill("The organization's repositories");
+  // The name is made, not typed.
+  await expect(page.locator('[data-property="Name"]')).toContainText(`${SERVICE} / ${OWNER_NAME} / Admin`);
+  await expect(page.locator("#grant-name")).toHaveCount(0);
   await axe();
+  await page.screenshot({ path: join(SHOTS, "ops148-permission-new-1440.png") });
   await page.getByRole("button", { name: "Submit changes" }).click();
   await expect(page).toHaveURL(/\/admin\/permissions\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(`${SERVICE} / admin`);
-  await expect(page.locator("[data-record-panel]")).toContainText("created this permission");
-  // Changed: the level.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(`${SERVICE} / ${OWNER_NAME} / Admin`);
+
+  // One event, the same on the permission, its service, its account and its person.
+  const sentence = `granted ${OWNER_NAME} Admin on ${SERVICE}`;
+  const history = page.locator("[data-record-panel]");
+  await expect(history.locator("[data-history-item]").filter({ hasNotText: "viewed" })).toHaveCount(1);
+  await expect(history).toContainText(sentence);
+  await bothThemes("ops148-permission-record-1440");
+  await page.goto(serviceUrl);
+  await expect(page.locator("[data-record-panel]")).toContainText(sentence);
+  await page.goto(`/admin/people?q=${encodeURIComponent(PERSON)}`);
+  await rows().first().getByRole("link").first().click();
+  await expect(page.locator("[data-record-panel]")).toContainText(sentence);
+  await page.goto("/admin/history");
+  await expect(page.locator("[data-history-item=access_granted]").first()).toContainText(`granted ${OWNER_NAME} Admin on`);
+  await expect(page.locator("[data-history-item=access_granted]").first().locator("[data-history-subject]")).toHaveText(SERVICE);
+  await page.screenshot({ path: join(SHOTS, "ops151-history-1440.png") });
+
+  // A new level renames it.
+  await page.goto(`/admin/permissions?q=${encodeURIComponent(SERVICE)}`);
+  await rows().filter({ hasText: SERVICE }).getByRole("link").first().click();
   await page.getByRole("group", { name: "Permission level" }).getByRole("button", { name: "write", exact: true }).click();
   await page.getByRole("button", { name: "Submit changes" }).click();
-  // Back to where the permission was opened from (the service), with the toast.
   await expect(page.getByRole("status").filter({ hasText: "Permission updated" })).toBeVisible();
 
   await page.goto("/admin/permissions");
   const views = page.getByRole("group", { name: "Views" });
   for (const view of ["All permissions", "Active permissions", "Review queue"]) await expect(views.getByRole("button", { name: view })).toBeVisible();
-  await expect(page.locator("thead th")).toContainText(["Name", "ID", "Account", "Service", "Permission level", "Status", "Resource scope"]);
+  // The same labels in the table (OPS-148).
+  await expect(page.locator("thead th")).toContainText(["Name", "ID", "Account", "Service", "Permission level", "Status", "Scope"]);
+  await expect(page.locator("thead th").filter({ hasText: "Resource scope" })).toHaveCount(0);
   await views.getByRole("button", { name: "Review queue" }).click();
-  await expect(rows().filter({ hasText: `${SERVICE} / write` })).toHaveCount(1);
-  await expect(rows().filter({ hasText: `${SERVICE} / write` })).toContainText(PERSON);
+  await expect(rows().filter({ hasText: `${SERVICE} / ${OWNER_NAME} / Write` })).toHaveCount(1);
   await expect(page).toHaveTitle("Permissions");
   for (const viewport of [FRAME, TABLET]) {
     await page.setViewportSize(viewport);
@@ -240,21 +337,20 @@ test("Permissions (p17): a permission from the service, the Review queue, and gr
   }
   await page.setViewportSize(FRAME);
 
-  // The person: the Permissions chip, and granted then changed access in the history.
-  await page.goto(`/admin/people?search=${encodeURIComponent(PERSON)}`);
-  await rows().first().getByRole("link").first().click();
-  await expect(page.getByRole("link", { name: `${SERVICE} · write` })).toBeVisible();
-  const history = page.locator("[data-record-panel]");
-  await expect(history).toContainText("changed access");
-  await expect(history).toContainText("granted access");
-  await page.screenshot({ path: join(SHOTS, "person-permissions-1440.png") });
+  // OPS-147: archived, never deleted.
+  await rows().filter({ hasText: SERVICE }).getByRole("link").first().click();
+  await page.getByRole("button", { name: "More options" }).click();
+  await expect(page.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+  await page.getByRole("button", { name: "More options" }).click();
 });
 
-test("Profile settings (p18): display name, appearance (saved and applied), time zone, picture, Account ID read-only", async () => {
+test("Profile settings (p18): display name, description, expertise, appearance (saved and applied), time zone, picture, Account ID read-only", async () => {
   await page.goto("/admin/profile");
   await expect(page.getByRole("heading", { name: "Profile settings" })).toBeVisible();
   await expect(page.locator("[data-record-main]")).toContainText(/GE-\d{6}/);
   await expect(page.locator("[data-record-main]")).toContainText("Read only.");
+  expect(await properties(page)).toEqual(expect.arrayContaining(["Display name", "Description", "Expertise", "Profile picture", "Time zone", "Appearance", "Email", "Account ID"]));
   await expect(page.getByRole("button", { name: "Save changes" })).toBeDisabled();
   const panel = page.locator("[data-record-panel]");
   for (const action of ["Close", "Discard changes", "Change email", "Change password", "Sign out", "Deactivate account"]) await expect(panel.getByRole("button", { name: action })).toBeVisible();
@@ -283,7 +379,7 @@ test("Profile settings (p18): display name, appearance (saved and applied), time
   await expect(page.locator("#admin-sidebar img")).toHaveAttribute("src", /\/api\/admin\/accounts\/[0-9a-f-]{36}\/picture/);
   await page.screenshot({ path: join(SHOTS, "profile-p18-saved-light.png") });
 
-  // Back to the defaults.
+  // Back to the defaults (the display name renames the owner's permissions back too).
   await page.getByLabel("Display name").fill("");
   await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "System" }).click();
   await page.getByLabel("Time zone").selectOption("");
@@ -294,8 +390,8 @@ test("Profile settings (p18): display name, appearance (saved and applied), time
 });
 
 test("a password reset link from the account, used on /admin/reset-password", async ({ browser }, testInfo) => {
-  await page.goto("/admin/accounts?filter=status%3Ais%3Aactive");
-  await rows().filter({ hasText: INVITEE.name }).getByRole("link").first().click();
+  await page.goto(`/admin/accounts?q=${encodeURIComponent(NEWCOMER.email)}`);
+  await rows().first().getByRole("link").first().click();
   await page.getByRole("button", { name: "New password reset link" }).click();
   const link = page.getByRole("textbox", { name: /password reset link/ });
   await expect(link).toHaveValue(/\/admin\/reset-password#[A-Za-z0-9_-]{43}$/);
@@ -310,7 +406,7 @@ test("a password reset link from the account, used on /admin/reset-password", as
   await axe(other);
   await other.getByRole("button", { name: "Change my password" }).click();
   await expect(other.locator("main").getByRole("status")).toContainText("Your password is changed.");
-  await signIn(other, INVITEE.email, "Seven calm harbours at 9pm");
+  await signIn(other, NEWCOMER.email, "Seven calm harbours at 9pm");
   await expect(other.locator("#admin-sidebar")).toBeVisible({ timeout: 60_000 });
   await other.context().close();
 });

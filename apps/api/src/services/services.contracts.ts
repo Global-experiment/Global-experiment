@@ -24,12 +24,15 @@ const optionalDay = z.iso.date().nullable().optional();
 const serviceFields = {
   name: z.string().trim().min(1, "Name is required.").max(200),
   statusKey: vocabularyKey.nullable().optional(),
-  categoryKey: vocabularyKey.nullable().optional(),
+  /** OPS-149: several tags, in the order picked. */
+  categoryKeys: z
+    .array(vocabularyKey)
+    .max(20)
+    .refine((keys) => new Set(keys).size === keys.length, "Each category once.")
+    .optional(),
   hostingModelKey: vocabularyKey.nullable().optional(),
   url: optionalLink,
   description: optionalText(5000),
-  /** Decision 5: an admin account. */
-  responsibleAdminId: z.uuid().nullable().optional(),
 };
 
 export const CreateServiceRequest = z.strictObject(serviceFields);
@@ -49,7 +52,6 @@ export const ServicesListQuery = listQuerySchema({
     status: { operators: ["is", "is_not", "is_empty"], value: vocabularyKey },
     category: { operators: ["is", "is_not", "is_empty"], value: vocabularyKey },
     hosting: { operators: ["is", "is_not", "is_empty"], value: vocabularyKey },
-    responsible: { operators: ["is", "is_empty", "is_not_empty"], value: z.uuid() },
     /** The "Access review" view: the service or one of its grants needs confirmation (or is planned/invited). */
     review: { operators: ["is"], value: z.enum(["true"]).transform(() => true) },
     archived: { operators: ["is"], value: z.enum(["true", "false"]).transform((value) => value === "true") },
@@ -57,9 +59,8 @@ export const ServicesListQuery = listQuerySchema({
 });
 export type ServicesListQuery = z.output<typeof ServicesListQuery>;
 
+/** No name: it is made from the service, the account and the level (OPS-138, grant-name.ts). */
 const grantFields = {
-  /** Optional own name; "<service> / <level>" when empty. */
-  name: optionalText(200),
   personId: z.uuid().nullable().optional(),
   adminUserId: z.uuid().nullable().optional(),
   serviceId: z.uuid("Choose a service."),
@@ -76,7 +77,7 @@ const datesInOrder = (body: { grantedOn?: string | null; revokedOn?: string | nu
     context.addIssue({ code: "custom", path: ["revokedOn"], message: "Revoked can't be before granted." });
   }
   if (body.grantedOn && body.expiresOn && body.expiresOn < body.grantedOn) {
-    context.addIssue({ code: "custom", path: ["expiresOn"], message: "Expires can't be before granted." });
+    context.addIssue({ code: "custom", path: ["expiresOn"], message: "Expired can't be before granted." });
   }
 };
 
@@ -106,9 +107,6 @@ export const GrantsListQuery = listQuerySchema({
 });
 export type GrantsListQuery = z.output<typeof GrantsListQuery>;
 
-export const DeleteRecordRequest = z.strictObject({ confirm: z.string().max(200) });
-export type DeleteRecordRequest = z.output<typeof DeleteRecordRequest>;
-
 export interface VocabularyEntry {
   key: string;
   label: string;
@@ -129,11 +127,11 @@ export interface ServiceDto {
   serviceNumber: number;
   name: string;
   status: VocabularyEntry | null;
-  category: VocabularyEntry | null;
+  /** OPS-149: tags, in their order. */
+  categories: VocabularyEntry[];
   hostingModel: VocabularyEntry | null;
   url: string | null;
   description: string | null;
-  responsible: Ref | null;
   /** Its grants (not archived), "<service> / <level>". */
   permissions: GrantRef[];
   archivedAt: string | null;
@@ -144,8 +142,7 @@ export interface ServiceDto {
 export interface GrantDto {
   id: string;
   grantNumber: number;
-  name: string | null;
-  /** The name shown: its own, or "<service> / <level>". */
+  /** "Service / Account / Permission level" (OPS-138). */
   title: string;
   person: Ref | null;
   account: Ref | null;
@@ -167,6 +164,6 @@ export interface ServicesOptionsDto {
   hostingModels: VocabularyEntry[];
   levels: VocabularyEntry[];
   accessStatuses: VocabularyEntry[];
-  /** Active admin accounts, for "Responsible account" and a grant's account. */
+  /** Active admin accounts, for a grant's account. */
   accounts: Ref[];
 }

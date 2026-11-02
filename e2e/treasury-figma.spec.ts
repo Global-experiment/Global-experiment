@@ -45,7 +45,7 @@ const sheetCapture = async (page: Page, name: string) => {
   await page.getByRole("dialog").screenshot({ path: join(SHOTS, `${name}.png`) });
 };
 
-test("p12 list (2026-10-19: no currency switch, search, sort or filter): header, pills, stats, rows", async ({ page }) => {
+test("p12 list (2026-10-19: no currency switch, search, sort or filter; OPS-128: stats, then pills): header, stats, pills, rows", async ({ page }) => {
   await page.goto("/treasury");
   await expect(page.locator("[data-amount]").first()).toBeVisible();
   await capture(page, "p12-list");
@@ -62,9 +62,10 @@ test("p12 list (2026-10-19: no currency switch, search, sort or filter): header,
   const more = await box(page.locator("header").getByRole("button", { name: "Page actions" }).locator("svg"));
   near(more.x + more.width, 404, "⋮ right edge");
   near(share.y + share.height / 2, fy(124), "share glyph centre");
-  // The pills take the toolbar's place: 32px at Figma's y 148.
+  // OPS-128 (client, 2026-11-03): the stats first, then the pills (32px), 16px below them; no note under the stats.
+  const stats = await box(page.locator("[data-stat-value]").first().locator("xpath=ancestor::*[self::button or self::a][1]"));
   const pill = await box(page.getByRole("button", { name: "Expenses", exact: true }));
-  near(pill.y, fy(148), "pills y");
+  expect(pill.y, "pills below the stats").toBeGreaterThan(stats.y + stats.height);
   near(pill.height, 32, "pill height");
   near(pill.x, 8, "pills x");
   // History rows: 40px, full bleed rule.

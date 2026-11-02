@@ -76,8 +76,8 @@ const CONFIG: Record<TaxonomyLevel, { title: string; noun: string; columns: Tabl
 
 /**
  * /admin/domains, /admin/fields, /admin/expertise — the Domain → Field →
- * Expertise taxonomy, READ-ONLY here: Notion is its source of truth and the
- * importer keeps it up to date (Import Notion). Figma's list screen (search,
+ * Expertise taxonomy, READ-ONLY here until its detail template is built
+ * (client, 2026-11-03); no import (OPS-154). Figma's list screen (search,
  * sort and filter popovers, column menu) over the loaded tree (≈1,250
  * nodes): filtering runs in the browser, so it's instant. No "New" button
  * and no record pages — nothing here is edited.

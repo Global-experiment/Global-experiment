@@ -21,14 +21,24 @@ const DEFAULT_SORT: SortRule[] = [{ field: "name", direction: "asc" }];
 
 const text = (value: string | null, search: string): ReactNode => (value ? <Highlight text={value} query={search} /> : null);
 
-/** admin-desktop.pdf p16, measured: Name 220, Service ID 110, Status 160, Category 154, Hosting model 172, Responsible account 168, Permissions 220. */
+/** admin-desktop.pdf p16, measured: Name 220, Service ID 110, Status 160, Category 154, Hosting model 172, Permissions 220 (no Responsible account, OPS-130). */
 const COLUMNS: TableColumn<Service>[] = [
   { id: "name", label: "Name", icon: "title", width: 220, render: (row, s) => text(row.name, s) },
   { id: "number", label: "Service ID", icon: "title", width: 110, render: (row) => String(row.serviceNumber) },
   { id: "status", label: "Status", icon: "select", width: 160, render: (row) => row.status?.label },
-  { id: "category", label: "Category", icon: "select", width: 154, render: (row) => row.category?.label },
+  {
+    id: "category",
+    label: "Category",
+    icon: "select",
+    width: 154,
+    render: (row) =>
+      row.categories.map((category) => (
+        <span key={category.key} className="block">
+          {category.label}
+        </span>
+      )),
+  },
   { id: "hosting", label: "Hosting model", icon: "select", width: 172, render: (row) => row.hostingModel?.label },
-  { id: "responsible", label: "Responsible account", icon: "arrow_outward", width: 168, render: (row) => row.responsible?.name },
   { id: "permissions", label: "Permissions", icon: "arrow_outward", width: 220, render: (row, s) => grantLines(row.permissions, s) },
   { id: "url", label: "URL", icon: "link", width: 220, defaultHidden: true, render: (row, s) => text(row.url, s) },
   { id: "description", label: "Description", icon: "title", width: 300, defaultHidden: true, render: (row, s) => text(row.description, s) },
@@ -102,13 +112,6 @@ export function ServicesList() {
       { id: "status", label: "Status", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.statuses), sort: "text" },
       { id: "category", label: "Category", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.categories), sort: "text" },
       { id: "hosting", label: "Hosting model", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.hostingModels) },
-      {
-        id: "responsible",
-        label: "Responsible account",
-        icon: "arrow_outward",
-        operators: ["is", "is_empty", "is_not_empty"],
-        options: (options.data?.accounts ?? []).map((account) => ({ value: account.id, label: account.name })),
-      },
       { id: "review", label: "Access review", icon: "check_box", operators: ["is"], options: [{ value: "true", label: "Needs review" }] },
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },

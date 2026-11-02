@@ -7,7 +7,8 @@ type Executor = Pick<Database, "select">;
 
 /**
  * Relationship caps (client, 2026-10-14; Figma record hints "People can
- * have up to 10 expertise." / "… up to 5 organizations."). Checked by every
+ * have up to 10 expertise." / "… up to 5 organizations."; accounts too,
+ * OPS-135). Checked by every
  * write path — record PATCH/POST, the single link endpoints (either side)
  * and the Notion directory importer, which keeps the first N in Notion
  * order and reports the rest. The web admin mirrors these numbers in
@@ -24,6 +25,8 @@ export const LIMIT_MESSAGES = {
   personExpertise: `People can have up to ${RELATION_LIMITS.expertise} expertise.`,
   personOrganizations: `People can have up to ${RELATION_LIMITS.organizationsPerPerson} organizations.`,
   organizationExpertise: `Organizations can have up to ${RELATION_LIMITS.expertise} expertise.`,
+  /** OPS-135. */
+  accountExpertise: `Accounts can have up to ${RELATION_LIMITS.expertise} expertise.`,
 } as const;
 
 /**

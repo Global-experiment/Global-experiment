@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
 import { adminApi, AdminApiError } from "../api/client";
-import { ROLE_OPTIONS, type Account, type OneTimeLink, type Page, type Person } from "../api/types";
+import { NO_ROLE_LABEL, ROLE_OPTIONS, type Account, type Invitation } from "../api/types";
+import { useAdminData } from "../api/useAdminData";
 import { formatDate } from "../people/peopleTable";
 import { grantLines } from "../services/accessDisplay";
 import { useCan } from "../session";
@@ -13,9 +13,8 @@ import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { SortRule } from "../table/listState";
 import { SavedViews, type SavedView } from "../table/SavedViews";
-import { AdminButton } from "../ui/controls";
-import { Pills, recordInput } from "../ui/RecordForm";
-import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { AdminButton, StatusMessage } from "../ui/controls";
+import { formatPanelDate } from "../ui/RecordForm";
 import { OneTimeLinkBox } from "./OneTimeLink";
 
 const DEFAULT_SORT: SortRule[] = [{ field: "name", direction: "asc" }];
@@ -24,12 +23,12 @@ const text = (value: string | null, search: string): ReactNode => (value ? <High
 
 export const STATUS_LABEL: Record<Account["status"], string> = { active: "Active", invited: "Invited", deactivated: "Deactivated" };
 
-/** admin-desktop.pdf p15, measured: Name 164, Role 130, Email 168, Note 336, Expertise 226, Permissions 164. */
+/** admin-desktop.pdf p15, measured: Name 164, Role 130, Email 168, Description 336 (Figma's Note, OPS-142/144), Expertise 226, Permissions 164. */
 const COLUMNS: TableColumn<Account>[] = [
   { id: "name", label: "Name", icon: "title", width: 164, render: (row, s) => text(row.name, s) },
-  { id: "role", label: "Role", icon: "select", width: 130, render: (row) => row.role.label },
+  { id: "role", label: "Role", icon: "select", width: 130, render: (row) => row.role?.label ?? <span className="text-text-muted">{NO_ROLE_LABEL}</span> },
   { id: "email", label: "Email", icon: "alternate_email", width: 168, render: (row, s) => text(row.email, s) },
-  { id: "note", label: "Note", icon: "title", width: 336, render: (row, s) => text(row.note, s) },
+  { id: "description", label: "Description", icon: "title", width: 336, render: (row, s) => text(row.description, s) },
   {
     id: "expertise",
     label: "Expertise",
@@ -51,142 +50,151 @@ const COLUMNS: TableColumn<Account>[] = [
 const VIEWS: SavedView[] = [
   { id: "all", label: "All", filters: [] },
   { id: "active", label: "Active", filters: [{ field: "status", operator: "is", value: "active" }] },
-  { id: "invited", label: "Invited", filters: [{ field: "status", operator: "is", value: "invited" }] },
+  { id: "no_role", label: "No role", filters: [{ field: "role", operator: "is", value: "none" }] },
   { id: "deactivated", label: "Deactivated", filters: [{ field: "status", operator: "is", value: "deactivated" }] },
 ];
 
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const failure = (caught: unknown, fallback: string) => (caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : fallback);
 
-async function searchPeople(text: string, signal: AbortSignal): Promise<RelationOption[]> {
-  const query = new URLSearchParams({ pageSize: "20", sort: "name:asc" });
-  if (text.trim()) query.set("search", text.trim());
-  return (await adminApi<Page<Person>>(`/people?${query}`, { signal })).items.map((person) => ({ id: person.id, label: person.name, href: `/admin/people/${person.id}` }));
-}
-
-/**
- * "New account" (p15): an invitation, not an account with a password. The
- * Rootadmin fills in who and which role, gets a one-time link (72 hours)
- * to copy and send privately — no email is sent yet — and the invitee
- * sets their own password on it.
- */
-function NewAccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+/** A modal of the Accounts page, open at once; Esc or a button of its dialog form closes it. */
+function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const router = useRouter();
   const titleId = useId();
-  const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState("");
-  const [person, setPerson] = useState<RelationOption[]>([]);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ account: Account; link: OneTimeLink } | null>(null);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
-
-  const problem = !EMAIL.test(email.trim()) ? "Enter the email address." : role === "" ? "Choose a role." : null;
-
-  async function invite(event: React.FormEvent) {
-    event.preventDefault();
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await adminApi<{ account: Account } & OneTimeLink>("/accounts", {
-        method: "POST",
-        body: { email: email.trim(), role, ...(displayName.trim() ? { displayName: displayName.trim() } : {}), personId: person[0]?.id ?? null, ...(note.trim() ? { note: note.trim() } : {}) },
-      });
-      setCreated({ account: result.account, link: { link: result.link, purpose: result.purpose, expiresAt: result.expiresAt } });
-    } catch (caught) {
-      setError(caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : "Couldn't create the invitation.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const field = "flex flex-col gap-1";
   return (
     <dialog
       ref={dialog}
       aria-labelledby={titleId}
-      onClose={() => {
-        onClose();
-        // The list reloads once the link has been seen (reloading earlier would close this dialog).
-        if (created) onCreated();
-      }}
-      className="m-auto w-[520px] max-w-[calc(100vw-32px)] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60"
+      onClose={onClose}
+      className={`m-auto ${wide ? "w-[640px]" : "w-[520px]"} max-w-[calc(100vw-32px)] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60`}
     >
       <h2 id={titleId} className="font-bold">
-        New account
+        {title}
       </h2>
-      {created ? (
-        <div className="mt-3 flex flex-col gap-3">
-          <OneTimeLinkBox link={created.link} name={created.account.name} />
-          <p className="flex justify-end gap-2">
-            <AdminButton onClick={() => router.push(`/admin/accounts/${created.account.id}`)}>Open the account</AdminButton>
-            <AdminButton onClick={() => dialog.current?.close()}>Done</AdminButton>
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={(event) => void invite(event)} noValidate className="mt-3 flex flex-col gap-3">
-          <p className="text-text-muted">They get a one-time link to set their own password. Nothing is sent: you copy the link and send it to them.</p>
-          <div className={field}>
-            <label htmlFor="invite-email" className="text-text-muted">
-              Email
-            </label>
-            <input id="invite-email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={320} required autoComplete="off" spellCheck={false} className={recordInput} />
-          </div>
-          <div className={field}>
-            <label htmlFor="invite-name" className="text-text-muted">
-              Name
-            </label>
-            <input id="invite-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} autoComplete="off" placeholder="How the admin shows them" className={recordInput} />
-          </div>
-          <div className={field}>
-            <span className="text-text-muted">Role</span>
-            <Pills label="Role" options={ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label }))} value={role} onChange={setRole} />
-          </div>
-          <div className={field}>
-            <span className="text-text-muted">Person</span>
-            <RelationPicker label="Person" selected={person} onChange={(next) => setPerson(next.slice(-1))} search={searchPeople} max={1} limitMessage="One person per account." />
-          </div>
-          <div className={field}>
-            <label htmlFor="invite-note" className="text-text-muted">
-              Note
-            </label>
-            <input id="invite-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} autoComplete="off" placeholder="Their part in the experiment" className={recordInput} />
-          </div>
-          {error ? (
-            <p role="alert" className="text-meta">
-              {error}
-            </p>
-          ) : null}
-          <p className="flex justify-end gap-2">
-            <AdminButton onClick={() => dialog.current?.close()} disabled={busy}>
-              Cancel
-            </AdminButton>
-            <AdminButton type="submit" icon="add" disabled={busy}>
-              {busy ? "Creating…" : "Create the invitation link"}
-            </AdminButton>
-          </p>
-        </form>
-      )}
+      {children}
     </dialog>
   );
 }
 
-function NewAccountControl({ onCreated }: { onCreated: () => void }) {
-  const [open, setOpen] = useState(false);
+/** The modal's closing button: a dialog form closes its dialog. */
+const CloseButton = ({ children }: { children: ReactNode }) => (
+  <form method="dialog" className="flex justify-end">
+    <AdminButton type="submit">{children}</AdminButton>
+  </form>
+);
+
+/**
+ * "New invitation link" (OPS-141): no email, no role asked — opening the
+ * modal makes the link. It is shown once, to copy and send privately (no
+ * email is sent); whoever opens it makes their own account (email and
+ * password) and lands on an empty profile, with no role until a Rootadmin
+ * gives one. Single use, 7 days, revocable from "Invitation links".
+ */
+function NewInvitationDialog({ onClose }: { onClose: () => void }) {
+  const [made, setMade] = useState<{ link: string; expiresAt: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
+  useEffect(() => {
+    // Once, even when React's development checks run the effect twice: each call makes a link.
+    if (started.current) return;
+    started.current = true;
+    adminApi<{ invitation: Invitation; link: string }>("/invitations", { method: "POST" })
+      .then((result) => setMade({ link: result.link, expiresAt: result.invitation.expiresAt }))
+      .catch((caught: unknown) => setError(failure(caught, "Couldn't make the invitation link.")));
+  }, []);
+  return (
+    <Modal title="New invitation link" onClose={onClose}>
+      <div className="mt-3 flex flex-col gap-3">
+        {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        {made ? (
+          <OneTimeLinkBox
+            link={{ link: made.link, purpose: "invite", expiresAt: made.expiresAt }}
+            title="Invitation link"
+            note={`Shown only now. Whoever opens it creates their own account, once, until ${formatPanelDate(made.expiresAt)}. The account has no role until you give it one. Revoke it from Invitation links.`}
+          />
+        ) : error ? null : (
+          <StatusMessage>Making the link…</StatusMessage>
+        )}
+        <CloseButton>Done</CloseButton>
+      </div>
+    </Modal>
+  );
+}
+
+const INVITATION_STATUS: Record<Invitation["status"], string> = { pending: "Waiting", used: "Used", revoked: "Revoked", expired: "Expired" };
+
+/** The invitation links: who made them, until when, the account made with each; pending ones can be revoked. */
+function InvitationsDialog({ onClose }: { onClose: () => void }) {
+  const invitations = useAdminData<Invitation[]>("/invitations");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  async function revoke(id: string) {
+    setBusy(id);
+    setError(null);
+    try {
+      await adminApi(`/invitations/${id}/revoke`, { method: "POST" });
+      invitations.reload();
+    } catch (caught) {
+      setError(failure(caught, "Couldn't revoke the link."));
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <Modal title="Invitation links" onClose={onClose} wide>
+      <div className="mt-3 flex flex-col gap-3">
+        {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
+        {!invitations.data ? (
+          <StatusMessage>{invitations.error ? invitations.error.message : "Loading…"}</StatusMessage>
+        ) : invitations.data.length === 0 ? (
+          <p className="text-text-muted">No invitation link yet.</p>
+        ) : (
+          <ul aria-label="Invitation links" className="flex flex-col">
+            {invitations.data.map((invitation) => (
+              <li key={invitation.id} data-invitation={invitation.status} className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-1">
+                <span className="w-20 shrink-0 font-bold">{INVITATION_STATUS[invitation.status]}</span>
+                <span className="min-w-0 flex-1 text-meta text-text-muted">
+                  Made {formatPanelDate(invitation.createdAt)}
+                  {invitation.createdBy ? ` by ${invitation.createdBy}` : ""}
+                  {invitation.status === "pending" ? ` · valid until ${formatPanelDate(invitation.expiresAt)}` : ""}
+                  {invitation.account ? (
+                    <>
+                      {" · "}
+                      <a href={`/admin/accounts/${invitation.account.id}`} className="text-text-primary underline underline-offset-2">
+                        {invitation.account.name}
+                      </a>
+                    </>
+                  ) : null}
+                </span>
+                {invitation.status === "pending" ? (
+                  <AdminButton icon="close" onClick={() => void revoke(invitation.id)} disabled={busy !== null} aria-label={`Revoke the link made ${formatPanelDate(invitation.createdAt)}`}>
+                    {busy === invitation.id ? "Revoking…" : "Revoke"}
+                  </AdminButton>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        <CloseButton>Close</CloseButton>
+      </div>
+    </Modal>
+  );
+}
+
+function InvitationControls() {
+  const [open, setOpen] = useState<"new" | "list" | null>(null);
   return (
     <>
-      <AdminButton icon="add" aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        New account
+      <AdminButton icon="link" aria-haspopup="dialog" onClick={() => setOpen("list")}>
+        Invitation links
       </AdminButton>
-      {open ? <NewAccountDialog onClose={() => setOpen(false)} onCreated={onCreated} /> : null}
+      <AdminButton icon="add" aria-haspopup="dialog" onClick={() => setOpen("new")}>
+        New invitation link
+      </AdminButton>
+      {open === "new" ? <NewInvitationDialog onClose={() => setOpen(null)} /> : null}
+      {open === "list" ? <InvitationsDialog onClose={() => setOpen(null)} /> : null}
     </>
   );
 }
@@ -194,11 +202,17 @@ function NewAccountControl({ onCreated }: { onCreated: () => void }) {
 /** /admin/accounts — the people who can sign in to the admin (p15); each row opens the account. */
 export function AccountsList() {
   const canManage = useCan("accounts.manage");
-  const [version, setVersion] = useState(0);
   const fields = useMemo<ListField[]>(
     () => [
       { id: "name", label: "Name", icon: "title", operators: [], sort: "text" },
-      { id: "role", label: "Role", icon: "select", operators: ["is", "is_not"], options: ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label })), sort: "text" },
+      {
+        id: "role",
+        label: "Role",
+        icon: "select",
+        operators: ["is", "is_not"],
+        options: [...ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label })), { value: "none", label: NO_ROLE_LABEL }],
+        sort: "text",
+      },
       { id: "email", label: "Email", icon: "alternate_email", operators: [], sort: "text" },
       {
         id: "status",
@@ -217,8 +231,6 @@ export function AccountsList() {
 
   return (
     <AdminListPage<Account>
-      // A new invitation shows in the list once its dialog closes.
-      key={version}
       config={{
         title: "Accounts",
         noun: "accounts",
@@ -229,7 +241,7 @@ export function AccountsList() {
         columns: COLUMNS,
         recordHref: (row) => `/admin/accounts/${row.id}`,
         views: <SavedViews views={VIEWS} />,
-        actions: canManage ? <NewAccountControl onCreated={() => setVersion((value) => value + 1)} /> : null,
+        actions: canManage ? <InvitationControls /> : null,
       }}
     />
   );

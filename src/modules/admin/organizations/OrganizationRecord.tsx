@@ -100,7 +100,6 @@ export function OrganizationRecord({ id }: { id: string }) {
   const toast = useToast();
   const canUpdate = useCan("directory.update");
   const canCreate = useCan("directory.create");
-  const canDelete = useCan("directory.delete");
   const organization = useAdminData<Organization>(`/organizations/${id}`);
   const history = useAdminData<RecordHistory>(`/history/organization/${id}`);
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
@@ -201,16 +200,6 @@ export function OrganizationRecord({ id }: { id: string }) {
         duplicate: canCreate ? duplicate : undefined,
         archived: loaded.archivedAt !== null,
         setArchived,
-        remove: canDelete
-          ? {
-              confirmText: loaded.name,
-              run: async (confirm) => {
-                await adminApi(`/organizations/${id}`, { method: "DELETE", body: { confirm } });
-                toast("Organization deleted");
-                router.push("/admin/organizations");
-              },
-            }
-          : undefined,
         savedMessage: "Organization updated",
         dirty,
         busy,

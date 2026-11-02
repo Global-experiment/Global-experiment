@@ -374,7 +374,7 @@ test.describe("signed in", () => {
   test("column menu (p11): freeze and hide a column; More options with the imports", async ({ page }) => {
     await page.goto("/admin/people");
     await page.getByRole("button", { name: "More options" }).click();
-    await expect(page.getByRole("menuitem", { name: "Import Notion" })).toHaveAttribute("href", "/admin/imports");
+    await expect(page.getByRole("menuitem", { name: "Import Notion" })).toHaveCount(0);
     await expect(page.getByRole("menuitem", { name: "Import CSV" })).toHaveAttribute("href", "/admin/imports/csv?table=people");
     await page.keyboard.press("Escape");
     const state = page.getByRole("columnheader", { name: "State", exact: true });
@@ -445,9 +445,12 @@ test.describe("signed in", () => {
     await expect(picker).toBeVisible();
     for (let step = 0; step < 36 && !(await picker.getByRole("heading").innerText()).includes("October 2026"); step++) {
       const shown = await picker.getByRole("heading").innerText();
-      const [month, year] = shown.replace(/^.*: /, "").split(" ");
+      // "Follow-up date: November 2026" (the label may sit on its own line): the month and year at the end.
+      const [, month, year] = /(\w+)\s+(\d{4})\s*$/.exec(shown) ?? [];
       const later = Number(year) > 2026 || (Number(year) === 2026 && new Date(`${month} 1, 2000`).getMonth() > 9);
       await picker.getByRole("button", { name: later ? "Previous month" : "Next month" }).click();
+      // Read the next month only once it shows (otherwise a fast loop steps past October).
+      await expect(picker.getByRole("heading")).not.toHaveText(shown);
     }
     await picker.getByRole("button", { name: "Wednesday, October 14, 2026", exact: false }).click();
     await picker.getByLabel("Time").fill("09:30");
@@ -562,35 +565,19 @@ test.describe("signed in", () => {
     expect(copyNumber).not.toBe(originalNumber);
   });
 
-  test("toast 'Notion imported' when an apply finishes on the Imports page", async ({ page }) => {
-    // The apply itself is mocked here: a real one would change the shared test directory.
-    const job = (status: string) => ({
-      id: "11111111-2222-4333-8444-555555555555",
-      kind: "directory",
-      mode: "apply",
-      status,
-      phase: status === "running" ? "applying" : "done",
-      startedAt: new Date().toISOString(),
-      finishedAt: status === "running" ? null : new Date().toISOString(),
-      triggeredBy: E2E_ADMIN.email,
-      runId: null,
-      dryRunId: null,
-      changes: 3,
-      applicable: false,
-      report: "DIRECTORY IMPORT — APPLIED (one transaction)",
-    });
-    await page.route("**/api/admin/imports/status", async (route) => {
-      const response = await route.fetch();
-      await route.fulfill({ response, json: { ...(await response.json()), activeJob: job("running") } });
-    });
-    await page.route("**/api/admin/imports/jobs/*", (route) => route.fulfill({ json: job("succeeded") }));
-    await page.goto("/admin/imports");
-    const toast = page.getByRole("status").filter({ hasText: "Notion imported" });
+  test("a toast sits at the bottom centre of the content area (p8)", async ({ page }) => {
+    // The Notion import and its "Notion imported" toast are gone (OPS-154): a profile save shows the same toast.
+    await page.goto("/admin/profile");
+    await page.getByLabel("Display name").fill("Toast Position");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    const toast = page.getByRole("status").filter({ hasText: "Profile updated" });
     await expect(toast).toBeVisible({ timeout: 5_000 });
     // Bottom centre of the content area (p8: 24px above the bottom edge).
     const pill = await box(toast.locator("p"));
     near(pill.x + pill.width / 2, 240 + (FRAME.width - 240) / 2);
     near(FRAME.height - (pill.y + pill.height), 24);
+    await page.getByLabel("Display name").fill("");
+    await page.getByRole("button", { name: "Save changes" }).click();
   });
 
   test("display name: set in Profile settings, shown on the user card, cleared back to the email", async ({ page }) => {

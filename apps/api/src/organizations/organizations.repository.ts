@@ -246,11 +246,6 @@ export class OrganizationsRepository {
       .where(eq(organizations.id, id));
   }
 
-  /** Permanent delete: links go with it (cascade); expenses paid to it block it (their recipient). */
-  async delete(tx: Executor, id: string): Promise<void> {
-    await tx.delete(organizations).where(eq(organizations.id, id));
-  }
-
   async hasExpenses(id: string): Promise<boolean> {
     const [row] = await this.db.select({ id: treasuryEntries.id }).from(treasuryEntries).where(eq(treasuryEntries.recipientOrganizationId, id)).limit(1);
     return row !== undefined;

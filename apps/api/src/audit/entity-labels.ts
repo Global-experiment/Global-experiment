@@ -58,11 +58,12 @@ export async function entityLabel(db: Executor, entityType: string, entityId: st
     const [row] = await db.select({ name: adminName }).from(adminUsers).where(eq(adminUsers.id, entityId)).limit(1);
     return row?.name;
   }
+  if (entityType === "admin_invitation") return "Invitation link";
   return undefined;
 }
 
-/** A grant's shown name: its own, else "<service> / <level>" (Figma p17). */
-const grantTitle = sql<string>`coalesce(${accessGrants.name}, ${services.name} || coalesce(' / ' || ${accessLevels.label}, ''))`;
+/** A grant's name, "Service / Account / Permission level" (OPS-138). */
+const grantTitle = sql<string>`coalesce(${accessGrants.name}, ${services.name})`;
 const adminName = sql<string>`coalesce(${adminUsers.displayName}, split_part(${adminUsers.email}, '@', 1))`;
 
 /** "PER-81 · Stanley Qiang" → "Stanley Qiang": a stored label without its number. */
@@ -119,5 +120,6 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
     const rows = await db.select({ id: adminUsers.id, name: adminName }).from(adminUsers).where(inArray(adminUsers.id, accountIds));
     for (const row of rows) titles.set(`admin_user:${row.id}`, row.name);
   }
+  for (const id of idsOf("admin_invitation")) titles.set(`admin_invitation:${id}`, "Invitation link");
   return titles;
 }

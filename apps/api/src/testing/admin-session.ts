@@ -78,7 +78,6 @@ export function testPrincipal(overrides: Partial<AdminPrincipal> = {}): AdminPri
     timeZone: null,
     appearance: "system",
     hasPicture: false,
-    personId: null,
     permissions: new Set(ALL_PERMISSIONS),
     sessionId: "s",
     ...overrides,

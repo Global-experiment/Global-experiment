@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, date, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, date, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { adminUsers } from "../auth/auth.schema.js";
 import { people } from "../people/people.schema.js";
 
@@ -29,12 +29,9 @@ export const services = pgTable(
     serviceNumber: integer("service_number").notNull().generatedByDefaultAsIdentity(),
     name: text("name").notNull(),
     statusKey: text("status_key").references(() => serviceStatuses.key, { onDelete: "restrict", onUpdate: "cascade" }),
-    categoryKey: text("category_key").references(() => serviceCategories.key, { onDelete: "restrict", onUpdate: "cascade" }),
     hostingModelKey: text("hosting_model_key").references(() => serviceHostingModels.key, { onDelete: "restrict", onUpdate: "cascade" }),
     url: text("url"),
     description: text("description"),
-    /** Decision 5: the admin account responsible for the service. */
-    responsibleAdminId: uuid("responsible_admin_id").references(() => adminUsers.id, { onDelete: "set null" }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     archivedById: uuid("archived_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -50,9 +47,28 @@ export const services = pgTable(
 );
 
 /**
+ * A service's categories (OPS-149, migration 0014): tags from the
+ * service_categories vocabulary, in the order they were picked.
+ */
+export const serviceCategoryTags = pgTable(
+  "service_category_tags",
+  {
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    categoryKey: text("category_key")
+      .notNull()
+      .references(() => serviceCategories.key, { onDelete: "restrict", onUpdate: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [primaryKey({ name: "service_category_tags_pk", columns: [table.serviceId, table.categoryKey] }), index("service_category_tags_category_key_idx").on(table.categoryKey)],
+);
+
+/**
  * Access grants (Figma p17 "Permissions"): who (a person of the directory,
  * decision 5, optionally their admin account) has which level on which
- * service, its status, scope and dates.
+ * service, its status, scope and dates. Who is in charge of a service is
+ * its Owner permission (OPS-130): services have no responsible account.
  */
 export const accessGrants = pgTable(
   "access_grants",
@@ -60,7 +76,7 @@ export const accessGrants = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     /** The grant's ID (Figma p17). */
     grantNumber: integer("grant_number").notNull().generatedByDefaultAsIdentity(),
-    /** Optional own name; shown as "<service> / <level>" when empty. */
+    /** "Service / Account / Permission level" (OPS-138), kept up to date by the API: grant-name.ts. */
     name: text("name"),
     personId: uuid("person_id").references(() => people.id, { onDelete: "restrict" }),
     adminUserId: uuid("admin_user_id").references(() => adminUsers.id, { onDelete: "set null" }),

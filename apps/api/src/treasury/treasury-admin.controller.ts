@@ -20,7 +20,6 @@ import { z } from "zod";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import {
-  DeleteTreasuryEntryRequest,
   ReviewTreasuryEntryRequest,
   TreasuryListQuery,
   UpdateTreasuryEntryRequest,
@@ -130,14 +129,6 @@ export class TreasuryAdminController {
   @HttpCode(200)
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.setArchived(id, false, request.admin);
-  }
-
-  /** Permanent delete: owner only, manual entries only, with the entry number typed in `confirm`. */
-  @Delete(":id")
-  @Requires("treasury.delete")
-  @HttpCode(204)
-  remove(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(DeleteTreasuryEntryRequest)) body: DeleteTreasuryEntryRequest, @Req() request: AdminRequest) {
-    return this.treasury.delete(id, body.confirm, request.admin);
   }
 
   @Get(":id/documents")

@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { ROLE_KEYS } from "../access-control/permissions.js";
 import { listQuerySchema } from "../common/listing/list-query.js";
+import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 
-/** Request contracts and response shapes for accounts, the profile and the one-time links. */
+/** Request contracts and response shapes for accounts, the profile, invitation links and the one-time links. */
 
 const email = z.string().trim().max(320).pipe(z.email("Invalid email address."));
 const displayName = z
@@ -12,25 +13,21 @@ const displayName = z
   .transform((value) => value || null)
   .nullable();
 const role = z.enum(ROLE_KEYS as [string, ...string[]], "Unknown role.");
-const note = z
+/** OPS-144. */
+const description = z
   .string()
-  .max(2000)
+  .max(5000, "Use at most 5,000 characters.")
   .transform((value) => value.trim() || null)
   .nullable();
+/** OPS-135: the account's own expertise, in order. */
+const expertiseIds = z
+  .array(z.uuid())
+  .max(RELATION_LIMITS.expertise, LIMIT_MESSAGES.accountExpertise)
+  .refine((ids) => new Set(ids).size === ids.length, "Each expertise once.");
 
-/** "New account" (admin-desktop.pdf p15): an invitation the owner copies (decision 13, no email sent). */
-export const InviteRequest = z.strictObject({
-  email,
-  displayName: displayName.optional(),
-  role,
-  personId: z.uuid().nullable().optional(),
-  note: note.optional(),
-});
-export type InviteRequest = z.output<typeof InviteRequest>;
-
-/** What a Rootadmin changes on an account (accounts.manage). */
+/** What a Rootadmin changes on another account (accounts.manage): the role, and its profile's name, description and expertise. */
 export const UpdateAccountRequest = z
-  .strictObject({ role: role.optional(), note: note.optional(), personId: z.uuid().nullable().optional(), displayName: displayName.optional() })
+  .strictObject({ role: role.optional(), displayName: displayName.optional(), description: description.optional(), expertiseIds: expertiseIds.optional() })
   .refine((body) => Object.keys(body).length > 0, "Nothing to update.");
 export type UpdateAccountRequest = z.output<typeof UpdateAccountRequest>;
 
@@ -41,6 +38,7 @@ export const AccountsListQuery = listQuerySchema({
   defaultSort: [{ field: "name", direction: "asc" }],
   filters: {
     status: { operators: ["is", "is_not"], value: z.enum(["active", "invited", "deactivated"]) },
+    /** "none": no role yet (OPS-141). */
     role: { operators: ["is", "is_not"], value: z.string().regex(/^[a-z]{1,40}$/) },
   },
 });
@@ -50,6 +48,8 @@ export type AccountsListQuery = z.output<typeof AccountsListQuery>;
 export const ProfileRequest = z
   .strictObject({
     displayName: displayName.optional(),
+    description: description.optional(),
+    expertiseIds: expertiseIds.optional(),
     timeZone: z
       .string()
       .max(64)
@@ -83,10 +83,23 @@ export const InspectTokenRequest = z.strictObject({ token });
 export type InspectTokenRequest = z.output<typeof InspectTokenRequest>;
 export const AcceptTokenRequest = z.strictObject({ token, password: z.string().max(200) });
 export type AcceptTokenRequest = z.output<typeof AcceptTokenRequest>;
+/** OPS-141: whoever opens an invitation link makes their own account. */
+export const SignUpRequest = z.strictObject({ token, email, password: z.string().max(200) });
+export type SignUpRequest = z.output<typeof SignUpRequest>;
 
 export interface VocabularyEntry {
   key: string;
   label: string;
+}
+
+/** An expertise tag with its Field and Domain (as on People). */
+export interface ExpertiseTag {
+  id: string;
+  name: string;
+  stableId: string | null;
+  status: VocabularyEntry | null;
+  field: { id: string; name: string };
+  domain: { id: string; name: string };
 }
 
 export interface AccountDto {
@@ -96,13 +109,14 @@ export interface AccountDto {
   name: string;
   displayName: string | null;
   email: string;
-  role: VocabularyEntry;
+  /** Null: no role yet (OPS-141). */
+  role: VocabularyEntry | null;
   status: "active" | "invited" | "deactivated";
-  note: string | null;
-  person: { id: string; name: string } | null;
-  /** The linked person's expertise (the Accounts list's Expertise column). */
-  expertise: { id: string; name: string }[];
-  /** The linked person's or the account's access grants ("GitHub / admin"). */
+  /** OPS-144. */
+  description: string | null;
+  /** The account's own expertise (OPS-135). */
+  expertise: ExpertiseTag[];
+  /** The account's access grants ("GitHub / admin"). */
   permissions: { id: string; service: string; level: string | null; status: VocabularyEntry | null }[];
   hasPicture: boolean;
   lastLoginAt: string | null;
@@ -124,4 +138,23 @@ export interface OneTimeLinkDto {
   link: string;
   purpose: "invite" | "reset";
   expiresAt: string;
+}
+
+/** An invitation link (OPS-141), never its token once made. */
+export interface InvitationDto {
+  id: string;
+  createdAt: string;
+  createdBy: string | null;
+  expiresAt: string;
+  status: "pending" | "used" | "revoked" | "expired";
+  usedAt: string | null;
+  /** The account made with it. */
+  account: { id: string; name: string } | null;
+  revokedAt: string | null;
+}
+
+/** "New invitation link": the link, returned once. */
+export interface NewInvitationDto {
+  invitation: InvitationDto;
+  link: string;
 }

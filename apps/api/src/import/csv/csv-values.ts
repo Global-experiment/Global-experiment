@@ -64,8 +64,12 @@ export function parseBoolean(raw: string): boolean | null {
   return null;
 }
 
-/** Notion's CSV export writes a relation as "Name (https://www.notion.so/…)". */
-const withoutNotionLink = (value: string) => value.replace(/\s*\(https?:\/\/(www\.)?notion\.(so|site)\/[^)]*\)\s*$/i, "").trim();
+/**
+ * Notion's CSV export writes a relation as "Name (https://www.notion.so/…)",
+ * and since late 2026 "Name (https://app.notion.com/p/…?pvs=21)" (OPS-153):
+ * any Notion address in brackets at the end goes.
+ */
+export const withoutNotionLink = (value: string) => value.replace(/\s*\(https?:\/\/[^\s()]*notion\.(so|site|com)\/[^)]*\)\s*$/i, "").trim();
 
 /**
  * The names in a cell, matched with `known` (whose keys are lowercased

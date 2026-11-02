@@ -185,4 +185,9 @@ test("a native expense can be reviewed; Qualified needs its recipient", async ()
   await rows().first().click();
   await expect(review.getByRole("button", { name: "Qualified", exact: true })).toHaveAttribute("aria-pressed", "true");
   await axe();
+  // OPS-147: a manual entry is archived, never deleted — for the Rootadmin too.
+  await page.getByRole("button", { name: "More options" }).click();
+  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete permanently" })).toHaveCount(0);
+  await page.getByRole("button", { name: "More options" }).click();
 });

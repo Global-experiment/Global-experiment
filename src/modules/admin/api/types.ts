@@ -186,10 +186,7 @@ export interface ExpertiseTree {
   domains: ExpertiseDomainNode[];
 }
 
-/** The Notion import: People and Organizations only (the Taxonomy and Treasury imports were removed, 2026-10-30). */
-export type ImportKind = "directory";
-
-/** An import_runs row (GET /imports/runs). */
+/** An import_runs row (GET /imports/runs): CSV imports, and the Notion runs from before OPS-154. */
 export interface ImportRun {
   id: string;
   kind: string;
@@ -199,30 +196,6 @@ export interface ImportRun {
   triggeredBy: string;
   counts: { changes?: number } & Record<string, unknown>;
   issues: { kind?: string; code?: string; detail?: string; name?: string }[];
-}
-
-/** A background import job (POST /imports/:kind/dry-run|apply, GET /imports/jobs/:id). */
-export interface ImportJob {
-  id: string;
-  kind: ImportKind;
-  mode: "dry_run" | "apply";
-  status: "running" | "succeeded" | "failed" | "refused";
-  phase: "queued" | "reading_notion" | "planning" | "applying" | "done";
-  startedAt: string;
-  finishedAt: string | null;
-  triggeredBy: string;
-  runId: string | null;
-  dryRunId: string | null;
-  changes: number | null;
-  /** A finished dry run with something to write, not refused: it can be applied. */
-  applicable: boolean;
-  report: string | null;
-  error: string | null;
-}
-
-export interface ImportStatus {
-  directory: { available: boolean; reason: string | null };
-  activeJob: ImportJob | null;
 }
 
 // ---- CSV import of People and Organizations (mirrors apps/api/src/import/csv) ----
@@ -236,6 +209,20 @@ export interface CsvCounts {
   duplicates: number;
   duplicatesIncluded: number;
   errors: number;
+  /** Rows imported without a value they named (OPS-153). */
+  warnings: number;
+}
+
+/** The columns whose values must name something that exists (OPS-153). */
+export type CsvValueField = "state" | "source" | "contactChannels" | "organizations" | "expertise";
+/** Per field: an unknown value's key → an option's id, or null to skip it. */
+export type CsvValueChoices = Partial<Record<CsvValueField, Record<string, string | null>>>;
+
+export interface CsvUnknownField {
+  field: CsvValueField;
+  label: string;
+  values: { value: string; key: string; rows: number; problem: "unknown" | "several"; choice?: string | null }[];
+  options: { id: string; label: string }[];
 }
 
 export interface CsvDuplicate {
@@ -249,6 +236,8 @@ export interface CsvPreviewRow {
   name: string;
   status: "create" | "duplicate" | "error";
   errors: string[];
+  /** Values left out of the record (OPS-153). */
+  warnings: string[];
   duplicate: CsvDuplicate | null;
   included: boolean;
 }
@@ -262,6 +251,7 @@ export interface CsvPreview {
   mapping: (string | null)[];
   fields: { key: string; label: string; required: boolean }[];
   counts: CsvCounts;
+  unknown: CsvUnknownField[];
   rows: CsvPreviewRow[];
 }
 
@@ -280,8 +270,9 @@ export interface CsvReport {
 export interface AdminPrincipal {
   id: string;
   email: string;
-  role: string;
-  /** "Rootadmin", "Treasury admin"… */
+  /** Null: no role yet (an account made from an invitation link, OPS-141). */
+  role: string | null;
+  /** "Rootadmin", "Treasury admin"… "No role". */
   roleLabel: string;
   /** Null until set on /admin/profile. */
   displayName: string | null;
@@ -316,11 +307,13 @@ export interface Account {
   name: string;
   displayName: string | null;
   email: string;
-  role: VocabularyEntry;
+  /** Null: no role yet (OPS-141). */
+  role: VocabularyEntry | null;
   status: AccountStatus;
-  note: string | null;
-  person: { id: string; name: string } | null;
-  expertise: { id: string; name: string }[];
+  /** OPS-144. */
+  description: string | null;
+  /** The account's own expertise (OPS-135). */
+  expertise: ExpertiseRef[];
   permissions: GrantRef[];
   hasPicture: boolean;
   lastLoginAt: string | null;
@@ -341,6 +334,21 @@ export interface OneTimeLink {
   purpose: "invite" | "reset";
   expiresAt: string;
 }
+
+/** An invitation link (OPS-141); its token is never sent again once made. */
+export interface Invitation {
+  id: string;
+  createdAt: string;
+  createdBy: string | null;
+  expiresAt: string;
+  status: "pending" | "used" | "revoked" | "expired";
+  usedAt: string | null;
+  account: { id: string; name: string } | null;
+  revokedAt: string | null;
+}
+
+/** How an account without a role shows. */
+export const NO_ROLE_LABEL = "No role";
 
 /** The roles (overview §3.1), in the order the admin lists them. */
 export const ROLE_OPTIONS: readonly VocabularyEntry[] = [
@@ -366,11 +374,11 @@ export interface Service {
   serviceNumber: number;
   name: string;
   status: VocabularyEntry | null;
-  category: VocabularyEntry | null;
+  /** Tags (OPS-149). */
+  categories: VocabularyEntry[];
   hostingModel: VocabularyEntry | null;
   url: string | null;
   description: string | null;
-  responsible: Ref | null;
   permissions: GrantRef[];
   archivedAt: string | null;
   createdAt: string;
@@ -380,7 +388,7 @@ export interface Service {
 export interface Grant {
   id: string;
   grantNumber: number;
-  name: string | null;
+  /** "Service / Account / Permission level", made by the API (OPS-138). */
   title: string;
   person: Ref | null;
   account: Ref | null;
@@ -527,6 +535,7 @@ export type HistoryAction =
   | "invited"
   | "activated"
   | "link_created"
+  | "link_revoked"
   | "password_changed"
   | "email_changed"
   | "deactivated"

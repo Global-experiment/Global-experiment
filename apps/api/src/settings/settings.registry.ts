@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { AppConfig } from "../common/config/env.js";
-import { CRON_OR_OFF } from "../common/config/env.js";
 import { TREASURY_CURRENCIES } from "../treasury/treasury.schema.js";
 
 /**
@@ -130,13 +129,6 @@ export const SETTINGS = {
     envDefault: () => false,
     public: false,
     description: "AI features are on: the AI relevance score is filled automatically and read-only in the admin.",
-  }),
-  // The scheduled Notion import of People and Organizations (overview §3.3): cron in UTC, or "off". Read when the API starts.
-  "imports.directory.schedule": define({
-    schema: z.string().regex(CRON_OR_OFF),
-    envDefault: (config) => config.importSchedules.directory,
-    public: false,
-    description: "Schedule of the People & Organizations import (cron, UTC) or off.",
   }),
 } as const;
 

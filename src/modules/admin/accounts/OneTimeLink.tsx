@@ -8,9 +8,10 @@ import { AdminButton } from "../ui/controls";
 /**
  * A one-time link, shown once to the Rootadmin who made it (no email is
  * sent yet): they copy it and pass it on privately. Only its hash is
- * stored, so it can't be shown again — a new link replaces it.
+ * stored, so it can't be shown again. An account's reset link names the
+ * account (`name`); an invitation link (OPS-141) has its own `title` and `note`.
  */
-export function OneTimeLinkBox({ link, name }: { link: OneTimeLink; name: string }) {
+export function OneTimeLinkBox({ link, name, title, note }: { link: OneTimeLink; name?: string; title?: string; note?: string }) {
   const id = useId();
   const [copied, setCopied] = useState<"yes" | "failed" | null>(null);
   const what = link.purpose === "invite" ? "invitation link" : "password reset link";
@@ -27,7 +28,7 @@ export function OneTimeLinkBox({ link, name }: { link: OneTimeLink; name: string
   return (
     <div data-one-time-link className="flex flex-col gap-2 rounded-control p-2 ring-1 ring-line">
       <label htmlFor={id} className="text-body font-bold">
-        {name}&rsquo;s {what}
+        {title ?? `${name}’s ${what}`}
       </label>
       <div className="flex gap-2">
         <input
@@ -44,7 +45,7 @@ export function OneTimeLinkBox({ link, name }: { link: OneTimeLink; name: string
       </div>
       <p role="status" className="text-meta text-text-muted">
         {copied === "failed" ? "Couldn’t copy: select the link and copy it. " : ""}
-        Shown only now. It works once, until {formatPanelDate(link.expiresAt)}; send it privately. A new link cancels this one.
+        {note ?? `Shown only now. It works once, until ${formatPanelDate(link.expiresAt)}; send it privately. A new link cancels this one.`}
       </p>
     </div>
   );

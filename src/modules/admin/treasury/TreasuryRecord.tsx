@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { formatDateOnly } from "@/shared/format/dates";
 import { Timestamp } from "@/shared/format/Timestamp";
@@ -57,12 +56,10 @@ const message = (caught: unknown, fallback: string) => (caught instanceof AdminA
  *   downloaded by admins only, never public.
  */
 export function TreasuryRecord({ id }: { id: string }) {
-  const router = useRouter();
   const toast = useToast();
   const canUpdate = useCan("treasury.update");
   const canReview = useCan("treasury.review");
   const canPublish = useCan("treasury.publish");
-  const canDelete = useCan("treasury.delete");
   const entry = useAdminData<TreasuryEntry>(`/treasury/${id}`);
   const history = useAdminData<RecordHistory>(`/history/treasury_entry/${id}`);
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
@@ -167,17 +164,6 @@ export function TreasuryRecord({ id }: { id: string }) {
         archived: loaded.archivedAt !== null,
         setArchived: !canUpdate ? undefined : (archived) => run(archived ? "archiving" : "restoring", () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }), archived ? "Entry archived" : "Entry restored"),
         // Only manual entries can go: Stripe entries belong to the ledger.
-        remove:
-          loaded.source === "manual" && canDelete
-            ? {
-                confirmText: number,
-                run: async (confirm) => {
-                  await adminApi(`/treasury/${id}`, { method: "DELETE", body: { confirm } });
-                  toast("Entry deleted");
-                  router.push("/admin/treasury/manage");
-                },
-              }
-            : undefined,
         savedMessage: "Treasury entry updated",
         dirty,
         busy,

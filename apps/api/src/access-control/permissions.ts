@@ -147,6 +147,7 @@ export const ENTITY_MODULE: Record<string, Module> = {
   service: "services",
   access_grant: "access",
   admin_user: "accounts",
+  admin_invitation: "accounts",
   setting: "settings",
   import_run: "imports",
 };
@@ -159,5 +160,3 @@ export function canReadEntity(permissions: ReadonlySet<string>, entityType: stri
   return area === "settings" ? permissions.has("settings.manage") : permissions.has(`${area}.read`);
 }
 
-/** An import kind's module: running it needs `<module>.import`. */
-export const IMPORT_MODULES: Readonly<Record<string, Module>> = { directory: "directory" };

@@ -80,7 +80,8 @@ export const ADMIN_MODULES: AdminSection[] = [
 /** The menu as this role sees it: modules it can't read drop out, and so do sections left empty. */
 export function modulesFor(sections: readonly AdminSection[], permissions: ReadonlySet<string>): AdminSection[] {
   return sections
-    .map((group) => ({ ...group, modules: group.modules.filter((entry) => !entry.permission || permissions.has(entry.permission)) }))
+    // A live module without a permission of its own (History) still needs a role: an account with none (OPS-141) has only its profile.
+    .map((group) => ({ ...group, modules: group.modules.filter((entry) => (entry.permission ? permissions.has(entry.permission) : entry.status !== "live" || permissions.size > 0)) }))
     .filter((group) => group.modules.length > 0);
 }
 

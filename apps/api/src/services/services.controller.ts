@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { z } from "zod";
 import { Requires } from "../access-control/requires.js";
 import { actorFor } from "../audit/audit.service.js";
@@ -8,7 +8,6 @@ import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import {
   CreateGrantRequest,
   CreateServiceRequest,
-  DeleteRecordRequest,
   GrantsListQuery,
   ServicesListQuery,
   UpdateGrantRequest,
@@ -71,14 +70,6 @@ export class ServicesController {
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.services.setServiceArchived(id, false, actorFor(principal(request)));
   }
-
-  @Delete(":id")
-  @HttpCode(204)
-  @Requires("services.delete")
-  async remove(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(DeleteRecordRequest)) body: DeleteRecordRequest, @Req() request: AdminRequest) {
-    const admin = principal(request);
-    await this.services.deleteService(id, body.confirm, admin, actorFor(admin));
-  }
 }
 
 /** /api/admin/access-grants — permissions, i.e. access grants (admin-desktop.pdf p17); access per access.*. */
@@ -122,13 +113,5 @@ export class AccessGrantsController {
   @Requires("access.update")
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.services.setGrantArchived(id, false, actorFor(principal(request)));
-  }
-
-  @Delete(":id")
-  @HttpCode(204)
-  @Requires("access.delete")
-  async remove(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(DeleteRecordRequest)) body: DeleteRecordRequest, @Req() request: AdminRequest) {
-    const admin = principal(request);
-    await this.services.deleteGrant(id, body.confirm, admin, actorFor(admin));
   }
 }

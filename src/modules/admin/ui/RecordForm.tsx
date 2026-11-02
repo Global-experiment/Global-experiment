@@ -268,7 +268,7 @@ export function PropertyRow({
   const id = useId();
   const Label = htmlFor ? "label" : "span";
   return (
-    <div className="grid grid-cols-[168px_minmax(0,1fr)] items-start">
+    <div data-property={label} className="grid grid-cols-[168px_minmax(0,1fr)] items-start">
       <div className="pr-2">
         <Label id={`${id}-label`} {...(htmlFor ? { htmlFor } : {})} className="flex min-h-8 items-center gap-1 pl-1 text-body text-text-muted">
           <AdminIcon name={icon} />

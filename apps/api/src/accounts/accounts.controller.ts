@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req, Res, StreamableFile, UploadedFile as UploadedFileParam, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, Res, StreamableFile, UploadedFile as UploadedFileParam, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
@@ -6,6 +6,10 @@ import { z } from "zod";
 import { Requires, SignedIn } from "../access-control/requires.js";
 import { AllowAnonymous, type AdminRequest } from "../auth/admin-area.js";
 import { LOGIN_LIMIT } from "../auth/auth.controller.js";
+import { AuthService } from "../auth/auth.service.js";
+import { sessionCookieName, sessionCookieOptions } from "../auth/session-cookie.js";
+import { APP_CONFIG } from "../common/config/config.module.js";
+import type { AppConfig } from "../common/config/env.js";
 import { UnauthenticatedError } from "../common/errors/api-error.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import {
@@ -15,8 +19,8 @@ import {
   ChangePasswordRequest,
   DeactivateSelfRequest,
   InspectTokenRequest,
-  InviteRequest,
   ProfileRequest,
+  SignUpRequest,
   UpdateAccountRequest,
 } from "./accounts.contracts.js";
 import { AccountsService, PICTURE_MAX_BYTES } from "./accounts.service.js";
@@ -31,8 +35,9 @@ const noStore = (response: Response) => response.set("Cache-Control", "no-store"
 
 /**
  * /api/admin/accounts — admin accounts (admin-desktop.pdf p15). Reading
- * them is accounts.read; inviting, changing and deactivating accounts and
- * issuing links is accounts.manage (the Rootadmin, overview §3.1).
+ * them is accounts.read; changing and deactivating accounts and issuing
+ * links is accounts.manage (the Rootadmin, overview §3.1). Accounts are made
+ * by their holders from an invitation link (OPS-141): there is no "create".
  */
 @Controller("admin/accounts")
 export class AccountsController {
@@ -42,14 +47,6 @@ export class AccountsController {
   @Requires("accounts.read")
   list(@Query(new ZodValidationPipe(AccountsListQuery)) query: AccountsListQuery) {
     return this.accounts.list(query);
-  }
-
-  /** "New account": the invited account and its one-time link (shown once). */
-  @Post()
-  @Requires("accounts.manage")
-  async invite(@Body(new ZodValidationPipe(InviteRequest)) body: InviteRequest, @Req() request: AdminRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    return this.accounts.invite(body, principal(request));
   }
 
   @Get(":id")
@@ -93,6 +90,33 @@ export class AccountsController {
   @Requires("accounts.manage")
   reactivate(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.accounts.reactivate(id, principal(request));
+  }
+}
+
+/** /api/admin/invitations — invitation links (OPS-141): made, listed and revoked by a Rootadmin (accounts.manage). */
+@Controller("admin/invitations")
+export class InvitationsController {
+  constructor(private readonly accounts: AccountsService) {}
+
+  @Get()
+  @Requires("accounts.manage")
+  list() {
+    return this.accounts.listInvitations();
+  }
+
+  /** "New invitation link": the link is in this answer only. */
+  @Post()
+  @Requires("accounts.manage")
+  create(@Req() request: AdminRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.accounts.createInvitation(principal(request));
+  }
+
+  @Post(":id/revoke")
+  @HttpCode(200)
+  @Requires("accounts.manage")
+  revoke(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    return this.accounts.revokeInvitation(id, principal(request));
   }
 }
 
@@ -177,5 +201,40 @@ export class TokensController {
   accept(@Body(new ZodValidationPipe(AcceptTokenRequest)) body: AcceptTokenRequest, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.accounts.acceptToken(body.token, body.password);
+  }
+}
+
+/**
+ * /api/admin/auth/invitations — the sign-up page of an invitation link
+ * (OPS-141, no session): check the link, then make the account (email and
+ * password) and sign it in. Rate-limited like sign-in.
+ */
+@Controller("admin/auth/invitations")
+export class SignUpController {
+  constructor(
+    private readonly accounts: AccountsService,
+    private readonly auth: AuthService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
+
+  @Post("inspect")
+  @HttpCode(200)
+  @AllowAnonymous()
+  @Throttle({ default: { limit: 20, ttl: 15 * 60 * 1000 } })
+  inspect(@Body(new ZodValidationPipe(InspectTokenRequest)) body: InspectTokenRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.accounts.inspectInvitation(body.token);
+  }
+
+  /** Makes the account and sets the session cookie: the new account lands on its (empty) profile. */
+  @Post("accept")
+  @HttpCode(204)
+  @AllowAnonymous()
+  @Throttle(LOGIN_LIMIT)
+  async accept(@Body(new ZodValidationPipe(SignUpRequest)) body: SignUpRequest, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    const { id } = await this.accounts.signUp(body.token, body.email, body.password);
+    const { token, expiresAt } = await this.auth.startSession(id);
+    response.cookie(sessionCookieName(this.config), token, sessionCookieOptions(this.config, expiresAt));
   }
 }

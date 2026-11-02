@@ -6,7 +6,8 @@ import { adminRolePermissions, adminRoles, adminSessions, adminUsers } from "./a
 export interface AdminUserRecord {
   id: string;
   email: string;
-  role: string;
+  /** Null: no role yet (OPS-141). */
+  role: string | null;
   status: string;
   passwordHash: string | null;
   displayName: string | null;
@@ -15,14 +16,14 @@ export interface AdminUserRecord {
 export interface SessionAdmin {
   id: string;
   email: string;
-  role: string;
+  /** Null: no role yet (OPS-141) — no permissions, only the own profile. */
+  role: string | null;
   roleLabel: string;
   displayName: string | null;
   accountNumber: number;
   timeZone: string | null;
   appearance: string;
   hasPicture: boolean;
-  personId: string | null;
   permissions: string[];
 }
 
@@ -32,6 +33,9 @@ export interface ActiveSessionRecord {
   expiresAt: Date;
   admin: SessionAdmin;
 }
+
+/** How an account without a role shows (OPS-141). */
+export const NO_ROLE = "No role";
 
 const permissionsOf = sql<string[]>`coalesce((select array_agg(${adminRolePermissions.permissionKey} order by ${adminRolePermissions.permissionKey}) from ${adminRolePermissions} where ${adminRolePermissions.roleKey} = ${adminUsers.role}), '{}')`;
 
@@ -103,12 +107,11 @@ export class AuthRepository {
         timeZone: adminUsers.timeZone,
         appearance: adminUsers.appearance,
         pictureKey: adminUsers.pictureKey,
-        personId: adminUsers.personId,
         permissions: permissionsOf,
       })
       .from(adminSessions)
       .innerJoin(adminUsers, eq(adminUsers.id, adminSessions.adminUserId))
-      .innerJoin(adminRoles, eq(adminRoles.key, adminUsers.role))
+      .leftJoin(adminRoles, eq(adminRoles.key, adminUsers.role))
       .where(and(eq(adminSessions.tokenHash, tokenHash), isNull(adminSessions.revokedAt), eq(adminUsers.status, "active")))
       .limit(1);
     if (!row) return undefined;
@@ -120,13 +123,12 @@ export class AuthRepository {
         id: row.id,
         email: row.email,
         role: row.role,
-        roleLabel: row.roleLabel,
+        roleLabel: row.roleLabel ?? NO_ROLE,
         displayName: row.displayName,
         accountNumber: row.accountNumber,
         timeZone: row.timeZone,
         appearance: row.appearance,
         hasPicture: row.pictureKey !== null,
-        personId: row.personId,
         permissions: row.permissions ?? [],
       },
     };

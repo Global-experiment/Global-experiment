@@ -4,7 +4,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { PinoLogger } from "nestjs-pino";
 import { actorFor, AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditChange } from "../audit/audit.types.js";
-import { entryLabel, moneyLabel } from "../audit/entity-labels.js";
+import { entryLabel } from "../audit/entity-labels.js";
 import type { AdminPrincipal } from "../auth/auth.service.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
@@ -178,29 +178,11 @@ export class TreasuryAdminService {
     tx: Executor,
     entry: Entry,
     admin: AdminPrincipal,
-    action: "updated" | "archived" | "restored" | "deleted",
+    action: "updated" | "archived" | "restored",
     changes: AuditChange[] = [],
-    meta: Record<string, unknown> = {},
   ) {
     if (action === "updated" && changes.length === 0) return;
-    await this.audit.record(tx, { entityType: "treasury_entry", entityId: entry.id, action, actor: actorFor(admin), source: "admin", changes, meta: { label: entryLabel(entry), ...meta } });
-  }
-
-  /** What a deleted entry was, kept in its "deleted" event: the History is the only trace left of it. */
-  private static deletedDetails(dto: TreasuryEntryDto): { label: string; value: string }[] {
-    const details = [
-      { label: "Number", value: `EXP-${dto.number}` },
-      { label: "Name", value: dto.name },
-      { label: "Type", value: dto.type[0]!.toUpperCase() + dto.type.slice(1) },
-      { label: "Date", value: dto.occurredOn },
-      { label: "Amount", value: moneyLabel(dto.grossAmount, dto.currency) },
-      { label: "Recipient", value: dto.recipient?.name ?? "" },
-      { label: "Expense types", value: dto.expenseTypes.map((type) => type.label).join(", ") },
-      { label: "Review status", value: dto.review.label },
-      { label: "Publication", value: dto.publication === "published" ? "Published" : "Unpublished" },
-      { label: "Documents", value: dto.documents > 0 ? String(dto.documents) : "" },
-    ];
-    return details.filter((detail) => detail.value !== "");
+    await this.audit.record(tx, { entityType: "treasury_entry", entityId: entry.id, action, actor: actorFor(admin), source: "admin", changes, meta: { label: entryLabel(entry) } });
   }
 
   async update(id: string, body: UpdateTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
@@ -249,25 +231,6 @@ export class TreasuryAdminService {
     });
     if (entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
     return this.get(id);
-  }
-
-  /**
-   * Permanent delete (decision 12): owner only, the entry number typed
-   * exactly, logged. Only manual entries (those copied from Notion
-   * included): Stripe entries are the ledger's record — archive them instead.
-   */
-  async delete(id: string, confirm: string, admin: AdminPrincipal | undefined): Promise<void> {
-    const editor = this.assertTreasuryAdmin(admin);
-    const entry = await this.load(id);
-    if (entry.source !== "manual") throw refused("cannot_delete", "Only manual entries can be deleted; archive Stripe entries instead.");
-    if (confirm.trim() !== `EXP-${entry.entryNumber}`) throw new ValidationFailedError([{ path: "confirm", message: `Type EXP-${entry.entryNumber} to confirm.` }]);
-    const details = TreasuryAdminService.deletedDetails(await this.get(id));
-    await this.db.transaction(async (tx) => {
-      await this.recordEntry(tx, entry, editor, "deleted", [], { details });
-      await tx.delete(treasuryDocuments).where(eq(treasuryDocuments.entryId, id));
-      await tx.delete(treasuryEntries).where(eq(treasuryEntries.id, id));
-    });
-    if (entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
   }
 
   async publish(id: string, publish: boolean, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {

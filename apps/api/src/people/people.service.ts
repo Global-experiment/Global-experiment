@@ -4,7 +4,7 @@ import type { AuditActor, AuditChange } from "../audit/audit.types.js";
 import { entryLabel } from "../audit/entity-labels.js";
 import { diffRecord } from "../audit/record-fields.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationFailedError, type ValidationIssue } from "../common/errors/api-error.js";
+import { NotFoundError, ValidationFailedError, type ValidationIssue } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
 import { countExistingExpertise } from "../expertise/expertise-refs.js";
 import { countExistingOrganizations } from "../organizations/organization-refs.js";
@@ -134,31 +134,6 @@ export class PeopleService {
       await this.repository.setArchived(tx, id, archived && actor.type === "admin" ? actor.id : null);
       await this.audit.record(tx, { entityType: ENTITY, entityId: id, action: archived ? "archived" : "restored", actor, source: "admin", meta: { label: labelOfPerson(before) } });
       return (await this.repository.findById(id, tx))!;
-    });
-  }
-
-  /**
-   * Permanent delete (decision 12): directory.delete, the person's name typed
-   * exactly, logged before the row goes. Refused while expenses name them
-   * as recipient (the ledger keeps its recipients).
-   */
-  async delete(id: string, confirm: string, actor: AuditActor): Promise<void> {
-    // directory.delete is checked by the permission guard (the Rootadmin's, overview §3.1).
-    if (actor.type !== "admin") throw new ForbiddenError("Only an admin can delete permanently.");
-    const person = await this.get(id);
-    if (confirm.trim() !== person.name) throw new ValidationFailedError([{ path: "confirm", message: "Type the person's name exactly to confirm." }]);
-    if (await this.repository.hasExpenses(id)) throw new ConflictError("This person is the recipient of expenses: unlink them first, or archive the person.");
-    if (await this.repository.hasGrants(id)) throw new ConflictError("This person has permissions: delete or reassign them first, or archive the person.");
-    await this.db.transaction(async (tx) => {
-      await this.audit.record(tx, {
-        entityType: ENTITY,
-        entityId: id,
-        action: "deleted",
-        actor,
-        source: "admin",
-        meta: { label: labelOfPerson(person), number: `PER-${person.personNumber}` },
-      });
-      await this.repository.delete(tx, id);
     });
   }
 

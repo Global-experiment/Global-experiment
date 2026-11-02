@@ -84,7 +84,6 @@ export const TREASURY_COPY = {
     expenses: "Expenses",
     noValue: "–",
     /** Under the stats while Balance and Sustainability are samples (treasury.sample_figures, before Wise). */
-    sampleNote: "Balance and Sustainability are sample figures until the Wise account is connected.",
     sampleCaption: "Sample figure, until the Wise account is connected",
     balanceDetail: {
       title: "Balance",

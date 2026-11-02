@@ -67,6 +67,10 @@ test.describe("Treasury list", () => {
     // Stats in the stats currency setting (USD); Balance and Sustainability wait for Wise.
     await expect(page.locator("[data-stat-label]")).toHaveText(["Med. donation", "Expenses"]);
     await expect(page.locator("[data-stat-value]")).toHaveText(["$6.4", "5.8K"]);
+    // OPS-128: the filters come below the stats, and no note sits under them.
+    const statsBottom = (await page.locator("[data-stat-value]").first().boundingBox())!.y;
+    expect((await page.getByRole("group", { name: "Show" }).boundingBox())!.y).toBeGreaterThan(statsBottom);
+    await expect(page.getByText(/sample figures until the Wise account is connected/)).toHaveCount(0);
     await page.getByRole("button", { name: /Expenses$/ }).filter({ has: page.locator("[data-stat-value]") }).click();
     const sheet = page.getByRole("dialog", { name: "Expenses" });
     await expect(sheet.getByText("USD 5,775", { exact: true })).toBeVisible();

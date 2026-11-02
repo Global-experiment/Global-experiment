@@ -9,12 +9,11 @@ import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
 import { useCan } from "../session";
 import { AdminButton, StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, DateField, Pills, PropertyRow, recordInput } from "../ui/RecordForm";
+import { AutoGrowTextarea, DateField, Pills, PropertyRow, ReadOnlyValue } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 
 interface Draft {
-  name: string;
   person: RelationOption[];
   account: RelationOption[];
   service: RelationOption[];
@@ -26,14 +25,13 @@ interface Draft {
   revokedOn: string;
 }
 
-const EMPTY: Draft = { name: "", person: [], account: [], service: [], levelKey: "", statusKey: "", resourceScope: "", grantedOn: "", expiresOn: "", revokedOn: "" };
+const EMPTY: Draft = { person: [], account: [], service: [], levelKey: "", statusKey: "", resourceScope: "", grantedOn: "", expiresOn: "", revokedOn: "" };
 
 const personOption = (ref: { id: string; name: string }): RelationOption => ({ id: ref.id, label: ref.name, href: `/admin/people/${ref.id}` });
 const accountOption = (ref: { id: string; name: string }): RelationOption => ({ id: ref.id, label: ref.name, href: `/admin/accounts/${ref.id}` });
 const serviceOption = (ref: { id: string; name: string }): RelationOption => ({ id: ref.id, label: ref.name, href: `/admin/services/${ref.id}` });
 
 const toDraft = (grant: Grant): Draft => ({
-  name: grant.name ?? "",
   person: grant.person ? [personOption(grant.person)] : [],
   account: grant.account ? [accountOption(grant.account)] : [],
   service: [serviceOption(grant.service)],
@@ -53,7 +51,6 @@ function bodyFor(base: Draft | null, draft: Draft): Record<string, unknown> {
   const changed = <Key extends keyof Draft>(key: Key, same: (a: Draft[Key], b: Draft[Key]) => boolean) => base === null || !same(base[key], draft[key]);
   const text = (a: string, b: string) => a.trim() === b.trim();
   const ref = (a: RelationOption[], b: RelationOption[]) => one(a) === one(b);
-  if (changed("name", text)) body.name = draft.name.trim() || null;
   if (changed("person", ref)) body.personId = one(draft.person);
   if (changed("account", ref)) body.adminUserId = one(draft.account);
   if (changed("service", ref) && one(draft.service)) body.serviceId = one(draft.service);
@@ -70,7 +67,7 @@ export function grantDraftErrors(draft: Pick<Draft, "service" | "grantedOn" | "e
   const errors: Record<string, string> = {};
   if (draft.service.length === 0) errors.service = "Choose a service.";
   if (draft.grantedOn && draft.revokedOn && draft.revokedOn < draft.grantedOn) errors.revokedOn = "Revoked can't be before granted.";
-  if (draft.grantedOn && draft.expiresOn && draft.expiresOn < draft.grantedOn) errors.expiresOn = "Expires can't be before granted.";
+  if (draft.grantedOn && draft.expiresOn && draft.expiresOn < draft.grantedOn) errors.expiresOn = "Expired can't be before granted.";
   return errors;
 }
 
@@ -88,12 +85,18 @@ async function searchServices(text: string, signal: AbortSignal): Promise<Relati
 
 const pills = (entries: { key: string; label: string }[] | undefined) => (entries ?? []).map((entry) => ({ value: entry.key, label: entry.label }));
 
+/** "ChatGPT / Candide / Owner" (OPS-138): what the API names the permission, shown as it is being filled. */
+export function grantName(service: string | null, account: string | null, level: string | null): string {
+  return [service, account, level ? level.charAt(0).toUpperCase() + level.slice(1) : null].filter((part): part is string => !!part).join(" / ");
+}
+
 /**
- * /admin/permissions/[id] — one access grant (p17): who (a person, and
- * their admin account if they have one), which service, at what level,
- * its status and scope, and when it was granted, expires or was revoked.
- * Every change shows in the history here and — as granted, changed or
- * revoked access — on the person, the account and the service.
+ * /admin/permissions/[id] — one access grant (p17), its fields in the
+ * order Candide asked (OPS-148): Service, Account, Permission level,
+ * Status, Scope, Granted, Revoked, Expired, People, then its Name — made
+ * from the service, the account and the level (OPS-138), never typed.
+ * Each save is one event in its history, also shown on the account, the
+ * service and the person (OPS-151). Archived, never deleted (OPS-147).
  * /admin/permissions/new creates one (prefilled with ?service= or ?person=).
  */
 export function GrantRecord({ id }: { id: string }) {
@@ -115,20 +118,15 @@ function GrantFields({
   const accounts = options?.accounts ?? [];
   const searchAccounts = async (text: string): Promise<RelationOption[]> =>
     accounts.filter((account) => account.name.toLowerCase().includes(text.trim().toLowerCase())).map(accountOption);
-  const automatic = draft.service[0] ? `${draft.service[0].label}${draft.levelKey ? ` / ${draft.levelKey}` : ""}` : "Service / level";
+  const levelLabel = options?.levels.find((level) => level.key === draft.levelKey)?.label ?? null;
+  const name = grantName(draft.service[0]?.label ?? null, draft.account[0]?.label ?? null, levelLabel);
   return (
     <>
-      <PropertyRow icon="title" label="Name" htmlFor="grant-name" hint="Empty: the service and the level.">
-        <input id="grant-name" value={draft.name} onChange={(e) => set("name", e.target.value)} maxLength={200} autoComplete="off" placeholder={automatic} className={recordInput} />
-      </PropertyRow>
-      <PropertyRow icon="arrow_outward" label="Person">
-        <RelationPicker label="Person" selected={draft.person} onChange={(next) => set("person", next.slice(-1))} search={searchPeople} max={1} limitMessage="One person per permission." />
-      </PropertyRow>
-      <PropertyRow icon="arrow_outward" label="Account">
-        <RelationPicker label="Account" selected={draft.account} onChange={(next) => set("account", next.slice(-1))} search={searchAccounts} max={1} limitMessage="One admin account per permission." />
-      </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Service" error={errors.service}>
         <RelationPicker label="Service" selected={draft.service} onChange={(next) => set("service", next.slice(-1))} search={searchServices} max={1} limitMessage="One service per permission." />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="Account">
+        <RelationPicker label="Account" selected={draft.account} onChange={(next) => set("account", next.slice(-1))} search={searchAccounts} max={1} limitMessage="One account per permission." />
       </PropertyRow>
       <PropertyRow icon="select" label="Permission level">
         <Pills label="Permission level" allowEmpty options={pills(options?.levels)} value={draft.levelKey} onChange={(value) => set("levelKey", value)} />
@@ -136,17 +134,23 @@ function GrantFields({
       <PropertyRow icon="select" label="Status">
         <Pills label="Status" allowEmpty options={pills(options?.accessStatuses)} value={draft.statusKey} onChange={(value) => set("statusKey", value)} />
       </PropertyRow>
-      <PropertyRow icon="title" label="Resource scope" htmlFor="grant-scope">
+      <PropertyRow icon="title" label="Scope" htmlFor="grant-scope">
         <AutoGrowTextarea id="grant-scope" value={draft.resourceScope} onChange={(e) => set("resourceScope", e.target.value)} maxLength={1000} placeholder="Which organization, project or files…" />
       </PropertyRow>
       <PropertyRow icon="schedule" label="Granted" error={errors.grantedOn}>
         <DateField id="grant-granted" label="Granted" value={draft.grantedOn} onChange={(value) => set("grantedOn", value)} error={errors.grantedOn} />
       </PropertyRow>
-      <PropertyRow icon="schedule" label="Expires" error={errors.expiresOn}>
-        <DateField id="grant-expires" label="Expires" value={draft.expiresOn} onChange={(value) => set("expiresOn", value)} error={errors.expiresOn} />
-      </PropertyRow>
       <PropertyRow icon="schedule" label="Revoked" error={errors.revokedOn}>
         <DateField id="grant-revoked" label="Revoked" value={draft.revokedOn} onChange={(value) => set("revokedOn", value)} error={errors.revokedOn} />
+      </PropertyRow>
+      <PropertyRow icon="schedule" label="Expired" error={errors.expiresOn}>
+        <DateField id="grant-expires" label="Expired" value={draft.expiresOn} onChange={(value) => set("expiresOn", value)} error={errors.expiresOn} />
+      </PropertyRow>
+      <PropertyRow icon="arrow_outward" label="People">
+        <RelationPicker label="People" selected={draft.person} onChange={(next) => set("person", next.slice(-1))} search={searchPeople} max={1} limitMessage="One person per permission." />
+      </PropertyRow>
+      <PropertyRow icon="title" label="Name" hint="Made from the service, the account and the permission level.">
+        <ReadOnlyValue>{name || <span className="text-text-muted">Service / Account / Permission level</span>}</ReadOnlyValue>
       </PropertyRow>
     </>
   );
@@ -208,10 +212,8 @@ function NewGrantRecord() {
 }
 
 function ExistingGrantRecord({ id }: { id: string }) {
-  const router = useRouter();
   const toast = useToast();
   const canUpdate = useCan("access.update");
-  const canDelete = useCan("access.delete");
   const grant = useAdminData<Grant>(`/access-grants/${id}`);
   const options = useAdminData<ServicesOptions>("/services/options");
   const history = useAdminData<RecordHistory>(`/history/access_grant/${id}`);
@@ -281,7 +283,7 @@ function ExistingGrantRecord({ id }: { id: string }) {
     <RecordPage
       backHref="/admin/permissions"
       backLabel="Permissions"
-      title={draft.name.trim() || loaded.title}
+      title={loaded.title}
       entity={{ type: "access_grant", id }}
       entityNoun="permission"
       recordLink={(other) => `/admin/permissions/${other}`}
@@ -294,16 +296,6 @@ function ExistingGrantRecord({ id }: { id: string }) {
         },
         archived: loaded.archivedAt !== null,
         setArchived,
-        remove: canDelete
-          ? {
-              confirmText: number,
-              run: async (confirm) => {
-                await adminApi(`/access-grants/${id}`, { method: "DELETE", body: { confirm } });
-                toast("Permission deleted");
-                router.push("/admin/permissions");
-              },
-            }
-          : undefined,
         savedMessage: "Permission updated",
         dirty,
         busy,

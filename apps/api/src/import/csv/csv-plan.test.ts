@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { autoMapping } from "./csv-fields.js";
 import { parseCsv } from "./csv-parse.js";
-import { csvCounts, CsvMappingError, planCsvImport, type CsvSnapshot } from "./csv-plan.js";
+import { csvCounts, CsvMappingError, planCsvImport, type CsvSnapshot, type ValueChoices } from "./csv-plan.js";
 
 // Test fixtures only.
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString().padStart(12, "0")}`;
@@ -25,12 +25,16 @@ const snapshot: CsvSnapshot = {
     { id: id(11), name: "Twin" },
     { id: id(12), name: "Twin" },
   ],
-  expertise: [{ id: id(20), name: "Facilitation" }],
+  expertise: [
+    { id: id(20), name: "Facilitation" },
+    { id: id(21), name: "Copywriting" },
+    { id: id(22), name: "Économie sociale" },
+  ],
 };
 
-const plan = (csv: string, options: { include?: number[]; mapping?: (string | null)[] } = {}) => {
+const plan = (csv: string, options: { include?: number[]; mapping?: (string | null)[]; choices?: ValueChoices } = {}) => {
   const parsed = parseCsv(new TextEncoder().encode(csv));
-  return planCsvImport({ table: "people", fileName: "people.csv", parsed, mapping: options.mapping ?? autoMapping("people", parsed.headers), include: options.include }, snapshot);
+  return planCsvImport({ table: "people", fileName: "people.csv", parsed, mapping: options.mapping ?? autoMapping("people", parsed.headers), include: options.include, choices: options.choices }, snapshot);
 };
 
 describe("CSV import plan (people)", () => {
@@ -58,29 +62,21 @@ describe("CSV import plan (people)", () => {
     });
   });
 
-  it("reports every problem of a row, with the field it's about, using the detail page's rules", () => {
+  it("reports every real problem of a row, with the field it's about, using the detail page's rules; unknown values are only warnings", () => {
     const result = plan(
       "Name,Email,Website,State,Relevance score,First contact,Organizations,ID\n" +
         "Eve Broken,not-an-email,not a link,Unknown,eleven,2026-02-30,Nowhere Ltd,PER-12\n" +
         ",,,,,,,\n" +
         "Fay Twin,,,,12,,Twin,not-a-uuid\n",
     );
-    expect(result.rows.map((row) => [row.line, row.status, row.errors])).toEqual([
+    expect(result.rows.map((row) => [row.line, row.status, row.errors, row.warnings])).toEqual([
       [
         2,
         "error",
-        [
-          'State: "Unknown" isn\'t one of: Sourced, Collaborating.',
-          "Relevance score: use a whole number from 0 to 10.",
-          "First contact: use a date like 2026-10-30.",
-          'Organizations: no organization named "Nowhere Ltd" (import or create it first).',
-        ],
+        ["Relevance score: use a whole number from 0 to 10.", "First contact: use a date like 2026-10-30."],
+        ['State: no state named "Unknown"; imported without it.', 'Organizations: no organization named "Nowhere Ltd"; imported without it.'],
       ],
-      [
-        4,
-        "error",
-        ['Organizations: several organizations are named "Twin": link this one on the record.', "ID (UUID): use the record's UUID (PER-, ORG- and GE- numbers aren't used)."],
-      ],
+      [4, "error", ["ID (UUID): use the record's UUID (PER-, ORG- and GE- numbers aren't used)."], ['Organizations: several are named "Twin"; imported without it.']],
     ]);
     // Once the lookups pass, the request schema speaks: email, link and score range.
     const second = plan("Name,Email,Website,Relevance score\nGus,not-an-email,not a link,12\n,a@example.net,,\n");
@@ -111,7 +107,57 @@ describe("CSV import plan (people)", () => {
       // PER-1 three times: display numbers are not compared.
       [8, "create", null, null],
     ]);
-    expect(csvCounts(result)).toEqual({ fileName: "people.csv", rows: 7, create: 2, duplicates: 5, duplicatesIncluded: 0, errors: 0 });
+    expect(csvCounts(result)).toEqual({ fileName: "people.csv", rows: 7, create: 2, duplicates: 5, duplicatesIncluded: 0, errors: 0, warnings: 0 });
+  });
+
+  describe("unknown values (OPS-153)", () => {
+    // As Notion exported the client's file on 2026-10-30: links after each name, "Other" as a channel.
+    const notion =
+      "Name,Email,Expertise,Contact channels\n" +
+      'Kim Lee,kim@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Other"\n' +
+      'Lou Ray,lou@example.net,"  copywriting ",Other\n' +
+      'Max Roe,not-an-email,"Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)",\n' +
+      ",nameless@example.net,Copywriting,\n";
+
+    it("imports the row without the value it doesn't know, with a warning; Notion's app.notion.com links are removed", () => {
+      const result = plan(notion);
+      expect(result.rows.map((row) => [row.line, row.status])).toEqual([
+        [2, "create"],
+        [3, "create"],
+        // Real errors still refuse a row: an invalid email, no name.
+        [4, "error"],
+        [5, "error"],
+      ]);
+      expect(result.rows[0]!.request).toMatchObject({ expertiseIds: [id(21)], contactChannelKeys: ["email"] });
+      expect(result.rows[0]!.warnings).toEqual(['Expertise: no expertise named "Game design"; imported without it.', 'Contact channels: no contact channel named "Other"; imported without it.']);
+      // Case and extra spaces ignored.
+      expect(result.rows[1]!.request).toMatchObject({ expertiseIds: [id(21)] });
+      expect(result.rows[2]!.errors).toEqual(["Email: Invalid email address."]);
+      expect(result.rows[3]!.errors).toEqual(["Name is required."]);
+      expect(csvCounts(result)).toMatchObject({ create: 2, errors: 2, warnings: 2 });
+    });
+
+    it("lists each unknown value once, with its rows and what it can be mapped to", () => {
+      const result = plan(notion);
+      expect(result.unknown.map((field) => [field.field, field.label, field.values.map((value) => [value.value, value.key, value.rows, value.problem])])).toEqual([
+        ["contactChannels", "Contact channels", [["Other", "other", 2, "unknown"]]],
+        ["expertise", "Expertise", [["Game design", "game design", 2, "unknown"]]],
+      ]);
+      expect(result.unknown[1]!.options.map((option) => option.label)).toEqual(["Copywriting", "Économie sociale", "Facilitation"]);
+    });
+
+    it("maps an unknown value to an existing one, or skips it, as the admin chose", () => {
+      const result = plan(notion, { choices: { expertise: { "game design": id(20) }, contactChannels: { other: null } } });
+      expect(result.rows[0]!.request).toMatchObject({ expertiseIds: [id(21), id(20)], contactChannelKeys: ["email"] });
+      expect(result.rows[0]!.warnings).toEqual(['Contact channels: "Other" skipped.']);
+      expect(result.unknown.find((field) => field.field === "expertise")!.values[0]).toMatchObject({ value: "Game design", choice: id(20) });
+      // A choice that isn't one of the options changes nothing.
+      expect(plan(notion, { choices: { expertise: { "game design": id(99) } } }).rows[0]!.request).toMatchObject({ expertiseIds: [id(21)] });
+    });
+
+    it("matches accents too", () => {
+      expect(plan("Name,Expertise\nNoa,economie   SOCIALE\n").rows[0]).toMatchObject({ status: "create", warnings: [], request: { expertiseIds: [id(22)] } });
+    });
   });
 
   it("imports a flagged row only when the admin includes it, still marked as a possible duplicate", () => {

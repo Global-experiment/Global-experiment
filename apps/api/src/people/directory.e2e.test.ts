@@ -366,16 +366,13 @@ describe("native directory API", () => {
       await admin.post("/api/admin/expertise/domains", { name: "technology" }).expect(409);
     });
 
-    it("renames, and deletes only what nothing depends on", async () => {
-      const { domain, field, web, backend } = await taxonomy();
-      await createPerson({ name: "P", expertiseIds: [web.id] });
+    it("renames, and deletes nothing (OPS-147)", async () => {
+      const { domain, field, backend } = await taxonomy();
       await admin.patch(`/api/admin/expertise/items/${backend.id}`, { name: "Server development" }).expect(200);
-
-      await admin.delete(`/api/admin/expertise/items/${web.id}`).expect(409);
-      await admin.delete(`/api/admin/expertise/fields/${field.id}`).expect(409);
-      await admin.delete(`/api/admin/expertise/domains/${domain.id}`).expect(409);
-      await admin.delete(`/api/admin/expertise/items/${backend.id}`).expect(204);
-      await admin.delete(`/api/admin/expertise/items/${backend.id}`).expect(404);
+      for (const path of [`items/${backend.id}`, `fields/${field.id}`, `domains/${domain.id}`]) {
+        expect((await admin.delete(`/api/admin/expertise/${path}`)).status).toBe(404);
+      }
+      expect(await t.db.$count(expertiseItems)).toBeGreaterThan(0);
       await admin.post("/api/admin/expertise/fields", { name: "X", domainId: "00000000-0000-4000-8000-000000000000" }).expect(404);
     });
   });
@@ -521,9 +518,9 @@ describe("native directory API", () => {
         ],
       });
 
-      // An expertise with teams can still be deleted when nothing else uses it; its team links go with it.
-      await admin.delete(`/api/admin/expertise/items/${web.id}`).expect(204);
-      expect(await t.db.$count(expertiseTeams)).toBe(0);
+      // Nothing is deleted (OPS-147): the expertise and its teams stay.
+      expect((await admin.delete(`/api/admin/expertise/items/${web.id}`)).status).toBe(404);
+      expect(await t.db.$count(expertiseTeams)).toBe(2);
     });
   });
 });

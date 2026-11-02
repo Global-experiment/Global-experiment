@@ -177,7 +177,8 @@ erDiagram
 
   admin_roles ||--o{ admin_users : role
   admin_roles }o--o{ admin_permissions : admin_role_permissions
-  admin_users |o--o| people : "is"
+  admin_users }o--o{ expertise_items : admin_user_expertise
+  admin_invitations |o--o| admin_users : "made"
   admin_users ||--o{ admin_sessions : "signed in"
   admin_users ||--o{ audit_events : "acted"
   import_runs ||--o{ audit_events : "caused"
@@ -929,19 +930,21 @@ History).
 
 ## 12. Imports and jobs
 
-- `import_runs` (built): one row per run. Kinds today: `directory` (Notion
-  People and Organizations) and `people_csv` / `organizations_csv` (CSV
-  import, ADR 016: `counts` holds the file name and the counts, `issues`
-  every row's outcome — created with its record id, possible duplicate with
-  the record it matched, or errors). Past `taxonomy` and `treasury` runs
-  stay as history. No other table has an import or an export.
+- `import_runs` (built): one row per run. The only kinds written today are
+  `people_csv` / `organizations_csv` (CSV import, ADR 016: `counts` holds
+  the file name and the counts, warnings included since OPS-153; `issues`
+  every row's outcome — created with its record id and the values left out,
+  possible duplicate with the record it matched, or errors). Past
+  `directory`, `taxonomy` and `treasury` runs (the Notion imports, removed
+  by OPS-154) stay as history. No other table has an import or an export.
 - Jobs: **pg-boss** keeps its own schema (`pgboss`), created and migrated by
   the library at startup, not by Drizzle. No job table of ours.
 
 ## 13. Notion import rules (People and Organizations)
 
-Since 2026-10-30 only People and Organizations are imported from Notion
-(ADR 016); the CSV import's rules are in ADR 016. The Notion rules:
+**Historical (removed 2026-11-03, OPS-154):** there is no Notion import any
+more; CSV is the only import (ADR 016). Until then only People and
+Organizations were imported from Notion, with these rules:
 
 1. **Matching** by `notion_page_id` only (taxonomy also by `stable_id`);
    never by name or email.
@@ -985,11 +988,12 @@ files; data steps and triggers are added to the generated file by hand.
 | **0011** | `link_order_and_description` | People, Organizations (built, detail-page review) | People and organizations `personal_note` → `description`; `position` on contact channels, organizations and expertise links (backfilled to the order shown) |
 | **0012** | `accounts_and_roles` | Accounts and roles (built, Delivery 2) | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_tokens`; `admin_users` account number, status, picture, time zone, appearance, note, person; the keep-a-Rootadmin trigger (§10) |
 | **0013** | `services_and_access` | Services and Permissions (built, Delivery 2) | Lookups (statuses, categories, hosting models, access levels, access statuses), `services`, `access_grants` (§9) |
-| **0014** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
-| **0015** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
-| **0016** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
-| **0017** | `waitlist` | Waitlist | `waitlist_entries` |
-| **0018** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| **0014** | `feedback_batch_1` | Candide's first feedback (built, Delivery 4, 2026-11-03) | `admin_invitations` (OPS-141, decision 018); `admin_users.role` nullable (no role yet), `admin_users.description` (OPS-144), `admin_user_expertise` (OPS-135); dropped `admin_users.note` and `person_id` (OPS-142, OPS-136; no values in production); `service_category_tags` from `services.category_key` (OPS-149); `services.responsible_admin_id` dropped after an Active Owner permission was added for each responsible account without one (OPS-130, client 2026-11-03), with one History event each; every permission named "Service / Account / Permission level" (OPS-138); `audit_events.action` += `link_revoked` |
+| **0015** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
+| **0016** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
+| **0017** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
+| **0018** | `waitlist` | Waitlist | `waitlist_entries` |
+| **0019** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
 
 Numbers follow the build order (roadmap §2); if a module moves, its
 migration takes the next free number at that time — numbers are never
