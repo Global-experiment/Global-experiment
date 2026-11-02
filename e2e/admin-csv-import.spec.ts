@@ -179,18 +179,18 @@ test("values the admin doesn't have (as in Notion's export): listed once on the 
   const csv =
     "Name,Email,Expertise,Contact channels\n" +
     `${notion},nils-${RUN}@example.net,"Interaction design (https://app.notion.com/p/Interaction-design-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Other"\n` +
-    `${other},ola-${RUN}@example.net,"  ux RESEARCH ",Other\n` +
+    `${other},ola-${RUN}@example.net,"  ux RESEARCH ",Pigeon\n` +
     `Broken ${RUN},not-an-email,Game design,\n`;
   await page.goto("/admin/imports/csv?table=people");
   await page.locator("input[type=file]").setInputFiles(file("notion-export.csv", csv));
   await expect(page.getByRole("heading", { name: /Match the columns/ })).toBeVisible();
   const unknown = page.locator("[data-unknown-values]");
   await expect(unknown.getByRole("heading", { name: "Values not found (2)" })).toBeVisible();
-  // Each once, with its rows; Notion's link removed, case and spaces ignored ("ux RESEARCH" matched).
+  // Each once, with its rows; Notion's link removed, case and spaces ignored ("ux RESEARCH" matched); "Other" is a channel since 0014.
   await expect(unknown.getByRole("rowheader", { name: "Game design" })).toBeVisible();
-  await expect(unknown.getByRole("rowheader", { name: "Other" })).toBeVisible();
-  await expect(unknown.getByRole("rowheader", { name: /Interaction design|UX research/ })).toHaveCount(0);
-  // Game design → Visual design; "Other" skipped (the default).
+  await expect(unknown.getByRole("rowheader", { name: "Pigeon" })).toBeVisible();
+  await expect(unknown.getByRole("rowheader", { name: /Interaction design|UX research|^Other$/ })).toHaveCount(0);
+  // Game design → Visual design; "Pigeon" skipped (the default).
   await unknown.getByLabel("Import Game design as").selectOption({ label: "Visual design" });
   await axe();
   await page.screenshot({ path: join(SHOTS, "ops153-columns-unknown-values-1440.png") });
@@ -199,8 +199,9 @@ test("values the admin doesn't have (as in Notion's export): listed once on the 
   await expect(page.getByRole("heading", { name: "Check before importing" })).toBeVisible();
   await expect(page.locator("[data-counts]")).toContainText("2 to add");
   await expect(page.locator("[data-counts]")).toContainText("1 with an error");
-  await expect(page.locator("[data-counts]")).toContainText("2 without some values");
-  await expect(page.locator("[data-create-row]").filter({ hasText: notion })).toContainText('Contact channels: "Other" skipped.');
+  await expect(page.locator("[data-counts]")).toContainText("1 without some values");
+  await expect(page.locator("[data-create-row]").filter({ hasText: other })).toContainText('Contact channels: "Pigeon" skipped.');
+  await expect(page.locator("[data-create-row]").filter({ hasText: notion })).not.toContainText("skipped");
   // A real error still refuses its row.
   await expect(page.locator("[data-error-row]")).toContainText("Email: Invalid email address.");
   await axe();
@@ -209,12 +210,14 @@ test("values the admin doesn't have (as in Notion's export): listed once on the 
   await expect(page.getByRole("heading", { name: "Imported" })).toBeVisible();
   await page.locator("[data-admin-toast]").getByRole("link", { name: "See the report" }).click();
   await expect(page).toHaveURL(/\/admin\/imports\/csv\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("region", { name: "Added (2)" })).toContainText('Contact channels: "Other" skipped.');
+  await expect(page.getByRole("region", { name: "Added (2)" })).toContainText('Contact channels: "Pigeon" skipped.');
   await page.screenshot({ path: join(SHOTS, "ops153-report-warnings-1440.png") });
 
   // The imported person has both expertise: the one named in the file, and the mapped one.
-  const found = (await (await page.request.get(`/api/admin/people?search=${encodeURIComponent(notion)}`)).json()) as { items: { expertise: { name: string }[] }[] };
+  const found = (await (await page.request.get(`/api/admin/people?search=${encodeURIComponent(notion)}`)).json()) as { items: { expertise: { name: string }[]; contactChannels: { label: string }[] }[] };
   expect(found.items[0]!.expertise.map((item) => item.name).sort()).toEqual(["Interaction design", "Visual design"]);
+  // "Other" is accepted as a contact channel.
+  expect(found.items[0]!.contactChannels.map((channel) => channel.label)).toEqual(["Email", "Other"]);
 });
 
 test("Treasury and every other list offer no import or export", async () => {

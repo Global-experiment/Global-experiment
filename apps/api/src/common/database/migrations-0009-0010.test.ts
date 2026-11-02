@@ -89,7 +89,7 @@ describe("migration 0010 — person fields, contact channels, archive", () => {
     expect(await rows(client, "select column_name from information_schema.columns where table_name = 'people' and column_name = 'next_followup_on'")).toEqual([]);
   });
 
-  it("seeds the nine contact channels in the decided order (vocabulary, not demo data)", async () => {
+  it("seeds the contact channels in the decided order, Other last since 0014 (vocabulary, not demo data)", async () => {
     const client = await databaseAt(journal.entries.length);
     expect((await rows<{ label: string }>(client, "select label from contact_channels order by sort_order")).map((row) => row.label)).toEqual([
       "Email",
@@ -101,6 +101,7 @@ describe("migration 0010 — person fields, contact channels, archive", () => {
       "X",
       "Matrix",
       "Workana",
+      "Other", // OPS-153, migration 0014
     ]);
     expect(await rows(client, "select count(*)::int as n from people")).toEqual([{ n: 0 }]);
   });

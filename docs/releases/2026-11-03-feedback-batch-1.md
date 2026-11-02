@@ -84,8 +84,11 @@ refused 370 rows, for two reasons only:
 None of the 370 rows had a real error (missing name, invalid email).
 
 What changed:
-- Notion's new link format is recognised. Names match even when their
-  case, accents or spaces differ.
+- Notion's links after a value are removed before matching, in both of
+  Notion's formats (notion.so and app.notion.com), for every column that
+  names existing values: Expertise, Organizations, Contact channels, State
+  and Source. Names match even when their case, accents or spaces differ.
+- **Other** is now a contact channel, so "Other" is imported as it is.
 - A value that isn't in the admin no longer refuses its row. On the
   **Columns** step, every such value is listed once, with how many rows
   use it. Choose an existing value for it, or **skip** it (the default).
@@ -95,7 +98,10 @@ What changed:
   the reason.
 
 The 24 people you imported were not touched. You can import the same file
-again: those 24 will show as possible duplicates and be skipped.
+again: we checked it on a copy of the live data, rebuilt from your import's
+report. The 24 show as possible duplicates and are skipped; the other 370
+rows are all added, with their expertise (351 rows) and the Other channel
+(188 rows), and none is left out or refused.
 
 **OPS-154 · No Notion import.** CSV is the only import: More options →
 **Import CSV** on People and on Organizations. The Notion import is gone
