@@ -38,7 +38,11 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
   });
 
   const deliver = (event: { payload: string; header: string }) =>
-    request(t.app.getHttpServer()).post("/api/stripe/webhook").set("content-type", "application/json").set("stripe-signature", event.header).send(event.payload);
+    request(t.app.getHttpServer())
+      .post("/api/stripe/webhook")
+      .set("content-type", "application/json")
+      .set("stripe-signature", event.header)
+      .send(event.payload);
 
   const send = async (type: string, objectId: string, options: Parameters<typeof signedEvent>[2] = {}) => {
     const event = signedEvent(type, objectId, options);
@@ -63,7 +67,11 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
         return (header === null ? call : call.set("stripe-signature", header)).send(body);
       };
       const signer = new Stripe("sk_test_signing_only_never_used_for_calls");
-      const stale = signer.webhooks.generateTestHeaderString({ payload: event.payload, secret: FAKE_WEBHOOK_SECRET, timestamp: Math.floor(Date.now() / 1000) - 3600 });
+      const stale = signer.webhooks.generateTestHeaderString({
+        payload: event.payload,
+        secret: FAKE_WEBHOOK_SECRET,
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      });
       const foreign = signedEvent("checkout.session.completed", "cs_test_x", { secret: "whsec_someoneelsessecret000000" });
 
       for (const [label, response] of [
@@ -139,12 +147,23 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
         internalNote: null,
         createdByAdminId: null,
       });
-      expect(await eventRow(event.id)).toMatchObject({ type: "checkout.session.completed", status: "processed", attempts: 1, lastError: null, entryId: entry!.id, objectId: donation.sessionId });
+      expect(await eventRow(event.id)).toMatchObject({
+        type: "checkout.session.completed",
+        status: "processed",
+        attempts: 1,
+        lastError: null,
+        entryId: entry!.id,
+        objectId: donation.sessionId,
+      });
       expect(revalidation.revalidate).toHaveBeenCalledExactlyOnceWith(["treasury"]);
     });
 
     it("records each currency in its own currency", async () => {
-      for (const [currency, amount] of [["EUR", 500], ["USD", 2000], ["CHF", 5000]] as const) {
+      for (const [currency, amount] of [
+        ["EUR", 500],
+        ["USD", 2000],
+        ["CHF", 5000],
+      ] as const) {
         await send("checkout.session.completed", stripe.oneOffDonation(currency, amount).sessionId);
       }
       expect((await entries()).map((entry) => [entry.currency, entry.grossAmount])).toEqual([
@@ -335,7 +354,13 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
         [partial, -300, 0, -300, donationEntry!.id],
         [rest, -700, 0, -700, donationEntry!.id],
       ]);
-      expect(refunds[0]).toMatchObject({ name: "Donation refund", publicDescription: "Refunded donation", publicationStatus: "published", reviewStatusKey: "not_required", occurredOn: "2026-10-16" });
+      expect(refunds[0]).toMatchObject({
+        name: "Donation refund",
+        publicDescription: "Refunded donation",
+        publicationStatus: "published",
+        reviewStatusKey: "not_required",
+        occurredOn: "2026-10-16",
+      });
 
       const summary = (await request(t.app.getHttpServer()).get("/api/treasury/summary?currency=EUR")).body;
       // Fully refunded: no longer counted, nothing left in the total.
@@ -440,7 +465,11 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
       });
       // Unpublished rows never count.
       await t.db.update(treasuryEntries).set({ publicationStatus: "unpublished", publishedAt: null }).where(eq(treasuryEntries.currency, "CHF"));
-      expect((await request(t.app.getHttpServer()).get("/api/treasury/summary?currency=CHF")).body).toMatchObject({ totalDonated: 0, donationCount: 0, medianDonation: null });
+      expect((await request(t.app.getHttpServer()).get("/api/treasury/summary?currency=CHF")).body).toMatchObject({
+        totalDonated: 0,
+        donationCount: 0,
+        medianDonation: null,
+      });
     });
   });
 
@@ -481,11 +510,22 @@ describe("Stripe webhook (HTTP, Stripe test double)", () => {
       await send("charge.dispute.funds_reinstated", disputeId);
       const rows = await entries();
       const [donationRow] = rows;
-      expect(rows.slice(1).map((entry) => [entry.entryType, entry.name, entry.publicDescription, entry.grossAmount, entry.feeAmount, entry.netAmount, entry.adjustsEntryId])).toEqual([
+      expect(
+        rows
+          .slice(1)
+          .map((entry) => [entry.entryType, entry.name, entry.publicDescription, entry.grossAmount, entry.feeAmount, entry.netAmount, entry.adjustsEntryId]),
+      ).toEqual([
         ["dispute", "Payment disputed", "Payment disputed", -1000, 1500, -2500, donationRow!.id],
         ["dispute", "Dispute won", "Dispute won", 1000, -1500, 2500, donationRow!.id],
       ]);
-      expect(rows[1]).toMatchObject({ source: "stripe", managedBy: "native", livemode: false, reviewStatusKey: "not_required", publicationStatus: "published", externalTransactionId: expect.stringMatching(/^txn_/) });
+      expect(rows[1]).toMatchObject({
+        source: "stripe",
+        managedBy: "native",
+        livemode: false,
+        reviewStatusKey: "not_required",
+        publicationStatus: "published",
+        externalTransactionId: expect.stringMatching(/^txn_/),
+      });
 
       summary = (await request(t.app.getHttpServer()).get("/api/treasury/summary?currency=EUR")).body;
       expect(summary).toMatchObject({ totalDonated: 1000, donationCount: 1, medianDonation: 1000 });
@@ -555,9 +595,17 @@ describe("Treasury figures in production show live entries only", () => {
   it("records test-mode donations (livemode = false) but leaves them out of every public figure", async () => {
     const donation = stripe.oneOffDonation("EUR", 1000);
     const monthly = stripe.monthlyDonation("EUR", 500);
-    for (const [type, id] of [["checkout.session.completed", donation.sessionId], ["invoice.paid", monthly.invoiceId], ["customer.subscription.created", monthly.subscriptionId]] as const) {
+    for (const [type, id] of [
+      ["checkout.session.completed", donation.sessionId],
+      ["invoice.paid", monthly.invoiceId],
+      ["customer.subscription.created", monthly.subscriptionId],
+    ] as const) {
       const event = signedEvent(type, id);
-      const res = await request(t.app.getHttpServer()).post("/api/stripe/webhook").set("content-type", "application/json").set("stripe-signature", event.header).send(event.payload);
+      const res = await request(t.app.getHttpServer())
+        .post("/api/stripe/webhook")
+        .set("content-type", "application/json")
+        .set("stripe-signature", event.header)
+        .send(event.payload);
       expect(res.body.result).toBe("processed");
     }
     expect((await t.db.select({ livemode: treasuryEntries.livemode }).from(treasuryEntries)).map((row) => row.livemode)).toEqual([false, false]);

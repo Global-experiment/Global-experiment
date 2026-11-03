@@ -20,7 +20,8 @@ import {
 
 const isDonation = (metadata: Stripe.Metadata | null | undefined) => metadata?.kind === DONATION_METADATA.kind;
 const at = (seconds: number) => new Date(seconds * 1000);
-const idOf = (value: string | { id: string } | null | undefined) => (value === null || value === undefined ? null : typeof value === "string" ? value : value.id);
+const idOf = (value: string | { id: string } | null | undefined) =>
+  value === null || value === undefined ? null : typeof value === "string" ? value : value.id;
 
 function balanceOf(value: string | Stripe.BalanceTransaction | null): BalanceInfo | null {
   if (!value || typeof value === "string") return null;
@@ -86,54 +87,54 @@ export class StripeSdkGateway implements StripeGateway {
     const description = input.productName;
     const session = await this.call(
       () =>
-      this.stripe.checkout.sessions.create(
-        {
-          mode: input.mode,
-          line_items: [
-            {
-              quantity: 1,
-              price_data: {
-                currency: input.currency.toLowerCase(),
-                unit_amount: input.amount,
-                product_data: { name: input.productName },
-                ...(input.mode === "subscription" ? { recurring: { interval: "month" as const } } : {}),
+        this.stripe.checkout.sessions.create(
+          {
+            mode: input.mode,
+            line_items: [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: input.currency.toLowerCase(),
+                  unit_amount: input.amount,
+                  product_data: { name: input.productName },
+                  ...(input.mode === "subscription" ? { recurring: { interval: "month" as const } } : {}),
+                },
               },
-            },
-          ],
-          payment_method_types: input.paymentMethodTypes,
-          // Donations are received by the association itself: never Stripe Managed
-          // Payments (Stripe as merchant of record for digital products), which some
-          // accounts enable by default and which also refuses an explicit method list.
-          managed_payments: { enabled: false },
-          // The donor pays in the currency they chose (EUR, USD or CHF — the ledger's
-          // currencies), never a local-currency conversion offered by Adaptive Pricing.
-          adaptive_pricing: { enabled: false },
-          // As little data as Stripe allows (client review 2026-10-21): the billing address only when the
-          // payment method needs it, no phone, no tax ID, no terms checkbox. Not sent, because off is
-          // Stripe's default and it refuses them as "off": name_collection (only accepted to turn a name
-          // field on) and consent_collection.promotions (not offered to Swiss accounts). No shipping
-          // address and no custom fields (not requested). Stripe always asks for the email.
-          billing_address_collection: "auto",
-          phone_number_collection: { enabled: false },
-          tax_id_collection: { enabled: false },
-          consent_collection: { terms_of_service: "none" },
-          // No "Save my information with Link" box: it is ticked by default and asks for a phone number.
-          wallet_options: { link: { display: "never" } },
-          success_url: input.successUrl,
-          cancel_url: input.cancelUrl,
-          locale: "auto",
-          metadata: { ...DONATION_METADATA },
-          ...(input.mode === "payment"
-            ? {
-                submit_type: "donate" as const,
-                // No Stripe customer is created for one-off donations: nothing to link a donor by.
-                customer_creation: "if_required" as const,
-                payment_intent_data: { metadata: { ...DONATION_METADATA }, description },
-              }
-            : { subscription_data: { metadata: { ...DONATION_METADATA }, description } }),
-        },
-        { idempotencyKey: input.idempotencyKey },
-      ),
+            ],
+            payment_method_types: input.paymentMethodTypes,
+            // Donations are received by the association itself: never Stripe Managed
+            // Payments (Stripe as merchant of record for digital products), which some
+            // accounts enable by default and which also refuses an explicit method list.
+            managed_payments: { enabled: false },
+            // The donor pays in the currency they chose (EUR, USD or CHF — the ledger's
+            // currencies), never a local-currency conversion offered by Adaptive Pricing.
+            adaptive_pricing: { enabled: false },
+            // As little data as Stripe allows (client review 2026-10-21): the billing address only when the
+            // payment method needs it, no phone, no tax ID, no terms checkbox. Not sent, because off is
+            // Stripe's default and it refuses them as "off": name_collection (only accepted to turn a name
+            // field on) and consent_collection.promotions (not offered to Swiss accounts). No shipping
+            // address and no custom fields (not requested). Stripe always asks for the email.
+            billing_address_collection: "auto",
+            phone_number_collection: { enabled: false },
+            tax_id_collection: { enabled: false },
+            consent_collection: { terms_of_service: "none" },
+            // No "Save my information with Link" box: it is ticked by default and asks for a phone number.
+            wallet_options: { link: { display: "never" } },
+            success_url: input.successUrl,
+            cancel_url: input.cancelUrl,
+            locale: "auto",
+            metadata: { ...DONATION_METADATA },
+            ...(input.mode === "payment"
+              ? {
+                  submit_type: "donate" as const,
+                  // No Stripe customer is created for one-off donations: nothing to link a donor by.
+                  customer_creation: "if_required" as const,
+                  payment_intent_data: { metadata: { ...DONATION_METADATA }, description },
+                }
+              : { subscription_data: { metadata: { ...DONATION_METADATA }, description } }),
+          },
+          { idempotencyKey: input.idempotencyKey },
+        ),
       // Stripe refuses a method/currency combination the account doesn't support.
       () => new ValidationFailedError([{ path: "method", message: "This payment method is not available for this currency right now." }]),
     );
@@ -247,7 +248,11 @@ export class StripeSdkGateway implements StripeGateway {
       amount: dispute.amount,
       currency: dispute.currency.toUpperCase(),
       status: dispute.status,
-      balanceTransactions: dispute.balance_transactions.map((transaction) => ({ id: transaction.id, created: at(transaction.created), ...balanceOf(transaction)! })),
+      balanceTransactions: dispute.balance_transactions.map((transaction) => ({
+        id: transaction.id,
+        created: at(transaction.created),
+        ...balanceOf(transaction)!,
+      })),
     };
   }
 

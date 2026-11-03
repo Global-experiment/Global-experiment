@@ -142,20 +142,25 @@ export class TreasuryLedgerRepository {
 
   /** Inserts once per Stripe object; a new entry gets its "created" event (Automation, Stripe) in the same transaction. */
   private async insertOnce(executor: Executor, externalId: string, values: typeof treasuryEntries.$inferInsert): Promise<RecordedEntry> {
-    const inserted = await executor
-      .insert(treasuryEntries)
-      .values(values)
-      .onConflictDoNothing(ON_CONFLICT)
-      .returning({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency });
+    const inserted = await executor.insert(treasuryEntries).values(values).onConflictDoNothing(ON_CONFLICT).returning({
+      id: treasuryEntries.id,
+      entryNumber: treasuryEntries.entryNumber,
+      grossAmount: treasuryEntries.grossAmount,
+      currency: treasuryEntries.currency,
+    });
     if (inserted[0]) {
-      await recordAuditEvent(executor, {
-        entityType: "treasury_entry",
-        entityId: inserted[0].id,
-        action: "created",
-        actor: AUTOMATION,
-        source: "stripe",
-        meta: { label: entryLabel(inserted[0]), collection: "Treasury", origin: "Stripe" },
-      }, values.createdAt instanceof Date ? values.createdAt : new Date());
+      await recordAuditEvent(
+        executor,
+        {
+          entityType: "treasury_entry",
+          entityId: inserted[0].id,
+          action: "created",
+          actor: AUTOMATION,
+          source: "stripe",
+          meta: { label: entryLabel(inserted[0]), collection: "Treasury", origin: "Stripe" },
+        },
+        values.createdAt instanceof Date ? values.createdAt : new Date(),
+      );
       return { entryId: inserted[0].id, created: true };
     }
     return { entryId: (await this.findStripeEntry(executor, externalId))!, created: false };
@@ -209,7 +214,16 @@ export class TreasuryLedgerRepository {
    */
   recordStripeDispute(
     executor: Executor,
-    input: { transactionId: string; gross: number; currency: string; balance: BalanceInfo; created: Date; donationEntryId: string; livemode: boolean; now: Date },
+    input: {
+      transactionId: string;
+      gross: number;
+      currency: string;
+      balance: BalanceInfo;
+      created: Date;
+      donationEntryId: string;
+      livemode: boolean;
+      now: Date;
+    },
   ): Promise<RecordedEntry> {
     const withdrawn = input.gross < 0;
     return this.insertOnce(executor, input.transactionId, {
@@ -276,7 +290,12 @@ export class TreasuryLedgerRepository {
         .update(treasuryEntries)
         .set({ ...amounts, updatedAt: now })
         .where(and(eq(treasuryEntries.id, entryId), isNull(treasuryEntries.feeAmount), isNull(treasuryEntries.settlementCurrency)))
-        .returning({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency });
+        .returning({
+          id: treasuryEntries.id,
+          entryNumber: treasuryEntries.entryNumber,
+          grossAmount: treasuryEntries.grossAmount,
+          currency: treasuryEntries.currency,
+        });
       const entry = updated[0];
       if (!entry) return false;
       // Stripe settled the payment: the fee and the net amount become known (Automation).
@@ -286,7 +305,19 @@ export class TreasuryLedgerRepository {
         { field: "netAmount", label: "Net", kind: "text", before: null, after: money(amounts.netAmount) },
       ].filter((change) => change.after !== null) as AuditChange[];
       if (changes.length > 0) {
-        await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: entry.id, action: "updated", actor: AUTOMATION, source: "stripe", changes, meta: { label: entryLabel(entry) } }, now);
+        await recordAuditEvent(
+          tx,
+          {
+            entityType: "treasury_entry",
+            entityId: entry.id,
+            action: "updated",
+            actor: AUTOMATION,
+            source: "stripe",
+            changes,
+            meta: { label: entryLabel(entry) },
+          },
+          now,
+        );
       }
       return true;
     });
@@ -335,13 +366,7 @@ export class TreasuryLedgerRepository {
     const [donors] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(stripeSubscriptions)
-      .where(
-        and(
-          eq(stripeSubscriptions.status, "active"),
-          eq(stripeSubscriptions.currency, currency),
-          inArray(stripeSubscriptions.livemode, modes),
-        ),
-      );
+      .where(and(eq(stripeSubscriptions.status, "active"), eq(stripeSubscriptions.currency, currency), inArray(stripeSubscriptions.livemode, modes)));
     const lastEntry = latest?.at ?? null;
     return {
       currency,

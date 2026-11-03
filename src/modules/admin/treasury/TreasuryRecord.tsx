@@ -134,7 +134,13 @@ export function TreasuryRecord({ id }: { id: string }) {
     <>
       <PanelButton
         icon="visibility"
-        onClick={() => void run("publication", () => adminApi(`/treasury/${id}/${published ? "unpublish" : "publish"}`, { method: "POST" }), published ? "Unpublished" : "Published")}
+        onClick={() =>
+          void run(
+            "publication",
+            () => adminApi(`/treasury/${id}/${published ? "unpublish" : "publish"}`, { method: "POST" }),
+            published ? "Unpublished" : "Published",
+          )
+        }
         disabled={!publication.allowed || dirty || busy !== null}
         title={dirty ? "Submit or discard your changes first" : (publication.reason ?? undefined)}
       >
@@ -162,7 +168,14 @@ export function TreasuryRecord({ id }: { id: string }) {
           setError(null);
         },
         archived: loaded.archivedAt !== null,
-        setArchived: !canUpdate ? undefined : (archived) => run(archived ? "archiving" : "restoring", () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }), archived ? "Entry archived" : "Entry restored"),
+        setArchived: !canUpdate
+          ? undefined
+          : (archived) =>
+              run(
+                archived ? "archiving" : "restoring",
+                () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }),
+                archived ? "Entry archived" : "Entry restored",
+              ),
         // Only manual entries can go: Stripe entries belong to the ledger.
         savedMessage: "Treasury entry updated",
         dirty,
@@ -188,7 +201,9 @@ export function TreasuryRecord({ id }: { id: string }) {
         </StatusMessage>
       ) : null}
       {loaded.sample ? (
-        <StatusMessage>Sample entry: shown on the public Treasury marked Test until go-live; npm run api:purge-sample-treasury removes every sample.</StatusMessage>
+        <StatusMessage>
+          Sample entry: shown on the public Treasury marked Test until go-live; npm run api:purge-sample-treasury removes every sample.
+        </StatusMessage>
       ) : null}
       {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
 
@@ -233,7 +248,10 @@ export function TreasuryRecord({ id }: { id: string }) {
           <PropertyRow icon="arrow_outward" label="Recipient">
             <ReadOnly>
               {loaded.recipient ? (
-                <Link href={`/admin/${loaded.recipient.kind === "person" ? "people" : "organizations"}/${loaded.recipient.id}`} className={`underline underline-offset-2 ${focusRing}`}>
+                <Link
+                  href={`/admin/${loaded.recipient.kind === "person" ? "people" : "organizations"}/${loaded.recipient.id}`}
+                  className={`underline underline-offset-2 ${focusRing}`}
+                >
                   {loaded.recipient.name}
                 </Link>
               ) : null}
@@ -257,7 +275,11 @@ export function TreasuryRecord({ id }: { id: string }) {
         <PropertyRow icon="arrow_outward" label="Adjustments">
           <div className="flex flex-col px-2">
             {loaded.adjustments.map((adjustment) => (
-              <Link key={adjustment.id} href={`/admin/treasury/${adjustment.id}`} className={`flex min-h-8 items-center underline underline-offset-2 ${focusRing}`}>
+              <Link
+                key={adjustment.id}
+                href={`/admin/treasury/${adjustment.id}`}
+                className={`flex min-h-8 items-center underline underline-offset-2 ${focusRing}`}
+              >
                 {`${TYPE_LABEL[adjustment.type as keyof typeof TYPE_LABEL] ?? adjustment.type} ${formatEntryNumber(adjustment.number)} · ${formatMoney(adjustment.grossAmount, loaded.currency)}`}
               </Link>
             ))}
@@ -315,7 +337,13 @@ export function TreasuryRecord({ id }: { id: string }) {
       ) : null}
       <PropertyRow icon="title" label="Internal note" htmlFor={permissions.editInternalNote ? "treasury-note" : undefined} hint="Admins only: never public.">
         {permissions.editInternalNote ? (
-          <AutoGrowTextarea id="treasury-note" value={draft.internalNote} onChange={(event) => set("internalNote", event.target.value)} maxLength={5000} placeholder="Notes for the admin team…" />
+          <AutoGrowTextarea
+            id="treasury-note"
+            value={draft.internalNote}
+            onChange={(event) => set("internalNote", event.target.value)}
+            maxLength={5000}
+            placeholder="Notes for the admin team…"
+          />
         ) : (
           <ReadOnly>{loaded.internalNote}</ReadOnly>
         )}
@@ -396,7 +424,11 @@ function Documents({ entryId, documents, onChange, editable }: { entryId: string
           {documents.map((document) => (
             <li key={document.id} className="flex min-h-8 items-center gap-2 border-b border-line px-2">
               <AdminIcon name="insert_drive_file" />
-              <a href={`/api/admin/treasury/documents/${document.id}`} download={document.fileName} className={`min-w-0 truncate underline underline-offset-2 ${focusRing}`}>
+              <a
+                href={`/api/admin/treasury/documents/${document.id}`}
+                download={document.fileName}
+                className={`min-w-0 truncate underline underline-offset-2 ${focusRing}`}
+              >
                 {document.fileName}
               </a>
               <span className="shrink-0 text-meta text-text-muted">

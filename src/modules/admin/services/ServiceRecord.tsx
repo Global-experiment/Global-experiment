@@ -179,12 +179,27 @@ export function ServiceRecord({ id }: { id: string }) {
           label="Category"
           reorderable
           selected={draft.categoryKeys.map((key) => ({ id: key, label: categories.find((category) => category.key === key)?.label ?? key }))}
-          onChange={(next) => set("categoryKeys", next.map((option) => option.id))}
-          search={async (text) => categories.filter((category) => category.label.toLowerCase().includes(text.trim().toLowerCase())).map((category) => ({ id: category.key, label: category.label }))}
+          onChange={(next) =>
+            set(
+              "categoryKeys",
+              next.map((option) => option.id),
+            )
+          }
+          search={async (text) =>
+            categories
+              .filter((category) => category.label.toLowerCase().includes(text.trim().toLowerCase()))
+              .map((category) => ({ id: category.key, label: category.label }))
+          }
         />
       </PropertyRow>
       <PropertyRow icon="select" label="Hosting model">
-        <Pills label="Hosting model" allowEmpty options={pills(options.data?.hostingModels)} value={draft.hostingModelKey} onChange={(value) => set("hostingModelKey", value)} />
+        <Pills
+          label="Hosting model"
+          allowEmpty
+          options={pills(options.data?.hostingModels)}
+          value={draft.hostingModelKey}
+          onChange={(value) => set("hostingModelKey", value)}
+        />
       </PropertyRow>
       <PropertyRow icon="link" label="URL" htmlFor="service-url" error={fieldErrors.url}>
         <input
@@ -201,7 +216,13 @@ export function ServiceRecord({ id }: { id: string }) {
         />
       </PropertyRow>
       <PropertyRow icon="title" label="Description" htmlFor="service-description">
-        <AutoGrowTextarea id="service-description" value={draft.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} placeholder="What it's used for…" />
+        <AutoGrowTextarea
+          id="service-description"
+          value={draft.description}
+          onChange={(e) => set("description", e.target.value)}
+          maxLength={5000}
+          placeholder="What it's used for…"
+        />
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Permissions">
         <div className="flex flex-col items-start gap-2">

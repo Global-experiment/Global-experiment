@@ -10,6 +10,8 @@ import { DocumentationContent } from "@/modules/documentation/ui/DocumentationCo
 import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { formatPublishedAt, formatUpdatedAt } from "@/modules/documentation/ui/formatPublishedAt";
 import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
+import { notionMissingLocally } from "@/shared/config/env";
+import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
 
 // getArticleBySlug() reads the same cached dataset the index page populates
 // (see getDocumentationDataset) rather than fetching fresh from Notion.
@@ -24,9 +26,8 @@ interface DocumentationArticlePageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({
-  params,
-}: DocumentationArticlePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: DocumentationArticlePageProps): Promise<Metadata> {
+  if (notionMissingLocally("documentation")) return { title: "Documentation" };
   const { slug } = await params;
   const article = await loadArticle(slug);
   if (!article) return {};
@@ -38,6 +39,8 @@ export async function generateMetadata({
  * figma.pdf p15 (metadata, tags, body, actions) under the sub-page header.
  */
 export default async function DocumentationArticlePage({ params }: DocumentationArticlePageProps) {
+  // A contributor's machine without Notion (never production): say so instead of failing.
+  if (notionMissingLocally("documentation")) return <NotionNotConnected title="Documentation" backHref="/documentation" />;
   const { slug } = await params;
   const article = await loadArticle(slug);
 

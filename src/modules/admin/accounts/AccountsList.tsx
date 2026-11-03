@@ -44,7 +44,14 @@ const COLUMNS: TableColumn<Account>[] = [
   { id: "permissions", label: "Permissions", icon: "arrow_outward", width: 164, render: (row, s) => grantLines(row.permissions, s, "service") },
   { id: "status", label: "Status", icon: "select", width: 120, defaultHidden: true, render: (row) => STATUS_LABEL[row.status] },
   { id: "number", label: "Account ID", icon: "title", width: 110, defaultHidden: true, render: (row) => row.accountId },
-  { id: "last_login", label: "Last sign-in", icon: "schedule", width: 120, defaultHidden: true, render: (row) => (row.lastLoginAt ? formatDate(row.lastLoginAt) : null) },
+  {
+    id: "last_login",
+    label: "Last sign-in",
+    icon: "schedule",
+    width: 120,
+    defaultHidden: true,
+    render: (row) => (row.lastLoginAt ? formatDate(row.lastLoginAt) : null),
+  },
 ];
 
 const VIEWS: SavedView[] = [
@@ -153,7 +160,11 @@ function InvitationsDialog({ onClose }: { onClose: () => void }) {
         ) : (
           <ul aria-label="Invitation links" className="flex flex-col">
             {invitations.data.map((invitation) => (
-              <li key={invitation.id} data-invitation={invitation.status} className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-1">
+              <li
+                key={invitation.id}
+                data-invitation={invitation.status}
+                className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line py-1"
+              >
                 <span className="w-20 shrink-0 font-bold">{INVITATION_STATUS[invitation.status]}</span>
                 <span className="min-w-0 flex-1 text-meta text-text-muted">
                   Made {formatPanelDate(invitation.createdAt)}
@@ -169,7 +180,12 @@ function InvitationsDialog({ onClose }: { onClose: () => void }) {
                   ) : null}
                 </span>
                 {invitation.status === "pending" ? (
-                  <AdminButton icon="close" onClick={() => void revoke(invitation.id)} disabled={busy !== null} aria-label={`Revoke the link made ${formatPanelDate(invitation.createdAt)}`}>
+                  <AdminButton
+                    icon="close"
+                    onClick={() => void revoke(invitation.id)}
+                    disabled={busy !== null}
+                    aria-label={`Revoke the link made ${formatPanelDate(invitation.createdAt)}`}
+                  >
                     {busy === invitation.id ? "Revoking…" : "Revoke"}
                   </AdminButton>
                 ) : null}

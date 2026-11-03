@@ -89,10 +89,7 @@ export function mapNotionPageProperties(page: PageObjectResponse): MappedNotionP
   }
 
   const displayOrderRaw = getNumber(properties["Display order"]);
-  const displayOrder =
-    displayOrderRaw !== undefined && Number.isFinite(displayOrderRaw)
-      ? displayOrderRaw
-      : FALLBACK_DISPLAY_ORDER;
+  const displayOrder = displayOrderRaw !== undefined && Number.isFinite(displayOrderRaw) ? displayOrderRaw : FALLBACK_DISPLAY_ORDER;
 
   if (displayOrder === FALLBACK_DISPLAY_ORDER) {
     logger.warn("Notion Documentation page has missing/invalid Display order; sorting last", {

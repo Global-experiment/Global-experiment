@@ -1,20 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import {
-  and,
-  asc,
-  eq,
-  exists,
-  ilike,
-  inArray,
-  isNotNull,
-  isNull,
-  ne,
-  not,
-  notIlike,
-  or,
-  sql,
-  type SQL,
-} from "drizzle-orm";
+import { and, asc, eq, exists, ilike, inArray, isNotNull, isNull, ne, not, notIlike, or, sql, type SQL } from "drizzle-orm";
 import type { Executor } from "../audit/audit.service.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
@@ -39,15 +24,7 @@ import type {
   UpdatePersonRequest,
   VocabularyEntry,
 } from "./people.contracts.js";
-import {
-  contactChannels,
-  people,
-  peopleExpertise,
-  peopleOrganizations,
-  personContactChannels,
-  personSources,
-  personStates,
-} from "./people.schema.js";
+import { contactChannels, people, peopleExpertise, peopleOrganizations, personContactChannels, personSources, personStates } from "./people.schema.js";
 
 /**
  * Overdue follow-up: the next follow-up (date and time) has passed, and the
@@ -113,9 +90,7 @@ function orderBy(sorts: readonly Sort<PeopleSortField>[]): SQL[] {
     next_followup: sql`${people.nextFollowupAt}`,
   };
   return [
-    ...sorts.map(({ field, direction }) =>
-      direction === "asc" ? sql`${expression[field]} asc nulls last` : sql`${expression[field]} desc nulls last`,
-    ),
+    ...sorts.map(({ field, direction }) => (direction === "asc" ? sql`${expression[field]} asc nulls last` : sql`${expression[field]} desc nulls last`)),
     asc(people.id),
   ];
 }
@@ -180,7 +155,10 @@ const COPIED = [
  */
 @Injectable()
 export class PeopleRepository {
-  constructor(@Inject(DATABASE) private readonly db: Database, @Inject(CLOCK) private readonly clock: Clock) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
 
   async list(query: PeopleListQuery): Promise<Page<PersonDto>> {
     const where = this.whereClause(query);
@@ -190,7 +168,10 @@ export class PeopleRepository {
         .orderBy(...orderBy(query.sort))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
-      this.db.select({ total: sql<number>`count(*)::int` }).from(people).where(where),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(people)
+        .where(where),
     ]);
     return {
       items: await this.hydrate(rows),
@@ -228,7 +209,10 @@ export class PeopleRepository {
 
   async countContactChannels(keys: readonly string[]): Promise<number> {
     if (keys.length === 0) return 0;
-    const rows = await this.db.select({ key: contactChannels.key }).from(contactChannels).where(inArray(contactChannels.key, [...keys]));
+    const rows = await this.db
+      .select({ key: contactChannels.key })
+      .from(contactChannels)
+      .where(inArray(contactChannels.key, [...keys]));
     return rows.length;
   }
 
@@ -287,7 +271,10 @@ export class PeopleRepository {
       .from(peopleOrganizations)
       .where(eq(peopleOrganizations.personId, id));
     if (organizationLinks.length > 0) await tx.insert(peopleOrganizations).values(organizationLinks.map((link) => ({ personId: copyId, ...link })));
-    const expertiseLinks = await tx.select({ expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position }).from(peopleExpertise).where(eq(peopleExpertise.personId, id));
+    const expertiseLinks = await tx
+      .select({ expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position })
+      .from(peopleExpertise)
+      .where(eq(peopleExpertise.personId, id));
     if (expertiseLinks.length > 0) await tx.insert(peopleExpertise).values(expertiseLinks.map((link) => ({ personId: copyId, ...link })));
     const channelLinks = await tx
       .select({ channelKey: personContactChannels.channelKey, position: personContactChannels.position })
@@ -416,10 +403,7 @@ export class PeopleRepository {
         .update(treasuryEntries)
         .set({ recipientPersonId: null, updatedAt: this.clock() })
         .where(
-          and(
-            eq(treasuryEntries.recipientPersonId, personId),
-            input.expenseIds.length > 0 ? not(inArray(treasuryEntries.id, input.expenseIds)) : undefined,
-          ),
+          and(eq(treasuryEntries.recipientPersonId, personId), input.expenseIds.length > 0 ? not(inArray(treasuryEntries.id, input.expenseIds)) : undefined),
         );
       if (input.expenseIds.length > 0) {
         await tx
@@ -552,7 +536,11 @@ export class PeopleRepository {
     const ids = rows.map((row) => row.id);
     const [organizationsByPerson, expertiseByPerson, channelsByPerson, expensesByPerson, grantsByPerson] = await Promise.all([
       this.organizationsFor(ids, db),
-      expertiseRefsByOwner(db as Database, { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position }, ids),
+      expertiseRefsByOwner(
+        db as Database,
+        { table: peopleExpertise, ownerId: peopleExpertise.personId, expertiseId: peopleExpertise.expertiseId, position: peopleExpertise.position },
+        ids,
+      ),
       this.channelsFor(ids, db),
       this.expensesFor(ids, db),
       grantRefsByOwner(db, "person", ids),

@@ -414,8 +414,7 @@ export interface ServicesOptions {
 }
 
 /** The user card's name: the display name, else the part of the email before "@". */
-export const adminDisplayName = (admin: Pick<AdminPrincipal, "email" | "displayName">) =>
-  admin.displayName?.trim() || admin.email.split("@")[0] || admin.email;
+export const adminDisplayName = (admin: Pick<AdminPrincipal, "email" | "displayName">) => admin.displayName?.trim() || admin.email.split("@")[0] || admin.email;
 
 // ---- Treasury (mirrors apps/api/src/treasury/treasury-admin.contracts.ts) ----
 
@@ -549,7 +548,16 @@ export interface HistoryItem {
   occurredAt: string;
   actor: { type: "admin" | "automation"; label: string };
   changes: HistoryChange[];
-  meta: { label?: string; collection?: string; importSource?: string; duplicatedFrom?: { id: string; label: string }; body?: string; origin?: string; details?: { label: string; value: string }[]; [key: string]: unknown };
+  meta: {
+    label?: string;
+    collection?: string;
+    importSource?: string;
+    duplicatedFrom?: { id: string; label: string };
+    body?: string;
+    origin?: string;
+    details?: { label: string; value: string }[];
+    [key: string]: unknown;
+  };
   comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
 }
 

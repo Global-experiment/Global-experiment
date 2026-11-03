@@ -38,7 +38,6 @@ export function reportHref(kind: ReportKind, source: string | null | undefined):
   return safe ? `${base}?source=${encodeURIComponent(safe)}` : base;
 }
 
-
 /** Reads and validates `source` from a query string (e.g. `location.search`). */
 export function sourcePageFromSearch(search: string): string | null {
   return sanitizeSourcePage(new URLSearchParams(search).get("source"));

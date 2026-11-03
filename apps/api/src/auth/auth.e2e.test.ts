@@ -24,10 +24,7 @@ describe("owner admin authentication", () => {
   let t: TestApp;
   const http = () => request(t.app.getHttpServer());
   const login = (body: object, origin: string | null = TEST_ORIGIN) => {
-    const req = http()
-      .post("/api/admin/auth/login")
-      .set("content-type", "application/json")
-      .set("x-forwarded-for", nextClientIp());
+    const req = http().post("/api/admin/auth/login").set("content-type", "application/json").set("x-forwarded-for", nextClientIp());
     if (origin) req.set("origin", origin);
     return req.send(body);
   };
@@ -62,7 +59,10 @@ describe("owner admin authentication", () => {
     });
 
     it("rejects a forged session cookie", async () => {
-      await http().get("/api/admin/auth/session").set("cookie", `ge_admin_session=${"A".repeat(43)}`).expect(401);
+      await http()
+        .get("/api/admin/auth/session")
+        .set("cookie", `ge_admin_session=${"A".repeat(43)}`)
+        .expect(401);
       await http().get("/api/admin/auth/session").set("cookie", "ge_admin_session=' OR 1=1 --").expect(401);
     });
   });
@@ -129,8 +129,7 @@ describe("owner admin authentication", () => {
   });
 
   describe("display name (Profile settings, admin/profile)", () => {
-    const profile = (cookie: string, body: object) =>
-      http().patch("/api/admin/profile").set("cookie", cookie).set("origin", TEST_ORIGIN).send(body);
+    const profile = (cookie: string, body: object) => http().patch("/api/admin/profile").set("cookie", cookie).set("origin", TEST_ORIGIN).send(body);
 
     it("is set, trimmed, returned by the session, and cleared by a blank value", async () => {
       const cookie = cookieFrom(await login({ email: OWNER_EMAIL, password: OWNER_PASSWORD }).expect(204));
@@ -161,7 +160,12 @@ describe("owner admin authentication", () => {
       const [owner] = await t.db.select().from(adminUsers);
       await expect(t.db.update(adminUsers).set({ displayName: "" }).where(eq(adminUsers.id, owner!.id))).rejects.toThrow();
       await expect(t.db.update(adminUsers).set({ displayName: " Candide" }).where(eq(adminUsers.id, owner!.id))).rejects.toThrow();
-      await expect(t.db.update(adminUsers).set({ displayName: "z".repeat(81) }).where(eq(adminUsers.id, owner!.id))).rejects.toThrow();
+      await expect(
+        t.db
+          .update(adminUsers)
+          .set({ displayName: "z".repeat(81) })
+          .where(eq(adminUsers.id, owner!.id)),
+      ).rejects.toThrow();
     });
   });
 
@@ -195,20 +199,20 @@ describe("owner admin authentication", () => {
       // One of the two may go…
       await t.db.update(adminUsers).set({ status: "deactivated" }).where(eq(adminUsers.id, second!.id));
       // …the last one may not, by status or by role (the constraint trigger checks at commit).
-      await expect(t.db.update(adminUsers).set({ status: "deactivated" }).where(eq(adminUsers.id, owner!.id))).rejects.toMatchObject({ cause: { message: expect.stringMatching(/last active Rootadmin/) } });
-      await expect(t.db.update(adminUsers).set({ role: "admin" }).where(eq(adminUsers.id, owner!.id))).rejects.toMatchObject({ cause: { message: expect.stringMatching(/last active Rootadmin/) } });
+      await expect(t.db.update(adminUsers).set({ status: "deactivated" }).where(eq(adminUsers.id, owner!.id))).rejects.toMatchObject({
+        cause: { message: expect.stringMatching(/last active Rootadmin/) },
+      });
+      await expect(t.db.update(adminUsers).set({ role: "admin" }).where(eq(adminUsers.id, owner!.id))).rejects.toMatchObject({
+        cause: { message: expect.stringMatching(/last active Rootadmin/) },
+      });
       await t.db.delete(adminUsers).where(eq(adminUsers.id, second!.id));
     });
 
     it("treats emails case-insensitively as unique and rejects unknown roles", async () => {
       const [owner] = await t.db.select().from(adminUsers).where(eq(adminUsers.role, "owner"));
       expect(owner).toBeDefined();
-      await expect(
-        t.db.insert(adminUsers).values({ email: "OWNER@EXAMPLE.ORG", role: "owner", passwordHash: "x" }),
-      ).rejects.toThrow();
-      await expect(
-        t.db.insert(adminUsers).values({ email: "editor@example.org", role: "editor", passwordHash: "x" }),
-      ).rejects.toThrow();
+      await expect(t.db.insert(adminUsers).values({ email: "OWNER@EXAMPLE.ORG", role: "owner", passwordHash: "x" })).rejects.toThrow();
+      await expect(t.db.insert(adminUsers).values({ email: "editor@example.org", role: "editor", passwordHash: "x" })).rejects.toThrow();
     });
   });
 

@@ -25,7 +25,9 @@ describe("donation rules (decided 2026-10-15)", () => {
   it("accepts amounts from 1 to 10,000 inclusive", () => {
     for (const ok of ["1", "1.00", "2", "50", "9999.99", "10000", "10000,00"]) expect(paths({ amount: ok }), ok).toEqual([]);
     expect(checkoutIssues(choice({ amount: "0.99" }), ALL_ON)).toEqual([{ path: "amount", message: "The minimum donation is 1 EUR." }]);
-    expect(checkoutIssues(choice({ amount: "10000.01", currency: "CHF" }), ALL_ON)).toEqual([{ path: "amount", message: "The maximum donation is 10,000 CHF." }]);
+    expect(checkoutIssues(choice({ amount: "10000.01", currency: "CHF" }), ALL_ON)).toEqual([
+      { path: "amount", message: "The maximum donation is 10,000 CHF." },
+    ]);
     expect(paths({ amount: "ten" })).toEqual(["amount"]);
   });
 
@@ -45,7 +47,9 @@ describe("donation rules (decided 2026-10-15)", () => {
 
   it("offers SEPA Direct Debit in EUR only", () => {
     expect(paths({ method: "sepa_debit", currency: "EUR" })).toEqual([]);
-    expect(checkoutIssues(choice({ method: "sepa_debit", currency: "USD" }), ALL_ON)).toEqual([{ path: "method", message: "This payment method is not available in USD." }]);
+    expect(checkoutIssues(choice({ method: "sepa_debit", currency: "USD" }), ALL_ON)).toEqual([
+      { path: "method", message: "This payment method is not available in USD." },
+    ]);
     expect(paths({ method: "sepa_debit", currency: "CHF" })).toEqual(["method"]);
     expect(paths({ method: "sepa_debit", frequency: "monthly" })).toEqual([]);
   });

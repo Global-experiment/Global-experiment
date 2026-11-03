@@ -11,14 +11,10 @@
  * instead of crashing a page or silently pretending it was rendered.
  */
 
-export type RichText =
-  | { kind: "text"; value: string }
-  | { kind: "link"; value: string; href: string };
+export type RichText = { kind: "text"; value: string } | { kind: "link"; value: string; href: string };
 
 export type ContentBlock =
-  | { kind: "heading"; level: 1 | 2 | 3 | 4; text: RichText[] }
-  | { kind: "paragraph"; text: RichText[] }
-  | { kind: "unsupported"; type: string };
+  { kind: "heading"; level: 1 | 2 | 3 | 4; text: RichText[] } | { kind: "paragraph"; text: RichText[] } | { kind: "unsupported"; type: string };
 
 export function richTextToPlain(text: RichText[]): string {
   return text.map((item) => item.value).join("");

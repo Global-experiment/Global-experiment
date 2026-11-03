@@ -27,8 +27,14 @@ export async function planTestDonationsPurge(db: Database): Promise<TestDonation
     .where(not(treasuryEntries.livemode))
     .groupBy(treasuryEntries.entryType);
   const count = (type: string) => byType.find((row) => row.type === type)?.count ?? 0;
-  const [subscriptions] = await db.select({ count: sql<number>`count(*)::int` }).from(stripeSubscriptions).where(not(stripeSubscriptions.livemode));
-  const [events] = await db.select({ count: sql<number>`count(*)::int` }).from(stripeEvents).where(not(stripeEvents.livemode));
+  const [subscriptions] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(stripeSubscriptions)
+    .where(not(stripeSubscriptions.livemode));
+  const [events] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(stripeEvents)
+    .where(not(stripeEvents.livemode));
   return {
     entries: { donation: count("donation"), refund: count("refund"), dispute: count("dispute") },
     subscriptions: subscriptions?.count ?? 0,
@@ -44,11 +50,23 @@ export async function purgeTestDonations(db: Database): Promise<TestDonationsPla
     // Adjustments first: a donation can't be deleted while a refund or dispute points at it.
     // Logged before the rows go (Automation: an operator command).
     const doomed = await tx
-      .select({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency })
+      .select({
+        id: treasuryEntries.id,
+        entryNumber: treasuryEntries.entryNumber,
+        grossAmount: treasuryEntries.grossAmount,
+        currency: treasuryEntries.currency,
+      })
       .from(treasuryEntries)
       .where(not(treasuryEntries.livemode));
     for (const entry of doomed) {
-      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: entry.id, action: "deleted", actor: AUTOMATION, source: "system", meta: { label: entryLabel(entry), origin: "purge-test-donations" } });
+      await recordAuditEvent(tx, {
+        entityType: "treasury_entry",
+        entityId: entry.id,
+        action: "deleted",
+        actor: AUTOMATION,
+        source: "system",
+        meta: { label: entryLabel(entry), origin: "purge-test-donations" },
+      });
     }
     await tx.delete(treasuryEntries).where(and(not(treasuryEntries.livemode), inArray(treasuryEntries.entryType, ADJUSTMENTS)));
     await tx.delete(treasuryEntries).where(not(treasuryEntries.livemode));

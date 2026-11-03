@@ -14,7 +14,17 @@ const copy = TREASURY_COPY.sort;
  * active row again flips its direction. Only Date and Amount exist for
  * Treasury entries (Figma's other rows belong to other lists).
  */
-export function TreasurySortSheet({ open, onClose, sort, onSort }: { open: boolean; onClose: () => void; sort: TreasurySort; onSort: (sort: TreasurySort) => void }) {
+export function TreasurySortSheet({
+  open,
+  onClose,
+  sort,
+  onSort,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sort: TreasurySort;
+  onSort: (sort: TreasurySort) => void;
+}) {
   const rows = [
     { field: "date", label: copy.date },
     { field: "amount", label: copy.amount },

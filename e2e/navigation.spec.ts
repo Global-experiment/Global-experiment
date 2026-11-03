@@ -43,25 +43,17 @@ test.describe("Home navigation", () => {
   test("every CTA has a real, correct href — no disabled navigation controls", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("link", { name: "Join waitlist" }).first()).toHaveAttribute(
-      "href",
-      "/waitlist",
-    );
+    await expect(page.getByRole("link", { name: "Join waitlist" }).first()).toHaveAttribute("href", "/waitlist");
     await expect(page.getByRole("link", { name: "Contribute" })).toHaveAttribute("href", "/contribute");
     await expect(page.getByRole("link", { name: "Donate" })).toHaveAttribute("href", "/donate");
     await expect(page.getByRole("link", { name: "Treasury" })).toHaveAttribute("href", "/treasury");
-    await expect(page.getByRole("link", { name: "Documentation" })).toHaveAttribute(
-      "href",
-      "/documentation",
-    );
+    await expect(page.getByRole("link", { name: "Documentation" })).toHaveAttribute("href", "/documentation");
 
     // No disabled buttons anywhere on Home.
     await expect(page.locator("button[disabled]")).toHaveCount(0);
   });
 
-  test("the action grid follows the 2026-09-24 Figma: full-width Join waitlist, then Documentation, Treasury, Contribute, Donate", async ({
-    page,
-  }) => {
+  test("the action grid follows the 2026-09-24 Figma: full-width Join waitlist, then Documentation, Treasury, Contribute, Donate", async ({ page }) => {
     await page.goto("/");
     const labels = await page.getByRole("navigation", { name: "Main" }).getByRole("link").allInnerTexts();
     expect(labels.map((l) => l.trim())).toEqual(["Join waitlist", "Documentation", "Treasury", "Contribute", "Donate"]);
@@ -86,7 +78,9 @@ test.describe("Home navigation", () => {
     await expect(page.locator("[data-action-bar]")).toBeHidden();
     await expect(page.locator("[data-action-bar-spacer]")).toBeHidden();
     // 1.5rem (24px at Figma's scale; 25.5px at the 17px desktop root).
-    const [mainPaddingBottom, root] = await page.locator("main").evaluate((el) => [getComputedStyle(el).paddingBottom, getComputedStyle(document.documentElement).fontSize]);
+    const [mainPaddingBottom, root] = await page
+      .locator("main")
+      .evaluate((el) => [getComputedStyle(el).paddingBottom, getComputedStyle(document.documentElement).fontSize]);
     expect(Number.parseFloat(mainPaddingBottom)).toBe(1.5 * Number.parseFloat(root));
   });
 
@@ -115,9 +109,7 @@ test.describe("Temporary light/dark theme toggle (client feedback item 7)", () =
 });
 
 test.describe("Documentation index", () => {
-  test("search matches the title, an expertise tag, and full body text — never just the title", async ({
-    page,
-  }) => {
+  test("search matches the title, an expertise tag, and full body text — never just the title", async ({ page }) => {
     await page.goto("/documentation", { waitUntil: "load" });
     const search = page.getByPlaceholder("Search");
 
@@ -134,9 +126,7 @@ test.describe("Documentation index", () => {
     await expect(page.getByRole("button", { name: "Introduction" })).toBeVisible();
   });
 
-  test("search auto-expands every match and highlights every occurrence; clearing restores the accordion", async ({
-    page,
-  }) => {
+  test("search auto-expands every match and highlights every occurrence; clearing restores the accordion", async ({ page }) => {
     await page.goto("/documentation", { waitUntil: "load" });
     const search = page.getByPlaceholder("Search");
     const introduction = page.getByRole("button", { name: "Introduction" });
@@ -225,9 +215,7 @@ test.describe("Documentation index", () => {
     await expect(page.getByRole("button", { name: "Version 0.1 scope" })).toBeVisible();
   });
 
-  test("expanding a row is instant — the full body is already loaded, no loading state appears", async ({
-    page,
-  }) => {
+  test("expanding a row is instant — the full body is already loaded, no loading state appears", async ({ page }) => {
     await page.goto("/documentation", { waitUntil: "load" });
     const toggle = page.getByRole("button", { name: "Introduction" });
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -239,14 +227,8 @@ test.describe("Documentation index", () => {
     await expect(page.getByRole("heading", { name: "Summary" })).toBeVisible();
     await expect(page.getByText("Loading")).toHaveCount(0);
     // Report links carry the article's anchor as their source page.
-    await expect(page.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
-      "href",
-      "/feedback?source=%2Fdocumentation%23introduction",
-    );
-    await expect(page.getByRole("link", { name: "Report issue" })).toHaveAttribute(
-      "href",
-      "/issue?source=%2Fdocumentation%23introduction",
-    );
+    await expect(page.getByRole("link", { name: "Send feedback" })).toHaveAttribute("href", "/feedback?source=%2Fdocumentation%23introduction");
+    await expect(page.getByRole("link", { name: "Report issue" })).toHaveAttribute("href", "/issue?source=%2Fdocumentation%23introduction");
   });
 
   test("each row has its own bottom stroke", async ({ page }) => {
@@ -264,18 +246,13 @@ test.describe("Documentation index", () => {
     await expect(page.getByText("The Global Experiment is an initiative")).toBeVisible();
   });
 
-  test("the overflow menu opens the page-actions sheet with no visible title, and closes with Escape", async ({
-    page,
-  }) => {
+  test("the overflow menu opens the page-actions sheet with no visible title, and closes with Escape", async ({ page }) => {
     await page.goto("/documentation", { waitUntil: "load" });
     await page.getByRole("button", { name: "Page actions" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading")).toHaveCount(0);
-    await expect(dialog.getByRole("link", { name: "Send feedback" })).toHaveAttribute(
-      "href",
-      "/feedback?source=%2Fdocumentation",
-    );
+    await expect(dialog.getByRole("link", { name: "Send feedback" })).toHaveAttribute("href", "/feedback?source=%2Fdocumentation");
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
   });
@@ -289,9 +266,7 @@ test.describe("Documentation article and history", () => {
     await expect(page.getByText("Error 404")).toBeVisible();
   });
 
-  test("back navigation from an article returns to the index (real history, not a hard-coded link)", async ({
-    page,
-  }) => {
+  test("back navigation from an article returns to the index (real history, not a hard-coded link)", async ({ page }) => {
     await page.goto("/documentation", { waitUntil: "load" });
     // The index row is a button; the article link is "Published" inside it.
     await page.getByRole("button", { name: "Introduction" }).click();
@@ -301,17 +276,13 @@ test.describe("Documentation article and history", () => {
     await expect(page).toHaveURL("/documentation");
   });
 
-  test("visiting an article directly (no in-app history) falls back to its href instead of failing", async ({
-    page,
-  }) => {
+  test("visiting an article directly (no in-app history) falls back to its href instead of failing", async ({ page }) => {
     await page.goto("/documentation/introduction", { waitUntil: "load" });
     await page.getByRole("link", { name: "Back", exact: true }).click();
     await expect(page).toHaveURL("/documentation");
   });
 
-  test("the article overflow menu offers Document history, which shows real current content with an honest no-history note", async ({
-    page,
-  }) => {
+  test("the article overflow menu offers Document history, which shows real current content with an honest no-history note", async ({ page }) => {
     await page.goto("/documentation/introduction", { waitUntil: "load" });
     await page.getByRole("button", { name: "Page actions" }).click();
     await page.getByRole("link", { name: "Document history" }).click();
@@ -329,9 +300,7 @@ test.describe("Route shells never fake a successful submission", () => {
     });
   }
 
-  test("Waitlist: the CTA sits inline under the email field, not fixed to the viewport (client feedback item 29)", async ({
-    page,
-  }) => {
+  test("Waitlist: the CTA sits inline under the email field, not fixed to the viewport (client feedback item 29)", async ({ page }) => {
     await page.goto("/waitlist");
     const button = page.getByRole("button", { name: "Join waitlist" });
     await expect(button).toHaveCSS("position", "static");
@@ -345,9 +314,7 @@ test.describe("Route shells never fake a successful submission", () => {
 });
 
 test.describe("Feedback / Issue: type selection happens before the composer (client feedback item 20)", () => {
-  test("the type sheet is open on arrival; the composer only becomes usable after it's dismissed", async ({
-    page,
-  }) => {
+  test("the type sheet is open on arrival; the composer only becomes usable after it's dismissed", async ({ page }) => {
     await page.goto("/feedback");
     const dialog = page.getByRole("dialog", { name: "Feedback type" });
     await expect(dialog).toBeVisible();
@@ -361,9 +328,7 @@ test.describe("Feedback / Issue: type selection happens before the composer (cli
     await expect(page.getByRole("button", { name: "Send feedback" })).toBeEnabled();
   });
 
-  test("the composer has no focus outline, no stroke and no background change on focus; suggestions stay on", async ({
-    page,
-  }) => {
+  test("the composer has no focus outline, no stroke and no background change on focus; suggestions stay on", async ({ page }) => {
     await page.goto("/feedback");
     await page.getByRole("dialog").getByRole("button", { name: "Send feedback" }).click();
     const composer = page.getByLabel("Your feedback");
@@ -406,9 +371,7 @@ test.describe("Feedback / Issue: type selection happens before the composer (cli
 });
 
 test.describe("Contribute: copy confirmation (client feedback item 30)", () => {
-  test("the copy icon becomes a checkmark for ~3 seconds, then reverts, with no layout shift", async ({
-    page,
-  }) => {
+  test("the copy icon becomes a checkmark for ~3 seconds, then reverts, with no layout shift", async ({ page }) => {
     await page.goto("/contribute");
     const copyButton = page.getByRole("button", { name: "Copy email address" });
     const box = await copyButton.boundingBox();
@@ -437,14 +400,8 @@ test.describe("Icons and icon buttons", () => {
     await expect(sticky.locator("svg[data-icon=how_to_vote]")).toHaveAttribute("data-variant", "filled");
 
     await page.goto("/treasury");
-    await expect(page.getByRole("link", { name: "Donate" }).last().locator("svg")).toHaveAttribute(
-      "data-icon",
-      "volunteer_activism",
-    );
-    await expect(page.getByRole("link", { name: "Donate" }).last().locator("svg")).toHaveAttribute(
-      "data-variant",
-      "filled",
-    );
+    await expect(page.getByRole("link", { name: "Donate" }).last().locator("svg")).toHaveAttribute("data-icon", "volunteer_activism");
+    await expect(page.getByRole("link", { name: "Donate" }).last().locator("svg")).toHaveAttribute("data-variant", "filled");
     await page.goto("/donate"); // the public Treasury has no ⋮ menu (decided 2026-10-19)
     await page.getByRole("button", { name: "Page actions" }).click();
     for (const svg of await page.getByRole("dialog").locator("svg[data-icon]").all()) {

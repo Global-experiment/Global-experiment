@@ -1,13 +1,5 @@
 export type ApiErrorCode =
-  | "validation_failed"
-  | "unauthenticated"
-  | "forbidden"
-  | "not_found"
-  | "conflict"
-  | "payload_too_large"
-  | "rate_limited"
-  | "provider_unavailable"
-  | "internal";
+  "validation_failed" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "payload_too_large" | "rate_limited" | "provider_unavailable" | "internal";
 
 export const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   validation_failed: 400,

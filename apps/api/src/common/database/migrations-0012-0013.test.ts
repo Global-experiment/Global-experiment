@@ -54,17 +54,29 @@ describe("migrations 0012–0013 — accounts, roles, services, access", () => {
   it("keeps the existing owner as an active Rootadmin, GE-000001, with its password and session", async () => {
     const client = await carriedOver();
     expect(await rows(client, "select email, role, status, account_number, password_hash, display_name, appearance from admin_users")).toEqual([
-      { email: "owner@example.org", role: "owner", status: "active", account_number: 1, password_hash: "scrypt$kept", display_name: "Owner", appearance: "system" },
+      {
+        email: "owner@example.org",
+        role: "owner",
+        status: "active",
+        account_number: 1,
+        password_hash: "scrypt$kept",
+        display_name: "Owner",
+        appearance: "system",
+      },
     ]);
     expect(await rows(client, "select count(*)::int as n from admin_sessions")).toEqual([{ n: 1 }]);
   });
 
   it("seeds the roles and the permission matrix exactly as permissions.ts defines them, and no demo rows", async () => {
     const client = await carriedOver();
-    expect((await rows<{ key: string; label: string }>(client, "select key, label from admin_roles order by sort_order")).map((row) => row.key)).toEqual(ROLE_KEYS);
+    expect((await rows<{ key: string; label: string }>(client, "select key, label from admin_roles order by sort_order")).map((row) => row.key)).toEqual(
+      ROLE_KEYS,
+    );
     expect((await rows(client, "select label from admin_roles where key = 'owner'"))[0]).toEqual({ label: "Rootadmin" });
     expect((await rows<{ key: string }>(client, "select key from admin_permissions order by key")).map((row) => row.key)).toEqual([...ALL_PERMISSIONS].sort());
-    const pairs = (await rows<{ role_key: string; permission_key: string }>(client, "select role_key, permission_key from admin_role_permissions")).map((row) => `${row.role_key} ${row.permission_key}`);
+    const pairs = (await rows<{ role_key: string; permission_key: string }>(client, "select role_key, permission_key from admin_role_permissions")).map(
+      (row) => `${row.role_key} ${row.permission_key}`,
+    );
     const expected = ROLE_KEYS.flatMap((role) => ROLE_PERMISSIONS[role].map((permission) => `${role} ${permission}`));
     expect(pairs.sort()).toEqual(expected.sort());
     expect(await rows(client, "select key from access_statuses order by sort_order")).toEqual(
@@ -90,7 +102,11 @@ describe("migrations 0012–0013 — accounts, roles, services, access", () => {
     expect((await rows(client, "select account_number from admin_users where email = 'second@example.org'"))[0]).toEqual({ account_number: 2 });
     // An invited account has no password yet; an active one must have one.
     await client.exec("INSERT INTO admin_users (email, role, status) VALUES ('invited@example.org', 'tech', 'invited')");
-    await expect(client.exec("UPDATE admin_users SET status = 'active' WHERE email = 'invited@example.org'")).rejects.toThrow(/admin_users_password_when_active/);
-    await expect(client.exec("INSERT INTO admin_users (email, role, status, password_hash) VALUES ('x@example.org', 'nobody', 'active', 'h')")).rejects.toThrow(/admin_users_role_admin_roles_key_fk/);
+    await expect(client.exec("UPDATE admin_users SET status = 'active' WHERE email = 'invited@example.org'")).rejects.toThrow(
+      /admin_users_password_when_active/,
+    );
+    await expect(client.exec("INSERT INTO admin_users (email, role, status, password_hash) VALUES ('x@example.org', 'nobody', 'active', 'h')")).rejects.toThrow(
+      /admin_users_role_admin_roles_key_fk/,
+    );
   });
 });

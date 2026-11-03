@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
-import {
-  getDocumentationDataset,
-  getDocumentationSummaries,
-} from "@/modules/documentation/application/getDocumentationDataset";
+import { getDocumentationDataset, getDocumentationSummaries } from "@/modules/documentation/application/getDocumentationDataset";
 import { DocumentationList } from "@/modules/documentation/ui/DocumentationList";
 import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
+import { notionMissingLocally } from "@/shared/config/env";
+import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
 
 // getDocumentationDataset() is cached server-side (unstable_cache, 60s
 // revalidate — see that file), so this no longer hits Notion on every
@@ -29,6 +28,8 @@ export const metadata: Metadata = {
  * exists for this page; it uses the same centered column as desktop Home.
  */
 export default async function DocumentationIndexPage() {
+  // A contributor's machine without Notion (never production): say so instead of failing.
+  if (notionMissingLocally("documentation")) return <NotionNotConnected title="Documentation" backHref="/" />;
   // Rows wait only for the one metadata query; bodies stream in behind them.
   // Both share the same 60s cache window, so warm loads resolve together.
   const content = getDocumentationDataset();
@@ -39,18 +40,14 @@ export default async function DocumentationIndexPage() {
 
   return (
     <main className="flex flex-1 flex-col pb-6">
-      <NavHeader
-        title="Documentation"
-        backHref="/"
-        menu={documentationMenu({ url: "/documentation", title: "Documentation" })}
-      />
+      <NavHeader title="Documentation" backHref="/" menu={documentationMenu({ url: "/documentation", title: "Documentation" })} />
       <Container className="pt-1">
         <DocumentationList articles={articles} content={content}>
           {/* NavHeader renders the page's <h1>; this is the in-page section heading from the design. */}
           <h2 className="mt-2 text-lead font-bold text-text-primary">Documentation</h2>
           <p className="mt-1 text-lead text-text-primary">
-            This page gathers the published articles explaining the experiment&rsquo;s purpose,
-            current release, administration, finances, privacy, technology, and future direction.
+            This page gathers the published articles explaining the experiment&rsquo;s purpose, current release, administration, finances, privacy, technology,
+            and future direction.
           </p>
         </DocumentationList>
       </Container>

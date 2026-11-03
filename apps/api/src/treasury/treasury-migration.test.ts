@@ -115,9 +115,12 @@ describe("migration 0006 — treasury and donations", () => {
 
   it("creates every index the data model lists", async () => {
     const client = await latest();
-    const indexes = (await rows<{ indexname: string }>(client, "select indexname from pg_indexes where tablename in ('treasury_entries', 'treasury_entry_expense_types', 'stripe_events', 'stripe_subscriptions', 'settings') order by 1")).map(
-      (row) => row.indexname,
-    );
+    const indexes = (
+      await rows<{ indexname: string }>(
+        client,
+        "select indexname from pg_indexes where tablename in ('treasury_entries', 'treasury_entry_expense_types', 'stripe_events', 'stripe_subscriptions', 'settings') order by 1",
+      )
+    ).map((row) => row.indexname);
     expect(indexes).toEqual(
       expect.arrayContaining([
         "treasury_entries_entry_number_unique",
@@ -229,7 +232,9 @@ describe("0006 treasury_entries checks", () => {
 
   it("links a recurrence to monthly donations only", async () => {
     const client = await latest();
-    await client.exec("insert into stripe_subscriptions (id, livemode, status, currency, amount, started_at) values ('sub_abc123', true, 'active', 'EUR', 1000, now())");
+    await client.exec(
+      "insert into stripe_subscriptions (id, livemode, status, currency, amount, started_at) values ('sub_abc123', true, 'active', 'EUR', 1000, now())",
+    );
     await insertEntry(client, { cadence: "monthly", recurrence_id: "sub_abc123", external_transaction_id: "ch_1" });
     await rejects(client, { cadence: "one_off", recurrence_id: "sub_abc123" }, /treasury_entries_recurrence_monthly/);
     await rejects(client, { cadence: "monthly", recurrence_id: "sub_missing" }, /treasury_entries_recurrence_id_stripe_subscriptions_id_fk/);
@@ -282,7 +287,8 @@ describe("0006 cross-row triggers", () => {
   it("links a refund to a donation of the same currency, never beyond its amount", async () => {
     const client = await latest();
     const donation = await insertEntry(client, { gross_amount: 1000 });
-    const refund = (values: Record<string, unknown> = {}) => insertEntry(client, { entry_type: "refund", name: "Donation refund", adjusts_entry_id: donation, gross_amount: -300, ...values });
+    const refund = (values: Record<string, unknown> = {}) =>
+      insertEntry(client, { entry_type: "refund", name: "Donation refund", adjusts_entry_id: donation, gross_amount: -300, ...values });
 
     // The integrity trigger (BEFORE INSERT) answers first for an unlinked refund.
     await expect(insertEntry(client, { entry_type: "refund", gross_amount: -100 })).rejects.toThrow(/must adjust a donation/);
@@ -301,7 +307,9 @@ describe("0006 cross-row triggers", () => {
     const client = await latest();
     const donation = await insertEntry(client, { gross_amount: 1000 });
     await insertEntry(client, { entry_type: "refund", name: "Donation refund", adjusts_entry_id: donation, gross_amount: -300 });
-    await expect(client.query("update treasury_entries set gross_amount = 200 where id = $1", [donation])).rejects.toThrow(/keeps its type, currency and amount/);
+    await expect(client.query("update treasury_entries set gross_amount = 200 where id = $1", [donation])).rejects.toThrow(
+      /keeps its type, currency and amount/,
+    );
     await expect(client.query("update treasury_entries set currency = 'USD' where id = $1", [donation])).rejects.toThrow(/keeps its type, currency and amount/);
     // Fee fill-in and review changes are fine.
     await client.query("update treasury_entries set fee_amount = 59, net_amount = 941 where id = $1", [donation]);
@@ -332,7 +340,8 @@ describe("0006 cross-row triggers", () => {
 describe("0006 stripe tables, settings and the public view", () => {
   it("validates Stripe event rows", async () => {
     const client = await latest();
-    const insert = (values: string) => client.exec(`insert into stripe_events (id, type, livemode, stripe_created_at, status, processed_at, attempts, last_error) values ${values}`);
+    const insert = (values: string) =>
+      client.exec(`insert into stripe_events (id, type, livemode, stripe_created_at, status, processed_at, attempts, last_error) values ${values}`);
     await insert("('evt_1abc', 'charge.refunded', false, now(), 'received', null, 0, null)");
     await insert("('evt_2abc', 'invoice.paid', false, now(), 'processed', now(), 1, null)");
     await expect(insert("('ev_1', 'x', false, now(), 'received', null, 0, null)")).rejects.toThrow(/stripe_events_id_shape/);
@@ -347,7 +356,10 @@ describe("0006 stripe tables, settings and the public view", () => {
   it("clears an event's entry link if the entry is ever deleted", async () => {
     const client = await latest();
     const entry = await insertEntry(client);
-    await client.query("insert into stripe_events (id, type, livemode, stripe_created_at, status, processed_at, entry_id) values ('evt_1', 'x', false, now(), 'processed', now(), $1)", [entry]);
+    await client.query(
+      "insert into stripe_events (id, type, livemode, stripe_created_at, status, processed_at, entry_id) values ('evt_1', 'x', false, now(), 'processed', now(), $1)",
+      [entry],
+    );
     await client.query("delete from treasury_entries where id = $1", [entry]);
     expect(await rows(client, "select entry_id from stripe_events")).toEqual([{ entry_id: null }]);
   });
@@ -355,7 +367,11 @@ describe("0006 stripe tables, settings and the public view", () => {
   it("validates subscriptions", async () => {
     const client = await latest();
     const insert = (id: string, currency: string, amount: number) =>
-      client.query("insert into stripe_subscriptions (id, livemode, status, currency, amount, started_at) values ($1, true, 'active', $2, $3, now())", [id, currency, amount]);
+      client.query("insert into stripe_subscriptions (id, livemode, status, currency, amount, started_at) values ($1, true, 'active', $2, $3, now())", [
+        id,
+        currency,
+        amount,
+      ]);
     await insert("sub_ok", "CHF", 500);
     await expect(insert("si_1", "CHF", 500)).rejects.toThrow(/stripe_subscriptions_id_shape/);
     await expect(insert("sub_2", "GBP", 500)).rejects.toThrow(/stripe_subscriptions_currency_known/);
@@ -409,7 +425,13 @@ describe("0006 stripe tables, settings and the public view", () => {
 
 describe("0006 dispute adjustments and Stripe mode", () => {
   const dispute = (client: PGlite, donation: string, gross: number, values: Record<string, unknown> = {}) =>
-    insertEntry(client, { entry_type: "dispute", name: gross < 0 ? "Payment disputed" : "Dispute won", adjusts_entry_id: donation, gross_amount: gross, ...values });
+    insertEntry(client, {
+      entry_type: "dispute",
+      name: gross < 0 ? "Payment disputed" : "Dispute won",
+      adjusts_entry_id: donation,
+      gross_amount: gross,
+      ...values,
+    });
 
   it("links a dispute to its donation; withdrawn negative, reinstated positive, never more than withdrawn", async () => {
     const client = await latest();
@@ -453,9 +475,9 @@ describe("0006 dispute adjustments and Stripe mode", () => {
 
   it("requires a Stripe mode on subscriptions", async () => {
     const client = await latest();
-    await expect(client.exec("insert into stripe_subscriptions (id, status, currency, amount, started_at) values ('sub_x1', 'active', 'EUR', 100, now())")).rejects.toThrow(
-      /livemode/,
-    );
+    await expect(
+      client.exec("insert into stripe_subscriptions (id, status, currency, amount, started_at) values ('sub_x1', 'active', 'EUR', 100, now())"),
+    ).rejects.toThrow(/livemode/);
   });
 });
 
@@ -499,7 +521,9 @@ describe("migration 0007 — treasury documents", () => {
     await expect(insertDocument(client, entry, { sha256: "d".repeat(64), size_bytes: 20 * 1024 * 1024 + 1 })).rejects.toThrow(/treasury_documents_size_range/);
     await insertDocument(client, entry, { sha256: "e".repeat(64), size_bytes: 20 * 1024 * 1024 });
     await expect(insertDocument(client, entry, { sha256: "F".repeat(64) })).rejects.toThrow(/treasury_documents_sha256_hex/);
-    await expect(insertDocument(client, entry, { sha256: "1".repeat(64), storage_key: "../etc/passwd" })).rejects.toThrow(/treasury_documents_storage_key_shape/);
+    await expect(insertDocument(client, entry, { sha256: "1".repeat(64), storage_key: "../etc/passwd" })).rejects.toThrow(
+      /treasury_documents_storage_key_shape/,
+    );
     await expect(insertDocument(client, entry, { sha256: "2".repeat(64), file_name: "  " })).rejects.toThrow(/treasury_documents_file_name_present/);
     // An entry with documents can't be deleted; an admin can (the uploader link clears).
     await expect(client.query("delete from treasury_entries where id = $1", [entry])).rejects.toThrow(/treasury_documents_entry_id/);
@@ -511,7 +535,13 @@ describe("migration 0008 — sample entries", () => {
 
   it("carries a database at 0007 over: every existing entry is real (sample false), and the view shows the column", async () => {
     const client = await databaseAt(AT_0007);
-    await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500, publication_status: "published", published_at: new Date().toISOString() });
+    await insertEntry(client, {
+      entry_type: "expense",
+      source: "manual",
+      gross_amount: -500,
+      publication_status: "published",
+      published_at: new Date().toISOString(),
+    });
     const before = await rows(client, "select * from treasury_entries");
     await migrate(drizzle(client), { migrationsFolder: folderUpTo(THROUGH_0008) });
     expect(await rows(client, "select * from treasury_entries")).toEqual(before.map((row) => ({ ...row, sample: false })));
@@ -521,6 +551,8 @@ describe("migration 0008 — sample entries", () => {
   it("only a manual entry can be a sample", async () => {
     const client = await latest();
     await insertEntry(client, { entry_type: "expense", source: "manual", gross_amount: -500, sample: true });
-    await expect(insertEntry(client, { entry_type: "expense", source: "wise", gross_amount: -500, sample: true })).rejects.toThrow(/treasury_entries_sample_manual_only/);
+    await expect(insertEntry(client, { entry_type: "expense", source: "wise", gross_amount: -500, sample: true })).rejects.toThrow(
+      /treasury_entries_sample_manual_only/,
+    );
   });
 });

@@ -59,11 +59,27 @@ const personFields = {
   firstContactOn: z.iso.date().nullable().optional(),
   lastContactOn: z.iso.date().nullable().optional(),
   /** Whole scores 0–10 (decision 7); the AI score is refused while ai.enabled is on. */
-  aiRelevanceScore: z.number().int("Use a whole number from 0 to 10.").min(0, "Use a whole number from 0 to 10.").max(10, "Use a whole number from 0 to 10.").nullable().optional(),
-  relevanceScore: z.number().int("Use a whole number from 0 to 10.").min(0, "Use a whole number from 0 to 10.").max(10, "Use a whole number from 0 to 10.").nullable().optional(),
+  aiRelevanceScore: z
+    .number()
+    .int("Use a whole number from 0 to 10.")
+    .min(0, "Use a whole number from 0 to 10.")
+    .max(10, "Use a whole number from 0 to 10.")
+    .nullable()
+    .optional(),
+  relevanceScore: z
+    .number()
+    .int("Use a whole number from 0 to 10.")
+    .min(0, "Use a whole number from 0 to 10.")
+    .max(10, "Use a whole number from 0 to 10.")
+    .nullable()
+    .optional(),
   otherSocials: optionalLink(2048),
   /** The channels this person can be reached on (contact_channels keys). */
-  contactChannelKeys: z.array(vocabularyKey).max(20).refine((keys) => new Set(keys).size === keys.length, "Duplicate channels.").optional(),
+  contactChannelKeys: z
+    .array(vocabularyKey)
+    .max(20)
+    .refine((keys) => new Set(keys).size === keys.length, "Duplicate channels.")
+    .optional(),
   /** Expenses paid to this person (Treasury expenses; sets their recipient). */
   expenseIds: uniqueIds(50, "At most 50 expenses.").optional(),
   organizationIds: uniqueIds(RELATION_LIMITS.organizationsPerPerson, LIMIT_MESSAGES.personOrganizations).optional(),
@@ -191,4 +207,3 @@ export interface PeopleOptionsDto {
   /** ai.enabled: the AI relevance score is read-only. */
   aiScoreReadOnly: boolean;
 }
-

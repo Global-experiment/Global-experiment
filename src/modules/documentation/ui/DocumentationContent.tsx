@@ -26,10 +26,7 @@ export function DocumentationContent({
   /** Search query to mark in the body (index search). */
   highlight?: string;
 }) {
-  const visible = blocks.filter(
-    (block) =>
-      block.kind === "heading" || (block.kind === "paragraph" && richTextToPlain(block.text).trim() !== ""),
-  );
+  const visible = blocks.filter((block) => block.kind === "heading" || (block.kind === "paragraph" && richTextToPlain(block.text).trim() !== ""));
 
   return (
     <div className="text-body text-text-primary">

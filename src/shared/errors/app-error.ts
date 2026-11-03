@@ -1,10 +1,4 @@
-export type AppErrorKind =
-  | "validation"
-  | "not_found"
-  | "unauthorized"
-  | "provider"
-  | "transient"
-  | "internal";
+export type AppErrorKind = "validation" | "not_found" | "unauthorized" | "provider" | "transient" | "internal";
 
 interface AppErrorOptions {
   cause?: unknown;

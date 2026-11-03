@@ -127,16 +127,16 @@ export class StripeWebhookService {
 
     const outcome = await this.db
       .transaction(async (tx) => {
-      const current = await this.events.lock(tx, event.id);
-      if (current === "processed" || current === "ignored") return { result: "duplicate" as const, wrote: false };
-      if (plan.kind === "ignore") {
-        await this.events.finish(tx, event.id, "ignored", null, this.clock());
-        return { result: "ignored" as const, wrote: false, reason: plan.reason };
-      }
-      const { entryId, wrote } = await this.apply(tx, plan, event.livemode);
-      await this.events.finish(tx, event.id, "processed", entryId, this.clock());
-      return { result: "processed" as const, wrote };
-    })
+        const current = await this.events.lock(tx, event.id);
+        if (current === "processed" || current === "ignored") return { result: "duplicate" as const, wrote: false };
+        if (plan.kind === "ignore") {
+          await this.events.finish(tx, event.id, "ignored", null, this.clock());
+          return { result: "ignored" as const, wrote: false, reason: plan.reason };
+        }
+        const { entryId, wrote } = await this.apply(tx, plan, event.livemode);
+        await this.events.finish(tx, event.id, "processed", entryId, this.clock());
+        return { result: "processed" as const, wrote };
+      })
       .catch(async (error: unknown) => {
         // Rolled back: nothing was written; record the failed attempt, Stripe retries.
         await this.events.fail(event.id, failureCode(error));
@@ -256,7 +256,9 @@ export class StripeWebhookService {
         const donationId = await this.donationFor(tx, plan.charge, livemode, now);
         const { dispute } = plan;
         // The withdrawal is the negative balance transaction, the reinstatement the positive one.
-        const transactions = dispute.balanceTransactions.filter((transaction) => (plan.direction === "withdrawn" ? transaction.amount < 0 : transaction.amount > 0));
+        const transactions = dispute.balanceTransactions.filter((transaction) =>
+          plan.direction === "withdrawn" ? transaction.amount < 0 : transaction.amount > 0,
+        );
         if (transactions.length === 0) throw new RetryLaterError("dispute_not_settled");
         let last: string | null = null;
         let wrote = false;

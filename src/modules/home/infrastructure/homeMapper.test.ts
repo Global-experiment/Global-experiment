@@ -8,15 +8,7 @@ const p = (value: string): ContentBlock => ({ kind: "paragraph", text: t(value) 
 
 describe("mapHomeBlocks", () => {
   it("maps the live page shape: heading-4 tagline, heading-2 label, heading-3 sections", () => {
-    const home = mapHomeBlocks([
-      h(4, "Tagline"),
-      h(2, "Label"),
-      h(3, "First"),
-      p("a"),
-      h(3, "Second"),
-      p("b"),
-      p("c"),
-    ]);
+    const home = mapHomeBlocks([h(4, "Tagline"), h(2, "Label"), h(3, "First"), p("a"), h(3, "Second"), p("b"), p("c")]);
     expect(home.tagline).toEqual(t("Tagline"));
     expect(home.sectionLabel).toEqual(t("Label"));
     expect(home.sections).toEqual([

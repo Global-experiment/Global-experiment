@@ -92,7 +92,11 @@ export async function runImport<Plan>(db: Database, spec: ImportRunSpec<Plan>): 
     const message = error instanceof Error ? error.message : String(error);
     const refused = error instanceof ImportRefusedError;
     await record(db, "failed", planned ? spec.counts(planned) : {}, [
-      { kind: "error", code: refused ? "apply_refused" : "run_failed", detail: refused ? `Refused, nothing written: ${message}` : `Rolled back, nothing written: ${message}` },
+      {
+        kind: "error",
+        code: refused ? "apply_refused" : "run_failed",
+        detail: refused ? `Refused, nothing written: ${message}` : `Rolled back, nothing written: ${message}`,
+      },
       ...(planned ? spec.issues(planned) : []),
     ]);
     throw error;

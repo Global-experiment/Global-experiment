@@ -102,4 +102,3 @@ export interface OrganizationDto {
   people: EntityRef[];
   expertise: ExpertiseRef[];
 }
-

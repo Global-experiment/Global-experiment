@@ -22,7 +22,8 @@ type Step = (typeof STEPS)[number];
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /** The API's sentence for a refusal (a file it can't read, column choices that can't work, a changed database). */
-const reason = (caught: unknown) => (caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : "Something went wrong. Please try again.");
+const reason = (caught: unknown) =>
+  caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : "Something went wrong. Please try again.";
 
 async function send(table: CsvTable, step: "preview" | "confirm", file: File, options: object) {
   const form = new FormData();
@@ -42,7 +43,12 @@ function ErrorDialog({ title, message, action, onClose }: { title: string; messa
     dialog.current?.showModal();
   }, []);
   return (
-    <dialog ref={dialog} aria-labelledby={titleId} onClose={onClose} className="m-auto w-[440px] max-w-[calc(100vw-32px)] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60">
+    <dialog
+      ref={dialog}
+      aria-labelledby={titleId}
+      onClose={onClose}
+      className="m-auto w-[440px] max-w-[calc(100vw-32px)] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60"
+    >
       <h2 id={titleId} className="flex items-center gap-1 font-bold">
         <AdminIcon name="warning" />
         {title}
@@ -62,8 +68,15 @@ function Stepper({ current }: { current: Step }) {
   return (
     <ol aria-label="Import steps" className="flex items-center gap-4 text-body">
       {STEPS.map((step, index) => (
-        <li key={step} aria-current={index === at ? "step" : undefined} className={`flex items-center gap-1 ${index === at ? "font-bold text-text-primary" : index < at ? "text-text-primary" : "text-text-muted"}`}>
-          <span aria-hidden="true" className={`flex size-5 items-center justify-center rounded-full text-meta ring-1 ${index <= at ? "ring-text-primary" : "ring-line"}`}>
+        <li
+          key={step}
+          aria-current={index === at ? "step" : undefined}
+          className={`flex items-center gap-1 ${index === at ? "font-bold text-text-primary" : index < at ? "text-text-primary" : "text-text-muted"}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`flex size-5 items-center justify-center rounded-full text-meta ring-1 ${index <= at ? "ring-text-primary" : "ring-line"}`}
+          >
             {index < at ? <AdminIcon name="check_circle" /> : index + 1}
           </span>
           {step}
@@ -92,7 +105,10 @@ function CountsLine({ counts, noun }: { counts: CsvCounts; noun: (typeof NOUN)[C
       ) : null}
       <li className="px-2 py-1 text-text-muted">
         {plural(counts.rows, "row", "rows")} in {counts.fileName}
-        {counts.duplicatesIncluded > 0 ? ` · ${counts.duplicatesIncluded} possible ${counts.duplicatesIncluded === 1 ? "duplicate" : "duplicates"} included` : ""} · {noun.many}
+        {counts.duplicatesIncluded > 0
+          ? ` · ${counts.duplicatesIncluded} possible ${counts.duplicatesIncluded === 1 ? "duplicate" : "duplicates"} included`
+          : ""}{" "}
+        · {noun.many}
       </li>
     </ul>
   );
@@ -113,7 +129,17 @@ function withDefaults(unknown: CsvUnknownField[], choices: CsvValueChoices): Csv
  * to an existing one or skip. A skipped value never refuses its row: the
  * row is imported without it, and the check and the report say so.
  */
-function UnknownValues({ unknown, choices, onChoose, disabled }: { unknown: CsvUnknownField[]; choices: CsvValueChoices; onChoose: (field: CsvUnknownField["field"], key: string, id: string | null) => void; disabled: boolean }) {
+function UnknownValues({
+  unknown,
+  choices,
+  onChoose,
+  disabled,
+}: {
+  unknown: CsvUnknownField[];
+  choices: CsvValueChoices;
+  onChoose: (field: CsvUnknownField["field"], key: string, id: string | null) => void;
+  disabled: boolean;
+}) {
   if (unknown.length === 0) return null;
   return (
     <section aria-labelledby="csv-unknown-title" data-unknown-values className="flex flex-col gap-2">
@@ -121,8 +147,8 @@ function UnknownValues({ unknown, choices, onChoose, disabled }: { unknown: CsvU
         Values not found ({unknown.reduce((sum, field) => sum + field.values.length, 0)})
       </h3>
       <p className="max-w-[720px] text-text-muted">
-        These values aren&rsquo;t in the admin. Map each one to an existing value, or skip it: a row is still imported without a skipped value, and the check and the report list it. Case, accents and
-        extra spaces are ignored when matching.
+        These values aren&rsquo;t in the admin. Map each one to an existing value, or skip it: a row is still imported without a skipped value, and the check
+        and the report list it. Case, accents and extra spaces are ignored when matching.
       </p>
       {unknown.map((field) => (
         <table key={field.field} className="w-full max-w-[880px] table-fixed border-separate border-spacing-0">
@@ -249,14 +275,19 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
       let fresh = (await send(table, "preview", chosen, options)) as CsvPreview;
       // Unknown values the admin hasn't mapped are skipped; checked again so the counts and warnings say so.
       const complete = withDefaults(fresh.unknown, options.choices ?? {});
-      if (JSON.stringify(complete) !== JSON.stringify(options.choices ?? {})) fresh = (await send(table, "preview", chosen, { ...options, mapping: fresh.mapping, choices: complete })) as CsvPreview;
+      if (JSON.stringify(complete) !== JSON.stringify(options.choices ?? {}))
+        fresh = (await send(table, "preview", chosen, { ...options, mapping: fresh.mapping, choices: complete })) as CsvPreview;
       setPreview(fresh);
       setMapping(fresh.mapping);
       setChoices(complete);
       setInclude(fresh.rows.filter((row) => row.included).map((row) => row.line));
       setStep(next);
     } catch (caught) {
-      setProblem({ title: next === "Columns" ? "This file can't be imported" : "These columns can't be used", message: reason(caught), action: next === "Columns" ? "Choose another file" : "Change the columns" });
+      setProblem({
+        title: next === "Columns" ? "This file can't be imported" : "These columns can't be used",
+        message: reason(caught),
+        action: next === "Columns" ? "Choose another file" : "Change the columns",
+      });
       if (next === "Columns") {
         setFile(null);
         if (input.current) input.current.value = "";
@@ -269,7 +300,11 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
   function choose(chosen: File | undefined) {
     if (!chosen) return;
     if (chosen.size > MAX_BYTES) {
-      setProblem({ title: "This file can't be imported", message: "The file is larger than 2 MB: split it into smaller files.", action: "Choose another file" });
+      setProblem({
+        title: "This file can't be imported",
+        message: "The file is larger than 2 MB: split it into smaller files.",
+        action: "Choose another file",
+      });
       if (input.current) input.current.value = "";
       return;
     }
@@ -281,7 +316,10 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
     if (!file || !preview) return;
     setBusy("importing");
     try {
-      const done = (await send(table, "confirm", file, { mapping: preview.mapping, include, choices, expect: preview.counts })) as { runId: string; counts: CsvCounts };
+      const done = (await send(table, "confirm", file, { mapping: preview.mapping, include, choices, expect: preview.counts })) as {
+        runId: string;
+        counts: CsvCounts;
+      };
       setResult(done);
       setStep("Done");
       const skipped = done.counts.duplicates;
@@ -306,7 +344,11 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
   const panel = (
     <div className="flex flex-col gap-2 pt-1">
       {step === "Columns" ? (
-        <PanelButton icon="check_circle" onClick={() => file && void check(file, { mapping, choices }, "Check")} disabled={busy !== null || !mapping.includes("name")}>
+        <PanelButton
+          icon="check_circle"
+          onClick={() => file && void check(file, { mapping, choices }, "Check")}
+          disabled={busy !== null || !mapping.includes("name")}
+        >
           {busy === "checking" ? "Checking…" : "Check the rows"}
         </PanelButton>
       ) : null}
@@ -350,8 +392,8 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
             Choose a CSV file
           </h2>
           <p className="text-text-muted">
-            UTF-8 text (&ldquo;CSV UTF-8&rdquo; in spreadsheets, or Notion&rsquo;s export), values separated by commas or semicolons, the first row naming the columns. Up to 2 MB
-            and 5,000 rows.
+            UTF-8 text (&ldquo;CSV UTF-8&rdquo; in spreadsheets, or Notion&rsquo;s export), values separated by commas or semicolons, the first row naming the
+            columns. Up to 2 MB and 5,000 rows.
           </p>
           <label
             htmlFor={inputId}
@@ -364,7 +406,15 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
           >
             <AdminIcon name="insert_drive_file" />
             <span>{busy === "checking" ? "Reading the file…" : "Drop the file here, or click to choose it"}</span>
-            <input ref={input} id={inputId} type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => choose(event.target.files?.[0])} disabled={busy !== null} />
+            <input
+              ref={input}
+              id={inputId}
+              type="file"
+              accept=".csv,text/csv"
+              className="sr-only"
+              onChange={(event) => choose(event.target.files?.[0])}
+              disabled={busy !== null}
+            />
           </label>
         </section>
       ) : null}
@@ -375,7 +425,8 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
             Match the columns of {preview.fileName}
           </h2>
           <p className="max-w-[720px] text-text-muted">
-            Each column is matched to a {noun.one}&rsquo;s field by its name. Change a match, or skip a column. Name is required. Display numbers (PER-, ORG-) are never imported.
+            Each column is matched to a {noun.one}&rsquo;s field by its name. Change a match, or skip a column. Name is required. Display numbers (PER-, ORG-)
+            are never imported.
           </p>
           <table className="w-full max-w-[880px] table-fixed border-separate border-spacing-0">
             <thead>
@@ -409,7 +460,8 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
                         const next = mapping.map((value, index) => (index === column ? event.target.value || null : value));
                         setMapping(next);
                         // Another field for a column may find other unknown values: look again (when the choices can work).
-                        if (file && next.includes("name") && new Set(next.filter(Boolean)).size === next.filter(Boolean).length) void check(file, { mapping: next, choices }, "Columns");
+                        if (file && next.includes("name") && new Set(next.filter(Boolean)).size === next.filter(Boolean).length)
+                          void check(file, { mapping: next, choices }, "Columns");
                       }}
                       className={`${recordInput} w-full cursor-pointer ring-1 ring-line`}
                     >
@@ -541,8 +593,8 @@ export function ImportCsvScreen({ table }: { table: CsvTable }) {
             {plural(result.counts.create, `${noun.one} added`, `${noun.many} added`)}
             {result.counts.duplicates > 0 ? `, ${result.counts.duplicates} not added (already existing)` : ""}
             {result.counts.errors > 0 ? `, ${plural(result.counts.errors, "row", "rows")} with errors left out` : ""}
-            {result.counts.warnings > 0 ? `, ${plural(result.counts.warnings, `${noun.one} added`, `${noun.many} added`)} without some values` : ""}. Each new {noun.one}&rsquo;s history says it came from this CSV
-            import.
+            {result.counts.warnings > 0 ? `, ${plural(result.counts.warnings, `${noun.one} added`, `${noun.many} added`)} without some values` : ""}. Each new{" "}
+            {noun.one}&rsquo;s history says it came from this CSV import.
           </p>
           <p className="flex flex-wrap gap-2">
             <AdminButtonLink href={`/admin/imports/csv/${result.runId}`} icon="insert_drive_file">

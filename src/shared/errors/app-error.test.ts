@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  InternalError,
-  NotFoundError,
-  ProviderError,
-  ValidationError,
-  toSafeErrorResponse,
-} from "./app-error";
+import { InternalError, NotFoundError, ProviderError, ValidationError, toSafeErrorResponse } from "./app-error";
 
 describe("toSafeErrorResponse", () => {
   it("preserves the message for validation errors", () => {
@@ -25,9 +19,7 @@ describe("toSafeErrorResponse", () => {
   });
 
   it("hides provider error details (e.g. leaked API responses) behind a generic message", () => {
-    const result = toSafeErrorResponse(
-      new ProviderError("Notion API responded with token=abc123 invalid"),
-    );
+    const result = toSafeErrorResponse(new ProviderError("Notion API responded with token=abc123 invalid"));
     expect(result.kind).toBe("provider");
     expect(result.message).not.toContain("token=abc123");
   });

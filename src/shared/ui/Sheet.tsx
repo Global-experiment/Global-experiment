@@ -2,13 +2,7 @@
 
 import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
 import { IconButton } from "./IconButton";
-import {
-  contentGestureOwner,
-  recentVelocity,
-  sheetDragOffset,
-  shouldDismissSheet,
-  type DragSample,
-} from "./sheetDrag";
+import { contentGestureOwner, recentVelocity, sheetDragOffset, shouldDismissSheet, type DragSample } from "./sheetDrag";
 
 /** Same breakpoint as the `md:` desktop dialog styles and the slide-up CSS. */
 const MOBILE_QUERY = "(width < 48rem)";

@@ -36,15 +36,17 @@ describe("people list: follow-ups, rollups, completeness", () => {
 
   it("overdue = the follow-up (date and time) has passed, not Rejected, not Do not contact", async () => {
     now = new Date("2026-10-14T10:00:00Z");
-    await t.db.insert(people).values([
-      { name: "Overdue", nextFollowupAt: new Date("2026-10-13T07:00:00Z"), stateKey: "contacted" },
-      { name: "Overdue, no state", nextFollowupAt: new Date("2026-09-14T07:00:00Z") },
-      { name: "Rejected", nextFollowupAt: new Date("2026-10-11T07:00:00Z"), stateKey: "rejected" },
-      { name: "Do not contact", nextFollowupAt: new Date("2026-10-11T07:00:00Z"), doNotContact: true },
-      { name: "Due later today", nextFollowupAt: new Date("2026-10-14T15:00:00Z") },
-      { name: "Later", nextFollowupAt: new Date("2026-10-19T07:00:00Z") },
-      { name: "No date" },
-    ]);
+    await t.db
+      .insert(people)
+      .values([
+        { name: "Overdue", nextFollowupAt: new Date("2026-10-13T07:00:00Z"), stateKey: "contacted" },
+        { name: "Overdue, no state", nextFollowupAt: new Date("2026-09-14T07:00:00Z") },
+        { name: "Rejected", nextFollowupAt: new Date("2026-10-11T07:00:00Z"), stateKey: "rejected" },
+        { name: "Do not contact", nextFollowupAt: new Date("2026-10-11T07:00:00Z"), doNotContact: true },
+        { name: "Due later today", nextFollowupAt: new Date("2026-10-14T15:00:00Z") },
+        { name: "Later", nextFollowupAt: new Date("2026-10-19T07:00:00Z") },
+        { name: "No date" },
+      ]);
     expect(await names("filter=follow_up:is:overdue")).toEqual(["Overdue", "Overdue, no state"]);
     const all = (await admin.get("/api/admin/people?pageSize=100&sort=name:asc").expect(200)).body.items as { name: string; followUpOverdue: boolean }[];
     expect(all.filter((person) => person.followUpOverdue).map((person) => person.name)).toEqual(["Overdue", "Overdue, no state"]);
@@ -78,7 +80,10 @@ describe("people list: follow-ups, rollups, completeness", () => {
         { name: "Optics", fieldId: physics!.id },
       ])
       .returning();
-    const [ada, bo, cleo] = await t.db.insert(people).values([{ name: "Ada" }, { name: "Bo" }, { name: "Cleo" }]).returning();
+    const [ada, bo, cleo] = await t.db
+      .insert(people)
+      .values([{ name: "Ada" }, { name: "Bo" }, { name: "Cleo" }])
+      .returning();
     await t.db.insert(peopleExpertise).values([
       { personId: ada!.id, expertiseId: assemblies!.id },
       { personId: bo!.id, expertiseId: procurement!.id },
@@ -96,10 +101,7 @@ describe("people list: follow-ups, rollups, completeness", () => {
     const [item] = await t.db.insert(expertiseItems).values({ name: "I", fieldId: field!.id }).returning();
     const [complete] = await t.db
       .insert(people)
-      .values([
-        { name: "Complete", stateKey: "sourced", sourceKey: "candide", description: "Met at the assembly." },
-        { name: "Bare" },
-      ])
+      .values([{ name: "Complete", stateKey: "sourced", sourceKey: "candide", description: "Met at the assembly." }, { name: "Bare" }])
       .returning();
     await t.db.insert(peopleExpertise).values({ personId: complete!.id, expertiseId: item!.id });
 
@@ -114,10 +116,7 @@ describe("people list: follow-ups, rollups, completeness", () => {
   });
 
   it("organization completeness: Description, Website, Email, Wise recipient ID, Expertise", async () => {
-    await t.db.insert(organizations).values([
-      { name: "Partial", description: "Water access.", website: "https://partial.ch" },
-      { name: "Empty" },
-    ]);
+    await t.db.insert(organizations).values([{ name: "Partial", description: "Water access.", website: "https://partial.ch" }, { name: "Empty" }]);
     const all = (await admin.get("/api/admin/organizations?sort=name:asc").expect(200)).body.items as { name: string; missing: string[] }[];
     expect(all.map((organization) => [organization.name, organization.missing])).toEqual([
       ["Empty", ["Description", "Website", "Email", "Wise recipient ID", "Expertise"]],

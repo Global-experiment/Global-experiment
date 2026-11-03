@@ -32,17 +32,14 @@ export default function DocumentationLoading() {
       <NavHeader title="Documentation" backHref="/" menu={documentationMenu({ url: "/documentation", title: "Documentation" })} />
       <Container className="pt-1">
         <div className="relative">
-          <Icon
-            name="search"
-            className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-muted"
-          />
+          <Icon name="search" className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-muted" />
           <div className="h-8 w-full rounded-control border border-line bg-transparent pl-8 text-body text-text-muted" />
         </div>
 
         <h2 className="mt-2 text-lead font-bold text-text-primary">Documentation</h2>
         <p className="mt-1 text-lead text-text-primary">
-          This page gathers the published articles explaining the experiment&rsquo;s purpose,
-          current release, administration, finances, privacy, technology, and future direction.
+          This page gathers the published articles explaining the experiment&rsquo;s purpose, current release, administration, finances, privacy, technology,
+          and future direction.
         </p>
 
         <span role="status" className="sr-only">
@@ -52,10 +49,7 @@ export default function DocumentationLoading() {
         <div className="mt-2" aria-hidden="true">
           {Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <div key={index} className="flex h-10 items-center justify-between border-b border-line">
-              <div
-                className="h-3 animate-pulse rounded-control bg-text-muted/20"
-                style={{ width: `${45 + ((index * 13) % 35)}%` }}
-              />
+              <div className="h-3 animate-pulse rounded-control bg-text-muted/20" style={{ width: `${45 + ((index * 13) % 35)}%` }} />
               <Icon name="expand_more" className="shrink-0 text-text-muted/40" />
             </div>
           ))}

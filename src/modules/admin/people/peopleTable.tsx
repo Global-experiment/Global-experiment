@@ -35,9 +35,29 @@ export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "name", label: "Name", icon: "title", width: 170, render: (p, s) => text(p.name, s) },
   { id: "state", label: "State", icon: "select", width: 130, render: (p) => p.state?.label ?? null },
   { id: "source", label: "Source", icon: "select", width: 124, render: (p) => p.source?.label ?? null },
-  { id: "expertise", label: "Expertise", icon: "arrow_outward", width: 228, render: (p, s) => lines(p.expertise.map((e) => e.name), s) },
+  {
+    id: "expertise",
+    label: "Expertise",
+    icon: "arrow_outward",
+    width: 228,
+    render: (p, s) =>
+      lines(
+        p.expertise.map((e) => e.name),
+        s,
+      ),
+  },
   { id: "description", label: "Description", icon: "title", width: 337, render: (p, s) => text(p.description, s) },
-  { id: "organization", label: "Organization", icon: "arrow_outward", width: 237, render: (p, s) => lines(p.organizations.map((o) => o.name), s) },
+  {
+    id: "organization",
+    label: "Organization",
+    icon: "arrow_outward",
+    width: 237,
+    render: (p, s) =>
+      lines(
+        p.organizations.map((o) => o.name),
+        s,
+      ),
+  },
   {
     id: "do_not_contact",
     label: "Do not contact",
@@ -59,14 +79,25 @@ export const PEOPLE_COLUMNS: TableColumn<Person>[] = [
   { id: "wise_recipient_id", label: "Wise recipient ID", icon: "title", width: 160, render: (p) => p.wiseRecipientId },
   { id: "created", label: "Created", icon: "schedule", width: 120, render: (p) => formatDate(p.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, render: (p) => formatDate(p.updatedAt) },
-  { id: "next_followup", label: "Follow-up date", icon: "schedule", width: 140, render: (p) => (p.nextFollowupAt ? <Timestamp value={p.nextFollowupAt} format="short" /> : null) },
+  {
+    id: "next_followup",
+    label: "Follow-up date",
+    icon: "schedule",
+    width: 140,
+    render: (p) => (p.nextFollowupAt ? <Timestamp value={p.nextFollowupAt} format="short" /> : null),
+  },
   {
     id: "overdue",
     label: "Overdue",
     icon: "schedule",
     width: 110,
     // Next follow-up before today, not Rejected, not Do not contact (computed by the API).
-    render: (p) => (p.followUpOverdue ? <span data-overdue="true" className="font-bold">Overdue</span> : null),
+    render: (p) =>
+      p.followUpOverdue ? (
+        <span data-overdue="true" className="font-bold">
+          Overdue
+        </span>
+      ) : null,
   },
   {
     id: "completeness",
@@ -96,16 +127,26 @@ export function domainOptions(tree: ExpertiseTree | undefined) {
 }
 
 /** Filterable/sortable fields — exactly what the API's People list contract accepts. */
-export function peopleFields(
-  options: PeopleOptions | undefined,
-  organizations: Organization[] | undefined,
-  tree: ExpertiseTree | undefined,
-): ListField[] {
+export function peopleFields(options: PeopleOptions | undefined, organizations: Organization[] | undefined, tree: ExpertiseTree | undefined): ListField[] {
   const vocabulary = (entries: PeopleOptions["states"] | undefined) => (entries ?? []).map((entry) => ({ value: entry.key, label: entry.label }));
   return [
     { id: "name", label: "Name", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
-    { id: "state", label: "State", icon: "select", operators: ["is", "is_not", "is_empty", "is_not_empty"], options: vocabulary(options?.states), sort: "text" },
-    { id: "source", label: "Source", icon: "select", operators: ["is", "is_not", "is_empty", "is_not_empty"], options: vocabulary(options?.sources), sort: "text" },
+    {
+      id: "state",
+      label: "State",
+      icon: "select",
+      operators: ["is", "is_not", "is_empty", "is_not_empty"],
+      options: vocabulary(options?.states),
+      sort: "text",
+    },
+    {
+      id: "source",
+      label: "Source",
+      icon: "select",
+      operators: ["is", "is_not", "is_empty", "is_not_empty"],
+      options: vocabulary(options?.sources),
+      sort: "text",
+    },
     { id: "expertise", label: "Expertise", icon: "arrow_outward", operators: ["is", "is_empty", "is_not_empty"], options: expertiseOptions(tree) },
     // The expertise rollup: any expertise in this field / domain.
     { id: "expertise_field", label: "Expertise field", icon: "arrow_outward", operators: ["is"], options: fieldOptions(tree) },

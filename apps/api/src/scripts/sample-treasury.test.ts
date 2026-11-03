@@ -5,7 +5,16 @@ import { settings } from "../settings/settings.schema.js";
 import { createTestDatabase } from "../testing/test-app.js";
 import { treasuryDocuments } from "../treasury/treasury-documents.schema.js";
 import { treasuryEntries, treasuryEntryExpenseTypes } from "../treasury/treasury.schema.js";
-import { formatSamplePlan, planSamplePurge, planSampleSeed, purgeSampleTreasury, SAMPLE_EXPENSES, SAMPLE_FIGURES, SAMPLE_RECIPIENT, seedSampleTreasury } from "./sample-treasury.js";
+import {
+  formatSamplePlan,
+  planSamplePurge,
+  planSampleSeed,
+  purgeSampleTreasury,
+  SAMPLE_EXPENSES,
+  SAMPLE_FIGURES,
+  SAMPLE_RECIPIENT,
+  seedSampleTreasury,
+} from "./sample-treasury.js";
 
 const closers: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -41,7 +50,15 @@ describe("sample Treasury data", () => {
   it("removes only the samples and the sample figures", async () => {
     const { db, close } = await createTestDatabase();
     closers.push(close);
-    await db.insert(treasuryEntries).values({ managedBy: "native", entryType: "expense", name: "Real hosting", currency: "USD", grossAmount: -900, source: "manual", occurredOn: "2026-10-01" });
+    await db.insert(treasuryEntries).values({
+      managedBy: "native",
+      entryType: "expense",
+      name: "Real hosting",
+      currency: "USD",
+      grossAmount: -900,
+      source: "manual",
+      occurredOn: "2026-10-01",
+    });
     await seedSampleTreasury(db, NOW);
 
     expect((await planSamplePurge(db)).expenses).toEqual({ USD: 12, EUR: 2, CHF: 2 });
@@ -58,7 +75,14 @@ describe("sample Treasury data", () => {
     closers.push(close);
     await seedSampleTreasury(db, NOW);
     const [sample] = await db.select({ id: treasuryEntries.id }).from(treasuryEntries).limit(1);
-    await db.insert(treasuryDocuments).values({ entryId: sample!.id, fileName: "invoice.pdf", contentType: "application/pdf", sizeBytes: 10, sha256: "a".repeat(64), storageKey: "ab/cd/invoice" });
+    await db.insert(treasuryDocuments).values({
+      entryId: sample!.id,
+      fileName: "invoice.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 10,
+      sha256: "a".repeat(64),
+      storageKey: "ab/cd/invoice",
+    });
     await expect(purgeSampleTreasury(db)).rejects.toThrow("1 documents are attached to sample entries");
     expect(await db.select().from(treasuryEntries)).toHaveLength(SAMPLE_EXPENSES.length);
   });
@@ -67,7 +91,17 @@ describe("sample Treasury data", () => {
     const { db, close } = await createTestDatabase();
     closers.push(close);
     await expect(
-      db.insert(treasuryEntries).values({ managedBy: "native", entryType: "donation", name: "Anonymous donation", currency: "USD", grossAmount: 500, source: "stripe", livemode: false, sample: true, occurredOn: "2026-10-01" }),
+      db.insert(treasuryEntries).values({
+        managedBy: "native",
+        entryType: "donation",
+        name: "Anonymous donation",
+        currency: "USD",
+        grossAmount: 500,
+        source: "stripe",
+        livemode: false,
+        sample: true,
+        occurredOn: "2026-10-01",
+      }),
     ).rejects.toThrow();
   });
 });

@@ -53,7 +53,14 @@ export class AccountsRepository {
     const conditions: (SQL | undefined)[] = [];
     if (query.search?.trim()) {
       const pattern = contains(query.search.trim());
-      conditions.push(or(sql`${accountName(adminUsers)} ilike ${pattern}`, sql`${adminUsers.email} ilike ${pattern}`, sql`${adminUsers.description} ilike ${pattern}`, sql`${adminRoles.label} ilike ${pattern}`));
+      conditions.push(
+        or(
+          sql`${accountName(adminUsers)} ilike ${pattern}`,
+          sql`${adminUsers.email} ilike ${pattern}`,
+          sql`${adminUsers.description} ilike ${pattern}`,
+          sql`${adminRoles.label} ilike ${pattern}`,
+        ),
+      );
     }
     const anyOf = new Map<string, SQL[]>();
     for (const filter of query.filters) {
@@ -81,7 +88,11 @@ export class AccountsRepository {
         .orderBy(...order, asc(adminUsers.id))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
-      this.db.select({ total: sql<number>`count(*)::int` }).from(adminUsers).leftJoin(adminRoles, eq(adminRoles.key, adminUsers.role)).where(where),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(adminUsers)
+        .leftJoin(adminRoles, eq(adminRoles.key, adminUsers.role))
+        .where(where),
     ]);
     return { items: await this.hydrate(rows), page: query.page, pageSize: query.pageSize, total: count?.total ?? 0 };
   }
@@ -102,7 +113,16 @@ export class AccountsRepository {
   private async hydrate(rows: Awaited<ReturnType<ReturnType<AccountsRepository["select"]>["where"]>>, db: Executor = this.db): Promise<AccountDto[]> {
     const ids = rows.map((row) => row.id);
     const [expertise, grants, links] = await Promise.all([
-      expertiseRefsByOwner(db as Database, { table: adminUserExpertise, ownerId: adminUserExpertise.adminUserId, expertiseId: adminUserExpertise.expertiseId, position: adminUserExpertise.position }, ids),
+      expertiseRefsByOwner(
+        db as Database,
+        {
+          table: adminUserExpertise,
+          ownerId: adminUserExpertise.adminUserId,
+          expertiseId: adminUserExpertise.expertiseId,
+          position: adminUserExpertise.position,
+        },
+        ids,
+      ),
       this.services.grantRefsFor(db, "account", ids),
       this.pendingLinks(db, ids),
     ]);
@@ -143,7 +163,8 @@ export class AccountsRepository {
   /** The account's own expertise, in this order (OPS-135). */
   async setExpertise(tx: Executor, id: string, expertiseIds: readonly string[]): Promise<void> {
     await tx.delete(adminUserExpertise).where(eq(adminUserExpertise.adminUserId, id));
-    if (expertiseIds.length > 0) await tx.insert(adminUserExpertise).values(expertiseIds.map((expertiseId, position) => ({ adminUserId: id, expertiseId, position })));
+    if (expertiseIds.length > 0)
+      await tx.insert(adminUserExpertise).values(expertiseIds.map((expertiseId, position) => ({ adminUserId: id, expertiseId, position })));
   }
 
   async emailTaken(email: string, exceptId?: string, db: Executor = this.db): Promise<boolean> {
@@ -165,7 +186,10 @@ export class AccountsRepository {
   }
 
   async update(tx: Executor, id: string, values: Partial<typeof adminUsers.$inferInsert>): Promise<void> {
-    await tx.update(adminUsers).set({ ...values, updatedAt: new Date() }).where(eq(adminUsers.id, id));
+    await tx
+      .update(adminUsers)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(adminUsers.id, id));
   }
 
   async passwordHashOf(id: string): Promise<string | null> {
@@ -176,11 +200,17 @@ export class AccountsRepository {
   // ---- One-time links of an account (reset; invitations of accounts invited before OPS-141) ----
 
   async expireTokens(tx: Executor, adminUserId: string): Promise<void> {
-    await tx.update(adminTokens).set({ usedAt: new Date() }).where(and(eq(adminTokens.adminUserId, adminUserId), isNull(adminTokens.usedAt)));
+    await tx
+      .update(adminTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(adminTokens.adminUserId, adminUserId), isNull(adminTokens.usedAt)));
   }
 
   /** A new link replaces the account's unused ones (only the latest works). */
-  async createToken(tx: Executor, values: { adminUserId: string; purpose: "invite" | "reset"; tokenHash: string; expiresAt: Date; createdById: string | null }): Promise<void> {
+  async createToken(
+    tx: Executor,
+    values: { adminUserId: string; purpose: "invite" | "reset"; tokenHash: string; expiresAt: Date; createdById: string | null },
+  ): Promise<void> {
     await tx
       .update(adminTokens)
       .set({ usedAt: new Date() })
@@ -210,7 +240,11 @@ export class AccountsRepository {
 
   /** Marks a link used; false when it was already (a concurrent use loses). */
   async useToken(tx: Executor, id: string): Promise<boolean> {
-    const used = await tx.update(adminTokens).set({ usedAt: new Date() }).where(and(eq(adminTokens.id, id), isNull(adminTokens.usedAt))).returning({ id: adminTokens.id });
+    const used = await tx
+      .update(adminTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(adminTokens.id, id), isNull(adminTokens.usedAt)))
+      .returning({ id: adminTokens.id });
     return used.length === 1;
   }
 
@@ -238,10 +272,7 @@ export class AccountsRepository {
     const pending = and(isNull(adminInvitations.usedAt), isNull(adminInvitations.revokedAt), gt(adminInvitations.expiresAt, now));
     const [open, past] = await Promise.all([
       this.selectInvitations().where(pending).orderBy(desc(adminInvitations.createdAt)),
-      this.selectInvitations()
-        .where(not(pending!))
-        .orderBy(desc(adminInvitations.createdAt))
-        .limit(20),
+      this.selectInvitations().where(not(pending!)).orderBy(desc(adminInvitations.createdAt)).limit(20),
     ]);
     return [...open, ...past].map((row) => toInvitation(row, now));
   }
@@ -253,7 +284,13 @@ export class AccountsRepository {
 
   async findInvitationByToken(tokenHash: string, db: Executor = this.db) {
     const [row] = await db
-      .select({ id: adminInvitations.id, expiresAt: adminInvitations.expiresAt, usedAt: adminInvitations.usedAt, revokedAt: adminInvitations.revokedAt, createdById: adminInvitations.createdById })
+      .select({
+        id: adminInvitations.id,
+        expiresAt: adminInvitations.expiresAt,
+        usedAt: adminInvitations.usedAt,
+        revokedAt: adminInvitations.revokedAt,
+        createdById: adminInvitations.createdById,
+      })
       .from(adminInvitations)
       .where(eq(adminInvitations.tokenHash, tokenHash))
       .limit(1);
@@ -304,7 +341,16 @@ export class AccountsRepository {
 }
 
 function toInvitation(
-  row: { id: string; createdAt: Date; createdBy: string | null; expiresAt: Date; usedAt: Date | null; accountId: string | null; accountName: string | null; revokedAt: Date | null },
+  row: {
+    id: string;
+    createdAt: Date;
+    createdBy: string | null;
+    expiresAt: Date;
+    usedAt: Date | null;
+    accountId: string | null;
+    accountName: string | null;
+    revokedAt: Date | null;
+  },
   now: Date,
 ): InvitationDto {
   const status = row.usedAt ? "used" : row.revokedAt ? "revoked" : row.expiresAt <= now ? "expired" : "pending";
@@ -319,4 +365,3 @@ function toInvitation(
     revokedAt: row.revokedAt?.toISOString() ?? null,
   };
 }
-

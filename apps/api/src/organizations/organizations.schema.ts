@@ -34,20 +34,16 @@ export const organizations = pgTable(
     index("organizations_updated_at_idx").on(table.updatedAt),
     index("organizations_archived_at_idx").on(table.archivedAt),
     uniqueIndex("organizations_org_number_unique").on(table.orgNumber),
-    uniqueIndex("organizations_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
+    uniqueIndex("organizations_notion_page_id_unique")
+      .on(table.notionPageId)
+      .where(sql`${table.notionPageId} is not null`),
     check("organizations_org_number_positive", sql`${table.orgNumber} > 0`),
     check("organizations_name_present", sql`length(btrim(${table.name})) between 1 and 200`),
     check("organizations_website_length", sql`${table.website} is null or length(${table.website}) <= 2048`),
     check("organizations_description_length", sql`${table.description} is null or length(${table.description}) <= 5000`),
     // Same rule as people.email.
-    check(
-      "organizations_email_shape",
-      sql`${table.email} is null or (${table.email} ~ '^[^@\\s]+@[^@\\s]+$' and length(${table.email}) <= 320)`,
-    ),
-    check(
-      "organizations_wise_recipient_id_length",
-      sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`,
-    ),
+    check("organizations_email_shape", sql`${table.email} is null or (${table.email} ~ '^[^@\\s]+@[^@\\s]+$' and length(${table.email}) <= 320)`),
+    check("organizations_wise_recipient_id_length", sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`),
   ],
 );
 

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { notionMissingLocally } from "@/shared/config/env";
 
 /**
  * Guard: the running application must only ever use live Notion content.
@@ -32,5 +33,23 @@ describe("no CMS fixtures in the running application", () => {
       return /FixtureDocumentationRepository|FixtureHomeRepository|isNotionConfigured|home-content/.test(text);
     });
     expect(offenders).toEqual([]);
+  });
+
+  // ADR 009, amended 2026-11-03: the one exception is a contributor's machine without Notion,
+  // which shows a "not connected" notice (no content) — and never in production.
+  it("shows the local 'Notion isn't connected' notice only outside production", () => {
+    vi.stubEnv("NOTION_API_KEY", "");
+    vi.stubEnv("NOTION_HOME_PAGE_ID", "");
+    vi.stubEnv("NODE_ENV", "development");
+    expect(notionMissingLocally("home")).toBe(true);
+    expect(notionMissingLocally("documentation")).toBe(true);
+    vi.stubEnv("NODE_ENV", "production");
+    expect(notionMissingLocally("home")).toBe(false);
+    expect(notionMissingLocally("documentation")).toBe(false);
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NOTION_API_KEY", "set");
+    vi.stubEnv("NOTION_HOME_PAGE_ID", "set");
+    expect(notionMissingLocally("home")).toBe(false);
+    vi.unstubAllEnvs();
   });
 });

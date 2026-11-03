@@ -97,23 +97,26 @@ export function RelationPicker({
   useEffect(() => {
     if (!open || atLimit) return;
     const controller = new AbortController();
-    const timer = setTimeout(() => {
-      search(query, controller.signal, page).then(
-        (result) => {
-          const { options, hasMore } = Array.isArray(result) ? { options: result, hasMore: false } : result;
-          setResults((previous) => ({
-            query,
-            page,
-            // Later pages append to what the same query already showed.
-            options: page > 1 && previous?.query === query ? [...previous.options, ...options] : options,
-            hasMore,
-          }));
-        },
-        () => {
-          if (!controller.signal.aborted) setResults({ query, page, options: [], hasMore: false, failed: true });
-        },
-      );
-    }, page > 1 ? 0 : 150);
+    const timer = setTimeout(
+      () => {
+        search(query, controller.signal, page).then(
+          (result) => {
+            const { options, hasMore } = Array.isArray(result) ? { options: result, hasMore: false } : result;
+            setResults((previous) => ({
+              query,
+              page,
+              // Later pages append to what the same query already showed.
+              options: page > 1 && previous?.query === query ? [...previous.options, ...options] : options,
+              hasMore,
+            }));
+          },
+          () => {
+            if (!controller.signal.aborted) setResults({ query, page, options: [], hasMore: false, failed: true });
+          },
+        );
+      },
+      page > 1 ? 0 : 150,
+    );
     return () => {
       clearTimeout(timer);
       controller.abort();

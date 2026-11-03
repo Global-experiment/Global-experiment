@@ -42,7 +42,10 @@ async function openPeople(page: Page) {
 
 async function freeze(page: Page, name: string) {
   await header(page, name).getByRole("button").first().click();
-  await page.getByRole("dialog", { name: `${name} column` }).getByRole("button", { name: "Freeze column" }).click();
+  await page
+    .getByRole("dialog", { name: `${name} column` })
+    .getByRole("button", { name: "Freeze column" })
+    .click();
   await page.keyboard.press("Escape");
 }
 
@@ -85,7 +88,7 @@ test("only the table scrolls sideways; the page never does and the nav stays ful
   const nav = await page.getByRole("navigation", { name: "Admin" }).boundingBox();
   expect(nav).toMatchObject({ x: 0, width: 240 });
   // The user card (last element of the sidebar) is always on screen.
-  await expect(page.locator("a[href=\"/admin/profile\"]")).toBeInViewport();
+  await expect(page.locator('a[href="/admin/profile"]')).toBeInViewport();
 });
 
 test("admin pages opt out of overscroll history swipes; the public site doesn't", async ({ page }) => {

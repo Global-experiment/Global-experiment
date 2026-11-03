@@ -21,7 +21,16 @@ import type {
 } from "./services.contracts.js";
 import { refreshGrantNames } from "./grant-name.js";
 import { grantRefsByOwner } from "./grant-refs.js";
-import { accessGrants, accessLevels, accessStatuses, serviceCategories, serviceCategoryTags, serviceHostingModels, services, serviceStatuses } from "./services.schema.js";
+import {
+  accessGrants,
+  accessLevels,
+  accessStatuses,
+  serviceCategories,
+  serviceCategoryTags,
+  serviceHostingModels,
+  services,
+  serviceStatuses,
+} from "./services.schema.js";
 
 export type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
 
@@ -60,7 +69,9 @@ export class ServicesRepository {
   }
 
   async knownKey(table: "status" | "category" | "hosting" | "level" | "accessStatus", key: string): Promise<boolean> {
-    const target = { status: serviceStatuses, category: serviceCategories, hosting: serviceHostingModels, level: accessLevels, accessStatus: accessStatuses }[table];
+    const target = { status: serviceStatuses, category: serviceCategories, hosting: serviceHostingModels, level: accessLevels, accessStatus: accessStatuses }[
+      table
+    ];
     const [row] = await this.db.select({ key: target.key }).from(target).where(eq(target.key, key)).limit(1);
     return row !== undefined;
   }
@@ -121,7 +132,14 @@ export class ServicesRepository {
     conditions.push(archived?.value === true ? isNotNull(services.archivedAt) : isNull(services.archivedAt));
     if (query.search?.trim()) {
       const pattern = contains(query.search.trim());
-      conditions.push(or(ilike(services.name, pattern), ilike(services.url, pattern), ilike(services.description, pattern), sql`${services.serviceNumber}::text = ${query.search.trim()}`));
+      conditions.push(
+        or(
+          ilike(services.name, pattern),
+          ilike(services.url, pattern),
+          ilike(services.description, pattern),
+          sql`${services.serviceNumber}::text = ${query.search.trim()}`,
+        ),
+      );
     }
     const column = { status: services.statusKey, hosting: services.hostingModelKey } as const;
     const tagged = (key?: string) =>
@@ -137,7 +155,12 @@ export class ServicesRepository {
         conditions.push(
           or(
             eq(services.statusKey, "needs_confirmation"),
-            exists(this.db.select({ one: sql`1` }).from(accessGrants).where(and(eq(accessGrants.serviceId, services.id), isNull(accessGrants.archivedAt), grantNeedsReview(accessGrants)))),
+            exists(
+              this.db
+                .select({ one: sql`1` })
+                .from(accessGrants)
+                .where(and(eq(accessGrants.serviceId, services.id), isNull(accessGrants.archivedAt), grantNeedsReview(accessGrants))),
+            ),
           ),
         );
       } else if (filter.field === "category") {
@@ -156,7 +179,10 @@ export class ServicesRepository {
     return and(...conditions);
   }
 
-  private async hydrateServices(rows: Awaited<ReturnType<ReturnType<ServicesRepository["selectServices"]>["where"]>>, db: Executor = this.db): Promise<ServiceDto[]> {
+  private async hydrateServices(
+    rows: Awaited<ReturnType<ReturnType<ServicesRepository["selectServices"]>["where"]>>,
+    db: Executor = this.db,
+  ): Promise<ServiceDto[]> {
     const ids = rows.map((row) => row.id);
     const [grants, tags] = await Promise.all([this.grantRefsFor(db, "service", ids), this.categoriesOf(db, ids)]);
     return rows.map((row) => ({
@@ -194,13 +220,19 @@ export class ServicesRepository {
   }
 
   async createService(tx: Executor, input: CreateServiceRequest): Promise<string> {
-    const [row] = await tx.insert(services).values({ ...serviceValues(input), name: input.name }).returning({ id: services.id });
+    const [row] = await tx
+      .insert(services)
+      .values({ ...serviceValues(input), name: input.name })
+      .returning({ id: services.id });
     if (input.categoryKeys) await this.setCategories(tx, row!.id, input.categoryKeys);
     return row!.id;
   }
 
   async updateService(tx: Executor, id: string, input: UpdateServiceRequest): Promise<void> {
-    await tx.update(services).set({ ...serviceValues(input), updatedAt: new Date() }).where(eq(services.id, id));
+    await tx
+      .update(services)
+      .set({ ...serviceValues(input), updatedAt: new Date() })
+      .where(eq(services.id, id));
     if (input.categoryKeys) await this.setCategories(tx, id, input.categoryKeys);
     // Its permissions' names start with the service's name.
     if (input.name !== undefined) await refreshGrantNames(tx, { serviceId: id });
@@ -214,7 +246,9 @@ export class ServicesRepository {
   async setServiceArchived(tx: Executor, id: string, adminId: string | null, archived: boolean): Promise<void> {
     await tx
       .update(services)
-      .set(archived ? { archivedAt: new Date(), archivedById: adminId, updatedAt: new Date() } : { archivedAt: null, archivedById: null, updatedAt: new Date() })
+      .set(
+        archived ? { archivedAt: new Date(), archivedById: adminId, updatedAt: new Date() } : { archivedAt: null, archivedById: null, updatedAt: new Date() },
+      )
       .where(eq(services.id, id));
   }
 
@@ -304,7 +338,13 @@ export class ServicesRepository {
         ),
       );
     }
-    const column = { service: accessGrants.serviceId, person: accessGrants.personId, account: accessGrants.adminUserId, level: accessGrants.levelKey, status: accessGrants.statusKey } as const;
+    const column = {
+      service: accessGrants.serviceId,
+      person: accessGrants.personId,
+      account: accessGrants.adminUserId,
+      level: accessGrants.levelKey,
+      status: accessGrants.statusKey,
+    } as const;
     // Several "is" rules on one field mean any of them (as on the other lists).
     const anyOf = new Map<string, SQL[]>();
     for (const filter of query.filters) {
@@ -334,20 +374,28 @@ export class ServicesRepository {
   }
 
   async createGrant(tx: Executor, input: CreateGrantRequest): Promise<string> {
-    const [row] = await tx.insert(accessGrants).values({ ...grantValues(input), serviceId: input.serviceId }).returning({ id: accessGrants.id });
+    const [row] = await tx
+      .insert(accessGrants)
+      .values({ ...grantValues(input), serviceId: input.serviceId })
+      .returning({ id: accessGrants.id });
     await refreshGrantNames(tx, { grantId: row!.id });
     return row!.id;
   }
 
   async updateGrant(tx: Executor, id: string, input: UpdateGrantRequest): Promise<void> {
-    await tx.update(accessGrants).set({ ...grantValues(input), updatedAt: new Date() }).where(eq(accessGrants.id, id));
+    await tx
+      .update(accessGrants)
+      .set({ ...grantValues(input), updatedAt: new Date() })
+      .where(eq(accessGrants.id, id));
     await refreshGrantNames(tx, { grantId: id });
   }
 
   async setGrantArchived(tx: Executor, id: string, adminId: string | null, archived: boolean): Promise<void> {
     await tx
       .update(accessGrants)
-      .set(archived ? { archivedAt: new Date(), archivedById: adminId, updatedAt: new Date() } : { archivedAt: null, archivedById: null, updatedAt: new Date() })
+      .set(
+        archived ? { archivedAt: new Date(), archivedById: adminId, updatedAt: new Date() } : { archivedAt: null, archivedById: null, updatedAt: new Date() },
+      )
       .where(eq(accessGrants.id, id));
   }
 

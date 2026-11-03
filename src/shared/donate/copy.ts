@@ -66,9 +66,7 @@ export const DONATE_COPY = {
     monthlyDonorsDetail: {
       title: "Monthly donors",
       caption: (currency: string) => `Active monthly donations in ${currency}`,
-      paragraphs: [
-        "The number of monthly donations currently active in this currency. A monthly donation stops counting as soon as it is cancelled.",
-      ],
+      paragraphs: ["The number of monthly donations currently active in this currency. A monthly donation stops counting as soon as it is cancelled."],
     },
     noValue: "–",
   },
@@ -178,7 +176,8 @@ export const DONATE_COPY = {
     toast: "Donation sent",
     // Card donations paid on the page carry no email: the reference replaces the receipt.
     referenceHeading: "Your reference",
-    referenceBody: (reference: string) => `${reference}. No email receipt is sent for a card donation made without an email address: keep this reference, and quote it if you contact us about this donation.`,
+    referenceBody: (reference: string) =>
+      `${reference}. No email receipt is sent for a card donation made without an email address: keep this reference, and quote it if you contact us about this donation.`,
     processingBody: "Your bank is still confirming the payment. It will appear on the treasury page once it has cleared.",
   },
 } as const;

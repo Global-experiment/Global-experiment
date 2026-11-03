@@ -30,7 +30,8 @@ describe("admin module registry", () => {
   });
 
   it("shows each role only the modules it can read (overview §3.1)", () => {
-    const menu = (role: keyof typeof ROLE_PERMISSIONS) => modulesFor(ADMIN_MODULES, new Set(ROLE_PERMISSIONS[role])).flatMap((group) => group.modules.map((entry) => entry.key));
+    const menu = (role: keyof typeof ROLE_PERMISSIONS) =>
+      modulesFor(ADMIN_MODULES, new Set(ROLE_PERMISSIONS[role])).flatMap((group) => group.modules.map((entry) => entry.key));
     expect(menu("owner")).toEqual(ADMIN_MODULES.flatMap((group) => group.modules.map((entry) => entry.key)));
     const moderator = menu("moderation");
     for (const hidden of ["treasury", "services", "permissions", "accounts", "waitlist"]) expect(moderator, hidden).not.toContain(hidden);

@@ -138,7 +138,10 @@ test.describe("people administration", () => {
     await page.keyboard.press("Escape");
 
     await page.getByLabel("Search expertise").fill("digital rights");
-    await page.getByRole("list", { name: "Expertise results" }).getByRole("button", { name: /Digital rights/ }).click();
+    await page
+      .getByRole("list", { name: "Expertise results" })
+      .getByRole("button", { name: /Digital rights/ })
+      .click();
     await page.keyboard.press("Escape");
 
     // No autosave (2026-10-21): Submit saves once, then goes back to the list it came from.

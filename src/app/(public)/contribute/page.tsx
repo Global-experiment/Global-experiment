@@ -21,8 +21,7 @@ export default function ContributePage() {
       <Container className="pt-3">
         <ContributeEmailLink email={CONTRIBUTE_EMAIL} />
         <p className="mt-3 text-body text-text-primary">
-          Send an email to the above email address stating what your expertises are and on what
-          aspects you might contribute to the development of the platform.
+          Send an email to the above email address stating what your expertises are and on what aspects you might contribute to the development of the platform.
         </p>
       </Container>
     </main>

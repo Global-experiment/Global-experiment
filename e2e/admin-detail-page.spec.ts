@@ -249,7 +249,10 @@ test("the panel's actions and counters stay fixed; only the History list scrolls
   await openPerson("Dana Detailed");
   const path = new URL(page.url()).pathname.split("/").pop()!;
   for (let index = 1; index <= 14; index++) {
-    const response = await page.request.post(`/api/admin/history/person/${path}/comments`, { data: { body: `Note ${index}: a longer comment so the list needs scrolling.` }, headers: { origin: origin() } });
+    const response = await page.request.post(`/api/admin/history/person/${path}/comments`, {
+      data: { body: `Note ${index}: a longer comment so the list needs scrolling.` },
+      headers: { origin: origin() },
+    });
     expect(response.status()).toBe(204);
   }
   await page.reload();
@@ -274,7 +277,12 @@ test("the panel's actions and counters stay fixed; only the History list scrolls
 
 test("duplicate ('Duplicated from PER-n') and duplicate as a draft (saved only on Submit)", async () => {
   await openPerson("Dana Detailed");
-  const number = (await page.locator("[data-record-main]").getByText(/^PER-\d+$/).innerText()).trim();
+  const number = (
+    await page
+      .locator("[data-record-main]")
+      .getByText(/^PER-\d+$/)
+      .innerText()
+  ).trim();
   await page.getByRole("button", { name: "Duplicate", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Person duplicated" })).toBeVisible();
   const duplicated = page.locator("[data-history-item=duplicated]");
@@ -372,7 +380,8 @@ test("Monitoring → History: every event, filtered by record type, actor, sourc
   await page.getByLabel("Record type").selectOption("organization");
   await expect(page).toHaveURL(/entity=organization/);
   await expect(list.locator("[data-history-item]").first()).toBeVisible();
-  for (const href of await list.getByRole("link").evaluateAll((links) => links.map((link) => link.getAttribute("href")))) expect(href).toMatch(/^\/admin\/organizations\//);
+  for (const href of await list.getByRole("link").evaluateAll((links) => links.map((link) => link.getAttribute("href"))))
+    expect(href).toMatch(/^\/admin\/organizations\//);
 
   await page.getByLabel("Actor").selectOption({ label: ACTOR });
   await page.getByLabel("Source").selectOption("admin");
@@ -401,14 +410,20 @@ test("formatting: short times in the feed, full dates on the record, the referen
   const time = items().first().locator("time");
   await expect(time).toHaveText(/^[A-Z][a-z]{2}\s\d{1,2}\s\d{1,2}:\d{2}\s(AM|PM)$/);
   await expect(time).toHaveAttribute("title", /\d{4}/);
-  const updated = page.locator("[data-record-main]").getByText(/^[A-Z][a-z]+\s\d{1,2}\sat\s\d{1,2}:\d{2}\s(AM|PM)$/).first();
+  const updated = page
+    .locator("[data-record-main]")
+    .getByText(/^[A-Z][a-z]+\s\d{1,2}\sat\s\d{1,2}:\d{2}\s(AM|PM)$/)
+    .first();
   await expect(updated).toBeVisible();
 });
 
 test("side-by-side comparisons with p10, p14 and the four prototype screenshots", async () => {
   const figmaDir = process.env.FIGMA_PNG_DIR;
   const prototypeDir = "docs/design/figma/person-record-prototype";
-  test.skip(!figmaDir || !existsSync(prototypeDir), "Set FIGMA_PNG_DIR to the PNG renders of admin-desktop.pdf (pN.png); the prototype screenshots must be in docs/design/.");
+  test.skip(
+    !figmaDir || !existsSync(prototypeDir),
+    "Set FIGMA_PNG_DIR to the PNG renders of admin-desktop.pdf (pN.png); the prototype screenshots must be in docs/design/.",
+  );
   // The app in the prototype's states: the top of a record, then its end.
   await openPerson("Dana Detailed");
   await page.screenshot({ path: join(SHOTS, "detail-p14-top-1440.png") });

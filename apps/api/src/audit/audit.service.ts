@@ -146,7 +146,10 @@ export class AuditService {
         .limit(1);
       await tx.insert(recordViews).values({ entityType, entityId, viewerId: viewer.id, viewedAt: now, inHistory: recent === undefined });
     });
-    const [row] = await this.db.select({ total: count() }).from(recordViews).where(and(eq(recordViews.entityType, entityType), eq(recordViews.entityId, entityId)));
+    const [row] = await this.db
+      .select({ total: count() })
+      .from(recordViews)
+      .where(and(eq(recordViews.entityType, entityType), eq(recordViews.entityId, entityId)));
     return { views: row?.total ?? 0 };
   }
 
@@ -159,16 +162,26 @@ export class AuditService {
     const [events, shownViews, [viewCount], [editCount], [eventCount], [shownViewCount], [created], [edited]] = await Promise.all([
       this.db.select().from(auditEvents).where(shownHere).orderBy(desc(auditEvents.id)).limit(FEED_LIMIT),
       this.db
-        .select({ id: recordViews.id, viewedAt: recordViews.viewedAt, label: sql<string | null>`coalesce(${adminUsers.displayName}, split_part(${adminUsers.email}, '@', 1))` })
+        .select({
+          id: recordViews.id,
+          viewedAt: recordViews.viewedAt,
+          label: sql<string | null>`coalesce(${adminUsers.displayName}, split_part(${adminUsers.email}, '@', 1))`,
+        })
         .from(recordViews)
         .leftJoin(adminUsers, eq(adminUsers.id, recordViews.viewerId))
         .where(and(viewsOf, eq(recordViews.inHistory, true)))
         .orderBy(desc(recordViews.id))
         .limit(FEED_LIMIT),
       this.db.select({ total: count() }).from(recordViews).where(viewsOf),
-      this.db.select({ total: count() }).from(auditEvents).where(and(forEntity, inArray(auditEvents.action, [...EDIT_ACTIONS]))),
+      this.db
+        .select({ total: count() })
+        .from(auditEvents)
+        .where(and(forEntity, inArray(auditEvents.action, [...EDIT_ACTIONS]))),
       this.db.select({ total: count() }).from(auditEvents).where(shownHere),
-      this.db.select({ total: count() }).from(recordViews).where(and(viewsOf, eq(recordViews.inHistory, true))),
+      this.db
+        .select({ total: count() })
+        .from(recordViews)
+        .where(and(viewsOf, eq(recordViews.inHistory, true))),
       this.db
         .select({ label: auditEvents.actorLabel, at: auditEvents.occurredAt })
         .from(auditEvents)
@@ -219,7 +232,8 @@ export class AuditService {
     if (query.source) conditions.push(eq(auditEvents.source, query.source));
     const isDay = (value: string) => value.length === 10;
     if (query.from) conditions.push(gte(auditEvents.occurredAt, new Date(isDay(query.from) ? `${query.from}T00:00:00Z` : query.from)));
-    if (query.to) conditions.push(lt(auditEvents.occurredAt, isDay(query.to) ? new Date(new Date(`${query.to}T00:00:00Z`).getTime() + 86_400_000) : new Date(query.to)));
+    if (query.to)
+      conditions.push(lt(auditEvents.occurredAt, isDay(query.to) ? new Date(new Date(`${query.to}T00:00:00Z`).getTime() + 86_400_000) : new Date(query.to)));
     const where = and(...conditions);
     const [rows, [total]] = await Promise.all([
       this.db
@@ -233,7 +247,10 @@ export class AuditService {
     ]);
     const [comments, titles] = await Promise.all([
       this.commentsFor(rows.map((row) => row.meta)),
-      entityTitles(this.db, rows.map((row) => ({ type: row.entityType, id: row.entityId }))),
+      entityTitles(
+        this.db,
+        rows.map((row) => ({ type: row.entityType, id: row.entityId })),
+      ),
     ]);
     return {
       items: rows.map((row) => {
@@ -261,7 +278,14 @@ export class AuditService {
   async addComment(entityType: string, entityId: string, label: string, author: AdminPrincipal, body: string): Promise<void> {
     await this.db.transaction(async (tx) => {
       const [comment] = await tx.insert(recordComments).values({ entityType, entityId, authorId: author.id, body }).returning({ id: recordComments.id });
-      await this.record(tx, { entityType, entityId, action: "comment_added", actor: actorFor(author), source: "admin", meta: { label, commentId: comment!.id, body } });
+      await this.record(tx, {
+        entityType,
+        entityId,
+        action: "comment_added",
+        actor: actorFor(author),
+        source: "admin",
+        meta: { label, commentId: comment!.id, body },
+      });
     });
   }
 
@@ -299,7 +323,11 @@ export class AuditService {
   }
 
   private async ownComment(tx: Executor, commentId: string, author: AdminPrincipal) {
-    const [comment] = await tx.select().from(recordComments).where(and(eq(recordComments.id, commentId), isNull(recordComments.deletedAt))).limit(1);
+    const [comment] = await tx
+      .select()
+      .from(recordComments)
+      .where(and(eq(recordComments.id, commentId), isNull(recordComments.deletedAt)))
+      .limit(1);
     if (!comment) throw new NotFoundError("Comment not found.");
     if (comment.authorId !== author.id) throw new ForbiddenError("Only its author can change a comment.");
     return comment;

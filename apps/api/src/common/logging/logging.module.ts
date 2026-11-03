@@ -33,7 +33,7 @@ export const REDACTED_PATHS = [
   "*.apiKey",
   "*.secretKey",
   "*.webhookSecret",
-  "req.headers[\"stripe-signature\"]",
+  'req.headers["stripe-signature"]',
   "*.databaseUrl",
   "*.email",
   "*.phone",

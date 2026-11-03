@@ -15,8 +15,7 @@
 const KIND = { a: 1, b: 2, c: 3, d: 4, e: 5 } as const;
 
 /** Valid RFC 4122 v4 UUIDs (strict validators accept them): de000000-<kind>000-4000-8000-<n>. */
-const id = (kind: keyof typeof KIND, n: number) =>
-  `de000000-${KIND[kind]}000-4000-8000-${n.toString(16).padStart(12, "0")}`;
+const id = (kind: keyof typeof KIND, n: number) => `de000000-${KIND[kind]}000-4000-8000-${n.toString(16).padStart(12, "0")}`;
 
 export interface FixtureItem {
   id: string;
@@ -30,7 +29,11 @@ export interface FixtureTaxonomy {
   domains: { id: string; name: string; stableId: string; fields: { id: string; name: string; stableId: string; items: FixtureItem[] }[] }[];
 }
 
-const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+const slug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 const two = (n: number) => String(n).padStart(2, "0");
 const TEAM_CYCLE = [["tech"], ["communication", "moderation"], [], ["treasury"], ["compliance"], ["operations", "tech"]];
 /** One deprecated item, to exercise "greyed out, not selectable". */
@@ -188,7 +191,12 @@ export const FIXTURE_PEOPLE: FixturePerson[] = Array.from({ length: 48 }, (_, in
     description: NOTES[index % NOTES.length]!,
     doNotContact: index % 11 === 5,
     email: index % 5 === 4 ? null : `${slug}@example.org`,
-    phone: index % 3 === 0 ? `+41 00 000 ${String(index).padStart(2, "0")} ${String(index * 3).padStart(2, "0").slice(-2)}` : null,
+    phone:
+      index % 3 === 0
+        ? `+41 00 000 ${String(index).padStart(2, "0")} ${String(index * 3)
+            .padStart(2, "0")
+            .slice(-2)}`
+        : null,
     website: index % 6 === 1 ? `https://${slug.replace(".", "-")}.example.org` : null,
     linkedin: index % 4 === 2 ? `https://www.linkedin.com/in/${slug.replace(".", "-")}-example` : null,
     x: index % 7 === 3 ? `@${slug.replace(".", "_")}_example` : null,

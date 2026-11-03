@@ -52,16 +52,12 @@ describe("mapNotionPageProperties", () => {
   });
 
   it("returns null when the title is missing", () => {
-    const mapped = mapNotionPageProperties(
-      validPublishedPage({ Name: { type: "title", title: [] } }),
-    );
+    const mapped = mapNotionPageProperties(validPublishedPage({ Name: { type: "title", title: [] } }));
     expect(mapped).toBeNull();
   });
 
   it("returns null when the slug is missing", () => {
-    const mapped = mapNotionPageProperties(
-      validPublishedPage({ Slug: { type: "rich_text", rich_text: [] } }),
-    );
+    const mapped = mapNotionPageProperties(validPublishedPage({ Slug: { type: "rich_text", rich_text: [] } }));
     expect(mapped).toBeNull();
   });
 
@@ -70,23 +66,17 @@ describe("mapNotionPageProperties", () => {
     expect(missing).not.toBeNull();
     expect(missing?.displayOrder).toBe(Number.MAX_SAFE_INTEGER);
 
-    const wrongType = mapNotionPageProperties(
-      validPublishedPage({ "Display order": { type: "rich_text", rich_text: [{ plain_text: "one" }] } }),
-    );
+    const wrongType = mapNotionPageProperties(validPublishedPage({ "Display order": { type: "rich_text", rich_text: [{ plain_text: "one" }] } }));
     expect(wrongType?.displayOrder).toBe(Number.MAX_SAFE_INTEGER);
   });
 
   it("defaults to the page's created_time when Published at is missing", () => {
-    const mapped = mapNotionPageProperties(
-      validPublishedPage({ "Published at": { type: "date", date: null } }),
-    );
+    const mapped = mapNotionPageProperties(validPublishedPage({ "Published at": { type: "date", date: null } }));
     expect(mapped?.publishedAt).toEqual(new Date("2026-01-01T00:00:00.000Z"));
   });
 
   it("reads a non-empty Archive relation (the live property type) as archived", () => {
-    const archived = mapNotionPageProperties(
-      validPublishedPage({ Archive: { type: "relation", relation: [{ id: "archive-entry" }] } }),
-    );
+    const archived = mapNotionPageProperties(validPublishedPage({ Archive: { type: "relation", relation: [{ id: "archive-entry" }] } }));
     expect(archived?.archived).toBe(true);
     expect(isPubliclyVisible(archived!)).toBe(false);
   });
@@ -111,9 +101,7 @@ describe("isPubliclyVisible", () => {
   });
 
   it("excludes an article with any status other than Published", () => {
-    const mapped = mapNotionPageProperties(
-      validPublishedPage({ Status: { type: "select", select: { name: "Draft" } } }),
-    );
+    const mapped = mapNotionPageProperties(validPublishedPage({ Status: { type: "select", select: { name: "Draft" } } }));
     expect(isPubliclyVisible(mapped!)).toBe(false);
   });
 

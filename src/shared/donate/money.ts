@@ -31,8 +31,7 @@ export function minorToAmountText(minor: number): string {
   return minor % 100 === 0 ? String(minor / 100) : (minor / 100).toFixed(2);
 }
 
-const plain = (value: number, digits: number) =>
-  new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits }).format(value);
+const plain = (value: number, digits: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: digits }).format(value);
 
 /** "$2", "€20", "CHF 50" — preset buttons and limits. */
 export function formatWhole(major: number, currency: DonationCurrency): string {
@@ -51,8 +50,7 @@ export function formatExact(minor: number, currency: DonationCurrency): string {
   return `${symbol}${spaced ? " " : ""}${text}`;
 }
 
-const compact = (major: number) =>
-  new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(major);
+const compact = (major: number) => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(major);
 
 /** Stats row: "$ 14.3K" (Donations, Figma p28 — spaced), never negative. */
 export function formatTotal(minor: number, currency: DonationCurrency): string {

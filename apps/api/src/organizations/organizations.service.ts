@@ -166,13 +166,29 @@ export class OrganizationsService {
     if (!personBefore || !personAfter) return;
     const changes = diffRecord(PERSON_FIELDS, personBefore, personAfter);
     if (changes.length === 0) return;
-    await this.audit.record(tx, { entityType: "person", entityId: personId, action: "updated", actor, source: "admin", changes, meta: { label: labelOfPerson(personAfter) } });
+    await this.audit.record(tx, {
+      entityType: "person",
+      entityId: personId,
+      action: "updated",
+      actor,
+      source: "admin",
+      changes,
+      meta: { label: labelOfPerson(personAfter) },
+    });
   }
 
   private async recordChanges(tx: Executor, before: OrganizationDto, after: OrganizationDto, actor: AuditActor) {
     const changes = diffRecord(ORGANIZATION_FIELDS, before, after);
     if (changes.length === 0) return;
-    await this.audit.record(tx, { entityType: ENTITY, entityId: after.id, action: "updated", actor, source: "admin", changes, meta: { label: labelOfOrganization(after) } });
+    await this.audit.record(tx, {
+      entityType: ENTITY,
+      entityId: after.id,
+      action: "updated",
+      actor,
+      source: "admin",
+      changes,
+      meta: { label: labelOfOrganization(after) },
+    });
   }
 
   private async assertExpertise(ids?: string[]) {

@@ -37,9 +37,7 @@ export function formatCompact(minor: number): string {
 
 function parts(date: Date, options: Intl.DateTimeFormatOptions): Record<string, string> {
   return Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", { timeZone: TREASURY_TIME_ZONE, hour12: true, ...options })
-      .formatToParts(date)
-      .map((part) => [part.type, part.value]),
+    new Intl.DateTimeFormat("en-US", { timeZone: TREASURY_TIME_ZONE, hour12: true, ...options }).formatToParts(date).map((part) => [part.type, part.value]),
   );
 }
 
@@ -99,7 +97,28 @@ export function zurichToday(now: Date): string {
 
 // ---- Amounts in words (p23, p27: "five American dollars") ----
 
-const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const ONES = [
+  "zero",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+  "thirteen",
+  "fourteen",
+  "fifteen",
+  "sixteen",
+  "seventeen",
+  "eighteen",
+  "nineteen",
+];
 const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 const SCALES: [number, string][] = [
   [1_000_000_000, "billion"],

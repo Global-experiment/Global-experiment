@@ -52,10 +52,7 @@ export async function endSession(request: () => Promise<unknown>): Promise<void>
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 /** `body`: JSON, or FormData for an upload (the browser sets its multipart Content-Type). */
-export async function adminApi<T>(
-  path: string,
-  options: { method?: Method; body?: unknown; signal?: AbortSignal } = {},
-): Promise<T> {
+export async function adminApi<T>(path: string, options: { method?: Method; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   const form = typeof FormData !== "undefined" && options.body instanceof FormData;
   let response: Response;
   try {
@@ -79,8 +76,7 @@ export async function adminApi<T>(
 
   if (response.status === 204) return undefined as T;
   const body = (await response.json().catch(() => undefined)) as
-    | { error?: { code?: string; message?: string; details?: { issues?: ValidationIssue[]; reason?: string } } }
-    | undefined;
+    { error?: { code?: string; message?: string; details?: { issues?: ValidationIssue[]; reason?: string } } } | undefined;
 
   if (!response.ok) {
     const error = body?.error;

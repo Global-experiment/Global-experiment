@@ -3,19 +3,13 @@ import { isInternalHref, normalizeInternalLink } from "./internalLinks";
 
 describe("normalizeInternalLink", () => {
   it("rewrites production documentation links to internal routes", () => {
-    expect(normalizeInternalLink("https://globalexperiment.org/documentation/public-treasury")).toBe(
-      "/documentation/public-treasury",
-    );
-    expect(normalizeInternalLink("https://www.globalexperiment.org/documentation/a-b/")).toBe(
-      "/documentation/a-b",
-    );
+    expect(normalizeInternalLink("https://globalexperiment.org/documentation/public-treasury")).toBe("/documentation/public-treasury");
+    expect(normalizeInternalLink("https://www.globalexperiment.org/documentation/a-b/")).toBe("/documentation/a-b");
     expect(normalizeInternalLink("https://globalexperiment.org/documentation")).toBe("/documentation");
   });
 
   it("preserves hash and query on rewritten links", () => {
-    expect(normalizeInternalLink("https://globalexperiment.org/documentation/x#section")).toBe(
-      "/documentation/x#section",
-    );
+    expect(normalizeInternalLink("https://globalexperiment.org/documentation/x#section")).toBe("/documentation/x#section");
   });
 
   it("leaves external URLs, mailto links and lookalike hosts untouched", () => {
@@ -31,9 +25,7 @@ describe("normalizeInternalLink", () => {
   });
 
   it("leaves non-documentation pages on the production domain alone", () => {
-    expect(normalizeInternalLink("https://globalexperiment.org/donate")).toBe(
-      "https://globalexperiment.org/donate",
-    );
+    expect(normalizeInternalLink("https://globalexperiment.org/donate")).toBe("https://globalexperiment.org/donate");
   });
 
   it("leaves relative and malformed values as written", () => {

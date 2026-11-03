@@ -53,7 +53,14 @@ export class PeopleService {
     return this.db.transaction(async (tx) => {
       const id = await this.repository.create(tx, input);
       const person = (await this.repository.findById(id, tx))!;
-      await this.audit.record(tx, { entityType: ENTITY, entityId: id, action: "created", actor, source: "admin", meta: { label: labelOfPerson(person), collection: "People" } });
+      await this.audit.record(tx, {
+        entityType: ENTITY,
+        entityId: id,
+        action: "created",
+        actor,
+        source: "admin",
+        meta: { label: labelOfPerson(person), collection: "People" },
+      });
       await this.recordExpenseLinks(tx, person, [], person.expenses, actor);
       return person;
     });
@@ -122,7 +129,15 @@ export class PeopleService {
     if (!organizationAfter) return;
     const changes = diffRecord(ORGANIZATION_FIELDS, organizationBefore, organizationAfter);
     if (changes.length === 0) return;
-    await this.audit.record(tx, { entityType: "organization", entityId: organizationAfter.id, action: "updated", actor, source: "admin", changes, meta: { label: labelOfOrganization(organizationAfter) } });
+    await this.audit.record(tx, {
+      entityType: "organization",
+      entityId: organizationAfter.id,
+      action: "updated",
+      actor,
+      source: "admin",
+      changes,
+      meta: { label: labelOfOrganization(organizationAfter) },
+    });
   }
 
   /** Archive (decision 12): out of the default views, into "Archived"; restorable. */
@@ -132,7 +147,14 @@ export class PeopleService {
       if (!before) throw new NotFoundError("Person not found.");
       if ((before.archivedAt !== null) === archived) return before;
       await this.repository.setArchived(tx, id, archived && actor.type === "admin" ? actor.id : null);
-      await this.audit.record(tx, { entityType: ENTITY, entityId: id, action: archived ? "archived" : "restored", actor, source: "admin", meta: { label: labelOfPerson(before) } });
+      await this.audit.record(tx, {
+        entityType: ENTITY,
+        entityId: id,
+        action: archived ? "archived" : "restored",
+        actor,
+        source: "admin",
+        meta: { label: labelOfPerson(before) },
+      });
       return (await this.repository.findById(id, tx))!;
     });
   }
@@ -141,7 +163,15 @@ export class PeopleService {
   private async recordUpdate(tx: Executor, before: PersonDto, after: PersonDto, actor: AuditActor) {
     const changes = diffRecord(PERSON_FIELDS, before, after);
     if (changes.length > 0) {
-      await this.audit.record(tx, { entityType: ENTITY, entityId: after.id, action: "updated", actor, source: "admin", changes, meta: { label: labelOfPerson(after) } });
+      await this.audit.record(tx, {
+        entityType: ENTITY,
+        entityId: after.id,
+        action: "updated",
+        actor,
+        source: "admin",
+        changes,
+        meta: { label: labelOfPerson(after) },
+      });
     }
     await this.recordExpenseLinks(tx, after, before.expenses, after.expenses, actor);
   }
@@ -151,9 +181,26 @@ export class PeopleService {
     const was = new Set(before.map((expense) => expense.id));
     const now = new Set(after.map((expense) => expense.id));
     const recipient = { id: person.id, label: labelOfPerson(person) };
-    for (const [expense, linked] of [...after.filter((e) => !was.has(e.id)).map((e) => [e, true] as const), ...before.filter((e) => !now.has(e.id)).map((e) => [e, false] as const)]) {
-      const change: AuditChange = { field: "recipient", label: "Recipient", kind: "relation", before: linked ? [] : [recipient], after: linked ? [recipient] : [] };
-      await this.audit.record(tx, { entityType: "treasury_entry", entityId: expense.id, action: "updated", actor, source: "admin", changes: [change], meta: { label: entryLabel(expense) } });
+    for (const [expense, linked] of [
+      ...after.filter((e) => !was.has(e.id)).map((e) => [e, true] as const),
+      ...before.filter((e) => !now.has(e.id)).map((e) => [e, false] as const),
+    ]) {
+      const change: AuditChange = {
+        field: "recipient",
+        label: "Recipient",
+        kind: "relation",
+        before: linked ? [] : [recipient],
+        after: linked ? [recipient] : [],
+      };
+      await this.audit.record(tx, {
+        entityType: "treasury_entry",
+        entityId: expense.id,
+        action: "updated",
+        actor,
+        source: "admin",
+        changes: [change],
+        meta: { label: entryLabel(expense) },
+      });
     }
   }
 
@@ -188,7 +235,9 @@ export class PeopleService {
       const expenses = await this.repository.expensesById(input.expenseIds);
       if (expenses.length !== input.expenseIds.length || expenses.some((expense) => expense.entryType !== "expense")) {
         issues.push({ path: "expenseIds", message: "Unknown expense." });
-      } else if (expenses.some((expense) => expense.recipientOrganizationId !== null || (expense.recipientPersonId !== null && expense.recipientPersonId !== personId))) {
+      } else if (
+        expenses.some((expense) => expense.recipientOrganizationId !== null || (expense.recipientPersonId !== null && expense.recipientPersonId !== personId))
+      ) {
         issues.push({ path: "expenseIds", message: "This expense already has a recipient." });
       }
       const current = personId ? ((await this.repository.findById(personId))?.expenses ?? []) : [];
@@ -199,7 +248,9 @@ export class PeopleService {
       }
       if (personId) {
         const removed = current.filter((expense) => !input.expenseIds!.includes(expense.id)).map((expense) => expense.id);
-        const qualified = (await this.repository.expensesById(removed)).some((expense) => ["qualified", "not_required"].includes(expense.reviewStatusKey ?? ""));
+        const qualified = (await this.repository.expensesById(removed)).some((expense) =>
+          ["qualified", "not_required"].includes(expense.reviewStatusKey ?? ""),
+        );
         if (qualified) issues.push({ path: "expenseIds", message: "A qualified expense keeps its recipient: change it in Treasury." });
       }
     }

@@ -120,7 +120,14 @@ export class AccountsService {
     if (invitation.status === "revoked") return invitation;
     return this.db.transaction(async (tx) => {
       if (!(await this.repository.revokeInvitation(tx, id, principal.id, now))) throw new ConflictError("This invitation link was already used.");
-      await this.audit.record(tx, { entityType: "admin_invitation", entityId: id, action: "link_revoked", actor: actorFor(principal), source: "admin", meta: { label: "Invitation link" } });
+      await this.audit.record(tx, {
+        entityType: "admin_invitation",
+        entityId: id,
+        action: "link_revoked",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: "Invitation link" },
+      });
       return (await this.repository.findInvitation(id, now, tx))!;
     });
   }
@@ -134,7 +141,14 @@ export class AccountsService {
     const purpose = account.status === "invited" ? "invite" : "reset";
     return this.db.transaction(async (tx) => {
       const link = await this.issueLink(tx, id, purpose, principal.id);
-      await this.audit.record(tx, { entityType: "admin_user", entityId: id, action: "link_created", actor: actorFor(principal), source: "admin", meta: { label: account.name, purpose: purpose === "invite" ? "Invitation link" : "Password reset link", expiresAt: link.expiresAt } });
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: id,
+        action: "link_created",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: account.name, purpose: purpose === "invite" ? "Invitation link" : "Password reset link", expiresAt: link.expiresAt },
+      });
       return link;
     });
   }
@@ -142,7 +156,13 @@ export class AccountsService {
   /** A Rootadmin on any account: its role (a new account has none, OPS-141), and its profile's name, description and expertise. */
   async update(id: string, input: UpdateAccountRequest, principal: AdminPrincipal): Promise<AccountDto> {
     const before = await this.get(id);
-    if (input.role !== undefined && input.role !== "owner" && before.role?.key === "owner" && before.status === "active" && (await this.repository.otherActiveOwners(id)) === 0) {
+    if (
+      input.role !== undefined &&
+      input.role !== "owner" &&
+      before.role?.key === "owner" &&
+      before.status === "active" &&
+      (await this.repository.otherActiveOwners(id)) === 0
+    ) {
       throw new ConflictError("This is the last active Rootadmin: make another account Rootadmin first.");
     }
     await this.checkExpertise(input.expertiseIds);
@@ -159,7 +179,12 @@ export class AccountsService {
   }
 
   /** The profile fields an account holder and a Rootadmin both change; a new name renames the account's permissions (OPS-138). */
-  private async writeProfile(tx: Executor, id: string, input: Pick<ProfileRequest, "displayName" | "description" | "expertiseIds">, values: Record<string, unknown>) {
+  private async writeProfile(
+    tx: Executor,
+    id: string,
+    input: Pick<ProfileRequest, "displayName" | "description" | "expertiseIds">,
+    values: Record<string, unknown>,
+  ) {
     if (input.displayName !== undefined) values.displayName = input.displayName;
     if (input.description !== undefined) values.description = input.description;
     await this.repository.update(tx, id, values);
@@ -168,7 +193,8 @@ export class AccountsService {
   }
 
   private async checkExpertise(ids: readonly string[] | undefined) {
-    if (ids?.length && (await countExistingExpertise(this.db, ids)) !== ids.length) throw new ValidationFailedError([{ path: "expertiseIds", message: "Unknown expertise." }]);
+    if (ids?.length && (await countExistingExpertise(this.db, ids)) !== ids.length)
+      throw new ValidationFailedError([{ path: "expertiseIds", message: "Unknown expertise." }]);
   }
 
   async deactivate(id: string, principal: AdminPrincipal): Promise<AccountDto> {
@@ -179,7 +205,14 @@ export class AccountsService {
       await this.repository.update(tx, id, { status: "deactivated", deactivatedAt: this.clock() });
       await this.auth.revokeSessionsOf(tx, id);
       await this.expireLinks(tx, id);
-      await this.audit.record(tx, { entityType: "admin_user", entityId: id, action: "deactivated", actor: actorFor(principal), source: "admin", meta: { label: account.name } });
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: id,
+        action: "deactivated",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: account.name },
+      });
       return (await this.repository.find(id, tx))!;
     });
   }
@@ -191,7 +224,14 @@ export class AccountsService {
     const hasPassword = (await this.repository.passwordHashOf(id)) !== null;
     return this.db.transaction(async (tx) => {
       await this.repository.update(tx, id, { status: hasPassword ? "active" : "invited", deactivatedAt: null });
-      await this.audit.record(tx, { entityType: "admin_user", entityId: id, action: "reactivated", actor: actorFor(principal), source: "admin", meta: { label: account.name } });
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: id,
+        action: "reactivated",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: account.name },
+      });
       return (await this.repository.find(id, tx))!;
     });
   }
@@ -299,7 +339,14 @@ export class AccountsService {
       await this.repository.update(tx, principal.id, { passwordHash });
       await this.auth.revokeSessionsOf(tx, principal.id, principal.sessionId);
       await this.expireLinks(tx, principal.id);
-      await this.audit.record(tx, { entityType: "admin_user", entityId: principal.id, action: "password_changed", actor: actorFor(principal), source: "admin", meta: { label: principal.displayName ?? principal.email.split("@")[0]! } });
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: principal.id,
+        action: "password_changed",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: principal.displayName ?? principal.email.split("@")[0]! },
+      });
     });
   }
 
@@ -312,7 +359,14 @@ export class AccountsService {
       await this.repository.update(tx, principal.id, { status: "deactivated", deactivatedAt: this.clock() });
       await this.auth.revokeSessionsOf(tx, principal.id);
       await this.expireLinks(tx, principal.id);
-      await this.audit.record(tx, { entityType: "admin_user", entityId: principal.id, action: "deactivated", actor: actorFor(principal), source: "admin", meta: { label: account.name, self: true } });
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: principal.id,
+        action: "deactivated",
+        actor: actorFor(principal),
+        source: "admin",
+        meta: { label: account.name, self: true },
+      });
     });
   }
 
@@ -320,7 +374,12 @@ export class AccountsService {
 
   async inspectToken(token: string): Promise<{ purpose: "invite" | "reset"; email: string; name: string; expiresAt: string }> {
     const found = await this.liveToken(token);
-    return { purpose: found.purpose as "invite" | "reset", email: found.email, name: found.displayName ?? found.email.split("@")[0]!, expiresAt: found.expiresAt.toISOString() };
+    return {
+      purpose: found.purpose as "invite" | "reset",
+      email: found.email,
+      name: found.displayName ?? found.email.split("@")[0]!,
+      expiresAt: found.expiresAt.toISOString(),
+    };
   }
 
   /** Sets the account's password from its link (used once): an invitation activates the account. */
@@ -426,7 +485,15 @@ export class AccountsService {
   private async recordChanges(tx: Executor, before: Parameters<typeof diffRecord>[1], after: Parameters<typeof diffRecord>[2], actor: AuditActor) {
     const changes = diffRecord(ACCOUNT_FIELDS, before as never, after as never);
     if (changes.length === 0) return;
-    await this.audit.record(tx, { entityType: "admin_user", entityId: (after as AccountDto).id, action: "updated", actor, source: "admin", changes, meta: { label: (after as AccountDto).name } });
+    await this.audit.record(tx, {
+      entityType: "admin_user",
+      entityId: (after as AccountDto).id,
+      action: "updated",
+      actor,
+      source: "admin",
+      changes,
+      meta: { label: (after as AccountDto).name },
+    });
   }
 
   private async removeStoredFile(key: string) {

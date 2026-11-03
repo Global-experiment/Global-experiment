@@ -7,7 +7,20 @@ import type { AuditChange } from "./audit.types.js";
  * The record types the platform audits (migration 0009). Text, not an
  * enum: a new module adds its type without a migration of this table.
  */
-export const AUDITED_ENTITIES = ["person", "organization", "treasury_entry", "expertise_domain", "expertise_field", "expertise_item", "setting", "import_run", "service", "access_grant", "admin_user", "admin_invitation"] as const;
+export const AUDITED_ENTITIES = [
+  "person",
+  "organization",
+  "treasury_entry",
+  "expertise_domain",
+  "expertise_field",
+  "expertise_item",
+  "setting",
+  "import_run",
+  "service",
+  "access_grant",
+  "admin_user",
+  "admin_invitation",
+] as const;
 export type AuditedEntity = (typeof AUDITED_ENTITIES)[number];
 
 /**
@@ -41,8 +54,14 @@ export const auditEvents = pgTable(
     actorLabel: text("actor_label").notNull(),
     /** admin · import · stripe · system */
     source: text("source").notNull(),
-    changes: jsonb("changes").$type<AuditChange[]>().notNull().default(sql`'[]'::jsonb`),
-    meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    changes: jsonb("changes")
+      .$type<AuditChange[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    meta: jsonb("meta")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
   },
   (table) => [
     index("audit_events_entity_idx").on(table.entityType, table.entityId, table.id),

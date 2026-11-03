@@ -138,7 +138,11 @@ export function AccountRecord({ id }: { id: string }) {
             {busy === "link" ? "Creating…" : loaded.status === "invited" ? "New invitation link" : "New password reset link"}
           </PanelButton>
         ) : null}
-        <PanelButton icon={loaded.status === "deactivated" ? "restart_alt" : "close"} onClick={() => void setActive(loaded.status === "deactivated")} disabled={dirty || busy !== null}>
+        <PanelButton
+          icon={loaded.status === "deactivated" ? "restart_alt" : "close"}
+          onClick={() => void setActive(loaded.status === "deactivated")}
+          disabled={dirty || busy !== null}
+        >
           {loaded.status === "deactivated" ? "Reactivate account" : "Deactivate account"}
         </PanelButton>
       </>
@@ -179,17 +183,34 @@ export function AccountRecord({ id }: { id: string }) {
       <PropertyRow
         icon="select"
         label="Role"
-        hint={loaded.id === me.id && canManage ? "Change your own role from another Rootadmin's account." : !loaded.role ? "No rights until a Rootadmin gives a role." : undefined}
+        hint={
+          loaded.id === me.id && canManage
+            ? "Change your own role from another Rootadmin's account."
+            : !loaded.role
+              ? "No rights until a Rootadmin gives a role."
+              : undefined
+        }
       >
         {loaded.id === me.id || !canManage ? (
           <ReadOnlyValue>{loaded.role?.label ?? NO_ROLE_LABEL}</ReadOnlyValue>
         ) : (
-          <Pills label="Role" options={ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label }))} value={draft.role} onChange={(value) => set("role", value)} />
+          <Pills
+            label="Role"
+            options={ROLE_OPTIONS.map((option) => ({ value: option.key, label: option.label }))}
+            value={draft.role}
+            onChange={(value) => set("role", value)}
+          />
         )}
       </PropertyRow>
       <PropertyRow icon="title" label="Description" htmlFor="account-description">
         {canManage ? (
-          <AutoGrowTextarea id="account-description" value={draft.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} placeholder="Add a description" />
+          <AutoGrowTextarea
+            id="account-description"
+            value={draft.description}
+            onChange={(e) => set("description", e.target.value)}
+            maxLength={5000}
+            placeholder="Add a description"
+          />
         ) : (
           <ReadOnlyValue>{loaded.description ?? <span className="text-text-muted">No description.</span>}</ReadOnlyValue>
         )}
@@ -198,7 +219,9 @@ export function AccountRecord({ id }: { id: string }) {
         {canManage ? (
           <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.accountExpertise} />
         ) : (
-          <ReadOnlyValue>{loaded.expertise.length > 0 ? loaded.expertise.map((item) => item.name).join(", ") : <span className="text-text-muted">No expertise.</span>}</ReadOnlyValue>
+          <ReadOnlyValue>
+            {loaded.expertise.length > 0 ? loaded.expertise.map((item) => item.name).join(", ") : <span className="text-text-muted">No expertise.</span>}
+          </ReadOnlyValue>
         )}
       </PropertyRow>
       <PropertyRow icon="alternate_email" label="Email">

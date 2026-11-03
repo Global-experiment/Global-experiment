@@ -32,9 +32,15 @@ describe("RevalidationService", () => {
   });
 
   it("never throws: a refusal or an unreachable web server only logs (the 5-minute fallback applies)", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 401 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("no", { status: 401 })),
+    );
     expect(await service({ REVALIDATE_SECRET: SECRET }).revalidate(["treasury"])).toBe(false);
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("fetch failed"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("fetch failed"))),
+    );
     expect(await service({ REVALIDATE_SECRET: SECRET }).revalidate(["treasury"])).toBe(false);
     // The secret is never logged.
     expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain(SECRET);

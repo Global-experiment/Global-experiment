@@ -93,11 +93,19 @@ export const people = pgTable(
     index("people_created_at_idx").on(table.createdAt),
     index("people_updated_at_idx").on(table.updatedAt),
     uniqueIndex("people_person_number_unique").on(table.personNumber),
-    uniqueIndex("people_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
+    uniqueIndex("people_notion_page_id_unique")
+      .on(table.notionPageId)
+      .where(sql`${table.notionPageId} is not null`),
     check("people_person_number_positive", sql`${table.personNumber} > 0`),
-    check("people_relevance_scores_range", sql`(${table.aiRelevanceScore} is null or ${table.aiRelevanceScore} between 0 and 10) and (${table.relevanceScore} is null or ${table.relevanceScore} between 0 and 10)`),
+    check(
+      "people_relevance_scores_range",
+      sql`(${table.aiRelevanceScore} is null or ${table.aiRelevanceScore} between 0 and 10) and (${table.relevanceScore} is null or ${table.relevanceScore} between 0 and 10)`,
+    ),
     check("people_other_socials_length", sql`${table.otherSocials} is null or length(${table.otherSocials}) between 1 and 2048`),
-    check("people_contact_dates_order", sql`${table.firstContactOn} is null or ${table.lastContactOn} is null or ${table.firstContactOn} <= ${table.lastContactOn}`),
+    check(
+      "people_contact_dates_order",
+      sql`${table.firstContactOn} is null or ${table.lastContactOn} is null or ${table.firstContactOn} <= ${table.lastContactOn}`,
+    ),
     index("people_next_followup_at_idx").on(table.nextFollowupAt),
     index("people_archived_at_idx").on(table.archivedAt),
     check("people_wise_recipient_id_length", sql`${table.wiseRecipientId} is null or length(${table.wiseRecipientId}) between 1 and 100`),

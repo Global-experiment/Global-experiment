@@ -26,11 +26,29 @@ const teamChips = (row: TaxonomyRow) =>
 
 const number = (value: number) => <span className="tabular-nums">{value}</span>;
 
-const NAME: TableColumn<TaxonomyRow> = { id: "name", label: "Name", icon: "title", width: 240, render: (row, search) => <Highlight text={row.name} query={search} /> };
+const NAME: TableColumn<TaxonomyRow> = {
+  id: "name",
+  label: "Name",
+  icon: "title",
+  width: 240,
+  render: (row, search) => <Highlight text={row.name} query={search} />,
+};
 const COMMON: TableColumn<TaxonomyRow>[] = [
   // Real Stable IDs run long (domain.13.trades_production_services_and_mobility): wrap inside the cell.
-  { id: "stable_id", label: "Stable ID", icon: "title", width: 200, render: (row) => <span className="font-mono text-meta [overflow-wrap:anywhere]">{row.stableId}</span> },
-  { id: "status", label: "Status", icon: "select", width: 120, render: (row) => <span className={row.status?.key === "active" ? "" : "text-text-muted"}>{row.status?.label ?? "—"}</span> },
+  {
+    id: "stable_id",
+    label: "Stable ID",
+    icon: "title",
+    width: 200,
+    render: (row) => <span className="font-mono text-meta [overflow-wrap:anywhere]">{row.stableId}</span>,
+  },
+  {
+    id: "status",
+    label: "Status",
+    icon: "select",
+    width: 120,
+    render: (row) => <span className={row.status?.key === "active" ? "" : "text-text-muted"}>{row.status?.label ?? "—"}</span>,
+  },
 ];
 const USAGE: TableColumn<TaxonomyRow>[] = [
   { id: "people", label: "People", icon: "numbers", width: 100, render: (row) => number(row.peopleCount) },

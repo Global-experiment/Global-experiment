@@ -57,12 +57,14 @@ describe("demo data purge", () => {
 
   it("finds every demo marker: seed ids, example.org, Fictional sample, DEMO-", async () => {
     await insertRealRecords();
-    await db.insert(people).values([
-      { name: "Imported Sample", email: "imported@sub.example.org" },
-      { name: "Story person", description: "Fictional sample — do not contact" },
-      { name: "DEMO-PER-3 Placeholder" },
-      { name: "Website only", website: "https://someone.example.org/profile" },
-    ]);
+    await db
+      .insert(people)
+      .values([
+        { name: "Imported Sample", email: "imported@sub.example.org" },
+        { name: "Story person", description: "Fictional sample — do not contact" },
+        { name: "DEMO-PER-3 Placeholder" },
+        { name: "Website only", website: "https://someone.example.org/profile" },
+      ]);
     await db.insert(organizations).values([
       { name: "Sample NGO", email: "info@example.org" },
       { name: "Story org", description: "A fictional sample organisation." },
@@ -117,7 +119,10 @@ describe("demo data purge", () => {
   it("keeps demo-marked expertise that real records still use, and its parents", async () => {
     const real = await insertRealRecords();
     const [domain] = await db.insert(expertiseDomains).values({ name: "Sample domain", id: "de000000-3000-4000-8000-0000000000aa" }).returning();
-    const [field] = await db.insert(expertiseFields).values({ name: "Sample field", domainId: domain!.id, id: "de000000-4000-4000-8000-0000000000aa" }).returning();
+    const [field] = await db
+      .insert(expertiseFields)
+      .values({ name: "Sample field", domainId: domain!.id, id: "de000000-4000-4000-8000-0000000000aa" })
+      .returning();
     const [item] = await db.insert(expertiseItems).values({ name: "Sample item", fieldId: field!.id, id: "de000000-5000-4000-8000-0000000000aa" }).returning();
     await db.insert(peopleExpertise).values({ personId: real.person.id, expertiseId: item!.id });
 

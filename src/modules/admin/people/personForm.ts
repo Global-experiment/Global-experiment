@@ -77,7 +77,11 @@ export function draftFromPerson(person: Person): PersonDraft {
     aiRelevanceScore: person.aiRelevanceScore === null ? "" : String(person.aiRelevanceScore),
     relevanceScore: person.relevanceScore === null ? "" : String(person.relevanceScore),
     contactChannelKeys: person.contactChannels.map((channel) => channel.key),
-    organizations: person.organizations.map((organization) => ({ id: organization.id, label: organization.name, href: `/admin/organizations/${organization.id}` })),
+    organizations: person.organizations.map((organization) => ({
+      id: organization.id,
+      label: organization.name,
+      href: `/admin/organizations/${organization.id}`,
+    })),
     expertise: person.expertise.map(linkedExpertiseOption),
     expenses: person.expenses.map(expenseOption),
   };
@@ -109,7 +113,8 @@ export function personDraftErrors(draft: PersonDraft): Record<string, string> {
   for (const field of ["aiRelevanceScore", "relevanceScore"] as const) {
     if (draft[field].trim() && !SCORE.test(draft[field].trim())) errors[field] = SCORE_MESSAGE;
   }
-  if (draft.firstContactOn && draft.lastContactOn && draft.firstContactOn > draft.lastContactOn) errors.lastContactOn = "The last contact can't be before the first contact.";
+  if (draft.firstContactOn && draft.lastContactOn && draft.firstContactOn > draft.lastContactOn)
+    errors.lastContactOn = "The last contact can't be before the first contact.";
   return errors;
 }
 

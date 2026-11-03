@@ -10,7 +10,11 @@ import { AdminButton, focusRing, Popover } from "../ui/controls";
 /** A row of the menu, drawn like the record panel's buttons (admin-desktop.pdf p11): glyph, bold label, 32px, its own ring. */
 function MenuLink({ href, glyph, children }: { href: string; glyph: ReactNode; children: ReactNode }) {
   return (
-    <Link href={href} role="menuitem" className={`flex h-8 w-full items-center gap-2 rounded-control px-2 text-body font-bold whitespace-nowrap text-text-primary ring-1 ring-line hover:bg-surface-raised ${focusRing}`}>
+    <Link
+      href={href}
+      role="menuitem"
+      className={`flex h-8 w-full items-center gap-2 rounded-control px-2 text-body font-bold whitespace-nowrap text-text-primary ring-1 ring-line hover:bg-surface-raised ${focusRing}`}
+    >
       {glyph}
       {children}
     </Link>

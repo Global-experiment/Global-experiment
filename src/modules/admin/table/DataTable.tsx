@@ -84,8 +84,7 @@ export function DataTable<Row extends { id: string }>({
   const { columns: arranged, frozenCount } = arrangeColumns(columns, prefs);
   // A resize in progress renders live but is only stored on release.
   const [liveWidth, setLiveWidth] = useState<{ id: string; width: number } | null>(null);
-  const widthOf = (column: TableColumn<Row>) =>
-    liveWidth?.id === column.id ? liveWidth.width : columnWidth(column, prefs);
+  const widthOf = (column: TableColumn<Row>) => (liveWidth?.id === column.id ? liveWidth.width : columnWidth(column, prefs));
   const widths = arranged.map(widthOf);
   const offsets = stickyOffsets(widths, frozenCount);
   const lastFrozen = frozenCount - 1;
@@ -99,8 +98,7 @@ export function DataTable<Row extends { id: string }>({
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
-  const frozenStyle = (index: number, header: boolean) =>
-    index < frozenCount ? { left: offsets[index], zIndex: header ? 20 : 1 } : undefined;
+  const frozenStyle = (index: number, header: boolean) => (index < frozenCount ? { left: offsets[index], zIndex: header ? 20 : 1 } : undefined);
   // Last frozen column: visible right stroke; the next cell drops its own left rule to avoid a double line.
   const frozenEdge = (index: number) => (index === lastFrozen ? "border-r border-line" : "");
 
@@ -118,11 +116,7 @@ export function DataTable<Row extends { id: string }>({
     if (change === "none") return;
     onPrefsChange(next);
     const position = arrangeColumns(columns, next).columns.findIndex((candidate) => candidate.id === column.id) + 1;
-    setAnnouncement(
-      change === "moved"
-        ? `${column.label} moved to position ${position}.`
-        : `${column.label} ${change === "frozen" ? "frozen" : "unfrozen"}.`,
-    );
+    setAnnouncement(change === "moved" ? `${column.label} moved to position ${position}.` : `${column.label} ${change === "frozen" ? "frozen" : "unfrozen"}.`);
     // The header re-renders in its new place; keep focus on it.
     requestAnimationFrame(() => triggerRefs.current.get(column.id)?.focus());
   }
@@ -172,10 +166,7 @@ export function DataTable<Row extends { id: string }>({
       className="relative min-h-0 flex-1 overflow-auto overscroll-x-none"
       aria-busy={busy}
     >
-      <table
-        className="table-fixed border-separate border-spacing-0 text-body"
-        style={{ width: widths.reduce((sum, width) => sum + width, 0) }}
-      >
+      <table className="table-fixed border-separate border-spacing-0 text-body" style={{ width: widths.reduce((sum, width) => sum + width, 0) }}>
         <caption className="sr-only">{caption}</caption>
         <colgroup>
           {arranged.map((column, index) => (

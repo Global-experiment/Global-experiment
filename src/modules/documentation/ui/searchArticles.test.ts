@@ -34,9 +34,7 @@ describe("buildSearchHaystack", () => {
   });
 
   it("skips unsupported blocks without throwing", () => {
-    const haystack = buildSearchHaystack(
-      article({ content: [{ kind: "unsupported", type: "image" }] }),
-    );
+    const haystack = buildSearchHaystack(article({ content: [{ kind: "unsupported", type: "image" }] }));
     expect(haystack).toContain("introduction");
   });
 });

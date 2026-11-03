@@ -87,7 +87,9 @@ describe("PgBossJobQueue (pg-boss on PGlite)", () => {
     const boss = new PgBoss({ db: fromPglite(client), supervise: false, schedule: false } as never);
     cleanup.push(() => boss.stop({ graceful: false }));
     await boss.start();
-    expect((await boss.getSchedules("test.scheduled")).map((schedule) => [schedule.key, schedule.cron, schedule.timezone])).toEqual([["treasury", "*/15 * * * *", "UTC"]]);
+    expect((await boss.getSchedules("test.scheduled")).map((schedule) => [schedule.key, schedule.cron, schedule.timezone])).toEqual([
+      ["treasury", "*/15 * * * *", "UTC"],
+    ]);
     expect((await boss.getQueue("test.scheduled"))?.retryLimit).toBe(1);
     await second.schedule("test.scheduled", "treasury", null, {});
     expect(await boss.getSchedules("test.scheduled")).toEqual([]);

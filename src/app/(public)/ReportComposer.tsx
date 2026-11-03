@@ -34,11 +34,19 @@ const noSubscribe = () => () => {};
 export function ReportComposer({ kind }: { kind: ReportKind }) {
   const config = REPORT_KINDS[kind];
   const messageId = useId();
-  const search = useSyncExternalStore(noSubscribe, () => window.location.search, () => null);
+  const search = useSyncExternalStore(
+    noSubscribe,
+    () => window.location.search,
+    () => null,
+  );
   const context = search === null ? null : composerContextFromSearch(kind, search);
   const sourcePage = context?.sourcePage ?? null;
   const draftKey = reportDraftKey(kind, sourcePage);
-  const storedRaw = useSyncExternalStore(noSubscribe, () => readReportDraftRaw(draftKey), () => null);
+  const storedRaw = useSyncExternalStore(
+    noSubscribe,
+    () => readReportDraftRaw(draftKey),
+    () => null,
+  );
   const stored = parseReportDraft(kind, storedRaw);
 
   // null = untouched in this visit → show what was stored.
@@ -57,11 +65,7 @@ export function ReportComposer({ kind }: { kind: ReportKind }) {
   }
 
   return (
-    <main
-      className="flex flex-1 flex-col"
-      data-source-page={sourcePage ?? undefined}
-      data-report-types={types.join("|")}
-    >
+    <main className="flex flex-1 flex-col" data-source-page={sourcePage ?? undefined} data-report-types={types.join("|")}>
       <NavHeader title={config.title} backHref={sourcePage ?? "/"} />
       {/* figma.pdf p24/p28: composer text starts 8px under the header. */}
       <Container className="flex flex-1 flex-col pt-2">

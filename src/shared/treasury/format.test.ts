@@ -76,7 +76,7 @@ describe("stat trends (p11)", () => {
     expect(formatTrend(0)).toBe("0%");
     expect(formatTrend(null)).toBeUndefined();
   });
-  it("the Balance stat: the symbol always spaced (\"$ 91.3K\")", async () => {
+  it('the Balance stat: the symbol always spaced ("$ 91.3K")', async () => {
     const { formatStatAmount } = await import("@/shared/donate/money");
     expect(formatStatAmount(9_130_000, "USD")).toBe("$ 91.3K");
     expect(formatStatAmount(2_450_000, "EUR")).toBe("€ 24.5K");

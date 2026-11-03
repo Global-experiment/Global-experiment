@@ -1,0 +1,15 @@
+# Generated or not code: never formatted.
+node_modules/
+.next/
+out/
+build/
+coverage/
+test-results/
+playwright-report/
+apps/*/dist/
+apps/api/drizzle/
+public/
+.data/
+docs/design/
+next-env.d.ts
+package-lock.json

@@ -47,9 +47,9 @@ describe("Treasury URL state", () => {
   });
 
   it("ignores what it can't read instead of failing the page", () => {
-    expect(
-      parseTreasuryParams({ currency: "GBP", type: "refund", from: "2026-02-30", to: "soon", types: "Bad Key", sort: "name", page: "-1" }),
-    ).toEqual(DEFAULT_TREASURY_STATE);
+    expect(parseTreasuryParams({ currency: "GBP", type: "refund", from: "2026-02-30", to: "soon", types: "Bad Key", sort: "name", page: "-1" })).toEqual(
+      DEFAULT_TREASURY_STATE,
+    );
     // Dates given the wrong way round are swapped.
     expect(parseTreasuryParams({ from: "2026-06-30", to: "2026-01-01" })).toMatchObject({ from: "2026-01-01", to: "2026-06-30" });
   });

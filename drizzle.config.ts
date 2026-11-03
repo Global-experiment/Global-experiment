@@ -18,13 +18,15 @@ loadEnvConfig(process.cwd());
  * Never run db:migrate against production from a development machine;
  * production migrations are an explicit, backed-up operator step.
  */
+const databaseUrl = process.env.DATABASE_URL ?? "";
+// The local development database (`pglite:<folder>`, from npm run setup): a folder under the repo root.
+const pglite = /^pglite:(.+)$/.exec(databaseUrl)?.[1];
+
 export default defineConfig({
   dialect: "postgresql",
   schema: "./apps/api/src/**/*.schema.ts",
   out: "./apps/api/drizzle",
-  dbCredentials: {
-    url: process.env.DATABASE_URL ?? "",
-  },
+  ...(pglite ? { driver: "pglite" as const, dbCredentials: { url: pglite } } : { dbCredentials: { url: databaseUrl } }),
   strict: true,
   verbose: true,
 });

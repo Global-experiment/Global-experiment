@@ -17,9 +17,7 @@ import { getNotionDocumentationEnv, getNotionHomeEnv } from "@/shared/config/env
  */
 // Test-only gate: this live check needs real credentials, so it is skipped
 // (never failed) where they are absent, e.g. CI. Not a runtime switch.
-const hasCredentials = Boolean(
-  process.env.NOTION_API_KEY && process.env.NOTION_DOCUMENTATION_DB_ID,
-);
+const hasCredentials = Boolean(process.env.NOTION_API_KEY && process.env.NOTION_DOCUMENTATION_DB_ID);
 const hasHomePage = Boolean(process.env.NOTION_HOME_PAGE_ID);
 
 describe.skipIf(!hasCredentials)("Notion live connectivity (requires credentials)", () => {
@@ -46,17 +44,11 @@ describe.skipIf(!hasCredentials)("Notion live connectivity (requires credentials
   });
 
   it("listPublishedArticles() returns real Notion data, not fixtures", async () => {
-    const { listPublishedArticles } = await import(
-      "@/modules/documentation/application/listPublishedArticles"
-    );
+    const { listPublishedArticles } = await import("@/modules/documentation/application/listPublishedArticles");
     const articles = await listPublishedArticles();
     expect(articles.length).toBeGreaterThan(0);
-    expect(articles.map((a) => a.displayOrder)).toEqual(
-      [...articles.map((a) => a.displayOrder)].sort((a, b) => a - b),
-    );
-    console.log(
-      `listPublishedArticles(): ${articles.length} published article(s): ${articles.map((a) => a.slug).join(", ")}`,
-    );
+    expect(articles.map((a) => a.displayOrder)).toEqual([...articles.map((a) => a.displayOrder)].sort((a, b) => a - b));
+    console.log(`listPublishedArticles(): ${articles.length} published article(s): ${articles.map((a) => a.slug).join(", ")}`);
   });
 });
 

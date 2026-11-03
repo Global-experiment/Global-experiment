@@ -30,11 +30,20 @@ describe("parseConfig", () => {
     expect(() => parseConfig({ DATABASE_URL: "mysql://localhost/db" })).toThrow(EnvValidationError);
   });
 
+  it("accepts a local PGlite database outside production only, with in-process jobs", () => {
+    expect(parseConfig({ DATABASE_URL: "pglite:.data/pglite" })).toMatchObject({ databaseUrl: "pglite:.data/pglite", jobsDriver: "inprocess" });
+    expect(() => parseConfig({ DATABASE_URL: "pglite:.data/pglite", NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://globalexperiment.org" })).toThrow(
+      /local development only/,
+    );
+    expect(() => parseConfig({ DATABASE_URL: "pglite:.data/pglite", JOBS_DRIVER: "pgboss" })).toThrow(/JOBS_DRIVER/);
+    expect(() => parseConfig({ DATABASE_URL: "pglite:" })).toThrow(EnvValidationError);
+  });
+
   it("requires an explicit admin origin allow-list in production and forces secure cookies", () => {
     expect(() => parseConfig({ ...base, NODE_ENV: "production" })).toThrow(/ADMIN_ALLOWED_ORIGINS/);
-    expect(() =>
-      parseConfig({ ...base, NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://globalexperiment.org", COOKIE_SECURE: "false" }),
-    ).toThrow(/COOKIE_SECURE/);
+    expect(() => parseConfig({ ...base, NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://globalexperiment.org", COOKIE_SECURE: "false" })).toThrow(
+      /COOKIE_SECURE/,
+    );
     const config = parseConfig({ ...base, NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://globalexperiment.org/" });
     expect(config.cookieSecure).toBe(true);
     expect(config.adminAllowedOrigins).toEqual(["https://globalexperiment.org"]);
@@ -49,8 +58,22 @@ describe("parseConfig — Stripe and donations", () => {
 
   it("defaults to donations off-flags, USD, no Stripe, local site and web origins", () => {
     const config = parseConfig({ ...base });
-    expect(config.stripe).toEqual({ secretKey: undefined, webhookSecret: undefined, livemode: false, customerPortalUrl: undefined, feeReconcileMinutes: 15, fixture: false });
-    expect(config.donationDefaults).toEqual({ enabled: false, monthly: false, extraMethods: false, defaultCurrency: "USD", paypalMonthly: false, checkout: "hosted" });
+    expect(config.stripe).toEqual({
+      secretKey: undefined,
+      webhookSecret: undefined,
+      livemode: false,
+      customerPortalUrl: undefined,
+      feeReconcileMinutes: 15,
+      fixture: false,
+    });
+    expect(config.donationDefaults).toEqual({
+      enabled: false,
+      monthly: false,
+      extraMethods: false,
+      defaultCurrency: "USD",
+      paypalMonthly: false,
+      checkout: "hosted",
+    });
     expect(config.donationPreviewToken).toBeUndefined();
     expect(config.publicSiteUrl).toBe("http://localhost:3000");
     expect(config.revalidation).toEqual({ webUrl: "http://127.0.0.1:3000", secret: undefined });
@@ -65,7 +88,14 @@ describe("parseConfig — Stripe and donations", () => {
       DONATIONS_PAYPAL_MONTHLY: "true",
       DONATIONS_CHECKOUT: "embedded",
     });
-    expect(config.donationDefaults).toEqual({ enabled: false, monthly: true, extraMethods: true, defaultCurrency: "CHF", paypalMonthly: true, checkout: "embedded" });
+    expect(config.donationDefaults).toEqual({
+      enabled: false,
+      monthly: true,
+      extraMethods: true,
+      defaultCurrency: "CHF",
+      paypalMonthly: true,
+      checkout: "embedded",
+    });
     expect(() => parseConfig({ ...base, DONATIONS_CHECKOUT: "popup" })).toThrow(/DONATIONS_CHECKOUT/);
     expect(() => parseConfig({ ...base, DONATIONS_DEFAULT_CURRENCY: "GBP" })).toThrow(/DONATIONS_DEFAULT_CURRENCY/);
   });
@@ -73,8 +103,12 @@ describe("parseConfig — Stripe and donations", () => {
   it("accepts test keys, refuses live keys unless explicitly enabled, never echoing them", () => {
     expect(parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY }).stripe.livemode).toBe(false);
     // The publishable key (embedded card form): a pk_ key in the same mode as the secret key.
-    expect(parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY, STRIPE_PUBLISHABLE_KEY: "pk_test_FAKEKEYFORTESTS0000" }).stripe.publishableKey).toBe("pk_test_FAKEKEYFORTESTS0000");
-    expect(() => parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY, STRIPE_PUBLISHABLE_KEY: "pk_live_FAKEKEYFORTESTS0000" })).toThrow(/STRIPE_PUBLISHABLE_KEY/);
+    expect(parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY, STRIPE_PUBLISHABLE_KEY: "pk_test_FAKEKEYFORTESTS0000" }).stripe.publishableKey).toBe(
+      "pk_test_FAKEKEYFORTESTS0000",
+    );
+    expect(() => parseConfig({ ...base, STRIPE_SECRET_KEY: TEST_KEY, STRIPE_PUBLISHABLE_KEY: "pk_live_FAKEKEYFORTESTS0000" })).toThrow(
+      /STRIPE_PUBLISHABLE_KEY/,
+    );
     expect(() => parseConfig({ ...base, STRIPE_PUBLISHABLE_KEY: TEST_KEY })).toThrow(/STRIPE_PUBLISHABLE_KEY/);
     expect(() => parseConfig({ ...base, STRIPE_SECRET_KEY: LIVE_KEY })).toThrow(/STRIPE_LIVE_ENABLED/);
     try {
@@ -88,7 +122,9 @@ describe("parseConfig — Stripe and donations", () => {
   });
 
   it("requires the webhook secret, site and revalidation settings in production when Stripe is on", () => {
-    expect(() => parseConfig({ ...production, STRIPE_SECRET_KEY: TEST_KEY })).toThrow(/STRIPE_WEBHOOK_SECRET[\s\S]*PUBLIC_SITE_URL[\s\S]*WEB_INTERNAL_URL[\s\S]*REVALIDATE_SECRET/);
+    expect(() => parseConfig({ ...production, STRIPE_SECRET_KEY: TEST_KEY })).toThrow(
+      /STRIPE_WEBHOOK_SECRET[\s\S]*PUBLIC_SITE_URL[\s\S]*WEB_INTERNAL_URL[\s\S]*REVALIDATE_SECRET/,
+    );
     expect(() => parseConfig({ ...base, REVALIDATE_SECRET: "too-short" })).toThrow(/REVALIDATE_SECRET/);
     const config = parseConfig({
       ...production,

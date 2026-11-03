@@ -98,49 +98,51 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
 
   return (
     <main className="flex flex-1 flex-col">
-      {embedded ? null : <NavHeader
-        title={copy.pageTitle}
-        backHref="/"
-        // Exactly Share and ⋮ on the right (client review 2026-10-21); the ⋮ menu is the Common pages p12 one, on every Treasury page.
-        // With the toolbar setting on, the currency switch is its first row (the chart link pointed to this page and is gone).
-        shareUrl={treasuryHref(state)}
-        menu={{
-          label: copy.header.pageActions,
-          actions: [
-            ...(toolbar
-              ? [{ label: copy.header.currencyRow(currencyLabel(state.currency)), icon: "account_balance" as const, onClick: () => setCurrencyOpen(true) }]
-              : []),
-            { label: copy.menu.donate, icon: "volunteer_activism", href: "/donate" },
-            { label: copy.menu.share, icon: "share", share: { url: treasuryHref(state), title: copy.pageTitle } },
-            { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
-            { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
-            { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
-          ],
-          // Common pages p12: two sentences on consecutive lines.
-          note: (
-            <p>
-              {copy.menu.refresh}
-              {lastUpdated ? (
-                <>
-                  <br />
-                  {copy.menu.lastUpdated(lastUpdated)}
-                </>
-              ) : null}
-            </p>
-          ),
-        }}
-      />}
+      {embedded ? null : (
+        <NavHeader
+          title={copy.pageTitle}
+          backHref="/"
+          // Exactly Share and ⋮ on the right (client review 2026-10-21); the ⋮ menu is the Common pages p12 one, on every Treasury page.
+          // With the toolbar setting on, the currency switch is its first row (the chart link pointed to this page and is gone).
+          shareUrl={treasuryHref(state)}
+          menu={{
+            label: copy.header.pageActions,
+            actions: [
+              ...(toolbar
+                ? [{ label: copy.header.currencyRow(currencyLabel(state.currency)), icon: "account_balance" as const, onClick: () => setCurrencyOpen(true) }]
+                : []),
+              { label: copy.menu.donate, icon: "volunteer_activism", href: "/donate" },
+              { label: copy.menu.share, icon: "share", share: { url: treasuryHref(state), title: copy.pageTitle } },
+              { label: copy.menu.feedback, icon: "lightbulb", href: "/feedback" },
+              { label: copy.menu.issue, icon: "new_releases", href: "/issue" },
+              { label: copy.menu.documentation, icon: "insert_drive_file", href: "/documentation" },
+            ],
+            // Common pages p12: two sentences on consecutive lines.
+            note: (
+              <p>
+                {copy.menu.refresh}
+                {lastUpdated ? (
+                  <>
+                    <br />
+                    {copy.menu.lastUpdated(lastUpdated)}
+                  </>
+                ) : null}
+              </p>
+            ),
+          }}
+        />
+      )}
 
       {toolbar ? (
-      <Sheet open={currencyOpen} onClose={() => setCurrencyOpen(false)} ariaLabel={copy.header.currencySheetLabel}>
-        <div className="flex flex-col gap-2">
-          {[...DONATION_CURRENCIES, "all" as const].map((code) => (
-            <Button key={code} onClick={() => chooseCurrency(code)} variant={code === state.currency ? "primary" : "secondary"} fullWidth>
-              <span aria-current={code === state.currency ? "true" : undefined}>{copy.header.currencyNames[code]}</span>
-            </Button>
-          ))}
-        </div>
-      </Sheet>
+        <Sheet open={currencyOpen} onClose={() => setCurrencyOpen(false)} ariaLabel={copy.header.currencySheetLabel}>
+          <div className="flex flex-col gap-2">
+            {[...DONATION_CURRENCIES, "all" as const].map((code) => (
+              <Button key={code} onClick={() => chooseCurrency(code)} variant={code === state.currency ? "primary" : "secondary"} fullWidth>
+                <span aria-current={code === state.currency ? "true" : undefined}>{copy.header.currencyNames[code]}</span>
+              </Button>
+            ))}
+          </div>
+        </Sheet>
       ) : null}
 
       <Container className="pt-1">
@@ -237,7 +239,6 @@ export function TreasuryView({ state, overview, history, now: nowIso, toolbar = 
               </button>
             ))}
           </div>
-
         </div>
 
         {/* Common pages p11: 14px bold heading, 12px muted count on the same baseline. */}
@@ -322,9 +323,21 @@ function History({
       <HistoryList entries={history.items} now={now} className="mt-[0.6875rem]" />
       {pages > 1 ? (
         <nav aria-label={copy.history.pagination} className="mt-4 flex items-center justify-between gap-2">
-          {history.page > 1 ? <Button href={viewHref({ ...state, page: history.page - 1 })} replace>{copy.history.newer}</Button> : <span />}
+          {history.page > 1 ? (
+            <Button href={viewHref({ ...state, page: history.page - 1 })} replace>
+              {copy.history.newer}
+            </Button>
+          ) : (
+            <span />
+          )}
           <span className="text-meta text-text-muted">{copy.history.page(history.page, pages)}</span>
-          {history.page < pages ? <Button href={viewHref({ ...state, page: history.page + 1 })} replace>{copy.history.older}</Button> : <span />}
+          {history.page < pages ? (
+            <Button href={viewHref({ ...state, page: history.page + 1 })} replace>
+              {copy.history.older}
+            </Button>
+          ) : (
+            <span />
+          )}
         </nav>
       ) : null}
     </>
@@ -437,7 +450,12 @@ function DonationAppeal() {
       <h2 className="pr-6 text-meta font-bold">{appeal.title}</h2>
       <p className="mt-1 pr-6 text-meta">
         {appeal.before}
-        <button type="button" onClick={() => setExplainOpen(true)} aria-haspopup="dialog" className={`cursor-pointer underline underline-offset-2 ${focusRing}`}>
+        <button
+          type="button"
+          onClick={() => setExplainOpen(true)}
+          aria-haspopup="dialog"
+          className={`cursor-pointer underline underline-offset-2 ${focusRing}`}
+        >
           {appeal.sustainability}
         </button>
         {appeal.middle}

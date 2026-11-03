@@ -1,4 +1,20 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, Res, StreamableFile, UploadedFile as UploadedFileParam, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  StreamableFile,
+  UploadedFile as UploadedFileParam,
+  UseInterceptors,
+} from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
@@ -60,7 +76,12 @@ export class AccountsController {
   @SignedIn()
   async picture(@Param("id", IdParam) id: string, @Res({ passthrough: true }) response: Response) {
     const picture = await this.accounts.picture(id);
-    response.set({ "Content-Type": picture.type, "Content-Length": String(picture.bytes.length), "X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-cache" });
+    response.set({
+      "Content-Type": picture.type,
+      "Content-Length": String(picture.bytes.length),
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-cache",
+    });
     return new StreamableFile(picture.bytes);
   }
 

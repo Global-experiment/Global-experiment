@@ -126,7 +126,11 @@ export function RecordPage({
       </div>
       <>
         {actions || (readOnly && entity) ? (
-          <aside data-record-panel aria-label="Record actions and history" className="flex w-[clamp(280px,calc((100vw-240px)/3),400px)] shrink-0 flex-col shadow-[-1px_0_0_0_var(--color-line)]">
+          <aside
+            data-record-panel
+            aria-label="Record actions and history"
+            className="flex w-[clamp(280px,calc((100vw-240px)/3),400px)] shrink-0 flex-col shadow-[-1px_0_0_0_var(--color-line)]"
+          >
             {readOnly ? (
               <div data-record-panel-top className="shrink-0 px-2 pt-2">
                 <p className="flex h-8 items-center gap-1 text-body text-text-muted">
@@ -182,7 +186,12 @@ function RecordPanelTop({ actions, history, panelExtra }: { actions: RecordActio
             </PanelButton>
           ) : null}
           {actions.setArchived ? (
-            <PanelButton icon={actions.archived ? "restart_alt" : "approval"} onClick={() => void actions.setArchived!(!actions.archived)} disabled={actions.dirty || busy} title={actions.dirty ? "Submit or discard your changes first" : undefined}>
+            <PanelButton
+              icon={actions.archived ? "restart_alt" : "approval"}
+              onClick={() => void actions.setArchived!(!actions.archived)}
+              disabled={actions.dirty || busy}
+              title={actions.dirty ? "Submit or discard your changes first" : undefined}
+            >
               {actions.archived ? "Restore" : "Archive"}
             </PanelButton>
           ) : null}

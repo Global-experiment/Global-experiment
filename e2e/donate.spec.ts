@@ -87,7 +87,11 @@ test.describe("Donate page", () => {
       const mark = methods(page).getByRole("button", { name }).locator("svg").first();
       await expect.poll(() => mark.evaluate((svg) => getComputedStyle(svg).color), { message: name }).toBe(text);
     }
-    expect(await methods(page).getByRole("button", { name: "Card payment via Stripe" }).evaluate((row) => getComputedStyle(row).color)).toBe(text);
+    expect(
+      await methods(page)
+        .getByRole("button", { name: "Card payment via Stripe" })
+        .evaluate((row) => getComputedStyle(row).color),
+    ).toBe(text);
   });
 
   test("the currency switch is kept in the URL and changes presets and figures", async ({ page }) => {
@@ -199,7 +203,11 @@ test.describe("Donate page", () => {
     await amounts(page).getByRole("button", { name: "$10" }).click();
 
     await page.route("**/api/donations/checkout", (route) =>
-      route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: { code: "provider_unavailable", message: "Stripe is temporarily unavailable." } }) }),
+      route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { code: "provider_unavailable", message: "Stripe is temporarily unavailable." } }),
+      }),
     );
     await methods(page).getByRole("button", { name: "Card payment via Stripe" }).click();
     await expect(warning(page)).toContainText("Stripe is unavailable");
@@ -228,7 +236,13 @@ test.describe("Donate page", () => {
       route.fulfill({
         status: 400,
         contentType: "application/json",
-        body: JSON.stringify({ error: { code: "validation_failed", message: "The request is invalid.", details: { issues: [{ path: "method", message: "This payment method is not available for this currency right now." }] } } }),
+        body: JSON.stringify({
+          error: {
+            code: "validation_failed",
+            message: "The request is invalid.",
+            details: { issues: [{ path: "method", message: "This payment method is not available for this currency right now." }] },
+          },
+        }),
       }),
     );
     await methods(page).getByRole("button", { name: "Card payment via Stripe" }).click();

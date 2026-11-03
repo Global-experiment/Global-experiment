@@ -24,8 +24,7 @@ const columnGaps = (page: Page, selector = "main .mx-auto") =>
     };
   }, selector);
 
-const noHorizontalOverflow = (page: Page) =>
-  page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+const noHorizontalOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 
 test("expanding/collapsing a long Documentation article never moves the centered column", async ({ page }) => {
   await page.goto("/documentation", { waitUntil: "load" });

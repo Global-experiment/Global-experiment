@@ -27,10 +27,9 @@ describe("entryTags", () => {
     expect(entryTags(entry({}))).toEqual([]);
   });
   it("keeps Not qualified yet before the expense types", () => {
-    expect(entryTags(entry({ type: "expense", amount: -5000, qualified: false, expenseTypes: [{ key: "hosting", label: "Hosting and infrastructure" }] }))).toEqual([
-      "Not qualified yet",
-      "Hosting and infrastructure",
-    ]);
+    expect(
+      entryTags(entry({ type: "expense", amount: -5000, qualified: false, expenseTypes: [{ key: "hosting", label: "Hosting and infrastructure" }] })),
+    ).toEqual(["Not qualified yet", "Hosting and infrastructure"]);
   });
 });
 

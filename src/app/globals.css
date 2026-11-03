@@ -76,8 +76,7 @@
    * the --font-inter variable on <html>. The system stack remains as a
    * fallback for the brief window before the font file is applied.
    */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 /*
@@ -275,7 +274,9 @@ html:has([data-admin]) body {
     -webkit-text-fill-color: var(--color-text-primary);
     caret-color: var(--color-text-primary);
     box-shadow: 0 0 0 1000px var(--color-surface-base) inset;
-    transition: background-color 600000s 0s, color 600000s 0s;
+    transition:
+      background-color 600000s 0s,
+      color 600000s 0s;
   }
 }
 

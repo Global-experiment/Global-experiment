@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  filterButtonLabel,
-  isCompleteFilter,
-  listStateToApiQuery,
-  listStateToUrl,
-  pageCount,
-  parseFilter,
-  readListState,
-  type SortRule,
-} from "./listState";
+import { filterButtonLabel, isCompleteFilter, listStateToApiQuery, listStateToUrl, pageCount, parseFilter, readListState, type SortRule } from "./listState";
 
 const DEFAULT_SORT: SortRule[] = [{ field: "created", direction: "desc" }];
 
@@ -78,7 +69,7 @@ describe("admin list state", () => {
     expect(isCompleteFilter({ field: "name", operator: "contains", value: "  " })).toBe(false);
   });
 
-  it("labels the filter button like Figma (\"2 filters\")", () => {
+  it('labels the filter button like Figma ("2 filters")', () => {
     expect(filterButtonLabel([])).toBe("Filter");
     expect(filterButtonLabel([{ field: "a", operator: "is", value: "x" }])).toBe("1 filter");
     expect(

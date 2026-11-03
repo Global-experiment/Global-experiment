@@ -51,9 +51,7 @@ function orderBy(sorts: readonly Sort<OrganizationSortField>[]): SQL[] {
     updated: sql`${organizations.updatedAt}`,
   };
   return [
-    ...sorts.map(({ field, direction }) =>
-      direction === "asc" ? sql`${expression[field]} asc nulls last` : sql`${expression[field]} desc nulls last`,
-    ),
+    ...sorts.map(({ field, direction }) => (direction === "asc" ? sql`${expression[field]} asc nulls last` : sql`${expression[field]} desc nulls last`)),
     asc(organizations.id),
   ];
 }
@@ -106,7 +104,10 @@ export class OrganizationsRepository {
         .orderBy(...orderBy(query.sort))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
-      this.db.select({ total: sql<number>`count(*)::int` }).from(organizations).where(where),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(organizations)
+        .where(where),
     ]);
     return { items: await this.hydrate(rows), page: query.page, pageSize: query.pageSize, total: count?.total ?? 0 };
   }
@@ -221,7 +222,11 @@ export class OrganizationsRepository {
       const added = await tx
         .insert(peopleOrganizations)
         // Last among the person's organizations (the person's order).
-        .values({ personId, organizationId, position: sql<number>`(select coalesce(max(${peopleOrganizations.position}) + 1, 0) from ${peopleOrganizations} where ${peopleOrganizations.personId} = ${personId})` })
+        .values({
+          personId,
+          organizationId,
+          position: sql<number>`(select coalesce(max(${peopleOrganizations.position}) + 1, 0) from ${peopleOrganizations} where ${peopleOrganizations.personId} = ${personId})`,
+        })
         .onConflictDoNothing()
         .returning({ personId: peopleOrganizations.personId });
       if (added.length > 0) await this.touchBoth(tx, organizationId, personId);
@@ -359,7 +364,12 @@ export class OrganizationsRepository {
       this.peopleFor(ids, db),
       expertiseRefsByOwner(
         db as Database,
-        { table: organizationExpertise, ownerId: organizationExpertise.organizationId, expertiseId: organizationExpertise.expertiseId, position: organizationExpertise.position },
+        {
+          table: organizationExpertise,
+          ownerId: organizationExpertise.organizationId,
+          expertiseId: organizationExpertise.expertiseId,
+          position: organizationExpertise.position,
+        },
         ids,
       ),
     ]);

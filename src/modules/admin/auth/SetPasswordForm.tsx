@@ -17,10 +17,7 @@ interface LinkInfo {
 }
 
 type State =
-  | { status: "checking" }
-  | { status: "invalid" }
-  | { status: "ready"; token: string; info: LinkInfo }
-  | { status: "done"; purpose: LinkInfo["purpose"] };
+  { status: "checking" } | { status: "invalid" } | { status: "ready"; token: string; info: LinkInfo } | { status: "done"; purpose: LinkInfo["purpose"] };
 
 const INVALID = "This link has expired or was already used.";
 
@@ -125,7 +122,9 @@ export function SetPasswordForm({ purpose }: { purpose: LinkInfo["purpose"] }) {
         {state.status === "ready" ? (
           <form onSubmit={(event) => void submit(event)} noValidate aria-labelledby="set-password-title" className="mt-3 flex flex-col gap-2">
             <p className="px-2 text-body text-text-muted">
-              {purpose === "invite" ? `${state.info.name}, set the password for ${state.info.email}.` : `Set a new password for ${state.info.email}. You'll be signed out everywhere else.`}
+              {purpose === "invite"
+                ? `${state.info.name}, set the password for ${state.info.email}.`
+                : `Set a new password for ${state.info.email}. You'll be signed out everywhere else.`}
             </p>
             {/* For password managers: the account this password belongs to. */}
             <input type="email" name="username" autoComplete="username" value={state.info.email} readOnly hidden />

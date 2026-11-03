@@ -16,8 +16,10 @@ reach the browser or be committed to source control.
   through a single Zod schema (`src/shared/config/env.ts`), which fails
   fast with a descriptive error rather than allowing a partially-configured
   app to run.
-- `.env.local` is gitignored; `.env.local.template` (committed) lists
-  variable names only, with no real values.
+- `.env.local` is gitignored; `.env.example` (committed) documents every
+  variable with no real values. `npm run setup` writes a contributor's
+  `.env.local` with local-only values and generated secrets; no production
+  secret is ever needed to develop (2026-11-03).
 - Any variable intentionally exposed to the browser must use Next.js's
   `NEXT_PUBLIC_` prefix and must be individually justified — none exist in
   v0.1 today (Documentation is server-rendered; no integration needs

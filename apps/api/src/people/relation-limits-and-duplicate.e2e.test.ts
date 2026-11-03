@@ -160,7 +160,9 @@ describe("relationship limits and duplicate", () => {
 
     it("copies an organization's values and expertise, not its people", async () => {
       const [skill] = await expertise(1);
-      const organization = (await admin.post("/api/admin/organizations", { name: "Lab", website: "https://lab.example.org", expertiseIds: [skill] }).expect(201)).body;
+      const organization = (
+        await admin.post("/api/admin/organizations", { name: "Lab", website: "https://lab.example.org", expertiseIds: [skill] }).expect(201)
+      ).body;
       const person = await createPerson({ name: "Member", organizationIds: [organization.id] });
 
       const copy = (await admin.post(`/api/admin/organizations/${organization.id}/duplicate`).expect(201)).body;

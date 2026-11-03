@@ -1,7 +1,4 @@
-import type {
-  BlockObjectResponse,
-  RichTextItemResponse,
-} from "@notionhq/client/build/src/api-endpoints";
+import type { BlockObjectResponse, RichTextItemResponse } from "@notionhq/client/build/src/api-endpoints";
 import type { ContentBlock, RichText } from "@/shared/content/types";
 import { normalizeInternalLink } from "@/shared/content/internalLinks";
 

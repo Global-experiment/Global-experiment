@@ -31,7 +31,7 @@ export const SETTINGS = {
     schema: z.boolean(),
     envDefault: (config) => config.donationDefaults.enabled,
     public: true,
-    description: "Donations are open: the donate page offers Checkout (otherwise \"Donations open soon\").",
+    description: 'Donations are open: the donate page offers Checkout (otherwise "Donations open soon").',
   }),
   "donations.monthly": define({
     schema: z.boolean(),
@@ -63,7 +63,7 @@ export const SETTINGS = {
     envDefault: (config) => config.donationDefaults.checkout,
     public: true,
     description:
-      "How a one-off card donation is paid: \"embedded\" (Stripe's card fields on the donate page, no email asked) or \"hosted\" (Stripe Checkout). Monthly donations always use hosted Checkout.",
+      'How a one-off card donation is paid: "embedded" (Stripe\'s card fields on the donate page, no email asked) or "hosted" (Stripe Checkout). Monthly donations always use hosted Checkout.',
   }),
   // Treasury (roadmap 1b) — pending client answers, so behind settings.
   "treasury.public_recipient_names": define({
@@ -76,7 +76,8 @@ export const SETTINGS = {
     schema: z.boolean(),
     envDefault: (config) => config.treasuryDefaults.publishUnqualified,
     public: true,
-    description: "Unqualified expenses may be published (shown as \"Not qualified yet\"). Off: only Qualified / Not required entries can be published or are public (Q25).",
+    description:
+      'Unqualified expenses may be published (shown as "Not qualified yet"). Off: only Qualified / Not required entries can be published or are public (Q25).',
   }),
   "treasury.wise_connected": define({
     schema: z.boolean(),
@@ -88,7 +89,7 @@ export const SETTINGS = {
     schema: z.boolean(),
     envDefault: (config) => config.treasuryDefaults.donationAppeal,
     public: true,
-    description: "The Treasury page shows the \"Cry for donation\" banner. Turned on by hand until Wise gives a Sustainability score to trigger it.",
+    description: 'The Treasury page shows the "Cry for donation" banner. Turned on by hand until Wise gives a Sustainability score to trigger it.',
   }),
   "treasury.stats_currency": define({
     schema: z.enum(TREASURY_CURRENCIES),
@@ -100,7 +101,8 @@ export const SETTINGS = {
     schema: z.boolean(),
     envDefault: (config) => config.treasuryDefaults.publicToolbar,
     public: true,
-    description: "The public Treasury's search, sort and filter controls (and its currency switch). Off (2026-10-19): the history is latest first, every currency.",
+    description:
+      "The public Treasury's search, sort and filter controls (and its currency switch). Off (2026-10-19): the history is latest first, every currency.",
   }),
   "treasury.show_test_donations": define({
     schema: z.boolean(),
@@ -118,10 +120,14 @@ export const SETTINGS = {
   }),
   // Decision 11 of 2026-10-19: every opening counts as a view; the history shows one "viewed" per account per window.
   "history.view_event_window_hours": define({
-    schema: z.number().int().min(1).max(24 * 30),
+    schema: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 30),
     envDefault: () => 24,
     public: false,
-    description: "A record's history shows \"viewed this page\" at most once per account per this many hours (every opening still counts).",
+    description: 'A record\'s history shows "viewed this page" at most once per account per this many hours (every opening still counts).',
   }),
   // Decision 7: the AI relevance score becomes read-only once an AI fills it.
   "ai.enabled": define({

@@ -16,12 +16,7 @@ import { useEffect, useState } from "react";
  * their own toolbars collapse/expand on scroll can't move the bar (Review #3
  * item 4 — the fixed bar already follows the visible bottom by itself).
  */
-export function computeKeyboardInset(
-  layoutHeight: number,
-  visualHeight: number,
-  visualOffsetTop: number,
-  editableFocused = true,
-): number {
+export function computeKeyboardInset(layoutHeight: number, visualHeight: number, visualOffsetTop: number, editableFocused = true): number {
   if (!editableFocused) return 0;
   const covered = layoutHeight - visualHeight - visualOffsetTop;
   return covered > 1 ? Math.round(covered) : 0;
@@ -57,9 +52,7 @@ export function useKeyboardInset(): number {
       const viewport = window.visualViewport;
       if (!viewport) return;
       // Same value → React bails out, so steady scrolling doesn't re-render.
-      setInset(
-        computeKeyboardInset(window.innerHeight, viewport.height, viewport.offsetTop, isTextEntry(document.activeElement)),
-      );
+      setInset(computeKeyboardInset(window.innerHeight, viewport.height, viewport.offsetTop, isTextEntry(document.activeElement)));
     }
 
     // Coalesced to one read per frame. Besides the viewport's own events,

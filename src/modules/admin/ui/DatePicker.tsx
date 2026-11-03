@@ -161,7 +161,11 @@ export function DatePicker({
                     aria-current={value === today ? "date" : undefined}
                     onClick={() => pick(value)}
                     className={`flex size-8 cursor-pointer items-center justify-center rounded-control tabular-nums ${
-                      selected ? "bg-text-primary font-bold text-surface-base" : outside ? "text-text-muted hover:ring-1 hover:ring-line" : "hover:ring-1 hover:ring-line"
+                      selected
+                        ? "bg-text-primary font-bold text-surface-base"
+                        : outside
+                          ? "text-text-muted hover:ring-1 hover:ring-line"
+                          : "hover:ring-1 hover:ring-line"
                     } ${value === today && !selected ? "ring-1 ring-text-muted" : ""} ${focusRing}`}
                   >
                     {Number(value.slice(8))}
@@ -187,7 +191,11 @@ export function DatePicker({
         </label>
       ) : null}
       <div className="mt-2 flex justify-between border-t border-line pt-2">
-        <button type="button" onClick={() => pick(today)} className={`h-8 cursor-pointer rounded-control px-2 font-bold hover:ring-1 hover:ring-line ${focusRing}`}>
+        <button
+          type="button"
+          onClick={() => pick(today)}
+          className={`h-8 cursor-pointer rounded-control px-2 font-bold hover:ring-1 hover:ring-line ${focusRing}`}
+        >
           Today
         </button>
         <span className="flex gap-1">

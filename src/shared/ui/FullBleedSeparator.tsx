@@ -7,10 +7,5 @@
  * content width — see ArticleAccordionItem.
  */
 export function FullBleedSeparator({ className = "" }: { className?: string }) {
-  return (
-    <hr
-      aria-hidden="true"
-      className={`-mx-gutter w-[calc(100%+var(--spacing-gutter)*2)] border-line ${className}`}
-    />
-  );
+  return <hr aria-hidden="true" className={`-mx-gutter w-[calc(100%+var(--spacing-gutter)*2)] border-line ${className}`} />;
 }

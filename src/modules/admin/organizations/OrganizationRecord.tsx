@@ -51,7 +51,11 @@ function patchFor(base: Draft, draft: Draft): OrganizationInput {
   for (const field of ["description", "website", "email", "wiseRecipientId"] as const) {
     if (draft[field].trim() !== base[field].trim()) patch[field] = draft[field].trim() || null;
   }
-  const ids = (options: RelationOption[]) => options.map((option) => option.id).sort().join(",");
+  const ids = (options: RelationOption[]) =>
+    options
+      .map((option) => option.id)
+      .sort()
+      .join(",");
   // Expertise keeps the order given (drag and drop): a new order is a change. People don't have one.
   const ordered = (options: RelationOption[]) => options.map((option) => option.id).join(",");
   if (ordered(draft.expertise) !== ordered(base.expertise)) patch.expertiseIds = draft.expertise.map((option) => option.id);

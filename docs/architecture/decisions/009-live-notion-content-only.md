@@ -42,6 +42,24 @@ my machine" depended on which mode the machine was in.
   normalised to internal routes; other external links stay external
   (`target=_blank`, `rel=noopener noreferrer`); `mailto:` stays a plain link.
 
+## Amendment (2026-11-03): contributors without Notion
+
+Contributors work locally without any production secret (Delivery 5a,
+client decision of 2026-11-03). On their machine, when the Notion values
+are missing and `NODE_ENV` isn't `production`, Home and Documentation (and
+an article and its history) render a plain "Notion isn't connected in this
+local setup" notice (`notionMissingLocally` in `src/shared/config/env.ts`,
+`src/shared/ui/NotionNotConnected.tsx`) instead of the error page.
+
+- It shows **no content**: no stand-in text, no fixture repository. The
+  rest of this decision is unchanged, and the guard test still forbids
+  fixture/mock repositories and checks that the notice can't appear in
+  production.
+- In production (`NODE_ENV=production`, which includes `next start`), a
+  missing value is still a loud error.
+- A contributor who has Notion read access adds the three values to
+  `.env.local` and sees the real pages.
+
 ## Caching
 
 All Notion-backed routes (`/`, `/documentation`, `/documentation/[slug]`) use

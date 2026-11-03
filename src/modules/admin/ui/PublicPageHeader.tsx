@@ -48,7 +48,14 @@ export function PublicPageHeader({ title, administrateHref, publicPath }: { titl
         Administrate
       </AdminButtonLink>
       <div className="relative -ml-1 flex items-center">
-        <button type="button" onClick={() => void share()} aria-label={copied ? "Link copied" : "Share"} title="Copy the public page's link" data-copied={copied || undefined} className={iconButton}>
+        <button
+          type="button"
+          onClick={() => void share()}
+          aria-label={copied ? "Link copied" : "Share"}
+          title="Copy the public page's link"
+          data-copied={copied || undefined}
+          className={iconButton}
+        >
           <AdminIcon name={copied ? "check_circle" : "share"} />
         </button>
         <button
@@ -62,7 +69,13 @@ export function PublicPageHeader({ title, administrateHref, publicPath }: { titl
         >
           <AdminIcon name="more_vert" />
         </button>
-        <Popover open={menuOpen} onClose={() => setMenuOpen(false)} triggerRef={menuTrigger} label="Page actions" className="top-[calc(100%+8px)] right-1 w-56 p-1">
+        <Popover
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          triggerRef={menuTrigger}
+          label="Page actions"
+          className="top-[calc(100%+8px)] right-1 w-56 p-1"
+        >
           <a
             href={publicPath}
             target="_blank"

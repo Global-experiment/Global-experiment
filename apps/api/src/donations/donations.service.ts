@@ -157,30 +157,41 @@ export class DonationsService {
     const amount = parseAmountToMinor(request.amount)!;
 
     // Back to the donate page with the same choices (cancel), or to the thank-you page.
-    const choice = new URLSearchParams({ currency: request.currency, amount: (amount / 100).toFixed(amount % 100 === 0 ? 0 : 2), frequency: request.frequency });
+    const choice = new URLSearchParams({
+      currency: request.currency,
+      amount: (amount / 100).toFixed(amount % 100 === 0 ? 0 : 2),
+      frequency: request.frequency,
+    });
     const site = this.config.publicSiteUrl;
     // {CHECKOUT_SESSION_ID} is Stripe's placeholder: it must stay unencoded.
     const successUrl = `${site}/donate/thank-you?${choice.toString()}&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${site}/donate?${choice.toString()}&canceled=1`;
 
-    const fingerprint = createHash("sha256").update(JSON.stringify([amount, request.currency, request.frequency, request.method])).digest("hex").slice(0, 16);
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify([amount, request.currency, request.frequency, request.method]))
+      .digest("hex")
+      .slice(0, 16);
 
     const session = await stripe
       .createCheckoutSession({
-      mode: request.frequency === "monthly" ? "subscription" : "payment",
-      currency: request.currency,
-      amount,
-      paymentMethodTypes: [DONATION_METHODS[request.method].stripeType],
-      productName: PRODUCT_NAME[request.frequency],
-      successUrl,
-      cancelUrl,
-      // Same attempt + same choice = same session (a double click never opens two Checkouts).
-      idempotencyKey: `donation-checkout:${request.attemptId}:${fingerprint}`,
-    })
+        mode: request.frequency === "monthly" ? "subscription" : "payment",
+        currency: request.currency,
+        amount,
+        paymentMethodTypes: [DONATION_METHODS[request.method].stripeType],
+        productName: PRODUCT_NAME[request.frequency],
+        successUrl,
+        cancelUrl,
+        // Same attempt + same choice = same session (a double click never opens two Checkouts).
+        idempotencyKey: `donation-checkout:${request.attemptId}:${fingerprint}`,
+      })
       .catch((error: unknown) => {
         // Stripe refused the request: why (type/code/param/request id — never donor data), for whoever operates the account.
         const stripeDetails = (error as { stripe?: unknown }).stripe;
-        if (stripeDetails) this.logger.warn({ stripe: stripeDetails, currency: request.currency, frequency: request.frequency, method: request.method }, "Stripe refused the Checkout session");
+        if (stripeDetails)
+          this.logger.warn(
+            { stripe: stripeDetails, currency: request.currency, frequency: request.frequency, method: request.method },
+            "Stripe refused the Checkout session",
+          );
         throw error;
       });
     this.logger.info(
@@ -203,7 +214,10 @@ export class DonationsService {
     const issues = checkoutIssues({ ...request, frequency: "once", method: "card" }, flags);
     if (issues.length > 0) throw new ValidationFailedError(issues);
     const amount = parseAmountToMinor(request.amount)!;
-    const fingerprint = createHash("sha256").update(JSON.stringify([amount, request.currency])).digest("hex").slice(0, 16);
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify([amount, request.currency]))
+      .digest("hex")
+      .slice(0, 16);
     const intent = await stripe
       .createPaymentIntent({
         currency: request.currency,

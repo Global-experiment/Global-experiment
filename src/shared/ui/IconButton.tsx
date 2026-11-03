@@ -8,9 +8,7 @@ interface IconButtonBase {
   className?: string;
 }
 
-type IconButtonProps =
-  | (IconButtonBase & { href: string; onClick?: never })
-  | (IconButtonBase & { onClick: () => void; href?: never });
+type IconButtonProps = (IconButtonBase & { href: string; onClick?: never }) | (IconButtonBase & { onClick: () => void; href?: never });
 
 /*
  * A 16px outlined glyph (the visible artwork) inside an invisible 32×40 hit

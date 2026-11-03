@@ -34,7 +34,16 @@ const person: Person = {
   createdAt: "2026-08-01T09:00:00.000Z",
   updatedAt: "2026-08-01T09:00:00.000Z",
   organizations: [{ id: "o1", name: "Lab" }],
-  expertise: [{ id: "e1", name: "Web", stableId: "03.01.web", status: { key: "active", label: "Active" }, field: { id: "f1", name: "Software" }, domain: { id: "d1", name: "Tech" } }],
+  expertise: [
+    {
+      id: "e1",
+      name: "Web",
+      stableId: "03.01.web",
+      status: { key: "active", label: "Active" },
+      field: { id: "f1", name: "Software" },
+      domain: { id: "d1", name: "Tech" },
+    },
+  ],
 };
 
 describe("person record form", () => {
@@ -46,9 +55,11 @@ describe("person record form", () => {
   });
 
   it("sends only the changed fields, clearing blanks to null", () => {
-    expect(
-      personPatch(original, { ...original, stateKey: "contacted", description: "  ", phone: " +41 1 ", sourceKey: "" }),
-    ).toEqual({ stateKey: "contacted", description: null, phone: "+41 1" });
+    expect(personPatch(original, { ...original, stateKey: "contacted", description: "  ", phone: " +41 1 ", sourceKey: "" })).toEqual({
+      stateKey: "contacted",
+      description: null,
+      phone: "+41 1",
+    });
   });
 
   it("sends relationship sets only when membership changed (order ignored)", () => {
@@ -72,20 +83,35 @@ describe("person record form", () => {
     expect(original.relevanceScore).toBe("7");
     expect(personPatch(original, { ...original, relevanceScore: "8", aiRelevanceScore: "0" })).toEqual({ relevanceScore: 8, aiRelevanceScore: 0 });
     expect(personPatch(original, { ...original, relevanceScore: " " })).toEqual({ relevanceScore: null });
-    for (const typed of ["11", "-1", "2.5", "a"]) expect(personDraftErrors({ ...original, relevanceScore: typed }), typed).toEqual({ relevanceScore: "Use a whole number from 0 to 10." });
-    expect(personDraftErrors({ ...original, firstContactOn: "2026-10-05", lastContactOn: "2026-10-01" })).toEqual({ lastContactOn: "The last contact can't be before the first contact." });
+    for (const typed of ["11", "-1", "2.5", "a"])
+      expect(personDraftErrors({ ...original, relevanceScore: typed }), typed).toEqual({ relevanceScore: "Use a whole number from 0 to 10." });
+    expect(personDraftErrors({ ...original, firstContactOn: "2026-10-05", lastContactOn: "2026-10-01" })).toEqual({
+      lastContactOn: "The last contact can't be before the first contact.",
+    });
     expect(personDraftErrors(original)).toEqual({});
   });
 
   it("contact channels and expenses are sets: sent only when membership changed", () => {
     expect(original.expenses).toEqual([{ id: "x1", label: "EXP-204 · \u2212USD\u00a0200.00", href: "/admin/treasury/x1" }]);
     expect(personPatch(original, { ...original, contactChannelKeys: ["signal"] })).toEqual({});
-    expect(personPatch(original, { ...original, contactChannelKeys: ["email", "signal"], expenses: [] })).toEqual({ contactChannelKeys: ["email", "signal"], expenseIds: [] });
+    expect(personPatch(original, { ...original, contactChannelKeys: ["email", "signal"], expenses: [] })).toEqual({
+      contactChannelKeys: ["email", "signal"],
+      expenseIds: [],
+    });
   });
 
   it("a duplicate as a draft sends every filled field, but never the expenses (they keep their recipient)", () => {
     const body = personCreateBody({ ...original, name: "Ada Example (copy)" });
-    expect(body).toMatchObject({ name: "Ada Example (copy)", stateKey: "sourced", description: "Note", email: "ada@example.org", relevanceScore: 7, contactChannelKeys: ["signal"], organizationIds: ["o1"], expertiseIds: ["e1"] });
+    expect(body).toMatchObject({
+      name: "Ada Example (copy)",
+      stateKey: "sourced",
+      description: "Note",
+      email: "ada@example.org",
+      relevanceScore: 7,
+      contactChannelKeys: ["signal"],
+      organizationIds: ["o1"],
+      expertiseIds: ["e1"],
+    });
     expect(body).not.toHaveProperty("expenseIds");
   });
 

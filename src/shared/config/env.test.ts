@@ -5,12 +5,7 @@ const ORIGINAL_ENV = { ...process.env };
 beforeEach(() => {
   vi.resetModules();
   process.env = { ...ORIGINAL_ENV };
-  for (const key of [
-    "DATABASE_URL",
-    "NOTION_API_KEY",
-    "NOTION_DOCUMENTATION_DB_ID",
-    "NOTION_HOME_PAGE_ID",
-  ]) {
+  for (const key of ["DATABASE_URL", "NOTION_API_KEY", "NOTION_DOCUMENTATION_DB_ID", "NOTION_HOME_PAGE_ID"]) {
     delete process.env[key];
   }
 });
@@ -21,8 +16,7 @@ afterEach(() => {
 
 describe("Notion environment scopes", () => {
   it("each scope fails clearly, naming the missing variable, when unset", async () => {
-    const { getNotionClientEnv, getNotionDocumentationEnv, getNotionHomeEnv, EnvValidationError } =
-      await import("./env");
+    const { getNotionClientEnv, getNotionDocumentationEnv, getNotionHomeEnv, EnvValidationError } = await import("./env");
 
     expect(() => getNotionClientEnv()).toThrow(EnvValidationError);
     expect(() => getNotionClientEnv()).toThrow(/NOTION_API_KEY/);

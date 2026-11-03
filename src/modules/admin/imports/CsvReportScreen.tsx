@@ -49,7 +49,11 @@ export function CsvReportScreen({ id }: { id: string }) {
   if (report.error || !report.data) {
     return (
       <RecordLayout backHref="/admin/history" backLabel="History" title="Import report">
-        {report.error ? <StatusMessage tone="error">{report.error.status === 404 ? "This import report doesn’t exist." : report.error.message}</StatusMessage> : <StatusMessage>Loading the report…</StatusMessage>}
+        {report.error ? (
+          <StatusMessage tone="error">{report.error.status === 404 ? "This import report doesn’t exist." : report.error.message}</StatusMessage>
+        ) : (
+          <StatusMessage>Loading the report…</StatusMessage>
+        )}
       </RecordLayout>
     );
   }
@@ -138,7 +142,9 @@ export function CsvReportScreen({ id }: { id: string }) {
           </>
         )}
       />
-      {of("not_imported").length > 0 ? <Section title="Not imported (the import stopped)" rows={of("not_imported")} empty="" render={(row) => row.name} /> : null}
+      {of("not_imported").length > 0 ? (
+        <Section title="Not imported (the import stopped)" rows={of("not_imported")} empty="" render={(row) => row.name} />
+      ) : null}
     </RecordLayout>
   );
 }
