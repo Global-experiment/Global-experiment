@@ -1,4 +1,5 @@
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AuthRepository } from "../auth/auth.repository.js";
 import { adminUsers } from "../auth/auth.schema.js";
@@ -31,6 +32,7 @@ async function open(url: string): Promise<{ db: Database; migrate: () => Promise
     const { PGlite } = await import("@electric-sql/pglite");
     const { drizzle } = await import("drizzle-orm/pglite");
     const { migrate } = await import("drizzle-orm/pglite/migrator");
+    mkdirSync(dirname(directory), { recursive: true }); // PGlite creates its folder, not the parents
     const client = new PGlite(directory);
     const db = drizzle(client, { schema });
     return { db: db as unknown as Database, migrate: () => migrate(db, { migrationsFolder: MIGRATIONS }), close: () => client.close() };

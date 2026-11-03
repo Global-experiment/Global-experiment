@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { Global, Inject, Module, type OnApplicationShutdown } from "@nestjs/common";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -31,6 +33,7 @@ async function connect(config: AppConfig): Promise<SqlClient> {
     // Loaded only for the local database: production never imports PGlite.
     const { PGlite } = await import("@electric-sql/pglite");
     const { drizzle: drizzlePglite } = await import("drizzle-orm/pglite");
+    mkdirSync(dirname(directory), { recursive: true }); // PGlite creates its folder, not the parents
     const client = new PGlite(directory);
     return { db: drizzlePglite(client, { schema }) as unknown as Database, close: () => client.close() };
   }
