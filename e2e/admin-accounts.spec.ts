@@ -44,6 +44,8 @@ async function properties(target: Page) {
 }
 
 async function axe(target = page) {
+  // A record page sets its tab title once the record has loaded: check the page after that.
+  await expect.poll(() => target.title()).not.toBe("");
   const results = await new AxeBuilder({ page: target }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
 }
