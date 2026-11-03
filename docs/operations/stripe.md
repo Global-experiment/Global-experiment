@@ -121,7 +121,7 @@ named e.g. "global-experiment-api", with only:
 | PaymentIntents, Charges, Refunds, Disputes, Invoices, Invoice Payments, Subscriptions, Balance transactions | Read |
 | Webhook endpoints, everything else | None |
 
-Put it in `/etc/global-experiment/api.env` as `STRIPE_SECRET_KEY` with
+Put it in the API's environment on the production server as `STRIPE_SECRET_KEY` with
 `STRIPE_LIVE_ENABLED=true` (never in the repository, never printed).
 
 ### 3.2 Account settings that would break donations
@@ -184,12 +184,12 @@ donations. Wise reconciliation is a later module (Wise API, Q-list).
 ### 3.7 Release checklist
 
 1. Backup, then migration **0006** (release runbook, as for 0005).
-2. `/etc/global-experiment/api.env`: `STRIPE_SECRET_KEY` (restricted live
+2. The API's environment on the production server: `STRIPE_SECRET_KEY` (restricted live
    key), `STRIPE_LIVE_ENABLED=true`, `STRIPE_WEBHOOK_SECRET`,
    `PUBLIC_SITE_URL=https://globalexperiment.org`,
    `WEB_INTERNAL_URL=http://127.0.0.1:3000`, `REVALIDATE_SECRET`,
    `STRIPE_CUSTOMER_PORTAL_URL` (if monthly is on).
-3. Next.js environment (`.env.local` on the server or the unit's drop-in):
+3. The site's environment on the production server:
    the same `REVALIDATE_SECRET`; `ADMIN_API_ORIGIN` already set.
 4. Dashboard: §3.2 off, §3.3 methods, §3.4 endpoint (9 events), §3.5, §3.6.
 5. Restart both services; `GET /api/donations/config` answers

@@ -450,8 +450,8 @@ owner in the admin (`/api/admin/treasury/:id/documents`,
 `/api/admin/treasury/documents/:id`, always `Content-Disposition:
 attachment`, `nosniff`, `no-store`); never in a public response. The type is
 judged from the file's bytes (PDF, PNG or JPEG), never its name. Files live
-behind the file-storage adapter (`FILE_STORAGE_DIR`, production
-`/var/lib/global-experiment/files`: outside the web root, in the backups);
+behind the file-storage adapter (`FILE_STORAGE_DIR`; in production a
+private folder on the server, outside the web root, in the backups);
 an S3-compatible adapter can replace it without a schema change (Q5).
 Deleting a document becomes an audited action with module 2; whether files
 may ever be deleted (accounting retention) is Q5/Q11.

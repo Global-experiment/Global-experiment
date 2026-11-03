@@ -129,9 +129,9 @@ describe("CSV import plan (people)", () => {
     // As Notion exported the client's file on 2026-10-30: links after each name. "Pigeon" stands for a channel the admin doesn't have ("Other" is one since migration 0014).
     const notion =
       "Name,Email,Expertise,Contact channels\n" +
-      'Kim Lee,kim@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Pigeon"\n' +
+      'Kim Lee,kim@example.net,"Copywriting (https://app.notion.com/p/Copywriting-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f?pvs=21), Game design (https://app.notion.com/p/Game-design-0f0f?pvs=21)","Email, Pigeon"\n' +
       'Lou Ray,lou@example.net,"  copywriting ",Pigeon\n' +
-      'Max Roe,not-an-email,"Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)",\n' +
+      'Max Roe,not-an-email,"Game design (https://app.notion.com/p/Game-design-0f0f?pvs=21)",\n' +
       ",nameless@example.net,Copywriting,\n";
 
     it("imports the row without the value it doesn't know, with a warning; Notion's app.notion.com links are removed", () => {
@@ -176,8 +176,8 @@ describe("CSV import plan (people)", () => {
     });
 
     it("removes Notion's links (www.notion.so and app.notion.com) on every value column, then matches the existing values", () => {
-      const notionSo = (name: string) => `${name} (https://www.notion.so/${name.replace(/\W+/g, "-")}-3d41dc64fd2881829739dcc486d08b9f)`;
-      const notionApp = (name: string) => `${name} (https://app.notion.com/p/${name.replace(/\W+/g, "-")}-3d41?pvs=21)`;
+      const notionSo = (name: string) => `${name} (https://www.notion.so/${name.replace(/\W+/g, "-")}-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f)`;
+      const notionApp = (name: string) => `${name} (https://app.notion.com/p/${name.replace(/\W+/g, "-")}-0f0f?pvs=21)`;
       const csv =
         "Name,Email,State,Source,Contact channels,Organizations,Expertise\n" +
         `Uma Link,uma@example.net,"${notionSo("Collaborating")}","${notionApp("Other")}","${notionSo("Email")}, ${notionApp("Signal")}","${notionSo("Acme, Inc.")}","${notionSo("Facilitation")}, ${notionApp("Économie sociale")}"\n`;

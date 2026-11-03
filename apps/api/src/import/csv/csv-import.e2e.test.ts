@@ -202,7 +202,7 @@ describe("CSV import API", () => {
     // As Notion exported the client's file: a link after each name; "Pigeon" stands for a channel the admin doesn't have.
     const file = csv(
       "Name,Email,Expertise,Contact channels\n" +
-        'Gil Notion,gil@example.net,"Copywriting (https://app.notion.com/p/Copywriting-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Copyediting (https://app.notion.com/p/Copyediting-3d41?pvs=21)","Email, Pigeon"\n' +
+        'Gil Notion,gil@example.net,"Copywriting (https://app.notion.com/p/Copywriting-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f?pvs=21), Copyediting (https://app.notion.com/p/Copyediting-0f0f?pvs=21)","Email, Pigeon"\n' +
         "Hana Notion,hana@example.net,COPYWRITING,Pigeon\n" +
         "Ivo Notion,not-an-email,Copywriting,\n",
     );
@@ -242,8 +242,8 @@ describe("CSV import API", () => {
 
   it("the client's file of 2026-10-30, imported again: the records already imported are skipped as duplicates, every other row goes through (OPS-153)", async () => {
     // The two refusal causes of that run: Notion links after each value (both of Notion's link formats), and "Other" as a contact channel.
-    const notionSo = (name: string) => `${name} (https://www.notion.so/${name.replace(/\W+/g, "-")}-3d41dc64fd2881829739dcc486d08b9f)`;
-    const notionApp = (name: string) => `${name} (https://app.notion.com/p/${name.replace(/\W+/g, "-")}-3d41?pvs=21)`;
+    const notionSo = (name: string) => `${name} (https://www.notion.so/${name.replace(/\W+/g, "-")}-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f)`;
+    const notionApp = (name: string) => `${name} (https://app.notion.com/p/${name.replace(/\W+/g, "-")}-0f0f?pvs=21)`;
     const file = csv(
       "Name,Email,Expertise,Contact channels,Organizations\n" +
         // Imported on 2026-10-30 (no expertise, no channel then): already in the admin.
