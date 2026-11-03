@@ -21,6 +21,10 @@ npm ci
 npm run setup
 ```
 
+Recent npm versions end `npm ci` with `npm warn allow-scripts` lines about
+packages whose install scripts they didn't run: that is expected, nothing to
+approve; the project works without them.
+
 `npm run setup`:
 
 - writes `.env.local` (never committed) with local-only values: the local
@@ -66,7 +70,7 @@ Everything except three things that need outside services:
 | Part | Without keys | To work on it |
 |---|---|---|
 | Home and Documentation | Say "Notion isn't connected in this local setup" (they're written in Notion) | Ask the maintainer for read access; add `NOTION_API_KEY`, `NOTION_HOME_PAGE_ID`, `NOTION_DOCUMENTATION_DB_ID` to `.env.local` |
-| Donations | "Donations open soon" | Your **own** Stripe account's test keys (`sk_test_…`, `pk_test_…`) and `DONATIONS_ENABLED=true` — see [docs/operations/stripe.md](docs/operations/stripe.md) |
+| Donations | The donate page says "Donations are unavailable" | Your **own** Stripe account's test keys (`sk_test_…`, `pk_test_…`) and `DONATIONS_ENABLED=true` — see [docs/operations/stripe.md](docs/operations/stripe.md) |
 | Email, AI | Not built yet | — |
 
 Every variable is described in [.env.example](.env.example).
