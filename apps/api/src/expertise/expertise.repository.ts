@@ -166,7 +166,12 @@ export class ExpertiseRepository {
           .select({ expertiseId: expertiseTeams.expertiseId, key: teams.key, label: teams.label })
           .from(expertiseTeams)
           .innerJoin(teams, eq(teams.key, expertiseTeams.teamKey))
-          .where(inArray(expertiseTeams.expertiseId, rows.map((row) => row.id)))
+          .where(
+            inArray(
+              expertiseTeams.expertiseId,
+              rows.map((row) => row.id),
+            ),
+          )
           .orderBy(asc(teams.sortOrder))
       : [];
     return {
@@ -223,11 +228,7 @@ export class ExpertiseRepository {
 
   async rename(level: ExpertiseLevel, id: string, name: string, db: Executor = this.db) {
     const table = TABLE[level];
-    const [row] = await db
-      .update(table)
-      .set({ name, updatedAt: new Date() })
-      .where(eq(table.id, id))
-      .returning({ id: table.id, name: table.name });
+    const [row] = await db.update(table).set({ name, updatedAt: new Date() }).where(eq(table.id, id)).returning({ id: table.id, name: table.name });
     return row;
   }
 }

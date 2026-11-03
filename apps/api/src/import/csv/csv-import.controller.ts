@@ -53,7 +53,8 @@ function readOptions(raw: unknown): Options {
     throw new ValidationFailedError([{ path: "options", message: "Invalid options." }]);
   }
   const parsed = Options.safeParse(json);
-  if (!parsed.success) throw new ValidationFailedError(parsed.error.issues.map((issue) => ({ path: `options.${issue.path.join(".")}`, message: issue.message })));
+  if (!parsed.success)
+    throw new ValidationFailedError(parsed.error.issues.map((issue) => ({ path: `options.${issue.path.join(".")}`, message: issue.message })));
   return parsed.data;
 }
 
@@ -85,8 +86,14 @@ export class CsvImportController {
   confirm(@Param("table", TableParam) table: CsvTable, @UploadedFileParam() file: Upload, @Body("options") raw: unknown, @Req() request: AdminRequest) {
     if (!request.admin) throw new UnauthenticatedError();
     const options = readOptions(raw);
-    if (!options.expect || !options.mapping) throw new ValidationFailedError([{ path: "options", message: "Confirm the preview you reviewed (its column choices and counts)." }]);
-    return this.imports.confirm(table, upload(file, options), { mapping: options.mapping, include: options.include, choices: options.choices, expect: options.expect }, request.admin);
+    if (!options.expect || !options.mapping)
+      throw new ValidationFailedError([{ path: "options", message: "Confirm the preview you reviewed (its column choices and counts)." }]);
+    return this.imports.confirm(
+      table,
+      upload(file, options),
+      { mapping: options.mapping, include: options.include, choices: options.choices, expect: options.expect },
+      request.admin,
+    );
   }
 
   @Get("runs/:id")

@@ -24,7 +24,11 @@ export function useColumnPrefs(tableId: string, knownIds: readonly string[], def
       window.removeEventListener(CHANGE_EVENT, onChange);
     };
   }, []);
-  const raw = useSyncExternalStore(subscribe, () => read(key), () => null);
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => read(key),
+    () => null,
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps -- knownIds is a static column list
   const prefs = useMemo(() => parsePrefs(raw, knownIds, defaultHidden), [raw]);
 

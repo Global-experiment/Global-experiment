@@ -6,13 +6,7 @@ import { ErrorState } from "@/shared/ui/ErrorState";
 import { logger } from "@/shared/logging/logger";
 import { rethrowNotFoundInErrorBoundary } from "@/shared/ui/rethrowNotFoundInErrorBoundary";
 
-export default function DocumentationError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function DocumentationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   rethrowNotFoundInErrorBoundary(error);
 
   useEffect(() => {

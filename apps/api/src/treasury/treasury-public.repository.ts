@@ -10,13 +10,7 @@ import { people } from "../people/people.schema.js";
 import { SettingsService } from "../settings/settings.service.js";
 import type { PublicEntriesQuery, PublicTreasuryEntry, PublicTreasuryOverview } from "./treasury-public.contracts.js";
 import { publicStripeModes, TreasuryLedgerRepository } from "./treasury-ledger.repository.js";
-import {
-  treasuryEntries,
-  treasuryEntryExpenseTypes,
-  treasuryExpenseTypes,
-  treasuryPublicEntries,
-  type TreasuryCurrency,
-} from "./treasury.schema.js";
+import { treasuryEntries, treasuryEntryExpenseTypes, treasuryExpenseTypes, treasuryPublicEntries, type TreasuryCurrency } from "./treasury.schema.js";
 
 const REVIEWED = ["qualified", "not_required"];
 /** Refunds and disputes adjust donations: the public "Donations" type covers them. */
@@ -169,11 +163,7 @@ export class TreasuryPublicRepository {
       qualified: REVIEWED.includes(row.reviewStatusKey),
       description: row.description,
       expenseTypes: links.filter((link) => link.entryId === row.id).map(({ key, label }) => ({ key, label })),
-      recipient: row.organizationName
-        ? { kind: "organization", name: row.organizationName }
-        : row.personName
-          ? { kind: "person", name: row.personName }
-          : null,
+      recipient: row.organizationName ? { kind: "organization", name: row.organizationName } : row.personName ? { kind: "person", name: row.personName } : null,
       adjustsNumber: row.adjustsNumber ?? null,
       // Sample entries (before go-live), and Stripe sandbox donations where real ones can be public too (production
       // before go-live; elsewhere every Stripe entry is a test one, unmarked).
@@ -191,7 +181,10 @@ export class TreasuryPublicRepository {
         .orderBy(...this.order(query.sort))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
-      this.db.select({ n: sql<number>`count(*)::int` }).from(view).where(where),
+      this.db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(view)
+        .where(where),
     ]);
     return { items: await this.withExpenseTypes(rows, visibility), total: count?.n ?? 0, page: query.page, pageSize: query.pageSize };
   }

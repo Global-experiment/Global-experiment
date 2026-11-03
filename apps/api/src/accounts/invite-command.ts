@@ -39,20 +39,42 @@ export async function inviteByCommand(db: Database, input: InviteCommandInput, p
       .where(sql`lower(${adminUsers.email}) = ${email.toLowerCase()}`)
       .limit(1);
     if (existing && existing.status !== "invited") {
-      throw new Error(existing.status === "active" ? "This account is already active: nothing to do." : "This account is deactivated: reactivate it in Accounts first.");
+      throw new Error(
+        existing.status === "active" ? "This account is already active: nothing to do." : "This account is deactivated: reactivate it in Accounts first.",
+      );
     }
-    const id = existing?.id ?? (await tx.insert(adminUsers).values({ email, displayName, role: input.role, status: "invited", passwordHash: null }).returning({ id: adminUsers.id }))[0]!.id;
+    const id =
+      existing?.id ??
+      (await tx.insert(adminUsers).values({ email, displayName, role: input.role, status: "invited", passwordHash: null }).returning({ id: adminUsers.id }))[0]!
+        .id;
     const label = existing?.displayName ?? displayName ?? email.split("@")[0]!;
 
     const token = generateSessionToken();
     const expiresAt = new Date(now.getTime() + LINK_HOURS * 3_600_000);
-    await tx.update(adminTokens).set({ usedAt: now }).where(and(eq(adminTokens.adminUserId, id), isNull(adminTokens.usedAt)));
+    await tx
+      .update(adminTokens)
+      .set({ usedAt: now })
+      .where(and(eq(adminTokens.adminUserId, id), isNull(adminTokens.usedAt)));
     await tx.insert(adminTokens).values({ adminUserId: id, purpose: "invite", tokenHash: hashSessionToken(token), expiresAt, createdById: null });
     await recordAuditEvent(
       tx,
       existing
-        ? { entityType: "admin_user", entityId: id, action: "link_created", actor: AUTOMATION, source: "system", meta: { label, purpose: "Invitation link", expiresAt: expiresAt.toISOString(), origin: "admin:invite" } }
-        : { entityType: "admin_user", entityId: id, action: "invited", actor: AUTOMATION, source: "system", meta: { label, role: ROLES[input.role as Role].label, collection: "Accounts", origin: "admin:invite" } },
+        ? {
+            entityType: "admin_user",
+            entityId: id,
+            action: "link_created",
+            actor: AUTOMATION,
+            source: "system",
+            meta: { label, purpose: "Invitation link", expiresAt: expiresAt.toISOString(), origin: "admin:invite" },
+          }
+        : {
+            entityType: "admin_user",
+            entityId: id,
+            action: "invited",
+            actor: AUTOMATION,
+            source: "system",
+            meta: { label, role: ROLES[input.role as Role].label, collection: "Accounts", origin: "admin:invite" },
+          },
       now,
     );
     return { outcome: existing ? "new_link" : "invited", link: `${publicSiteUrl}/admin/welcome#${token}`, expiresAt: expiresAt.toISOString() };

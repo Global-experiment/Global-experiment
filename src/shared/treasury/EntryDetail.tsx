@@ -63,12 +63,7 @@ export function EntryDetail({ entry, route, now }: { entry: PublicTreasuryEntry 
 
   return (
     <main className="flex flex-1 flex-col">
-      <NavHeader
-        title={title}
-        backHref="/treasury"
-        shareUrl={url}
-        menu={entryMenu({ sentence, url, title: `${title} ${amount}` })}
-      />
+      <NavHeader title={title} backHref="/treasury" shareUrl={url} menu={entryMenu({ sentence, url, title: `${title} ${amount}` })} />
       <Container className="pt-1">
         {/* p22/p26: the time, muted, with Share on the right of the same row. */}
         <div className="flex items-center justify-between gap-2">
@@ -80,7 +75,10 @@ export function EntryDetail({ entry, route, now }: { entry: PublicTreasuryEntry 
         {entry.adjustsNumber !== null ? (
           <p className="text-meta text-text-muted">
             {copy.adjusts(entry.type)}
-            <Link href={`/treasury/donation/${entry.adjustsNumber}`} className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary">
+            <Link
+              href={`/treasury/donation/${entry.adjustsNumber}`}
+              className="underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+            >
               {copy.adjustsLink(entry.adjustsNumber)}
             </Link>
           </p>
@@ -114,7 +112,10 @@ export function EntryDetail({ entry, route, now }: { entry: PublicTreasuryEntry 
                 {copy.spent.body}
                 <br />
                 {copy.spent.record}{" "}
-                <Link href="/documentation" className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary">
+                <Link
+                  href="/documentation"
+                  className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary"
+                >
                   {copy.spent.readMore}
                 </Link>
               </p>

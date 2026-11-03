@@ -36,7 +36,10 @@ test.describe("headers", () => {
         expect(await box.evaluate((element) => [getComputedStyle(element).position, getComputedStyle(element).top]), path).toEqual(["sticky", "0px"]);
         // The right side: Share, then ⋮ — nothing else (no theme toggle, currency or chart link).
         const actions = box.locator("[data-header-actions] > :is(a, button)");
-        expect(await actions.evaluateAll((elements) => elements.map((element) => element.getAttribute("aria-label"))), `${path} @${width}`).toEqual(["Share", "Page actions"]);
+        expect(await actions.evaluateAll((elements) => elements.map((element) => element.getAttribute("aria-label"))), `${path} @${width}`).toEqual([
+          "Share",
+          "Page actions",
+        ]);
         await box.getByRole("button", { name: "Page actions" }).click();
         const menu = page.getByRole("dialog", { name: "Page actions" });
         await expect(menu.getByRole("link", { name: "Send feedback" }), path).toBeVisible();
@@ -118,9 +121,9 @@ test.describe("mobile share", () => {
     });
     await page.goto("/contribute");
     await header(page).getByRole("button", { name: "Share" }).click();
-    await expect.poll(() => page.evaluate(() => (window as unknown as { __shares: { url: string }[] }).__shares.map((share) => share.url))).toEqual([
-      new URL("/contribute", page.url()).toString(),
-    ]);
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __shares: { url: string }[] }).__shares.map((share) => share.url)))
+      .toEqual([new URL("/contribute", page.url()).toString()]);
     await expect(page.locator("[data-toast]")).toHaveCount(0);
   });
 });
@@ -135,7 +138,10 @@ test.describe("layout details", () => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto("/treasury");
       const bar = page.locator("[data-action-bar]");
-      expect(await bar.evaluate((element) => [getComputedStyle(element).paddingTop, getComputedStyle(element).paddingBottom]), String(width)).toEqual([padding, padding]);
+      expect(await bar.evaluate((element) => [getComputedStyle(element).paddingTop, getComputedStyle(element).paddingBottom]), String(width)).toEqual([
+        padding,
+        padding,
+      ]);
     }
   });
 
@@ -154,7 +160,10 @@ test.describe("layout details", () => {
     test.skip(!process.env.E2E_ADMIN_ENABLED, "Treasury needs the API.");
     await page.setViewportSize({ width: 412, height: 800 });
     await page.goto("/treasury");
-    await page.getByRole("button", { name: /Expenses$/ }).filter({ has: page.locator("[data-stat-value]") }).click();
+    await page
+      .getByRole("button", { name: /Expenses$/ })
+      .filter({ has: page.locator("[data-stat-value]") })
+      .click();
     const dialog = page.locator("dialog.sheet[open]");
     await expect(dialog).toBeVisible();
     await page.waitForTimeout(400); // opening slide done
@@ -222,7 +231,12 @@ test.describe("size scale (client review 2026-10-21)", () => {
       expect(await root(), String(width)).toBe(size);
     }
     // Text follows: the 0.875rem body is 14.875px at 17px.
-    expect(await page.locator("main p").last().evaluate((element) => getComputedStyle(element).fontSize)).toBe("14.875px");
+    expect(
+      await page
+        .locator("main p")
+        .last()
+        .evaluate((element) => getComputedStyle(element).fontSize),
+    ).toBe("14.875px");
     // Adjustable in one place.
     await page.evaluate(() => document.documentElement.style.setProperty("--public-root-size", "125%"));
     expect(await root()).toBe("20px");

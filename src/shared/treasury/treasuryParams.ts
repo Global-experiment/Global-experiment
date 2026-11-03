@@ -50,9 +50,17 @@ export const DEFAULT_TREASURY_STATE: TreasuryState = {
 type Params = Record<string, string | string[] | undefined>;
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
-const listOf = (value: string | string[] | undefined) => [...new Set(first(value).split(",").map((part) => part.trim()).filter(Boolean))];
+const listOf = (value: string | string[] | undefined) => [
+  ...new Set(
+    first(value)
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean),
+  ),
+];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const isDate = (value: string) => DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
+const isDate = (value: string) =>
+  DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
 
 export function parseTreasuryParams(params: Params, defaultCurrency: DonationCurrency = "USD"): TreasuryState {
   const currency = first(params.currency).toUpperCase();
@@ -70,7 +78,9 @@ export function parseTreasuryParams(params: Params, defaultCurrency: DonationCur
     type: type === "expense" || type === "donation" ? type : null,
     from: from || null,
     to: to || null,
-    expenseTypes: listOf(params.types).filter((key) => /^[a-z][a-z0-9_]{0,39}$/.test(key)).slice(0, 20),
+    expenseTypes: listOf(params.types)
+      .filter((key) => /^[a-z][a-z0-9_]{0,39}$/.test(key))
+      .slice(0, 20),
     sort: (TREASURY_SORTS as readonly string[]).includes(sort) ? (sort as TreasurySort) : "date_desc",
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
     q: first(params.q).slice(0, 100) || null,
@@ -100,8 +110,7 @@ export function activeFilterCount(state: TreasuryState): number {
   return [state.type !== null, state.from !== null || state.to !== null, state.expenseTypes.length > 0].filter(Boolean).length;
 }
 
-export const clearFilters = (state: TreasuryState): TreasuryState =>
-  withFilters(state, { type: null, from: null, to: null, expenseTypes: [] });
+export const clearFilters = (state: TreasuryState): TreasuryState => withFilters(state, { type: null, from: null, to: null, expenseTypes: [] });
 
 /** The currency of the stats: the chosen one, or the default with "All currencies". */
 export const statsCurrency = (state: Pick<TreasuryState, "currency">, defaultCurrency: DonationCurrency = "USD"): DonationCurrency =>
@@ -152,8 +161,10 @@ export function presetRange(preset: DatePreset, today: string): { from: string |
 
 /** The preset a range matches today, if any. */
 export function matchingPreset(from: string | null, to: string | null, today: string): DatePreset | null {
-  return DATE_PRESETS.find((preset) => {
-    const range = presetRange(preset, today);
-    return range.from === from && range.to === to;
-  }) ?? null;
+  return (
+    DATE_PRESETS.find((preset) => {
+      const range = presetRange(preset, today);
+      return range.from === from && range.to === to;
+    }) ?? null
+  );
 }

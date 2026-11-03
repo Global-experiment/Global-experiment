@@ -22,7 +22,9 @@ const SHOTS = "test-results/figma";
 mkdirSync(SHOTS, { recursive: true });
 const FRAME = { width: 1440, height: 920 };
 const TABLET = { width: 1024, height: 768 };
-const SAVED_SESSIONS = ["admin-detail", "admin-treasury", "admin-figma", "admin-table", "admin-directory-v2", "admin"].map((name) => `test-results/.auth/${name}.json`);
+const SAVED_SESSIONS = ["admin-detail", "admin-treasury", "admin-figma", "admin-table", "admin-directory-v2", "admin"].map(
+  (name) => `test-results/.auth/${name}.json`,
+);
 const NAME = "Rae Review";
 const INVALID_LINK = "Invalid link. Use an address like https://example.org.";
 
@@ -36,7 +38,8 @@ const box = async (locator: Locator) => {
   if (!value) throw new Error("element not rendered");
   return value;
 };
-const chipLabels = (picker: string) => page.locator(`[data-relation-picker="${picker}"] [data-chip]`).evaluateAll((chips) => chips.map((chip) => chip.getAttribute("data-chip")));
+const chipLabels = (picker: string) =>
+  page.locator(`[data-relation-picker="${picker}"] [data-chip]`).evaluateAll((chips) => chips.map((chip) => chip.getAttribute("data-chip")));
 
 async function axe() {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -86,7 +89,8 @@ test.beforeAll(async ({ browser }, testInfo) => {
   }
   // Every console error or warning on the way fails the last test (e.g. invalid HTML nesting).
   page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") consoleIssues.push(`[${message.type()}] ${new URL(page.url()).pathname} :: ${message.text().slice(0, 300)}`);
+    if (message.type() === "error" || message.type() === "warning")
+      consoleIssues.push(`[${message.type()}] ${new URL(page.url()).pathname} :: ${message.text().slice(0, 300)}`);
   });
   page.on("pageerror", (error) => consoleIssues.push(`[pageerror] ${new URL(page.url()).pathname} :: ${error.message.slice(0, 300)}`));
   const response = await page.request.post("/api/admin/people", { data: { name: NAME, description: "First notes" }, headers: { origin: origin() } });

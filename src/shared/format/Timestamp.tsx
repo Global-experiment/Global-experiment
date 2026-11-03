@@ -42,7 +42,12 @@ function subscribeClock(listener: () => void) {
     }
   };
 }
-const useNow = (serverNow: number) => useSyncExternalStore(subscribeClock, () => nowMinute, () => serverNow);
+const useNow = (serverNow: number) =>
+  useSyncExternalStore(
+    subscribeClock,
+    () => nowMinute,
+    () => serverNow,
+  );
 
 /**
  * A timestamp in the client's format for its context (formatting.md):
@@ -51,7 +56,17 @@ const useNow = (serverNow: number) => useSyncExternalStore(subscribeClock, () =>
  * dates ("October 14 at 9:24 PM"). Always a <time> with the exact reference
  * (year and time zone) on hover and keyboard focus.
  */
-export function Timestamp({ value, format, serverNow = 0, className = "" }: { value: TimestampInput; format: "elapsed" | "short" | "full"; serverNow?: number; className?: string }) {
+export function Timestamp({
+  value,
+  format,
+  serverNow = 0,
+  className = "",
+}: {
+  value: TimestampInput;
+  format: "elapsed" | "short" | "full";
+  serverNow?: number;
+  className?: string;
+}) {
   const timeZone = useViewerTimeZone();
   const now = useNow(serverNow || new Date(value).getTime());
   const date = new Date(value);

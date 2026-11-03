@@ -26,10 +26,7 @@ export function HomeSections({ content }: { content: Pick<HomeContent, "sectionL
               </h3>
             ) : null}
             {section.paragraphs.map((paragraph, paragraphIndex) => (
-              <p
-                key={paragraphIndex}
-                className={paragraphIndex === 0 ? (section.heading ? "mt-1" : "") : "mt-paragraph"}
-              >
+              <p key={paragraphIndex} className={paragraphIndex === 0 ? (section.heading ? "mt-1" : "") : "mt-paragraph"}>
                 <RichText text={paragraph} />
               </p>
             ))}

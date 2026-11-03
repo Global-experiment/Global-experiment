@@ -11,13 +11,7 @@ import { rethrowNotFoundInErrorBoundary } from "@/shared/ui/rethrowNotFoundInErr
  * their own (Home). Never shows CMS content, error messages, or details —
  * only that the page is unavailable.
  */
-export default function PublicRouteError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function PublicRouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   rethrowNotFoundInErrorBoundary(error);
 
   useEffect(() => {

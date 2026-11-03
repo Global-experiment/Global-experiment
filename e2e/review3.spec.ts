@@ -8,8 +8,7 @@ import { expect, test, type Page } from "@playwright/test";
  * launch options).
  */
 
-const noPageOverflow = (page: Page) =>
-  page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+const noPageOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 
 /** Real touch input through Chromium's DevTools protocol (not mouse emulation). */
 async function touchDrag(page: Page, from: { x: number; y: number }, dy: number, steps: number) {
@@ -41,9 +40,7 @@ test.describe("qualification opens over the page you came from (item 5)", () => 
     await picker.getByText("Broken link").click();
     await picker.getByRole("button", { name: "Report issue" }).click();
 
-    await expect(page).toHaveURL(
-      "/issue?source=%2Fdocumentation%23introduction&qualified=1&type=Visual+bug&type=Broken+link",
-    );
+    await expect(page).toHaveURL("/issue?source=%2Fdocumentation%23introduction&qualified=1&type=Visual+bug&type=Broken+link");
     // The composer opens straight to the paragraph: no second qualification.
     await expect(page.getByLabel("Your issue report")).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -193,9 +190,7 @@ test.describe("Documentation deep links (item 7)", () => {
       await expect(page.locator("h2 > button[aria-expanded=true]")).toHaveCount(1);
       // Still on target once streamed article bodies have changed the layout: right under the sticky header.
       const headerBottom = await page.locator("[data-nav-header]").evaluate((element) => element.getBoundingClientRect().bottom);
-      await expect
-        .poll(async () => Math.abs((await row.boundingBox())!.y - headerBottom) <= 1, { timeout: 8000 })
-        .toBe(true);
+      await expect.poll(async () => Math.abs((await row.boundingBox())!.y - headerBottom) <= 1, { timeout: 8000 }).toBe(true);
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
       expect(await noPageOverflow(page)).toBe(true);
     });
@@ -297,8 +292,7 @@ test.describe("mobile", () => {
     await expect(bar).toBeVisible();
     await expect(bar.getByRole("link", { name: "Join waitlist" })).toBeVisible();
 
-    const barBottom = async () =>
-      bar.evaluate((el) => Math.round(innerHeight - el.getBoundingClientRect().bottom));
+    const barBottom = async () => bar.evaluate((el) => Math.round(innerHeight - el.getBoundingClientRect().bottom));
     expect(await barBottom()).toBe(0);
     await page.mouse.wheel(0, 600);
     await page.waitForTimeout(200);

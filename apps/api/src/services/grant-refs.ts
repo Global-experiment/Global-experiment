@@ -8,7 +8,11 @@ import { accessGrants, accessLevels, accessStatuses, services } from "./services
  * by owner id — the Permissions chips of a person (“GitHub · admin”), the
  * Accounts list and a service. Shared, so any repository can show them.
  */
-export async function grantRefsByOwner(db: Pick<Database, "select">, owner: "person" | "account" | "service", ids: readonly string[]): Promise<Map<string, GrantRef[]>> {
+export async function grantRefsByOwner(
+  db: Pick<Database, "select">,
+  owner: "person" | "account" | "service",
+  ids: readonly string[],
+): Promise<Map<string, GrantRef[]>> {
   const result = new Map<string, GrantRef[]>();
   if (ids.length === 0) return result;
   const column = { person: accessGrants.personId, account: accessGrants.adminUserId, service: accessGrants.serviceId }[owner];
@@ -28,7 +32,12 @@ export async function grantRefsByOwner(db: Pick<Database, "select">, owner: "per
     .where(and(inArray(column, [...ids]), isNull(accessGrants.archivedAt)))
     .orderBy(asc(sql`lower(${services.name})`), asc(accessLevels.sortOrder), asc(accessGrants.grantNumber));
   for (const row of rows) {
-    const ref: GrantRef = { id: row.id, service: row.service, level: row.level, status: row.statusKey ? { key: row.statusKey, label: row.statusLabel ?? row.statusKey } : null };
+    const ref: GrantRef = {
+      id: row.id,
+      service: row.service,
+      level: row.level,
+      status: row.statusKey ? { key: row.statusKey, label: row.statusLabel ?? row.statusKey } : null,
+    };
     result.set(row.ownerId, [...(result.get(row.ownerId) ?? []), ref]);
   }
   return result;

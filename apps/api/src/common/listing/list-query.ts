@@ -64,9 +64,7 @@ export interface Page<Item> {
 const asArray = (value: unknown) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
 
 /** Builds the Zod schema for one resource's list query string. */
-export function listQuerySchema<SortField extends string, FilterField extends string>(
-  definition: ListDefinition<SortField, FilterField>,
-) {
+export function listQuerySchema<SortField extends string, FilterField extends string>(definition: ListDefinition<SortField, FilterField>) {
   const sortFields = new Set<string>(definition.sortFields);
 
   const sortItem = z.string().transform((raw, context): Sort<SortField> => {
@@ -89,15 +87,11 @@ export function listQuerySchema<SortField extends string, FilterField extends st
       return z.NEVER;
     };
 
-    const spec = Object.hasOwn(definition.filters, field)
-      ? definition.filters[field as FilterField]
-      : undefined;
+    const spec = Object.hasOwn(definition.filters, field) ? definition.filters[field as FilterField] : undefined;
     if (!spec || first === -1) return fail(`Unsupported filter field "${field.slice(0, 40)}".`);
     if (!spec.operators.includes(operator)) return fail(`Unsupported operator for "${field}".`);
     if (VALUELESS.has(operator)) {
-      return value === undefined || value === ""
-        ? { field: field as FilterField, operator }
-        : fail(`"${operator}" takes no value.`);
+      return value === undefined || value === "" ? { field: field as FilterField, operator } : fail(`"${operator}" takes no value.`);
     }
     if (value === undefined || value.trim() === "") return fail(`Filter "${field}" needs a value.`);
     const parsed = (spec.value ?? z.string().trim().min(1).max(200)).safeParse(value);
@@ -118,15 +112,13 @@ export function listQuerySchema<SortField extends string, FilterField extends st
       sort: z.preprocess(asArray, z.array(sortItem).max(MAX_SORTS)),
       filter: z.preprocess(asArray, z.array(filterItem).max(MAX_FILTERS)),
     })
-    .transform(
-      (query): ListQuery<SortField, FilterField> => ({
-        page: query.page,
-        pageSize: query.pageSize,
-        search: query.search,
-        sort: query.sort.length > 0 ? dedupeSorts(query.sort) : [...definition.defaultSort],
-        filters: query.filter,
-      }),
-    );
+    .transform((query): ListQuery<SortField, FilterField> => ({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      sort: query.sort.length > 0 ? dedupeSorts(query.sort) : [...definition.defaultSort],
+      filters: query.filter,
+    }));
 }
 
 /** Keeps the first occurrence of each sort field (a later duplicate can't change the order). */

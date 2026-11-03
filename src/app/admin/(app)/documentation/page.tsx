@@ -22,8 +22,8 @@ export default async function AdminDocumentationPage() {
         <DocumentationList articles={articles} content={content} variant="admin">
           <h2 className="text-lead font-bold text-text-primary">Documentation</h2>
           <p className="mt-1 text-lead text-text-primary">
-            This page gathers the published articles explaining the experiment&rsquo;s purpose, current release,
-            administration, finances, privacy, technology, and future direction.
+            This page gathers the published articles explaining the experiment&rsquo;s purpose, current release, administration, finances, privacy, technology,
+            and future direction.
           </p>
         </DocumentationList>
       </Container>

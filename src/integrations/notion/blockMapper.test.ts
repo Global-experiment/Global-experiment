@@ -25,9 +25,9 @@ describe("mapRichText", () => {
   });
 
   it("normalizes links to this site's own documentation into internal routes", () => {
-    expect(
-      mapRichText([richText("Privacy", "https://globalexperiment.org/documentation/privacy-and-personal-data")]),
-    ).toEqual([{ kind: "link", value: "Privacy", href: "/documentation/privacy-and-personal-data" }]);
+    expect(mapRichText([richText("Privacy", "https://globalexperiment.org/documentation/privacy-and-personal-data")])).toEqual([
+      { kind: "link", value: "Privacy", href: "/documentation/privacy-and-personal-data" },
+    ]);
   });
 
   it("keeps external and mailto links external", () => {
@@ -53,15 +53,18 @@ describe("mapNotionBlockToContentBlock", () => {
   });
 
   it("maps heading_4 blocks (used by the live Home tagline)", () => {
-    expect(
-      mapNotionBlockToContentBlock(block({ type: "heading_4", heading_4: { rich_text: [richText("T")] } })),
-    ).toEqual({ kind: "heading", level: 4, text: [{ kind: "text", value: "T" }] });
+    expect(mapNotionBlockToContentBlock(block({ type: "heading_4", heading_4: { rich_text: [richText("T")] } }))).toEqual({
+      kind: "heading",
+      level: 4,
+      text: [{ kind: "text", value: "T" }],
+    });
   });
 
   it("maps paragraph blocks", () => {
-    expect(
-      mapNotionBlockToContentBlock(block({ type: "paragraph", paragraph: { rich_text: [richText("Hello")] } })),
-    ).toEqual({ kind: "paragraph", text: [{ kind: "text", value: "Hello" }] });
+    expect(mapNotionBlockToContentBlock(block({ type: "paragraph", paragraph: { rich_text: [richText("Hello")] } }))).toEqual({
+      kind: "paragraph",
+      text: [{ kind: "text", value: "Hello" }],
+    });
   });
 
   it("falls back to unsupported, reporting the exact Notion block type", () => {

@@ -104,13 +104,14 @@ export class TreasuryAdminService {
 
   /** Whether visitors see each entry now: the public Treasury's rule (TreasuryPublicRepository.visible). */
   private async withPublicNow<Row extends TreasuryEntryRowDto>(rows: Row[]): Promise<Row[]> {
-    const [modes, publishUnqualified] = await Promise.all([readPublicStripeModes(this.config, this.settings), this.settings.get("treasury.publish_unqualified")]);
+    const [modes, publishUnqualified] = await Promise.all([
+      readPublicStripeModes(this.config, this.settings),
+      this.settings.get("treasury.publish_unqualified"),
+    ]);
     return rows.map((row) => ({
       ...row,
       publicNow:
-        row.publication === "published" &&
-        (row.source !== "stripe" || modes.includes(row.livemode)) &&
-        (publishUnqualified || REVIEWED.has(row.review.key)),
+        row.publication === "published" && (row.source !== "stripe" || modes.includes(row.livemode)) && (publishUnqualified || REVIEWED.has(row.review.key)),
     }));
   }
 
@@ -174,21 +175,24 @@ export class TreasuryAdminService {
   }
 
   /** One audit event for an entry, in the write's transaction (the entry's label as it is now). */
-  private async recordEntry(
-    tx: Executor,
-    entry: Entry,
-    admin: AdminPrincipal,
-    action: "updated" | "archived" | "restored",
-    changes: AuditChange[] = [],
-  ) {
+  private async recordEntry(tx: Executor, entry: Entry, admin: AdminPrincipal, action: "updated" | "archived" | "restored", changes: AuditChange[] = []) {
     if (action === "updated" && changes.length === 0) return;
-    await this.audit.record(tx, { entityType: "treasury_entry", entityId: entry.id, action, actor: actorFor(admin), source: "admin", changes, meta: { label: entryLabel(entry) } });
+    await this.audit.record(tx, {
+      entityType: "treasury_entry",
+      entityId: entry.id,
+      action,
+      actor: actorFor(admin),
+      source: "admin",
+      changes,
+      meta: { label: entryLabel(entry) },
+    });
   }
 
   async update(id: string, body: UpdateTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
     const editor = this.assertTreasuryAdmin(admin);
     // Field by field (overview §3.1): the internal note is treasury.update, the review status treasury.review.
-    if (body.internalNote !== undefined && !editor.permissions.has("treasury.update")) throw new ForbiddenError("Your role doesn't allow editing the internal note.");
+    if (body.internalNote !== undefined && !editor.permissions.has("treasury.update"))
+      throw new ForbiddenError("Your role doesn't allow editing the internal note.");
     if (body.reviewStatus !== undefined && !editor.permissions.has("treasury.review")) throw new ForbiddenError("Your role doesn't allow reviewing expenses.");
     const entry = await this.load(id);
     const review = body.reviewStatus === undefined ? null : await this.checkReview(entry, body.reviewStatus);
@@ -245,10 +249,20 @@ export class TreasuryAdminService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(treasuryEntries)
-        .set(publish ? { publicationStatus: "published", publishedAt: now, updatedAt: now } : { publicationStatus: "unpublished", publishedAt: null, updatedAt: now })
+        .set(
+          publish
+            ? { publicationStatus: "published", publishedAt: now, updatedAt: now }
+            : { publicationStatus: "unpublished", publishedAt: null, updatedAt: now },
+        )
         .where(eq(treasuryEntries.id, id));
       await this.recordEntry(tx, entry, editor, "updated", [
-        { field: "publication", label: "Publication", kind: "select", before: status(entry.publicationStatus), after: status(publish ? "published" : "unpublished") },
+        {
+          field: "publication",
+          label: "Publication",
+          kind: "select",
+          before: status(entry.publicationStatus),
+          after: status(publish ? "published" : "unpublished"),
+        },
       ]);
     });
     this.logger.info({ entryId: id, action: publish ? "publish" : "unpublish" }, "Treasury publication changed");
@@ -307,7 +321,9 @@ export class TreasuryAdminService {
           .onConflictDoNothing({ target: [treasuryDocuments.entryId, treasuryDocuments.sha256] })
           .returning({ id: treasuryDocuments.id });
         if (!inserted) throw refused("duplicate_document", "This file is already attached to this entry.");
-        await this.recordEntry(tx, entry, uploader, "updated", [{ field: "documents", label: "Documents", kind: "relation", before: [], after: [{ id: inserted.id, label: fileName }] }]);
+        await this.recordEntry(tx, entry, uploader, "updated", [
+          { field: "documents", label: "Documents", kind: "relation", before: [], after: [{ id: inserted.id, label: fileName }] },
+        ]);
         return inserted;
       });
       this.logger.info({ entryId, documentId: row.id, contentType, sizeBytes: file.size }, "Treasury document uploaded");
@@ -336,7 +352,10 @@ export class TreasuryAdminService {
       const [row] = await tx.delete(treasuryDocuments).where(eq(treasuryDocuments.id, documentId)).returning();
       if (!row) throw new NotFoundError("Document not found.");
       const [entry] = await tx.select().from(treasuryEntries).where(eq(treasuryEntries.id, row.entryId));
-      if (entry) await this.recordEntry(tx, entry, editor, "updated", [{ field: "documents", label: "Documents", kind: "relation", before: [{ id: row.id, label: row.fileName }], after: [] }]);
+      if (entry)
+        await this.recordEntry(tx, entry, editor, "updated", [
+          { field: "documents", label: "Documents", kind: "relation", before: [{ id: row.id, label: row.fileName }], after: [] },
+        ]);
       return row;
     });
     await this.removeIfUnused(deleted.storageKey);
@@ -357,7 +376,9 @@ const EXTENSION: Record<string, string> = { "application/pdf": ".pdf", "image/pn
 
 /** The uploaded name, made safe to show and to send back: no path, no control characters, ≤ 255, the right extension. */
 export function cleanFileName(original: string, contentType: string): string {
-  let name = basename(original.replace(/\\/g, "/")).replace(/[\u0000-\u001f\u007f"]/g, "").trim();
+  let name = basename(original.replace(/\\/g, "/"))
+    .replace(/[\u0000-\u001f\u007f"]/g, "")
+    .trim();
   if (!name || name === "." || name === "..") name = "document";
   const extension = EXTENSION[contentType]!;
   if (!/\.(pdf|png|jpe?g)$/i.test(name)) name += extension;

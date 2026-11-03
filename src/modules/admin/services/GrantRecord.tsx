@@ -123,10 +123,24 @@ function GrantFields({
   return (
     <>
       <PropertyRow icon="arrow_outward" label="Service" error={errors.service}>
-        <RelationPicker label="Service" selected={draft.service} onChange={(next) => set("service", next.slice(-1))} search={searchServices} max={1} limitMessage="One service per permission." />
+        <RelationPicker
+          label="Service"
+          selected={draft.service}
+          onChange={(next) => set("service", next.slice(-1))}
+          search={searchServices}
+          max={1}
+          limitMessage="One service per permission."
+        />
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="Account">
-        <RelationPicker label="Account" selected={draft.account} onChange={(next) => set("account", next.slice(-1))} search={searchAccounts} max={1} limitMessage="One account per permission." />
+        <RelationPicker
+          label="Account"
+          selected={draft.account}
+          onChange={(next) => set("account", next.slice(-1))}
+          search={searchAccounts}
+          max={1}
+          limitMessage="One account per permission."
+        />
       </PropertyRow>
       <PropertyRow icon="select" label="Permission level">
         <Pills label="Permission level" allowEmpty options={pills(options?.levels)} value={draft.levelKey} onChange={(value) => set("levelKey", value)} />
@@ -135,7 +149,13 @@ function GrantFields({
         <Pills label="Status" allowEmpty options={pills(options?.accessStatuses)} value={draft.statusKey} onChange={(value) => set("statusKey", value)} />
       </PropertyRow>
       <PropertyRow icon="title" label="Scope" htmlFor="grant-scope">
-        <AutoGrowTextarea id="grant-scope" value={draft.resourceScope} onChange={(e) => set("resourceScope", e.target.value)} maxLength={1000} placeholder="Which organization, project or files…" />
+        <AutoGrowTextarea
+          id="grant-scope"
+          value={draft.resourceScope}
+          onChange={(e) => set("resourceScope", e.target.value)}
+          maxLength={1000}
+          placeholder="Which organization, project or files…"
+        />
       </PropertyRow>
       <PropertyRow icon="schedule" label="Granted" error={errors.grantedOn}>
         <DateField id="grant-granted" label="Granted" value={draft.grantedOn} onChange={(value) => set("grantedOn", value)} error={errors.grantedOn} />
@@ -147,7 +167,14 @@ function GrantFields({
         <DateField id="grant-expires" label="Expired" value={draft.expiresOn} onChange={(value) => set("expiresOn", value)} error={errors.expiresOn} />
       </PropertyRow>
       <PropertyRow icon="arrow_outward" label="People">
-        <RelationPicker label="People" selected={draft.person} onChange={(next) => set("person", next.slice(-1))} search={searchPeople} max={1} limitMessage="One person per permission." />
+        <RelationPicker
+          label="People"
+          selected={draft.person}
+          onChange={(next) => set("person", next.slice(-1))}
+          search={searchPeople}
+          max={1}
+          limitMessage="One person per permission."
+        />
       </PropertyRow>
       <PropertyRow icon="title" label="Name" hint="Made from the service, the account and the permission level.">
         <ReadOnlyValue>{name || <span className="text-text-muted">Service / Account / Permission level</span>}</ReadOnlyValue>
@@ -173,7 +200,11 @@ function NewGrantRecord() {
   const [error, setError] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
 
-  const draft: Draft = edited ?? { ...EMPTY, service: service.data ? [serviceOption(service.data)] : [], person: person.data ? [personOption(person.data)] : [] };
+  const draft: Draft = edited ?? {
+    ...EMPTY,
+    service: service.data ? [serviceOption(service.data)] : [],
+    person: person.data ? [personOption(person.data)] : [],
+  };
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdited({ ...draft, [key]: value });
   const found = grantDraftErrors(draft);
   const backHref = serviceId ? `/admin/services/${serviceId}` : personId ? `/admin/people/${personId}` : "/admin/permissions";

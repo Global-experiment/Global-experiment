@@ -19,11 +19,7 @@ import type { Response } from "express";
 import { z } from "zod";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
-import {
-  ReviewTreasuryEntryRequest,
-  TreasuryListQuery,
-  UpdateTreasuryEntryRequest,
-} from "./treasury-admin.contracts.js";
+import { ReviewTreasuryEntryRequest, TreasuryListQuery, UpdateTreasuryEntryRequest } from "./treasury-admin.contracts.js";
 import { TreasuryAdminService, type UploadedFile } from "./treasury-admin.service.js";
 import { DOCUMENT_MAX_BYTES } from "./treasury-documents.schema.js";
 import { Requires, RequiresAny } from "../access-control/requires.js";
@@ -140,9 +136,7 @@ export class TreasuryAdminController {
   /** multipart/form-data, one `file` field; held in memory (multer's default, ≤ 20 MB) and type-checked from its bytes. */
   @Post(":id/documents")
   @Requires("treasury.update")
-  @UseInterceptors(
-    FileInterceptor("file", { limits: { fileSize: DOCUMENT_MAX_BYTES, files: 1, fields: 0, parts: 2 } }),
-  )
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: DOCUMENT_MAX_BYTES, files: 1, fields: 0, parts: 2 } }))
   upload(@Param("id", IdParam) id: string, @UploadedFileParam() file: UploadedFile | undefined, @Req() request: AdminRequest) {
     return this.treasury.upload(id, file, request.admin);
   }

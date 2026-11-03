@@ -61,7 +61,10 @@ export const serviceCategoryTags = pgTable(
       .references(() => serviceCategories.key, { onDelete: "restrict", onUpdate: "cascade" }),
     position: integer("position").notNull().default(0),
   },
-  (table) => [primaryKey({ name: "service_category_tags_pk", columns: [table.serviceId, table.categoryKey] }), index("service_category_tags_category_key_idx").on(table.categoryKey)],
+  (table) => [
+    primaryKey({ name: "service_category_tags_pk", columns: [table.serviceId, table.categoryKey] }),
+    index("service_category_tags_category_key_idx").on(table.categoryKey),
+  ],
 );
 
 /**

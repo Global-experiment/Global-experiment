@@ -28,7 +28,7 @@ function isConnectionFailure(error: unknown): boolean {
     return (
       cause.name === "ConnectTimeoutError" ||
       cause.name === "ConnTimeoutError" ||
-      "code" in cause && typeof cause.code === "string" && /^(ECONNRESET|ECONNREFUSED|EAI_AGAIN|UND_ERR_CONNECT_TIMEOUT)$/.test(cause.code)
+      ("code" in cause && typeof cause.code === "string" && /^(ECONNRESET|ECONNREFUSED|EAI_AGAIN|UND_ERR_CONNECT_TIMEOUT)$/.test(cause.code))
     );
   }
   return false;

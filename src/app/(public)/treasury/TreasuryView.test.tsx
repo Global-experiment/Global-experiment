@@ -39,8 +39,8 @@ describe("Treasury stats", () => {
     expect(html).toContain("+1.8%");
     expect(html).not.toContain("sample figures until the Wise account is connected");
     // The stats come before the filters (OPS-128).
-    expect(html).toContain("aria-label=\"Show\"");
-    expect(html.indexOf("Med. donation")).toBeLessThan(html.indexOf("aria-label=\"Show\""));
+    expect(html).toContain('aria-label="Show"');
+    expect(html.indexOf("Med. donation")).toBeLessThan(html.indexOf('aria-label="Show"'));
   });
 
   it("renders an overview from an older API (cached before a deploy: no trends, no sample flag) instead of failing", () => {

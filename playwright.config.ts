@@ -99,7 +99,8 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|admin-csv-import|treasury-toolbar|donate-embedded).spec.ts/,
+      testIgnore:
+        /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|admin-csv-import|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when

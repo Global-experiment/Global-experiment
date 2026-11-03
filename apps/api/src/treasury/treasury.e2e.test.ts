@@ -105,13 +105,15 @@ describe("Treasury API", () => {
     await t.db.delete(organizations);
   });
 
-  const setting = (key: string, value: unknown) =>
-    t.db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } });
+  const setting = (key: string, value: unknown) => t.db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } });
 
   async function insert(values: EntryValues, expenseTypes: string[] = []) {
     // A qualified expense has exactly one recipient (a database rule): give it one when the test doesn't care which.
     const needsRecipient =
-      values.entryType === "expense" && ["qualified", "not_required"].includes(values.reviewStatusKey ?? "") && !values.recipientPersonId && !values.recipientOrganizationId;
+      values.entryType === "expense" &&
+      ["qualified", "not_required"].includes(values.reviewStatusKey ?? "") &&
+      !values.recipientPersonId &&
+      !values.recipientOrganizationId;
     if (needsRecipient) values = { ...values, recipientPersonId: (await recipient(`Recipient ${randomUUID().slice(0, 8)}`)).id };
     const [row] = await t.db.insert(treasuryEntries).values(values).returning();
     if (expenseTypes.length > 0) await t.db.insert(treasuryEntryExpenseTypes).values(expenseTypes.map((typeKey) => ({ entryId: row!.id, typeKey })));
@@ -127,7 +129,9 @@ describe("Treasury API", () => {
     it("lists only published entries of the public mode, newest first, with the expense types", async () => {
       const person = await recipient();
       await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, recipientPersonId: person.id }), ["hosting_and_infrastructure"]);
-      await insert(expense({ occurredOn: "2026-10-02", grossAmount: -1200, publicationStatus: "unpublished", publishedAt: null, recipientPersonId: person.id }));
+      await insert(
+        expense({ occurredOn: "2026-10-02", grossAmount: -1200, publicationStatus: "unpublished", publishedAt: null, recipientPersonId: person.id }),
+      );
       // Not production and a test key: the public mode is test mode, so this test-mode donation is public…
       await insert(donation({ occurredOn: "2026-10-03", grossAmount: 500 }));
       // …and a live one is not.
@@ -151,7 +155,22 @@ describe("Treasury API", () => {
       });
       // Nothing private ever leaves: no ids, notes, names, Notion or Stripe references.
       expect(Object.keys(spent).sort()).toEqual(
-        ["adjustsNumber", "amount", "cadence", "currency", "description", "expenseTypes", "number", "occurredAt", "occurredOn", "publishedAt", "qualified", "recipient", "test", "type"].sort(),
+        [
+          "adjustsNumber",
+          "amount",
+          "cadence",
+          "currency",
+          "description",
+          "expenseTypes",
+          "number",
+          "occurredAt",
+          "occurredOn",
+          "publishedAt",
+          "qualified",
+          "recipient",
+          "test",
+          "type",
+        ].sort(),
       );
     });
 
@@ -190,8 +209,15 @@ describe("Treasury API", () => {
       await insert(expense({ occurredOn: "2026-09-01", grossAmount: -900 }), ["legal_and_compliance"]);
       await insert(expense({ occurredOn: "2026-10-01", grossAmount: -100, currency: "EUR", netAmount: -100 }), ["hosting_and_infrastructure"]);
       const gift = await insert(donation({ occurredOn: "2026-10-05", grossAmount: 300 }));
-      await insert({ ...donation({ occurredOn: "2026-10-06", grossAmount: -300 }), entryType: "refund", name: "Donation refund", adjustsEntryId: gift.id, publicDescription: "Refunded donation" });
-      const amounts = async (query: string) => (await anonymous().get(`/api/treasury/entries?${query}`).expect(200)).body.items.map((entry: { amount: number }) => entry.amount);
+      await insert({
+        ...donation({ occurredOn: "2026-10-06", grossAmount: -300 }),
+        entryType: "refund",
+        name: "Donation refund",
+        adjustsEntryId: gift.id,
+        publicDescription: "Refunded donation",
+      });
+      const amounts = async (query: string) =>
+        (await anonymous().get(`/api/treasury/entries?${query}`).expect(200)).body.items.map((entry: { amount: number }) => entry.amount);
 
       expect(await amounts("type=expense")).toEqual([-100, -900]);
       // Donations include their refunds and disputes.
@@ -269,8 +295,13 @@ describe("Treasury API", () => {
     });
 
     it("searches public text only: the description, an expense type, the entry number; wildcards are literal", async () => {
-      const hosting = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, publicDescription: "Server hosting for the platform" }), ["hosting_and_infrastructure"]);
-      const legal = await insert(expense({ occurredOn: "2026-10-02", grossAmount: -2000, publicDescription: "Advice on the statutes", name: "Secret internal name" }), ["legal_and_compliance"]);
+      const hosting = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, publicDescription: "Server hosting for the platform" }), [
+        "hosting_and_infrastructure",
+      ]);
+      const legal = await insert(
+        expense({ occurredOn: "2026-10-02", grossAmount: -2000, publicDescription: "Advice on the statutes", name: "Secret internal name" }),
+        ["legal_and_compliance"],
+      );
       const search = async (q: string) =>
         (await anonymous().get("/api/treasury/entries").query({ q }).expect(200)).body.items.map((entry: { number: number }) => entry.number);
 
@@ -282,7 +313,10 @@ describe("Treasury API", () => {
       expect(await search("Secret")).toEqual([]);
       expect(await search("%")).toEqual([]);
       expect(await search("_")).toEqual([]);
-      await anonymous().get("/api/treasury/entries").query({ q: "x".repeat(101) }).expect(400);
+      await anonymous()
+        .get("/api/treasury/entries")
+        .query({ q: "x".repeat(101) })
+        .expect(400);
     });
 
     it("sample data (before go-live): sample entries are marked Test; sample Balance and Sustainability; trends from 30 days earlier", async () => {
@@ -299,11 +333,25 @@ describe("Treasury API", () => {
 
       await setting("treasury.sample_figures", { balance: { USD: 9_130_000 }, sustainability: 1.4, trends: { balance: 2.1, sustainability: 2.1 } });
       const usd = (await anonymous().get("/api/treasury/overview?currency=USD").expect(200)).body;
-      expect(usd).toMatchObject({ wiseConnected: false, sampleFigures: true, balance: 9_130_000, sustainability: 1.4, trends: { balance: 2.1, sustainability: 2.1 } });
-      expect((await anonymous().get("/api/treasury/overview?currency=EUR").expect(200)).body).toMatchObject({ sampleFigures: true, balance: null, sustainability: 1.4 });
+      expect(usd).toMatchObject({
+        wiseConnected: false,
+        sampleFigures: true,
+        balance: 9_130_000,
+        sustainability: 1.4,
+        trends: { balance: 2.1, sustainability: 2.1 },
+      });
+      expect((await anonymous().get("/api/treasury/overview?currency=EUR").expect(200)).body).toMatchObject({
+        sampleFigures: true,
+        balance: null,
+        sustainability: 1.4,
+      });
       // Once Wise is connected, samples are ignored.
       await setting("treasury.wise_connected", true);
-      expect((await anonymous().get("/api/treasury/overview?currency=USD").expect(200)).body).toMatchObject({ sampleFigures: false, balance: null, sustainability: null });
+      expect((await anonymous().get("/api/treasury/overview?currency=USD").expect(200)).body).toMatchObject({
+        sampleFigures: false,
+        balance: null,
+        sustainability: null,
+      });
 
       const entries = (await anonymous().get("/api/treasury/entries?type=expense").expect(200)).body.items;
       expect(entries.map((entry: { amount: number; test: boolean }) => [entry.amount, entry.test])).toEqual([
@@ -328,7 +376,15 @@ describe("Treasury API", () => {
       const all = (await admin.get("/api/admin/treasury").expect(200)).body;
       expect(all.total).toBe(2);
       const [gift, spent] = all.items;
-      expect(gift).toMatchObject({ type: "donation", grossAmount: 500, feeAmount: 45, netAmount: 455, source: "stripe", livemode: false, publication: "published" });
+      expect(gift).toMatchObject({
+        type: "donation",
+        grossAmount: 500,
+        feeAmount: 45,
+        netAmount: 455,
+        source: "stripe",
+        livemode: false,
+        publication: "published",
+      });
       expect(spent).toMatchObject({
         type: "expense",
         recipient: { kind: "person", name: "Ada Lovelace" },
@@ -337,7 +393,8 @@ describe("Treasury API", () => {
         documents: 0,
       });
 
-      const filtered = async (query: string) => (await admin.get(`/api/admin/treasury?${query}`).expect(200)).body.items.map((row: { type: string }) => row.type);
+      const filtered = async (query: string) =>
+        (await admin.get(`/api/admin/treasury?${query}`).expect(200)).body.items.map((row: { type: string }) => row.type);
       expect(await filtered("filter=type:is:expense")).toEqual(["expense"]);
       expect(await filtered("filter=mode:is:test")).toEqual(["donation"]);
       // No "managed by Notion" filter any more (decision of 2026-10-23: the Treasury is edited here only).
@@ -353,14 +410,26 @@ describe("Treasury API", () => {
       const record = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
       expect(record).not.toHaveProperty("notionUrl");
       expect(record).not.toHaveProperty("managedBy");
-      expect(record.permissions).toMatchObject({ editInternalNote: true, publish: { allowed: false, reason: "Already published." }, unpublish: { allowed: true }, review: { allowed: true }, documents: true });
+      expect(record.permissions).toMatchObject({
+        editInternalNote: true,
+        publish: { allowed: false, reason: "Already published." },
+        unpublish: { allowed: true },
+        review: { allowed: true },
+        documents: true,
+      });
       await admin.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "Checked the invoice" }).expect(200);
       // A published entry stays reviewed (the publication rules): unpublish first, then review.
       await admin.post(`/api/admin/treasury/${entry.id}/unpublish`).expect(200);
       await admin.post(`/api/admin/treasury/${entry.id}/review`, { reviewStatus: "pending_documents" }).expect(200);
       const [changed] = await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, entry.id));
       // Edited in the admin; what it was copied from stays in the data.
-      expect(changed).toMatchObject({ internalNote: "Checked the invoice", publicationStatus: "unpublished", reviewStatusKey: "pending_documents", managedBy: "notion", notionPageId: entry.notionPageId });
+      expect(changed).toMatchObject({
+        internalNote: "Checked the invoice",
+        publicationStatus: "unpublished",
+        reviewStatusKey: "pending_documents",
+        managedBy: "notion",
+        notionPageId: entry.notionPageId,
+      });
     });
 
     it("lets a native Stripe entry change only its internal note and publication", async () => {
@@ -382,7 +451,16 @@ describe("Treasury API", () => {
     it("applies the publication and review rules to native expenses", async () => {
       const person = await recipient();
       const unqualified = await insert(
-        expense({ managedBy: "native", notionPageId: null, source: "manual", occurredOn: "2026-10-01", grossAmount: -800, reviewStatusKey: "unqualified", publicationStatus: "unpublished", publishedAt: null }),
+        expense({
+          managedBy: "native",
+          notionPageId: null,
+          source: "manual",
+          occurredOn: "2026-10-01",
+          grossAmount: -800,
+          reviewStatusKey: "unqualified",
+          publicationStatus: "unpublished",
+          publishedAt: null,
+        }),
       );
 
       let record = (await admin.get(`/api/admin/treasury/${unqualified.id}`).expect(200)).body;
@@ -407,11 +485,15 @@ describe("Treasury API", () => {
 
       // Back to unqualified while public: refused once the setting is off.
       await setting("treasury.publish_unqualified", false);
-      expect((await admin.post(`/api/admin/treasury/${unqualified.id}/review`, { reviewStatus: "unqualified" })).body.error.details).toEqual({ reason: "cannot_review" });
+      expect((await admin.post(`/api/admin/treasury/${unqualified.id}/review`, { reviewStatus: "unqualified" })).body.error.details).toEqual({
+        reason: "cannot_review",
+      });
     });
 
     it("deletes no entry, manual or copied from Notion (OPS-147): Rootadmin included, it is archived and restored instead", async () => {
-      const entry = await insert(expense({ source: "manual", name: "Legal advice", occurredOn: "2026-09-15", grossAmount: -12000, currency: "CHF", netAmount: -12000 }));
+      const entry = await insert(
+        expense({ source: "manual", name: "Legal advice", occurredOn: "2026-09-15", grossAmount: -12000, currency: "CHF", netAmount: -12000 }),
+      );
       expect((await admin.delete(`/api/admin/treasury/${entry.id}`).send({ confirm: `EXP-${entry.entryNumber}` })).status).toBe(404);
       await admin.post(`/api/admin/treasury/${entry.id}/archive`).expect(200);
       await admin.post(`/api/admin/treasury/${entry.id}/restore`).expect(200);
@@ -423,7 +505,7 @@ describe("Treasury API", () => {
 
       it("uploads, lists, downloads and deletes a document on any entry (Notion-managed too)", async () => {
         const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, recipientPersonId: (await recipient()).id }));
-        const uploaded = (await send(entry.id, PDF, "../../etc/Invoice \"May\".pdf").expect(201)).body;
+        const uploaded = (await send(entry.id, PDF, '../../etc/Invoice "May".pdf').expect(201)).body;
         expect(uploaded).toMatchObject({ fileName: "Invoice May.pdf", contentType: "application/pdf", sizeBytes: PDF.length, uploadedBy: expect.any(String) });
 
         const record = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
@@ -431,11 +513,14 @@ describe("Treasury API", () => {
         expect(record.documentsList).toEqual([uploaded]);
         expect((await admin.get(`/api/admin/treasury/${entry.id}/documents`).expect(200)).body).toEqual([uploaded]);
 
-        const download = await admin.get(`/api/admin/treasury/documents/${uploaded.id}`).buffer(true).parse((res, done) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => done(null, Buffer.concat(chunks)));
-        });
+        const download = await admin
+          .get(`/api/admin/treasury/documents/${uploaded.id}`)
+          .buffer(true)
+          .parse((res, done) => {
+            const chunks: Buffer[] = [];
+            res.on("data", (chunk: Buffer) => chunks.push(chunk));
+            res.on("end", () => done(null, Buffer.concat(chunks)));
+          });
         expect(download.status).toBe(200);
         expect(download.headers["content-type"]).toBe("application/pdf");
         expect(download.headers["content-disposition"]).toBe(`attachment; filename="Invoice May.pdf"; filename*=UTF-8''Invoice%20May.pdf`);
@@ -521,7 +606,9 @@ describe("Treasury API in production", () => {
   const showTestDonations = () => production.db.insert(settings).values({ key: "treasury.show_test_donations", value: true });
 
   it("hides Stripe test-mode entries", async () => {
-    await production.db.insert(treasuryEntries).values([donation({ occurredOn: "2026-10-03", grossAmount: 500 }), donation({ occurredOn: "2026-10-04", grossAmount: 700, livemode: true })]);
+    await production.db
+      .insert(treasuryEntries)
+      .values([donation({ occurredOn: "2026-10-03", grossAmount: 500 }), donation({ occurredOn: "2026-10-04", grossAmount: 700, livemode: true })]);
     const res = await request(production.app.getHttpServer()).get("/api/treasury/entries").expect(200);
     expect(res.body.items.map((entry: { amount: number }) => entry.amount)).toEqual([700]);
   });
@@ -544,7 +631,10 @@ describe("Treasury API in production", () => {
     const server = production.app.getHttpServer();
 
     // Off (the default): hidden, and the admin says it isn't public.
-    expect((await service.list(TreasuryListQuery.parse({}))).items.find((row) => row.id === gift!.id)).toMatchObject({ publication: "published", publicNow: false });
+    expect((await service.list(TreasuryListQuery.parse({}))).items.find((row) => row.id === gift!.id)).toMatchObject({
+      publication: "published",
+      publicNow: false,
+    });
     await request(server).get(`/api/treasury/entries/${gift!.entryNumber}`).expect(404);
 
     await showTestDonations();

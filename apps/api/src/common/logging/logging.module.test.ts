@@ -3,9 +3,7 @@ import { redactQueryParams, serializeError } from "./logging.module.js";
 
 describe("error log serialization", () => {
   it("drops bound query parameters (personal data) but keeps the parameterised SQL", () => {
-    const error = new Error(
-      'Failed query: select "id" from "people" where lower("email") = $1\nparams: jane.doe@example.org,Jane',
-    );
+    const error = new Error('Failed query: select "id" from "people" where lower("email") = $1\nparams: jane.doe@example.org,Jane');
     const serialized = serializeError(error);
     expect(serialized.message).toContain('select "id" from "people"');
     expect(serialized.message).toContain("params: [redacted]");

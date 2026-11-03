@@ -91,29 +91,12 @@ export const buttonClasses = { base: baseClasses, size: sizeClasses, variant: va
 
 export function Button(props: ButtonProps) {
   const { variant = "secondary", size = "control", children, className = "", fullWidth } = props;
-  const icon = props.icon ? (
-    <Icon name={props.icon} variant={variant === "primary" && !props.disabled ? "filled" : "outlined"} />
-  ) : (
-    props.leading
-  );
-  const classes = [
-    baseClasses,
-    sizeClasses[size],
-    icon ? "gap-2" : "",
-    fullWidth ? "w-full justify-start" : "",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const icon = props.icon ? <Icon name={props.icon} variant={variant === "primary" && !props.disabled ? "filled" : "outlined"} /> : props.leading;
+  const classes = [baseClasses, sizeClasses[size], icon ? "gap-2" : "", fullWidth ? "w-full justify-start" : "", className].filter(Boolean).join(" ");
 
   if (props.disabled) {
     return (
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        className={`${classes} cursor-not-allowed border-text-muted bg-text-muted text-black`}
-      >
+      <button type="button" disabled aria-disabled="true" className={`${classes} cursor-not-allowed border-text-muted bg-text-muted text-black`}>
         {icon}
         {children}
       </button>
@@ -130,7 +113,12 @@ export function Button(props: ButtonProps) {
   }
 
   return (
-    <Link href={props.href} replace={"replace" in props ? props.replace : undefined} onClick={props.onNavigate} className={`${classes} ${variantClasses[variant]} cursor-pointer`}>
+    <Link
+      href={props.href}
+      replace={"replace" in props ? props.replace : undefined}
+      onClick={props.onNavigate}
+      className={`${classes} ${variantClasses[variant]} cursor-pointer`}
+    >
       {icon}
       {children}
     </Link>

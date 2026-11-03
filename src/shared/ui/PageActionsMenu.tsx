@@ -65,14 +65,7 @@ export function PageActionsMenu({ label, actions, children, source: explicitSour
           {actions.map((action) => {
             const reportKind = action.href ? reportKindForHref(action.href) : undefined;
             return reportKind ? (
-              <ReportLaunchButton
-                key={action.label}
-                kind={reportKind}
-                source={source}
-                icon={action.icon}
-                fullWidth
-                onLaunch={() => setOpen(false)}
-              >
+              <ReportLaunchButton key={action.label} kind={reportKind} source={source} icon={action.icon} fullWidth onLaunch={() => setOpen(false)}>
                 {action.label}
               </ReportLaunchButton>
             ) : action.share ? (

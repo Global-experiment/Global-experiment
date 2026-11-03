@@ -112,7 +112,13 @@ describe("native directory API", () => {
       expect(updated.state).toEqual({ key: "contacted", label: "Contacted" });
       expect(updated.description).toBeNull();
       expect(updated.nextFollowupAt).toBe("2026-11-02T08:30:00.000Z");
-      expect(updated).toMatchObject({ firstContactOn: "2026-10-01", lastContactOn: "2026-10-12", aiRelevanceScore: 7, relevanceScore: 8, otherSocials: "https://mastodon.example/@ada" });
+      expect(updated).toMatchObject({
+        firstContactOn: "2026-10-01",
+        lastContactOn: "2026-10-12",
+        aiRelevanceScore: 7,
+        relevanceScore: 8,
+        otherSocials: "https://mastodon.example/@ada",
+      });
       // In the order sent: the first one is the preferred way of contact (client, 2026-10-22).
       expect(updated.contactChannels).toEqual([
         { key: "signal", label: "Signal" },
@@ -309,24 +315,9 @@ describe("native directory API", () => {
     });
 
     it("sorts by vocabulary order (not alphabetically), nulls last, multi-key", async () => {
-      expect(names(await admin.get("/api/admin/people?sort=state:asc"))).toEqual([
-        "Alice Sample",
-        "Bob Sample",
-        "Carol Sample",
-        "Dan 50%_off",
-      ]);
-      expect(names(await admin.get("/api/admin/people?sort=state:desc"))).toEqual([
-        "Carol Sample",
-        "Bob Sample",
-        "Alice Sample",
-        "Dan 50%_off",
-      ]);
-      expect(names(await admin.get("/api/admin/people?sort=source:asc&sort=name:desc"))).toEqual([
-        "Carol Sample",
-        "Alice Sample",
-        "Bob Sample",
-        "Dan 50%_off",
-      ]);
+      expect(names(await admin.get("/api/admin/people?sort=state:asc"))).toEqual(["Alice Sample", "Bob Sample", "Carol Sample", "Dan 50%_off"]);
+      expect(names(await admin.get("/api/admin/people?sort=state:desc"))).toEqual(["Carol Sample", "Bob Sample", "Alice Sample", "Dan 50%_off"]);
+      expect(names(await admin.get("/api/admin/people?sort=source:asc&sort=name:desc"))).toEqual(["Carol Sample", "Alice Sample", "Bob Sample", "Dan 50%_off"]);
       // Default: newest first.
       expect(names(await admin.get("/api/admin/people"))[0]).toBe("Dan 50%_off");
     });
@@ -486,8 +477,7 @@ describe("native directory API", () => {
 
       await createOrganization({ name: "With email", email: "team@ngo.ch", description: "Water access" });
       await createOrganization({ name: "Without email" });
-      const names = async (query: string) =>
-        (await admin.get(`/api/admin/organizations?${query}`).expect(200)).body.items.map((o: { name: string }) => o.name);
+      const names = async (query: string) => (await admin.get(`/api/admin/organizations?${query}`).expect(200)).body.items.map((o: { name: string }) => o.name);
       expect(await names("filter=email:is_not_empty")).toEqual(["With email"]);
       expect(await names("filter=email:contains:ngo.ch")).toEqual(["With email"]);
       expect(await names("filter=description:contains:water")).toEqual(["With email"]);

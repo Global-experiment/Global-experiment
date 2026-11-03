@@ -49,9 +49,7 @@ export interface DonationFlags {
 
 /** The frequencies a method offers under the current flags (monthly ones only while monthly donations are on). */
 export function methodFrequencies(method: DonationMethodKey, flags: DonationFlags): readonly DonationFrequency[] {
-  return DONATION_METHODS[method].frequencies.filter(
-    (frequency) => frequency === "once" || (flags.monthly && (method !== "paypal" || flags.paypalMonthly)),
-  );
+  return DONATION_METHODS[method].frequencies.filter((frequency) => frequency === "once" || (flags.monthly && (method !== "paypal" || flags.paypalMonthly)));
 }
 
 /** Amount text ("10", "10.5", "10,50") → minor units, or null if it isn't a valid amount format. */
@@ -76,14 +74,17 @@ export function checkoutIssues(choice: CheckoutChoice, flags: DonationFlags): Va
   const issues: ValidationIssue[] = [];
   const minor = parseAmountToMinor(choice.amount);
   if (minor === null) issues.push({ path: "amount", message: "Enter an amount with at most two decimals." });
-  else if (minor < DONATION_RULES.minimum * 100) issues.push({ path: "amount", message: `The minimum donation is ${DONATION_RULES.minimum} ${choice.currency}.` });
+  else if (minor < DONATION_RULES.minimum * 100)
+    issues.push({ path: "amount", message: `The minimum donation is ${DONATION_RULES.minimum} ${choice.currency}.` });
   else if (minor > DONATION_RULES.maximum * 100)
     issues.push({ path: "amount", message: `The maximum donation is ${DONATION_RULES.maximum.toLocaleString("en-US")} ${choice.currency}.` });
   if (choice.frequency === "monthly" && !flags.monthly) issues.push({ path: "frequency", message: "Monthly donations are not available." });
   const method = DONATION_METHODS[choice.method];
   if (!methodAvailable(choice.method, flags)) issues.push({ path: "method", message: "This payment method is not available." });
-  else if (!method.currencies.includes(choice.currency)) issues.push({ path: "method", message: `This payment method is not available in ${choice.currency}.` });
+  else if (!method.currencies.includes(choice.currency))
+    issues.push({ path: "method", message: `This payment method is not available in ${choice.currency}.` });
   // The method's own limits only (PayPal monthly); the global monthly switch is the frequency issue above.
-  else if (!methodFrequencies(choice.method, { ...flags, monthly: true }).includes(choice.frequency)) issues.push({ path: "method", message: "This payment method is not available for monthly donations." });
+  else if (!methodFrequencies(choice.method, { ...flags, monthly: true }).includes(choice.frequency))
+    issues.push({ path: "method", message: "This payment method is not available for monthly donations." });
   return issues;
 }

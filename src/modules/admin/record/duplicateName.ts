@@ -5,4 +5,8 @@
  */
 const SUFFIX = " DUPLICATE";
 
-export const duplicateName = (name: string) => `${name.trim().slice(0, 200 - SUFFIX.length).trimEnd()}${SUFFIX}`;
+export const duplicateName = (name: string) =>
+  `${name
+    .trim()
+    .slice(0, 200 - SUFFIX.length)
+    .trimEnd()}${SUFFIX}`;

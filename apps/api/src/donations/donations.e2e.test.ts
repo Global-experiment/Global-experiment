@@ -30,9 +30,15 @@ describe("donations API (HTTP, Stripe test double)", () => {
   };
 
   beforeAll(async () => {
-    t = await createTestApp({ TRUST_PROXY_HOPS: "1", DONATIONS_ENABLED: "true", PUBLIC_SITE_URL: TEST_ORIGIN, STRIPE_CUSTOMER_PORTAL_URL: "https://billing.stripe.com/p/login/test_portal" }, [
-      { provide: STRIPE_GATEWAY, useValue: stripe },
-    ]);
+    t = await createTestApp(
+      {
+        TRUST_PROXY_HOPS: "1",
+        DONATIONS_ENABLED: "true",
+        PUBLIC_SITE_URL: TEST_ORIGIN,
+        STRIPE_CUSTOMER_PORTAL_URL: "https://billing.stripe.com/p/login/test_portal",
+      },
+      [{ provide: STRIPE_GATEWAY, useValue: stripe }],
+    );
   });
   afterAll(async () => {
     await t.close();
@@ -336,7 +342,11 @@ describe("donations closed without a preview token configured", () => {
 
   it("never treats a token as valid", async () => {
     expect((await request(t.app.getHttpServer()).get("/api/donations/config").set("x-donations-preview", "anything").expect(200)).body.enabled).toBe(false);
-    await request(t.app.getHttpServer()).post("/api/donations/checkout").set("origin", TEST_ORIGIN).send(checkoutBody({ previewToken: "" })).expect(403);
+    await request(t.app.getHttpServer())
+      .post("/api/donations/checkout")
+      .set("origin", TEST_ORIGIN)
+      .send(checkoutBody({ previewToken: "" }))
+      .expect(403);
   });
 });
 
@@ -350,13 +360,15 @@ describe("embedded card donations (PaymentIntent)", () => {
   let t: TestApp;
   const stripe = new FakeStripe();
   const http = () => request(t.app.getHttpServer());
-  const intent = (body: Record<string, unknown>) => http().post("/api/donations/payment-intent").set("x-forwarded-for", nextClient()).set("origin", TEST_ORIGIN).send(body);
+  const intent = (body: Record<string, unknown>) =>
+    http().post("/api/donations/payment-intent").set("x-forwarded-for", nextClient()).set("origin", TEST_ORIGIN).send(body);
   const attempt = () => ({ amount: "20", currency: "USD", attemptId: randomUUID() });
 
   beforeAll(async () => {
-    t = await createTestApp({ TRUST_PROXY_HOPS: "1", DONATIONS_ENABLED: "true", PUBLIC_SITE_URL: TEST_ORIGIN, STRIPE_PUBLISHABLE_KEY: "pk_test_FAKEKEYforapitestsonly" }, [
-      { provide: STRIPE_GATEWAY, useValue: stripe },
-    ]);
+    t = await createTestApp(
+      { TRUST_PROXY_HOPS: "1", DONATIONS_ENABLED: "true", PUBLIC_SITE_URL: TEST_ORIGIN, STRIPE_PUBLISHABLE_KEY: "pk_test_FAKEKEYforapitestsonly" },
+      [{ provide: STRIPE_GATEWAY, useValue: stripe }],
+    );
   });
   afterAll(async () => {
     await t.close();
@@ -371,7 +383,10 @@ describe("embedded card donations (PaymentIntent)", () => {
   });
 
   it("uses hosted Checkout by default even with a publishable key; donations.checkout = embedded offers the card form", async () => {
-    expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({ checkout: "embedded", publishableKey: "pk_test_FAKEKEYforapitestsonly" });
+    expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({
+      checkout: "embedded",
+      publishableKey: "pk_test_FAKEKEYforapitestsonly",
+    });
     await t.db.delete(settings);
     expect((await http().get("/api/donations/config").expect(200)).body).toMatchObject({ checkout: "hosted", publishableKey: null });
     const refused = await intent(attempt()).expect(403);

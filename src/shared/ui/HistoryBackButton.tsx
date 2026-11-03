@@ -12,7 +12,6 @@ interface HistoryBackButtonProps {
   className?: string;
 }
 
-
 /**
  * Every back control in the app (client feedback item 21): returns to
  * whatever page was actually visited before this one — with its scroll

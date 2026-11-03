@@ -155,7 +155,10 @@ export const adminUserExpertise = pgTable(
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [primaryKey({ name: "admin_user_expertise_pk", columns: [table.adminUserId, table.expertiseId] }), index("admin_user_expertise_expertise_id_idx").on(table.expertiseId)],
+  (table) => [
+    primaryKey({ name: "admin_user_expertise_pk", columns: [table.adminUserId, table.expertiseId] }),
+    index("admin_user_expertise_expertise_id_idx").on(table.expertiseId),
+  ],
 );
 
 /**

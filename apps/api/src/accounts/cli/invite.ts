@@ -33,13 +33,20 @@ async function main() {
   });
   const site = z.url({ protocol: /^https?$/ }).parse(process.env.PUBLIC_SITE_URL, { error: () => "PUBLIC_SITE_URL must be set (the links point there)." });
   const email = z.email().parse(arg("email"), { error: () => "Pass --email=<their email>" });
-  const role = z.string().min(1).parse(arg("role"), { error: () => "Pass --role=<role key, e.g. owner>" });
+  const role = z
+    .string()
+    .min(1)
+    .parse(arg("role"), { error: () => "Pass --role=<role key, e.g. owner>" });
 
   const client = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
   try {
     const db = drizzle(client, { schema }) as unknown as Database;
     const result = await inviteByCommand(db, { email, role, displayName: arg("name") ?? null }, new URL(site).origin);
-    console.error(result.outcome === "invited" ? `Invited ${email}; the link works once, until ${result.expiresAt}.` : `${email} was already invited: new link, until ${result.expiresAt} (the older one no longer works).`);
+    console.error(
+      result.outcome === "invited"
+        ? `Invited ${email}; the link works once, until ${result.expiresAt}.`
+        : `${email} was already invited: new link, until ${result.expiresAt} (the older one no longer works).`,
+    );
     process.stdout.write(`${result.link}\n`);
   } finally {
     await client.end({ timeout: 5 });

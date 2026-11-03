@@ -81,12 +81,7 @@ export function arrangeColumns<Column extends { id: string }>(columns: readonly 
  * - dropped after the zone → not frozen (it leaves the zone; the zone shrinks).
  * Hidden columns keep their place in the stored order.
  */
-export function moveColumn<Column extends { id: string }>(
-  columns: readonly Column[],
-  prefs: ColumnPrefs,
-  id: string,
-  toIndex: number,
-): ColumnPrefs {
+export function moveColumn<Column extends { id: string }>(columns: readonly Column[], prefs: ColumnPrefs, id: string, toIndex: number): ColumnPrefs {
   const { columns: arranged, frozenCount } = arrangeColumns(columns, prefs);
   const from = arranged.findIndex((column) => column.id === id);
   if (from === -1) return prefs;

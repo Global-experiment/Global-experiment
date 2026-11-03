@@ -28,9 +28,7 @@ function toggled(set: ReadonlySet<string>, slug: string): Set<string> {
 }
 
 export function toggleRow(state: AccordionState, slug: string, searching: boolean): AccordionState {
-  return searching
-    ? { ...state, searchCollapsed: toggled(state.searchCollapsed, slug) }
-    : { ...state, open: toggled(state.open, slug) };
+  return searching ? { ...state, searchCollapsed: toggled(state.searchCollapsed, slug) } : { ...state, open: toggled(state.open, slug) };
 }
 
 /** A new query re-expands every match. */

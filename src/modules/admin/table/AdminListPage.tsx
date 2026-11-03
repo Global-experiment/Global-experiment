@@ -28,9 +28,7 @@ import { ViewTabs } from "./ViewTabs";
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 250;
 
-type Result<Row> =
-  | { key: string; status: "ok"; page: Page<Row> }
-  | { key: string; status: "error"; error: AdminApiError };
+type Result<Row> = { key: string; status: "ok"; page: Page<Row> } | { key: string; status: "error"; error: AdminApiError };
 
 export interface AdminListConfig<Row extends { id: string }> {
   /** Page heading (figma.pdf p40: bold 14px at 248,129). */

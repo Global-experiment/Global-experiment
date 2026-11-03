@@ -107,7 +107,17 @@ export function JoinForm() {
           <form onSubmit={(event) => void submit(event)} noValidate aria-labelledby="join-title" className="mt-3 flex flex-col gap-2">
             <p className="px-2 text-body text-text-muted">Create your account: your email and a password. You&rsquo;ll then fill in your profile.</p>
             <Field icon="alternate_email">
-              <input aria-label="Email address" placeholder="Email address" type="email" inputMode="email" autoComplete="username" maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} className={input} />
+              <input
+                aria-label="Email address"
+                placeholder="Email address"
+                type="email"
+                inputMode="email"
+                autoComplete="username"
+                maxLength={320}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className={input}
+              />
             </Field>
             <Field icon="lock">
               <input

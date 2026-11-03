@@ -41,10 +41,7 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: StatItem[]
         Each stat is a button (it opens its sheet), so the value and label are
         plain spans: a <dl> cannot hold buttons (axe: definition-list).
       */}
-      <div
-        className={`-mx-0.5 grid text-center ${className}`}
-        style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
-      >
+      <div className={`-mx-0.5 grid text-center ${className}`} style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}>
         {stats.map((stat) => (
           <button
             key={stat.id}
@@ -79,12 +76,8 @@ export function ClickableStatsRow({ stats, className = "" }: { stats: StatItem[]
             <div className="mt-4 flex flex-col gap-paragraph">
               {open.detail.paragraphs.map((paragraph, index) => (
                 <div key={index}>
-                  {paragraph.heading ? (
-                    <p className="text-body font-bold text-text-primary">{paragraph.heading}</p>
-                  ) : null}
-                  <p className={`text-body text-text-primary ${paragraph.heading ? "mt-1" : ""}`}>
-                    {paragraph.body}
-                  </p>
+                  {paragraph.heading ? <p className="text-body font-bold text-text-primary">{paragraph.heading}</p> : null}
+                  <p className={`text-body text-text-primary ${paragraph.heading ? "mt-1" : ""}`}>{paragraph.body}</p>
                 </div>
               ))}
             </div>

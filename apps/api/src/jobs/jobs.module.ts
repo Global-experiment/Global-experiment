@@ -33,7 +33,10 @@ export class JobsLifecycle implements OnApplicationBootstrap, OnApplicationShutd
         if (config.jobsDriver === "inprocess") return new InProcessJobQueue();
         // Nest's Logger goes through pino (the app logger).
         const logger = new Logger("Jobs");
-        return new PgBossJobQueue({ connectionString: config.databaseUrl, max: 4 }, { info: (message) => logger.log(message), error: (message) => logger.error(message) });
+        return new PgBossJobQueue(
+          { connectionString: config.databaseUrl, max: 4 },
+          { info: (message) => logger.log(message), error: (message) => logger.error(message) },
+        );
       },
     },
     JobsLifecycle,

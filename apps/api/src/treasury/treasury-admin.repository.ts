@@ -20,8 +20,14 @@ export class TreasuryAdminRepository {
 
   async vocabularies(): Promise<{ expenseTypes: VocabularyEntry[]; reviewStatuses: VocabularyEntry[] }> {
     const [expenseTypes, reviewStatuses] = await Promise.all([
-      this.db.select({ key: treasuryExpenseTypes.key, label: treasuryExpenseTypes.label }).from(treasuryExpenseTypes).orderBy(asc(treasuryExpenseTypes.sortOrder)),
-      this.db.select({ key: treasuryReviewStatuses.key, label: treasuryReviewStatuses.label }).from(treasuryReviewStatuses).orderBy(asc(treasuryReviewStatuses.sortOrder)),
+      this.db
+        .select({ key: treasuryExpenseTypes.key, label: treasuryExpenseTypes.label })
+        .from(treasuryExpenseTypes)
+        .orderBy(asc(treasuryExpenseTypes.sortOrder)),
+      this.db
+        .select({ key: treasuryReviewStatuses.key, label: treasuryReviewStatuses.label })
+        .from(treasuryReviewStatuses)
+        .orderBy(asc(treasuryReviewStatuses.sortOrder)),
     ]);
     return { expenseTypes, reviewStatuses };
   }
@@ -57,7 +63,12 @@ export class TreasuryAdminRepository {
     if (values("expense_type").length > 0) conditions.push(typeLink(values("expense_type")));
     for (const value of values("occurred_from")) conditions.push(gte(treasuryEntries.occurredOn, value));
     for (const value of values("occurred_to")) conditions.push(lte(treasuryEntries.occurredOn, value));
-    const documents = exists(this.db.select({ one: sql`1` }).from(treasuryDocuments).where(eq(treasuryDocuments.entryId, treasuryEntries.id)));
+    const documents = exists(
+      this.db
+        .select({ one: sql`1` })
+        .from(treasuryDocuments)
+        .where(eq(treasuryDocuments.entryId, treasuryEntries.id)),
+    );
 
     for (const filter of all) {
       const empty = filter.operator === "is_empty";
@@ -226,7 +237,10 @@ export class TreasuryAdminRepository {
     const where = this.where(query);
     const [rows, [count]] = await Promise.all([
       this.listRows(where, this.order(query), query.pageSize, (query.page - 1) * query.pageSize),
-      this.db.select({ total: sql<number>`count(*)::int` }).from(treasuryEntries).where(where),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(treasuryEntries)
+        .where(where),
     ]);
     const types = await this.expenseTypesOf(rows.map((row) => row.id));
     return { items: rows.map((row) => this.toRow(row, types)), page: query.page, pageSize: query.pageSize, total: count?.total ?? 0 };
@@ -242,7 +256,10 @@ export class TreasuryAdminRepository {
     if (!entry) return null;
     const [adjusts, adjustments, documents] = await Promise.all([
       entry.adjustsEntryId
-        ? this.db.select({ id: treasuryEntries.id, number: treasuryEntries.entryNumber }).from(treasuryEntries).where(eq(treasuryEntries.id, entry.adjustsEntryId))
+        ? this.db
+            .select({ id: treasuryEntries.id, number: treasuryEntries.entryNumber })
+            .from(treasuryEntries)
+            .where(eq(treasuryEntries.id, entry.adjustsEntryId))
         : Promise.resolve([]),
       this.db
         .select({ id: treasuryEntries.id, number: treasuryEntries.entryNumber, type: treasuryEntries.entryType, grossAmount: treasuryEntries.grossAmount })

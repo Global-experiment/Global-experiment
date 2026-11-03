@@ -74,10 +74,7 @@ export function PeopleList() {
   const options = useAdminData<PeopleOptions>("/people/options");
   const organizations = useAdminData<Page<Organization>>("/organizations?pageSize=100&sort=name:asc");
   const tree = useAdminData<ExpertiseTree>("/expertise/tree");
-  const fields = useMemo(
-    () => peopleFields(options.data, organizations.data?.items, tree.data),
-    [options.data, organizations.data, tree.data],
-  );
+  const fields = useMemo(() => peopleFields(options.data, organizations.data?.items, tree.data), [options.data, organizations.data, tree.data]);
 
   return (
     <AdminListPage<Person>

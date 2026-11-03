@@ -27,7 +27,17 @@ const tree: ExpertiseTree = {
           name: "Physics",
           stableId: "field.01.01.physics",
           status: status("active", "Active"),
-          items: [{ id: "i4", name: "Optics", stableId: "01.01.optics", status: status("active", "Active"), teams: [status("tech", "Tech")], peopleCount: 2, organizationCount: 0 }],
+          items: [
+            {
+              id: "i4",
+              name: "Optics",
+              stableId: "01.01.optics",
+              status: status("active", "Active"),
+              teams: [status("tech", "Tech")],
+              peopleCount: 2,
+              organizationCount: 0,
+            },
+          ],
         },
       ],
     },
@@ -43,11 +53,33 @@ const tree: ExpertiseTree = {
           stableId: "field.07.02.participation",
           status: status("active", "Active"),
           items: [
-            { id: "i1", name: "Citizen assemblies", stableId: "07.02.citizen_assemblies", status: status("active", "Active"), teams: [status("moderation", "Moderation")], peopleCount: 3, organizationCount: 1 },
-            { id: "i2", name: "Petitions", stableId: "07.02.petitions", status: status("deprecated", "Deprecated"), teams: [], peopleCount: 1, organizationCount: 0 },
+            {
+              id: "i1",
+              name: "Citizen assemblies",
+              stableId: "07.02.citizen_assemblies",
+              status: status("active", "Active"),
+              teams: [status("moderation", "Moderation")],
+              peopleCount: 3,
+              organizationCount: 1,
+            },
+            {
+              id: "i2",
+              name: "Petitions",
+              stableId: "07.02.petitions",
+              status: status("deprecated", "Deprecated"),
+              teams: [],
+              peopleCount: 1,
+              organizationCount: 0,
+            },
           ],
         },
-        { id: "f2", name: "Administration", stableId: null, status: null, items: [{ id: "i3", name: "Procurement", stableId: null, status: null, teams: [], peopleCount: 0, organizationCount: 2 }] },
+        {
+          id: "f2",
+          name: "Administration",
+          stableId: null,
+          status: null,
+          items: [{ id: "i3", name: "Procurement", stableId: null, status: null, teams: [], peopleCount: 0, organizationCount: 2 }],
+        },
       ],
     },
   ],
@@ -94,7 +126,14 @@ describe("taxonomy screen filters", () => {
 
   it("sorts by several rules (by name where the filter uses ids), empty values last, and pages", () => {
     expect(names([], { sort: [{ field: "people", direction: "desc" }] })).toEqual(["Citizen assemblies", "Optics", "Petitions", "Procurement"]);
-    expect(names([], { sort: [{ field: "domain", direction: "desc" }, { field: "name", direction: "asc" }] })).toEqual(["Optics", "Citizen assemblies", "Petitions", "Procurement"]);
+    expect(
+      names([], {
+        sort: [
+          { field: "domain", direction: "desc" },
+          { field: "name", direction: "asc" },
+        ],
+      }),
+    ).toEqual(["Optics", "Citizen assemblies", "Petitions", "Procurement"]);
     expect(names([], { sort: [{ field: "stable_id", direction: "desc" }] }).at(-1)).toBe("Procurement");
     const page2 = applyListState(taxonomyRows("expertise", tree), taxonomyListSpec("expertise"), state({ page: 2 }), 3);
     expect([page2.page, page2.total, page2.items.map((row) => row.name)]).toEqual([2, 4, ["Optics"]]);

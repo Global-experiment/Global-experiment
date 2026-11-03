@@ -33,7 +33,9 @@ export const stripeEvents = pgTable(
     check("stripe_events_attempts_not_negative", sql`${table.attempts} >= 0`),
     check("stripe_events_processed_at_matches", sql`(${table.status} in ('processed', 'ignored')) = (${table.processedAt} is not null)`),
     check("stripe_events_last_error_length", sql`${table.lastError} is null or length(${table.lastError}) <= 1000`),
-    index("stripe_events_pending_idx").on(table.receivedAt).where(sql`${table.status} in ('received', 'failed')`),
+    index("stripe_events_pending_idx")
+      .on(table.receivedAt)
+      .where(sql`${table.status} in ('received', 'failed')`),
     index("stripe_events_entry_idx").on(table.entryId),
   ],
 );

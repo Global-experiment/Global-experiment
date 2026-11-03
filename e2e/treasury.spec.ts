@@ -71,7 +71,10 @@ test.describe("Treasury list", () => {
     const statsBottom = (await page.locator("[data-stat-value]").first().boundingBox())!.y;
     expect((await page.getByRole("group", { name: "Show" }).boundingBox())!.y).toBeGreaterThan(statsBottom);
     await expect(page.getByText(/sample figures until the Wise account is connected/)).toHaveCount(0);
-    await page.getByRole("button", { name: /Expenses$/ }).filter({ has: page.locator("[data-stat-value]") }).click();
+    await page
+      .getByRole("button", { name: /Expenses$/ })
+      .filter({ has: page.locator("[data-stat-value]") })
+      .click();
     const sheet = page.getByRole("dialog", { name: "Expenses" });
     await expect(sheet.getByText("USD 5,775", { exact: true })).toBeVisible();
     await expect(sheet.getByText("Total expenses in USD")).toBeVisible();
@@ -128,7 +131,9 @@ test.describe("Treasury list", () => {
     const chips = row.locator(":scope > div > span[aria-hidden=true]").filter({ visible: true });
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/treasury");
-    await expect(row).toHaveAccessibleName(/Software and subscriptions, Hosting and infrastructure, Development and engineering, Design and product, Research and consulting/);
+    await expect(row).toHaveAccessibleName(
+      /Software and subscriptions, Hosting and infrastructure, Development and engineering, Design and product, Research and consulting/,
+    );
     const wide = await chips.count();
     await page.setViewportSize({ width: 320, height: 700 });
     await expect(row.locator("[data-more-tags]")).toBeVisible();
@@ -159,14 +164,17 @@ test.describe("Treasury entries", () => {
     await expect(page.getByText("Paid Apr 6 2:07 PM")).toBeVisible();
     // The chart link moved from the header into the ⋮ menu (client review 2026-10-21).
     await expect(page.locator("header").getByRole("link", { name: "Treasury" })).toHaveCount(0);
-    for (const tag of ["Development and engineering", "Design and product", "Research and consulting", "General operations"]) await expect(page.getByText(tag)).toBeVisible();
+    for (const tag of ["Development and engineering", "Design and product", "Research and consulting", "General operations"])
+      await expect(page.getByText(tag)).toBeVisible();
     await expect(page.getByText("USD 5,675", { exact: true })).toBeVisible();
     await expect(page.getByText("Development of the contribution flow")).toBeVisible();
     // Recipient names are off by default.
     await expect(page.getByText(/^Paid to/)).toHaveCount(0);
     await axe(page);
     await page.getByRole("button", { name: "Page actions" }).click();
-    await expect(page.getByRole("dialog")).toContainText("This expense of five thousand six hundred seventy-five American dollars was made on April 6 at 2:07 PM.");
+    await expect(page.getByRole("dialog")).toContainText(
+      "This expense of five thousand six hundred seventy-five American dollars was made on April 6 at 2:07 PM.",
+    );
     await expect(page.getByRole("dialog").getByRole("link", { name: "Treasury" })).toHaveAttribute("href", "/treasury");
     await page.keyboard.press("Escape");
     await expect(page.locator("dialog[open]")).toHaveCount(0);

@@ -64,7 +64,19 @@ test("the sidebar opens the public Treasury; Administrate opens the list: every 
   await expect(page).toHaveURL("/admin/treasury/manage");
   await expect(rows()).toHaveCount(10);
   const headers = await page.locator("thead th").allInnerTexts();
-  for (const column of ["Number", "Date", "Type", "Amount", "Gross / fee / net", "Recipient", "Expense types", "Review status", "Publication", "Source", "Mode"]) {
+  for (const column of [
+    "Number",
+    "Date",
+    "Type",
+    "Amount",
+    "Gross / fee / net",
+    "Recipient",
+    "Expense types",
+    "Review status",
+    "Publication",
+    "Source",
+    "Mode",
+  ]) {
     expect(headers.map((header) => header.trim())).toContain(column);
   }
   await expect(rows().first()).toContainText("EXP-5");
@@ -123,7 +135,9 @@ test("supporting documents: upload, list, download and delete (private, admins o
 
   // The download route itself needs a session.
   const anonymous = await page.context().browser()!.newContext();
-  expect((await anonymous.request.get("/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000", { headers: { origin: "http://localhost" } })).status()).toBe(401);
+  expect(
+    (await anonymous.request.get("/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000", { headers: { origin: "http://localhost" } })).status(),
+  ).toBe(401);
   await anonymous.close();
 });
 

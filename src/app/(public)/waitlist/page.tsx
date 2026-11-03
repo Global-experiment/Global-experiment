@@ -82,10 +82,8 @@ export default function WaitlistPage() {
         )}
 
         <p className="mt-3 text-body text-text-primary">
-          The email address provided for the waitlist will only be used once, to notify you when
-          the platform is up and running. It will not be used for any other purpose, and no
-          further emails will be sent. The email address is also encrypted and will not be
-          accessible to admins.
+          The email address provided for the waitlist will only be used once, to notify you when the platform is up and running. It will not be used for any
+          other purpose, and no further emails will be sent. The email address is also encrypted and will not be accessible to admins.
         </p>
         {submitted ? <InertActionNotice /> : null}
       </Container>

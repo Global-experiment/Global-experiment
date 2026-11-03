@@ -3,7 +3,15 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Zurich's offset from UTC (minutes) at an instant: +120 in summer, +60 in winter. */
 function zurichOffsetMinutes(at: Date): number {
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Zurich", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/Zurich",
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
       .formatToParts(at)
       .map((part) => [part.type, part.value]),
   );

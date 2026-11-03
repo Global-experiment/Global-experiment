@@ -27,7 +27,10 @@ describe("admin accounts", () => {
   let files: string;
   let now = new Date("2026-11-03T09:00:00Z");
   let expertise: { id: string; name: string }[] = [];
-  const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a0000000000049454e44ae426082", "hex");
+  const PNG = Buffer.from(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a0000000000049454e44ae426082",
+    "hex",
+  );
 
   beforeAll(async () => {
     files = await mkdtemp(join(tmpdir(), "ge-accounts-"));
@@ -37,7 +40,10 @@ describe("admin accounts", () => {
     ]);
     owner = await signedInAdmin(t);
     const [domain] = await t.db.insert(expertiseDomains).values({ name: "Government", stableId: "domain.07.government", statusKey: "active" }).returning();
-    const [field] = await t.db.insert(expertiseFields).values({ name: "Participation", domainId: domain!.id, stableId: "field.07.02.participation", statusKey: "active" }).returning();
+    const [field] = await t.db
+      .insert(expertiseFields)
+      .values({ name: "Participation", domainId: domain!.id, stableId: "field.07.02.participation", statusKey: "active" })
+      .returning();
     expertise = await t.db
       .insert(expertiseItems)
       .values([
@@ -54,17 +60,20 @@ describe("admin accounts", () => {
   const anonymous = () => request(t.app.getHttpServer());
   const tokenOf = (link: string) => link.split("#")[1]!;
   let ip = 10;
-  const post = (path: string, body: object, from = `203.0.113.${++ip}`) => anonymous().post(path).set("origin", TEST_ORIGIN).set("x-forwarded-for", from).send(body);
+  const post = (path: string, body: object, from = `203.0.113.${++ip}`) =>
+    anonymous().post(path).set("origin", TEST_ORIGIN).set("x-forwarded-for", from).send(body);
   const inspectInvitation = (token: string) => post("/api/admin/auth/invitations/inspect", { token });
-  const signUp = (token: string, email: string, password: string, from?: string) => post("/api/admin/auth/invitations/accept", { token, email, password }, from);
+  const signUp = (token: string, email: string, password: string, from?: string) =>
+    post("/api/admin/auth/invitations/accept", { token, email, password }, from);
   const accept = (token: string, password: string) => post("/api/admin/auth/tokens/accept", { token, password });
   const login = (email: string, password: string) => post("/api/admin/auth/login", { email, password });
-  const historyOf = async (id: string) => (await owner.get(`/api/admin/history/admin_user/${id}`).expect(200)).body.items.map((item: { action: string }) => item.action);
+  const historyOf = async (id: string) =>
+    (await owner.get(`/api/admin/history/admin_user/${id}`).expect(200)).body.items.map((item: { action: string }) => item.action);
   const cookieOf = (response: request.Response) => (response.headers["set-cookie"] as unknown as string[]).map((cookie) => cookie.split(";")[0]).join("; ");
   const as = (cookie: string) => ({ get: (path: string) => anonymous().get(path).set("cookie", cookie).set("origin", TEST_ORIGIN) });
 
   describe("invitation links (OPS-141)", () => {
-    it("\"New invitation link\" asks nothing: the link is shown once, hashed, valid 7 days; whoever opens it makes an account with no role and lands signed in", async () => {
+    it('"New invitation link" asks nothing: the link is shown once, hashed, valid 7 days; whoever opens it makes an account with no role and lands signed in', async () => {
       const made = (await owner.post("/api/admin/invitations").expect(201)).body;
       expect(made.link).toMatch(/^https:\/\/admin\.example\.org\/admin\/join#[A-Za-z0-9_-]{43}$/);
       expect(made.invitation).toMatchObject({ status: "pending", expiresAt: "2026-11-10T09:00:00.000Z", createdBy: "owner", account: null });
@@ -92,7 +101,9 @@ describe("admin accounts", () => {
       expect(listed).toMatchObject({ id: made.invitation.id, status: "used", account: { id: session.id, name: "newcomer" } });
       // Its refused request is logged too.
       expect(await historyOf(session.id)).toEqual(["permission_denied", "created"]);
-      expect((await owner.get("/api/admin/accounts?filter=role:is:none").expect(200)).body.items.map((account: { email: string }) => account.email)).toEqual(["newcomer@example.org"]);
+      expect((await owner.get("/api/admin/accounts?filter=role:is:none").expect(200)).body.items.map((account: { email: string }) => account.email)).toEqual([
+        "newcomer@example.org",
+      ]);
 
       // A Rootadmin gives a role: it applies at the next sign-in.
       await owner.patch(`/api/admin/accounts/${session.id}`, { role: "operations" }).expect(200);
@@ -125,7 +136,7 @@ describe("admin accounts", () => {
       expect(statuses[5]).toBe(429);
     });
 
-    it("only a Rootadmin makes, lists and revokes invitation links; there is no \"create account with email\" any more", async () => {
+    it('only a Rootadmin makes, lists and revokes invitation links; there is no "create account with email" any more', async () => {
       const admin = await signedInAs(t, "admin");
       await admin.post("/api/admin/invitations").expect(403);
       await admin.get("/api/admin/invitations").expect(403);
@@ -135,7 +146,10 @@ describe("admin accounts", () => {
   });
 
   it("an account invited before OPS-141 still gets a link and sets its password; an active one gets a reset link", async () => {
-    const [invited] = await t.db.insert(adminUsers).values({ email: "earlier@example.org", displayName: "Earlier", role: "treasury", status: "invited", passwordHash: null }).returning();
+    const [invited] = await t.db
+      .insert(adminUsers)
+      .values({ email: "earlier@example.org", displayName: "Earlier", role: "treasury", status: "invited", passwordHash: null })
+      .returning();
     const link = (await owner.post(`/api/admin/accounts/${invited!.id}/link`).expect(201)).body;
     expect(link.link).toMatch(/\/admin\/welcome#/);
     await accept(tokenOf(link.link), "Gentle rain falls on 9 hills").expect(200);
@@ -153,7 +167,9 @@ describe("admin accounts", () => {
   it("never deactivates or demotes the last active Rootadmin", async () => {
     const [second] = await t.db.insert(adminUsers).values({ email: "root2@example.org", role: "owner", status: "active", passwordHash: "x" }).returning();
     await owner.post(`/api/admin/accounts/${second!.id}/deactivate`).expect(200);
-    const self = (await owner.get("/api/admin/accounts?filter=role:is:owner").expect(200)).body.items.find((account: { email: string }) => account.email === "owner@example.org");
+    const self = (await owner.get("/api/admin/accounts?filter=role:is:owner").expect(200)).body.items.find(
+      (account: { email: string }) => account.email === "owner@example.org",
+    );
     expect((await owner.post(`/api/admin/accounts/${self.id}/deactivate`).expect(409)).body.error.message).toMatch(/last active Rootadmin/);
     await owner.patch(`/api/admin/accounts/${self.id}`, { role: "admin" }).expect(409);
     await owner.post(`/api/admin/accounts/${second!.id}/reactivate`).expect(200);
@@ -173,7 +189,11 @@ describe("admin accounts", () => {
 
   describe("description and expertise (OPS-144, OPS-135); no note, no People link (OPS-142, OPS-136)", () => {
     it("the account holder sets their own description and expertise from Profile settings", async () => {
-      const profile = (await owner.patch("/api/admin/profile", { description: "  Runs the treasury reviews.  ", expertiseIds: [expertise[1]!.id, expertise[0]!.id] }).expect(200)).body;
+      const profile = (
+        await owner
+          .patch("/api/admin/profile", { description: "  Runs the treasury reviews.  ", expertiseIds: [expertise[1]!.id, expertise[0]!.id] })
+          .expect(200)
+      ).body;
       expect(profile.description).toBe("Runs the treasury reviews.");
       expect(profile.expertise.map((item: { name: string }) => item.name)).toEqual(["Participatory budgeting", "Citizen assemblies"]);
       expect(profile.expertise[0]).toMatchObject({ field: { name: "Participation" }, domain: { name: "Government" } });
@@ -183,12 +203,16 @@ describe("admin accounts", () => {
       await owner.patch("/api/admin/profile", { description: "x".repeat(5001) }).expect(400);
       // Anyone, whatever their role, edits their own.
       const moderator = await signedInAs(t, "moderation", "mod-profile@example.org");
-      expect((await moderator.patch("/api/admin/profile", { description: "Moderates feedback", expertiseIds: [expertise[0]!.id] }).expect(200)).body.description).toBe("Moderates feedback");
+      expect(
+        (await moderator.patch("/api/admin/profile", { description: "Moderates feedback", expertiseIds: [expertise[0]!.id] }).expect(200)).body.description,
+      ).toBe("Moderates feedback");
     });
 
     it("a Rootadmin sets them for other accounts; no other role can, not even Admin", async () => {
       const [account] = await t.db.select().from(adminUsers).where(eq(adminUsers.email, "mod-profile@example.org"));
-      const updated = (await owner.patch(`/api/admin/accounts/${account!.id}`, { description: "Moderation lead", expertiseIds: [expertise[1]!.id] }).expect(200)).body;
+      const updated = (
+        await owner.patch(`/api/admin/accounts/${account!.id}`, { description: "Moderation lead", expertiseIds: [expertise[1]!.id] }).expect(200)
+      ).body;
       expect(updated).toMatchObject({ description: "Moderation lead", expertise: [{ name: "Participatory budgeting" }] });
       expect((await owner.get(`/api/admin/accounts/${account!.id}`).expect(200)).body.description).toBe("Moderation lead");
       const admin = await signedInAs(t, "admin");
@@ -226,7 +250,8 @@ describe("admin accounts", () => {
   });
 
   it("lists the views of Figma p15: All, Active, Invited, Deactivated", async () => {
-    const statuses = async (query: string) => ((await owner.get(`/api/admin/accounts?pageSize=100${query}`).expect(200)).body.items as { status: string }[]).map((account) => account.status);
+    const statuses = async (query: string) =>
+      ((await owner.get(`/api/admin/accounts?pageSize=100${query}`).expect(200)).body.items as { status: string }[]).map((account) => account.status);
     expect(new Set(await statuses(""))).toEqual(new Set(["active"]));
     expect(new Set(await statuses("&filter=status:is:active"))).toEqual(new Set(["active"]));
     expect(await statuses("&filter=status:is:invited")).toEqual([]);
@@ -263,22 +288,32 @@ describe("admin accounts", () => {
       await owner.post("/api/admin/profile/email", { currentPassword: "a long and unique passphrase", email: "newcomer@example.org" }).expect(409);
       const other = await signInWith(t, "owner@example.org", "a long and unique passphrase");
       await owner.post("/api/admin/profile/password", { currentPassword: "a long and unique passphrase", newPassword: "short" }).expect(400);
-      await owner.post("/api/admin/profile/password", { currentPassword: "a long and unique passphrase", newPassword: "Gardens keep 3 quiet rivers" }).expect(204);
+      await owner
+        .post("/api/admin/profile/password", { currentPassword: "a long and unique passphrase", newPassword: "Gardens keep 3 quiet rivers" })
+        .expect(204);
       await owner.get("/api/admin/auth/session").expect(200);
       await other.get("/api/admin/auth/session").expect(401);
       const [account] = await t.db.select().from(adminUsers).where(eq(adminUsers.email, "owner@example.org"));
-      const events = await t.db.select().from(auditEvents).where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "password_changed")));
+      const events = await t.db
+        .select()
+        .from(auditEvents)
+        .where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "password_changed")));
       expect(events).toHaveLength(1);
       expect(JSON.stringify(events)).not.toMatch(/quiet rivers|scrypt/);
     });
 
-    it("deactivates the own account (\"Delete account\") with the password, and never the last Rootadmin", async () => {
+    it('deactivates the own account ("Delete account") with the password, and never the last Rootadmin', async () => {
       const moderator = await signedInAs(t, "moderation", "leaving@example.org");
       await moderator.post("/api/admin/profile/deactivate", { currentPassword: "Another long passphrase 42" }).expect(204);
       await moderator.get("/api/admin/auth/session").expect(401);
       const [left] = await t.db.select().from(adminUsers).where(eq(adminUsers.email, "leaving@example.org"));
       expect(left!.status).toBe("deactivated");
-      expect(await t.db.select().from(adminSessions).where(and(eq(adminSessions.adminUserId, left!.id)))).toSatisfy((rows: { revokedAt: Date | null }[]) => rows.every((row) => row.revokedAt));
+      expect(
+        await t.db
+          .select()
+          .from(adminSessions)
+          .where(and(eq(adminSessions.adminUserId, left!.id))),
+      ).toSatisfy((rows: { revokedAt: Date | null }[]) => rows.every((row) => row.revokedAt));
     });
   });
 });

@@ -96,7 +96,9 @@ export const TREASURY_COPY = {
       title: "Sustainability",
       caption: "Sustainability score",
       paragraphs: [
-        { body: "The sustainability score estimates how long the experiment could continue using its current balance, based on its average monthly expenses over the past six months. A score of 0 indicates no financial reserve, while a score of 10 indicates approximately three years of available funding." },
+        {
+          body: "The sustainability score estimates how long the experiment could continue using its current balance, based on its average monthly expenses over the past six months. A score of 0 indicates no financial reserve, while a score of 10 indicates approximately three years of available funding.",
+        },
         {
           heading: "How it is calculated",
           body: "It calculates the average monthly expenses from the past six months. It divides the current balance by that monthly average to estimate how many months the experiment could continue without receiving new donations. It converts that estimate into a score from 0 to 10. The logarithmic scale gives more detail to shorter runways, while gradually reducing the difference between longer ones. A runway of 36 months or more receives the maximum score of 10.",
@@ -116,7 +118,10 @@ export const TREASURY_COPY = {
       caption: (currency: string) => `Total expenses in ${currency}`,
       paragraphs: [
         { body: "Expenses is the total of every published expense paid in this currency. Each one is listed in the history, with what it was spent on." },
-        { heading: "How it is calculated", body: "It adds up the published expenses in the selected currency. Amounts in other currencies are never converted: switch the currency to see them. Donations are not counted." },
+        {
+          heading: "How it is calculated",
+          body: "It adds up the published expenses in the selected currency. Amounts in other currencies are never converted: switch the currency to see them. Donations are not counted.",
+        },
       ],
     },
   },

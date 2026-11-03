@@ -116,17 +116,30 @@ describe("migration 0002 — directory aligned with Notion", () => {
     );
     expect(migratedPeople).toEqual([
       // Creation order, not insertion order.
-      { name: "Ada", person_number: 1, source_key: "candide", state_key: "sourced", next_followup_on: null, last_followup_at_legacy: new Date("2026-09-01T08:00:00Z") },
+      {
+        name: "Ada",
+        person_number: 1,
+        source_key: "candide",
+        state_key: "sourced",
+        next_followup_on: null,
+        last_followup_at_legacy: new Date("2026-09-01T08:00:00Z"),
+      },
       // Removed source cleared (and listed — see the next test); everything else kept.
       { name: "Bo", person_number: 2, source_key: null, state_key: null, next_followup_on: null, last_followup_at_legacy: null },
-      { name: "Cleo", person_number: 3, source_key: null, state_key: "collaborating", next_followup_on: null, last_followup_at_legacy: new Date("2026-09-03T08:00:00Z") },
+      {
+        name: "Cleo",
+        person_number: 3,
+        source_key: null,
+        state_key: "collaborating",
+        next_followup_on: null,
+        last_followup_at_legacy: new Date("2026-09-03T08:00:00Z"),
+      },
     ]);
 
     // The old follow-up column is gone; its values live in the legacy column only.
-    expect(await rows(client, "select column_name from information_schema.columns where table_name = 'people' and column_name like '%followup%' order by 1")).toEqual([
-      { column_name: "last_followup_at_legacy" },
-      { column_name: "next_followup_on" },
-    ]);
+    expect(
+      await rows(client, "select column_name from information_schema.columns where table_name = 'people' and column_name like '%followup%' order by 1"),
+    ).toEqual([{ column_name: "last_followup_at_legacy" }, { column_name: "next_followup_on" }]);
 
     expect(await rows(client, "select name, org_number, description from organizations order by org_number")).toEqual([
       { name: "First", org_number: 1, description: "A long-standing partner." },
@@ -169,7 +182,9 @@ describe("migration 0003 — taxonomy import", () => {
     const client = await databaseAt(journal.entries.length);
     await client.exec("insert into expertise_domains (name, stable_id) values ('Government', 'domain.07.government_democracy_and_public_affairs')");
     for (const bad of ["domain.7.x", "07.government", "http://domain.07.x", "domain.07.Upper", "domain.07.with-hyphen"]) {
-      await expect(client.exec(`insert into expertise_domains (name, stable_id) values ('${bad}', '${bad}')`)).rejects.toThrow(/expertise_domains_stable_id_shape/);
+      await expect(client.exec(`insert into expertise_domains (name, stable_id) values ('${bad}', '${bad}')`)).rejects.toThrow(
+        /expertise_domains_stable_id_shape/,
+      );
     }
   });
 
@@ -184,15 +199,15 @@ describe("migration 0003 — taxonomy import", () => {
 
   it("records import runs with a known mode and a sane time range", async () => {
     const client = await databaseAt(journal.entries.length);
-    await client.exec(
-      "insert into import_runs (kind, mode, started_at, finished_at, triggered_by) values ('taxonomy', 'dry_run', now(), now(), 'cli:test')",
-    );
+    await client.exec("insert into import_runs (kind, mode, started_at, finished_at, triggered_by) values ('taxonomy', 'dry_run', now(), now(), 'cli:test')");
     expect(await rows(client, "select counts, issues from import_runs")).toEqual([{ counts: {}, issues: [] }]);
     await expect(client.exec("insert into import_runs (kind, mode, started_at, triggered_by) values ('taxonomy', 'yolo', now(), 'x')")).rejects.toThrow(
       /import_runs_mode_known/,
     );
     await expect(
-      client.exec("insert into import_runs (kind, mode, started_at, finished_at, triggered_by) values ('taxonomy', 'apply', now(), now() - interval '1 hour', 'x')"),
+      client.exec(
+        "insert into import_runs (kind, mode, started_at, finished_at, triggered_by) values ('taxonomy', 'apply', now(), now() - interval '1 hour', 'x')",
+      ),
     ).rejects.toThrow(/import_runs_finished_after_start/);
   });
 });
@@ -238,7 +253,11 @@ describe("0002 constraints", () => {
   it("keeps Stable IDs, Notion page IDs and PER/ORG numbers unique", async () => {
     const client = await ready();
     await client.exec(`update expertise_items set stable_id = '07.02.participatory_democracy' where id = '${ITEM}'`);
-    await rejects(client, `insert into expertise_items (field_id, name, stable_id) values ('${FIELD}', 'Other', '07.02.participatory_democracy')`, /expertise_items_stable_id_unique/);
+    await rejects(
+      client,
+      `insert into expertise_items (field_id, name, stable_id) values ('${FIELD}', 'Other', '07.02.participatory_democracy')`,
+      /expertise_items_stable_id_unique/,
+    );
 
     const page = "44444444-4444-4444-8444-444444444444";
     await client.exec(`insert into people (name, notion_page_id) values ('A', '${page}')`);
@@ -249,7 +268,11 @@ describe("0002 constraints", () => {
     for (const table of ["expertise_domains", "expertise_fields", "expertise_items"]) {
       await client.exec(`update ${table} set notion_page_id = '${page}'`);
     }
-    await rejects(client, `insert into expertise_items (field_id, name, notion_page_id) values ('${FIELD}', 'Dup page', '${page}')`, /expertise_items_notion_page_id_unique/);
+    await rejects(
+      client,
+      `insert into expertise_items (field_id, name, notion_page_id) values ('${FIELD}', 'Dup page', '${page}')`,
+      /expertise_items_notion_page_id_unique/,
+    );
 
     await rejects(client, "insert into people (name, person_number) values ('Dup', 1)", /people_person_number_unique/);
     await rejects(client, "insert into people (name, person_number) values ('Zero', 0)", /people_person_number_positive/);

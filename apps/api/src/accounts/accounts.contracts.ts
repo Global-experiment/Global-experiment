@@ -71,7 +71,10 @@ export type ProfileRequest = z.output<typeof ProfileRequest>;
 export const ChangeEmailRequest = z.strictObject({ currentPassword: z.string().min(1, "Enter your current password.").max(200), email });
 export type ChangeEmailRequest = z.output<typeof ChangeEmailRequest>;
 
-export const ChangePasswordRequest = z.strictObject({ currentPassword: z.string().min(1, "Enter your current password.").max(200), newPassword: z.string().max(200) });
+export const ChangePasswordRequest = z.strictObject({
+  currentPassword: z.string().min(1, "Enter your current password.").max(200),
+  newPassword: z.string().max(200),
+});
 export type ChangePasswordRequest = z.output<typeof ChangePasswordRequest>;
 
 export const DeactivateSelfRequest = z.strictObject({ currentPassword: z.string().min(1, "Enter your current password.").max(200) });

@@ -63,10 +63,7 @@ export function ReportLauncherProvider({ children }: { children: ReactNode }) {
 export function useReportLauncher(): Launch {
   const launch = useContext(LauncherContext);
   const router = useRouter();
-  return useCallback<Launch>(
-    (kind, source) => (launch ? launch(kind, source) : router.push(reportHref(kind, source))),
-    [launch, router],
-  );
+  return useCallback<Launch>((kind, source) => (launch ? launch(kind, source) : router.push(reportHref(kind, source))), [launch, router]);
 }
 
 /** Plain left-click only; modifier/middle clicks keep the link's own new-tab behaviour. */

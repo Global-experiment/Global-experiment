@@ -14,8 +14,6 @@ export class ZodValidationPipe<Schema extends z.ZodType> implements PipeTransfor
   transform(value: unknown): z.output<Schema> {
     const result = this.schema.safeParse(value);
     if (result.success) return result.data;
-    throw new ValidationFailedError(
-      result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
-    );
+    throw new ValidationFailedError(result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })));
   }
 }

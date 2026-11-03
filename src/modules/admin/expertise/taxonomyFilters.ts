@@ -30,12 +30,38 @@ export function taxonomyRows(level: TaxonomyLevel, tree: ExpertiseTree): Taxonom
     });
     const domainRef = { id: domain.id, name: domain.name };
     if (level === "domain") {
-      return [{ id: domain.id, name: domain.name, stableId: domain.stableId, status: domain.status, domain: domainRef, field: null, teams: [], fieldCount: domain.fields.length, itemCount: items.length, ...usage(items) }];
+      return [
+        {
+          id: domain.id,
+          name: domain.name,
+          stableId: domain.stableId,
+          status: domain.status,
+          domain: domainRef,
+          field: null,
+          teams: [],
+          fieldCount: domain.fields.length,
+          itemCount: items.length,
+          ...usage(items),
+        },
+      ];
     }
     return byName(domain.fields).flatMap((field): TaxonomyRow[] => {
       const fieldRef = { id: field.id, name: field.name };
       if (level === "field") {
-        return [{ id: field.id, name: field.name, stableId: field.stableId, status: field.status, domain: domainRef, field: null, teams: [], fieldCount: 0, itemCount: field.items.length, ...usage(field.items) }];
+        return [
+          {
+            id: field.id,
+            name: field.name,
+            stableId: field.stableId,
+            status: field.status,
+            domain: domainRef,
+            field: null,
+            teams: [],
+            fieldCount: 0,
+            itemCount: field.items.length,
+            ...usage(field.items),
+          },
+        ];
       }
       return byName(field.items).map((item) => ({
         id: item.id,
@@ -85,7 +111,8 @@ export function taxonomyListSpec(level: TaxonomyLevel): LocalListSpec<TaxonomyRo
 }
 
 export function taxonomyFields(level: TaxonomyLevel, rows: readonly TaxonomyRow[]): ListField[] {
-  const unique = (entries: [string, string][]) => [...new Map(entries)].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  const unique = (entries: [string, string][]) =>
+    [...new Map(entries)].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   const statuses = unique(rows.map((row) => [row.status?.key ?? NO_STATUS, row.status?.label ?? "No status"]));
   const domains = unique(rows.map((row) => [row.domain.id, row.domain.name]));
   const fields = unique(rows.flatMap((row): [string, string][] => (row.field ? [[row.field.id, `${row.field.name} · ${row.domain.name}`]] : [])));
@@ -95,7 +122,9 @@ export function taxonomyFields(level: TaxonomyLevel, rows: readonly TaxonomyRow[
     { id: "name", label: "Name", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
     { id: "stable_id", label: "Stable ID", icon: "title", operators: ["contains", "is_empty", "is_not_empty"], sort: "text" },
     { id: "status", label: "Status", icon: "select", operators: ["is", "is_not"], options: statuses, sort: "text" },
-    ...(level === "domain" ? [] : [{ id: "domain", label: "Domain", icon: "arrow_outward", operators: ["is", "is_not"], options: domains, sort: "text" } satisfies ListField]),
+    ...(level === "domain"
+      ? []
+      : [{ id: "domain", label: "Domain", icon: "arrow_outward", operators: ["is", "is_not"], options: domains, sort: "text" } satisfies ListField]),
     ...(level === "expertise"
       ? [
           { id: "field", label: "Field", icon: "arrow_outward", operators: ["is", "is_not"], options: fields, sort: "text" } satisfies ListField,

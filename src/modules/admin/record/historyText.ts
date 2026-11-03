@@ -137,7 +137,10 @@ export const PRIVATE_NOTE_TEXT = ["Private note updated.", "Previous and new tex
  * the title goes — "updated 3 fields on |Stanley Qiang|", "archived
  * |EXP-12 Hosting|", "commented on |…|".
  */
-export function historyPageHeadline(item: Pick<HistoryItem, "action" | "changes"> & { meta?: HistoryItem["meta"] }, entity = "record"): { before: string; after: string } {
+export function historyPageHeadline(
+  item: Pick<HistoryItem, "action" | "changes"> & { meta?: HistoryItem["meta"] },
+  entity = "record",
+): { before: string; after: string } {
   switch (item.action) {
     case "comment_added":
       return { before: "commented on", after: "" };

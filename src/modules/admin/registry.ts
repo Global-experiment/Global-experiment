@@ -71,7 +71,14 @@ export const ADMIN_MODULES: AdminSection[] = [
       { key: "fields", label: "Fields", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/fields" },
       { key: "domains", label: "Domains", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/domains" },
       // The same page as Admin › Organizations (decision 16): highlighted there, not twice.
-      { key: "organizations_other", label: "Organizations", icon: "corporate_fare", permission: "directory.read", status: "live", href: "/admin/organizations" },
+      {
+        key: "organizations_other",
+        label: "Organizations",
+        icon: "corporate_fare",
+        permission: "directory.read",
+        status: "live",
+        href: "/admin/organizations",
+      },
       { key: "waitlist", label: "Waitlist", icon: "approval", permission: "waitlist.read", status: "coming_soon" },
     ],
   },
@@ -79,10 +86,15 @@ export const ADMIN_MODULES: AdminSection[] = [
 
 /** The menu as this role sees it: modules it can't read drop out, and so do sections left empty. */
 export function modulesFor(sections: readonly AdminSection[], permissions: ReadonlySet<string>): AdminSection[] {
-  return sections
-    // A live module without a permission of its own (History) still needs a role: an account with none (OPS-141) has only its profile.
-    .map((group) => ({ ...group, modules: group.modules.filter((entry) => (entry.permission ? permissions.has(entry.permission) : entry.status !== "live" || permissions.size > 0)) }))
-    .filter((group) => group.modules.length > 0);
+  return (
+    sections
+      // A live module without a permission of its own (History) still needs a role: an account with none (OPS-141) has only its profile.
+      .map((group) => ({
+        ...group,
+        modules: group.modules.filter((entry) => (entry.permission ? permissions.has(entry.permission) : entry.status !== "live" || permissions.size > 0)),
+      }))
+      .filter((group) => group.modules.length > 0)
+  );
 }
 
 /** The menu filtered by the sidebar search (case-insensitive, on the label); empty sections drop out. */

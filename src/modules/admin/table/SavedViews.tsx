@@ -26,7 +26,12 @@ export function SavedViews({ views, archived = false, maxVisible = 7 }: { views:
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const current = key(params.getAll("filter").map(parseFilter).filter((rule): rule is FilterRule => rule !== undefined));
+  const current = key(
+    params
+      .getAll("filter")
+      .map(parseFilter)
+      .filter((rule): rule is FilterRule => rule !== undefined),
+  );
   const inArchive = params.get("view") === "archived";
   const active = inArchive ? (current === "" ? ARCHIVED.id : "") : (views.find((view) => key(view.filters) === current)?.id ?? "");
   const select = (id: string) => {

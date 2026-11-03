@@ -56,7 +56,11 @@ const ORGANIZATIONS: CsvField[] = [
 
 export const CSV_FIELDS: Record<CsvTable, readonly CsvField[]> = { people: PEOPLE, organizations: ORGANIZATIONS };
 
-const normal = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const normal = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
 /** Header → field key, or null (skip). Each field is used at most once: the first matching column wins. */
 export function autoMapping(table: CsvTable, headers: readonly string[]): (string | null)[] {
@@ -64,7 +68,9 @@ export function autoMapping(table: CsvTable, headers: readonly string[]): (strin
   return headers.map((header) => {
     const name = normal(header);
     if (!name) return null;
-    const field = CSV_FIELDS[table].find((candidate) => !used.has(candidate.key) && [candidate.label, ...(candidate.aliases ?? [])].some((alias) => normal(alias) === name));
+    const field = CSV_FIELDS[table].find(
+      (candidate) => !used.has(candidate.key) && [candidate.label, ...(candidate.aliases ?? [])].some((alias) => normal(alias) === name),
+    );
     if (!field) return null;
     used.add(field.key);
     return field.key;

@@ -131,7 +131,11 @@ test("Documentation (p8): the public list without its search; each article's Adm
   await expect(administrate).toBeVisible();
   await expect(article.getByRole("status", { name: "Loading article" })).toHaveCount(0, { timeout: 30_000 });
   // p8: Administrate, Send feedback, Report issue.
-  await expect(article.getByRole("link", { name: /^(Administrate|Send feedback|Report issue)$/ })).toHaveText(["Administrate", "Send feedback", "Report issue"]);
+  await expect(article.getByRole("link", { name: /^(Administrate|Send feedback|Report issue)$/ })).toHaveText([
+    "Administrate",
+    "Send feedback",
+    "Report issue",
+  ]);
   await axe();
   await page.screenshot({ path: join(SHOTS, "p08-documentation-1440.png") });
 

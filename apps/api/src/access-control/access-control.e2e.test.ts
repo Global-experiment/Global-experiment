@@ -194,7 +194,10 @@ describe("access control", () => {
     expect(routes.length).toBeGreaterThan(80);
     const undeclared = routes.filter((route) => !route.anonymous && !route.requirement).map((route) => `${route.method.toUpperCase()} ${route.path}`);
     expect(undeclared).toEqual([]);
-    const anonymous = routes.filter((route) => route.anonymous).map((route) => `${route.method.toUpperCase()} ${route.path}`).sort();
+    const anonymous = routes
+      .filter((route) => route.anonymous)
+      .map((route) => `${route.method.toUpperCase()} ${route.path}`)
+      .sort();
     expect(anonymous).toEqual([
       "POST /api/admin/auth/invitations/accept",
       "POST /api/admin/auth/invitations/inspect",
@@ -205,16 +208,21 @@ describe("access control", () => {
     // Every permission named by a route exists.
     for (const route of routes) {
       const requirement = route.requirement;
-      if (requirement && (requirement.kind === "all" || requirement.kind === "any")) for (const permission of requirement.permissions) expect(PERMISSIONS).toHaveProperty(permission);
+      if (requirement && (requirement.kind === "all" || requirement.kind === "any"))
+        for (const permission of requirement.permissions) expect(PERMISSIONS).toHaveProperty(permission);
     }
   });
 
   it("seeds the roles, the permission keys and the role grants exactly as permissions.ts (migration 0012)", async () => {
     const roles = await t.db.select().from(adminRoles);
-    expect(Object.fromEntries(roles.map((role) => [role.key, role.label]))).toEqual(Object.fromEntries(Object.entries(ROLES).map(([key, role]) => [key, role.label])));
+    expect(Object.fromEntries(roles.map((role) => [role.key, role.label]))).toEqual(
+      Object.fromEntries(Object.entries(ROLES).map(([key, role]) => [key, role.label])),
+    );
     expect((await t.db.select({ key: adminPermissions.key }).from(adminPermissions)).map((row) => row.key).sort()).toEqual(Object.keys(PERMISSIONS).sort());
     for (const role of ROLE_KEYS) {
-      const granted = (await t.db.select({ key: adminRolePermissions.permissionKey }).from(adminRolePermissions).where(eq(adminRolePermissions.roleKey, role))).map((row) => row.key).sort();
+      const granted = (await t.db.select({ key: adminRolePermissions.permissionKey }).from(adminRolePermissions).where(eq(adminRolePermissions.roleKey, role)))
+        .map((row) => row.key)
+        .sort();
       expect(granted, role).toEqual([...new Set(ROLE_PERMISSIONS[role])].sort());
     }
   });
@@ -240,7 +248,8 @@ describe("access control", () => {
         if (allowed && SIDE_EFFECTS.some((pattern) => pattern.test(route.path))) continue;
         // An unknown key makes every strict body a 400 *after* the permission check.
         const response = await agent.call(route.method, fill(route.path), { notAField: true });
-        if ((response.status === 403) === allowed) mismatches.push(`${route.method.toUpperCase()} ${route.path}: ${response.status} (expected ${allowed ? "not 403" : "403"})`);
+        if ((response.status === 403) === allowed)
+          mismatches.push(`${route.method.toUpperCase()} ${route.path}: ${response.status} (expected ${allowed ? "not 403" : "403"})`);
       }
       expect(mismatches).toEqual([]);
     });
@@ -250,7 +259,10 @@ describe("access control", () => {
     const moderator = await signedInAs(t, "moderation");
     await moderator.get("/api/admin/treasury").expect(403);
     const [account] = await t.db.select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.email, "moderation@example.org"));
-    const events = await t.db.select().from(auditEvents).where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "permission_denied")));
+    const events = await t.db
+      .select()
+      .from(auditEvents)
+      .where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "permission_denied")));
     expect(events.at(-1)).toMatchObject({ entityType: "admin_user", meta: { permission: "treasury.read", route: "GET /api/admin/treasury" } });
   });
 });

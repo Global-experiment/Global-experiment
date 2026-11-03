@@ -27,7 +27,10 @@ export class SettingsService {
   }
 
   async getMany<Key extends SettingKey>(keys: readonly Key[]): Promise<{ [K in Key]: SettingValue<K> }> {
-    const rows = await this.db.select({ key: settings.key, value: settings.value }).from(settings).where(inArray(settings.key, [...keys]));
+    const rows = await this.db
+      .select({ key: settings.key, value: settings.value })
+      .from(settings)
+      .where(inArray(settings.key, [...keys]));
     const stored = new Map(rows.map((row) => [row.key, row.value]));
     const result = {} as { [K in Key]: SettingValue<K> };
     for (const key of keys) {

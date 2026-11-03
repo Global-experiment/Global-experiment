@@ -165,8 +165,11 @@ test.describe("signed in", () => {
     expect(documentation.y).toBe(116);
     const people = nav(page).getByRole("link", { name: "People" });
     await expect(people).toHaveAttribute("aria-current", "page");
-    expect(await people.evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color])).toEqual(["rgb(31, 31, 31)", "rgb(255, 255, 255)"]);
-    const card = await box(page.locator("a[href=\"/admin/profile\"]").locator(".."));
+    expect(await people.evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color])).toEqual([
+      "rgb(31, 31, 31)",
+      "rgb(255, 255, 255)",
+    ]);
+    const card = await box(page.locator('a[href="/admin/profile"]').locator(".."));
     expect([card.x, card.width, card.height, card.y + card.height]).toEqual([8, 224, 64, FRAME.height - 8]);
     await expect(page.locator("[data-user-name]")).toHaveText("e2e-owner"); // no display name: the email's local part
 
@@ -259,7 +262,9 @@ test.describe("signed in", () => {
     await messages.click();
     await expect(page).toHaveURL(/\/admin\/people$/);
     // Only the existing modules link anywhere.
-    const links = await nav(page).getByRole("link").evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
+    const links = await nav(page)
+      .getByRole("link")
+      .evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
     expect(links).toEqual([
       "/admin/home",
       "/admin/documentation",
@@ -427,7 +432,9 @@ test.describe("signed in", () => {
     await expect(state.getByRole("button", { name: "In discussion" })).toHaveAttribute("aria-pressed", "true");
     // Fully rounded 32px pills (radius at least half the height).
     expect(
-      await state.getByRole("button", { name: "In discussion" }).evaluate((el) => parseFloat(getComputedStyle(el).borderRadius) >= el.getBoundingClientRect().height / 2),
+      await state
+        .getByRole("button", { name: "In discussion" })
+        .evaluate((el) => parseFloat(getComputedStyle(el).borderRadius) >= el.getBoundingClientRect().height / 2),
     ).toBe(true);
     await page.getByRole("group", { name: "Source" }).getByRole("button", { name: "Other" }).click();
     // Prototype: Do not contact is a checkbox.
@@ -499,7 +506,11 @@ test.describe("signed in", () => {
 
     const linked = (noun: string) => page.getByRole("list", { name: `Linked ${noun}` }).getByRole("listitem");
     const clear = async (noun: string) => {
-      while ((await linked(noun).count()) > 0) await linked(noun).first().getByRole("button", { name: /^Remove / }).click();
+      while ((await linked(noun).count()) > 0)
+        await linked(noun)
+          .first()
+          .getByRole("button", { name: /^Remove / })
+          .click();
     };
     const pickUntilFull = async (label: string, noun: string, max: number) => {
       await page.getByLabel(`Search ${noun}`).click();
@@ -554,14 +565,20 @@ test.describe("signed in", () => {
   test("duplicate: a copy without Notion page or number, opened", async ({ page }) => {
     await openPerson(page, "pia example");
     const originalUrl = page.url();
-    const originalNumber = await page.locator("[data-record-main]").getByText(/^PER-\d+$/).innerText();
+    const originalNumber = await page
+      .locator("[data-record-main]")
+      .getByText(/^PER-\d+$/)
+      .innerText();
     await page.getByRole("button", { name: "Duplicate" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Person duplicated" })).toBeVisible();
     await expect(page).not.toHaveURL(originalUrl);
     await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
     // The copy is named "<name> DUPLICATE" (client, 2026-10-22).
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Pia Example DUPLICATE");
-    const copyNumber = await page.locator("[data-record-main]").getByText(/^PER-\d+$/).innerText();
+    const copyNumber = await page
+      .locator("[data-record-main]")
+      .getByText(/^PER-\d+$/)
+      .innerText();
     expect(copyNumber).not.toBe(originalNumber);
   });
 

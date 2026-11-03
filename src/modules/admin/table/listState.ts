@@ -59,8 +59,14 @@ export function isCompleteFilter(rule: FilterRule): boolean {
 }
 
 export function readListState(params: URLSearchParams, defaultSort: SortRule[]): ListState {
-  const sort = params.getAll("sort").map(parseSort).filter((rule): rule is SortRule => rule !== undefined);
-  const filters = params.getAll("filter").map(parseFilter).filter((rule): rule is FilterRule => rule !== undefined);
+  const sort = params
+    .getAll("sort")
+    .map(parseSort)
+    .filter((rule): rule is SortRule => rule !== undefined);
+  const filters = params
+    .getAll("filter")
+    .map(parseFilter)
+    .filter((rule): rule is FilterRule => rule !== undefined);
   const page = Number.parseInt(params.get("page") ?? "1", 10);
   return {
     search: params.get("q") ?? "",

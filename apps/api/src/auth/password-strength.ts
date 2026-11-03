@@ -11,9 +11,23 @@ export const PASSWORD_MAX = 128;
 export const PASSPHRASE_LENGTH = 20;
 
 const COMMON = new Set([
-  "password1234", "password12345", "password123456", "123456789012", "1234567890123", "qwertyuiop12", "qwertyuiopas",
-  "iloveyou1234", "letmein12345", "welcome12345", "administrator", "admin1234567", "passw0rd1234", "abc123456789",
-  "globalexperiment", "global experiment", "experiment123",
+  "password1234",
+  "password12345",
+  "password123456",
+  "123456789012",
+  "1234567890123",
+  "qwertyuiop12",
+  "qwertyuiopas",
+  "iloveyou1234",
+  "letmein12345",
+  "welcome12345",
+  "administrator",
+  "admin1234567",
+  "passw0rd1234",
+  "abc123456789",
+  "globalexperiment",
+  "global experiment",
+  "experiment123",
 ]);
 
 export interface PasswordContext {

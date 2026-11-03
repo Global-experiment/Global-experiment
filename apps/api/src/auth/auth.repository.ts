@@ -37,7 +37,9 @@ export interface ActiveSessionRecord {
 /** How an account without a role shows (OPS-141). */
 export const NO_ROLE = "No role";
 
-const permissionsOf = sql<string[]>`coalesce((select array_agg(${adminRolePermissions.permissionKey} order by ${adminRolePermissions.permissionKey}) from ${adminRolePermissions} where ${adminRolePermissions.roleKey} = ${adminUsers.role}), '{}')`;
+const permissionsOf = sql<
+  string[]
+>`coalesce((select array_agg(${adminRolePermissions.permissionKey} order by ${adminRolePermissions.permissionKey}) from ${adminRolePermissions} where ${adminRolePermissions.roleKey} = ${adminUsers.role}), '{}')`;
 
 @Injectable()
 export class AuthRepository {
@@ -82,12 +84,7 @@ export class AuthRepository {
       // Housekeeping: drop this admin's dead sessions (expired or revoked).
       await tx
         .delete(adminSessions)
-        .where(
-          and(
-            eq(adminSessions.adminUserId, adminUserId),
-            or(lt(adminSessions.expiresAt, new Date()), sql`${adminSessions.revokedAt} is not null`),
-          ),
-        );
+        .where(and(eq(adminSessions.adminUserId, adminUserId), or(lt(adminSessions.expiresAt, new Date()), sql`${adminSessions.revokedAt} is not null`)));
     });
   }
 
@@ -150,9 +147,7 @@ export class AuthRepository {
     await db
       .update(adminSessions)
       .set({ revokedAt: new Date() })
-      .where(
-        and(eq(adminSessions.adminUserId, adminUserId), isNull(adminSessions.revokedAt), ...(keepSessionId ? [ne(adminSessions.id, keepSessionId)] : [])),
-      );
+      .where(and(eq(adminSessions.adminUserId, adminUserId), isNull(adminSessions.revokedAt), ...(keepSessionId ? [ne(adminSessions.id, keepSessionId)] : [])));
   }
 
   /**

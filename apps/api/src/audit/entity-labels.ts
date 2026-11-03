@@ -16,7 +16,8 @@ export const moneyLabel = (minor: number, currency: string) =>
 
 export const personLabel = (row: { personNumber: number; name: string }) => `PER-${row.personNumber} · ${row.name}`;
 export const organizationLabel = (row: { orgNumber: number; name: string }) => `ORG-${row.orgNumber} · ${row.name}`;
-export const entryLabel = (row: { entryNumber: number; grossAmount: number; currency: string }) => `EXP-${row.entryNumber} · ${moneyLabel(row.grossAmount, row.currency)}`;
+export const entryLabel = (row: { entryNumber: number; grossAmount: number; currency: string }) =>
+  `EXP-${row.entryNumber} · ${moneyLabel(row.grossAmount, row.currency)}`;
 
 /**
  * The label of a record that has a detail page, as the history shows it
@@ -29,7 +30,11 @@ export async function entityLabel(db: Executor, entityType: string, entityId: st
     return row ? personLabel(row) : undefined;
   }
   if (entityType === "organization") {
-    const [row] = await db.select({ orgNumber: organizations.orgNumber, name: organizations.name }).from(organizations).where(eq(organizations.id, entityId)).limit(1);
+    const [row] = await db
+      .select({ orgNumber: organizations.orgNumber, name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, entityId))
+      .limit(1);
     return row ? organizationLabel(row) : undefined;
   }
   if (entityType === "treasury_entry") {
@@ -108,11 +113,17 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
   // Import runs are never deleted: a CSV run is titled by its file (its report opens from History).
   const runIds = idsOf("import_run");
   if (runIds.length > 0) {
-    const rows = await db.select({ id: importRuns.id, kind: importRuns.kind, mode: importRuns.mode, counts: importRuns.counts }).from(importRuns).where(inArray(importRuns.id, runIds));
+    const rows = await db
+      .select({ id: importRuns.id, kind: importRuns.kind, mode: importRuns.mode, counts: importRuns.counts })
+      .from(importRuns)
+      .where(inArray(importRuns.id, runIds));
     for (const row of rows) {
       const fileName = (row.counts as { fileName?: unknown }).fileName;
       const csv = row.kind.endsWith("_csv") ? (row.kind === "people_csv" ? "People" : "Organizations") : null;
-      titles.set(`import_run:${row.id}`, csv && typeof fileName === "string" ? `CSV import of ${csv} · ${fileName}` : `${row.kind} import · ${row.mode.replace("_", " ")}`);
+      titles.set(
+        `import_run:${row.id}`,
+        csv && typeof fileName === "string" ? `CSV import of ${csv} · ${fileName}` : `${row.kind} import · ${row.mode.replace("_", " ")}`,
+      );
     }
   }
   const accountIds = idsOf("admin_user");

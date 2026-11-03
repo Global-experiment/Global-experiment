@@ -30,8 +30,28 @@ const text = (value: string | null, search: string) => (value ? <Highlight text=
 /** Organizations has no Figma frame: same table system and glyph vocabulary as People (p40). */
 const COLUMNS: TableColumn<Organization>[] = [
   { id: "name", label: "Name", icon: "title", width: 220, render: (o, s) => text(o.name, s) },
-  { id: "people", label: "People", icon: "arrow_outward", width: 220, render: (o, s) => lines(o.people.map((p) => p.name), s) },
-  { id: "expertise", label: "Expertise", icon: "arrow_outward", width: 228, render: (o, s) => lines(o.expertise.map((e) => e.name), s) },
+  {
+    id: "people",
+    label: "People",
+    icon: "arrow_outward",
+    width: 220,
+    render: (o, s) =>
+      lines(
+        o.people.map((p) => p.name),
+        s,
+      ),
+  },
+  {
+    id: "expertise",
+    label: "Expertise",
+    icon: "arrow_outward",
+    width: 228,
+    render: (o, s) =>
+      lines(
+        o.expertise.map((e) => e.name),
+        s,
+      ),
+  },
   { id: "website", label: "Website", icon: "link", width: 260, render: (o, s) => text(o.website, s) },
   { id: "email", label: "Email", icon: "alternate_email", width: 230, render: (o, s) => text(o.email, s) },
   { id: "description", label: "Description", icon: "title", width: 337, render: (o, s) => text(o.description, s) },
@@ -82,7 +102,15 @@ function NewOrganizationControl() {
           <label htmlFor="new-organization-name" className="text-text-muted">
             Name
           </label>
-          <input id="new-organization-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required autoComplete="off" className={chipInput} />
+          <input
+            id="new-organization-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={200}
+            required
+            autoComplete="off"
+            className={chipInput}
+          />
           {error ? (
             <p role="alert" className="text-text-primary">
               {error}

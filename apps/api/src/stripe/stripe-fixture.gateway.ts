@@ -45,7 +45,12 @@ export class FixtureStripeGateway implements StripeGateway {
 
   async createCheckoutSession(input: CreateCheckoutSessionInput): Promise<{ id: string; url: string }> {
     const id = `cs_test_e2ecreated${String(++this.created).padStart(8, "0")}`;
-    const query = new URLSearchParams({ mode: input.mode, currency: input.currency, amount: String(input.amount), methods: input.paymentMethodTypes.join(",") });
+    const query = new URLSearchParams({
+      mode: input.mode,
+      currency: input.currency,
+      amount: String(input.amount),
+      methods: input.paymentMethodTypes.join(","),
+    });
     return { id, url: `https://checkout.stripe.com/c/pay/${id}?${query.toString()}` };
   }
 

@@ -54,7 +54,15 @@ export function AutoGrowTextarea({ value, className = "", ...rest }: Omit<Compon
     element.style.height = "auto";
     element.style.height = `${element.scrollHeight}px`;
   }, [value]);
-  return <textarea ref={ref} rows={1} value={value} className={`${recordField} block min-h-8 resize-none overflow-hidden py-[7px] text-text-primary ${className}`} {...rest} />;
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      className={`${recordField} block min-h-8 resize-none overflow-hidden py-[7px] text-text-primary ${className}`}
+      {...rest}
+    />
+  );
 }
 
 const calendarDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -122,7 +130,19 @@ function DateTrigger({
  * "Set a date"; the design-system picker (DatePicker) opens under it. Shown
  * as stored, never converted between time zones.
  */
-export function DateField({ id, value, onChange, label, error }: { id: string; value: string; onChange: (value: string) => void; label: string; error?: string }) {
+export function DateField({
+  id,
+  value,
+  onChange,
+  label,
+  error,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  error?: string;
+}) {
   const [open, setOpen] = useState(false);
   const close = useCallback(
     (returnFocus: boolean) => {
@@ -143,7 +163,19 @@ export function DateField({ id, value, onChange, label, error }: { id: string; v
  * time zone (the year on hover), or "Set a date". `value` is a local
  * "YYYY-MM-DDTHH:MM" (the viewer's zone) or "".
  */
-export function DateTimeField({ id, value, onChange, label, error }: { id: string; value: string; onChange: (value: string) => void; label: string; error?: string }) {
+export function DateTimeField({
+  id,
+  value,
+  onChange,
+  label,
+  error,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  error?: string;
+}) {
   const [open, setOpen] = useState(false);
   const timeZone = useViewerTimeZone();
   const instant = value ? new Date(value) : null;
@@ -178,9 +210,22 @@ export function DateTimeField({ id, value, onChange, label, error }: { id: strin
 }
 
 /** A checkbox value (prototype: "☑ Do not contact"): the box, then its label, 24px apart from the row's edge. */
-export function CheckboxField({ id, checked, onChange, children }: { id: string; checked: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
+export function CheckboxField({
+  id,
+  checked,
+  onChange,
+  children,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: ReactNode;
+}) {
   return (
-    <label htmlFor={id} className="flex h-8 w-fit cursor-pointer items-center gap-2 rounded-control px-2 text-body text-text-primary ring-1 ring-transparent hover:ring-line has-[:focus-visible]:ring-text-primary">
+    <label
+      htmlFor={id}
+      className="flex h-8 w-fit cursor-pointer items-center gap-2 rounded-control px-2 text-body text-text-primary ring-1 ring-transparent hover:ring-line has-[:focus-visible]:ring-text-primary"
+    >
       <input id={id} type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="peer sr-only" />
       <Icon name={checked ? "check_box" : "check_box_outline_blank"} />
       {children}
@@ -240,7 +285,11 @@ export function RecordLayout({
           <div className="flex flex-col gap-4">{children}</div>
         </div>
         {panel ? (
-          <aside data-record-panel aria-label="Record details" className="w-[clamp(280px,calc((100vw-240px)/3),400px)] shrink-0 overflow-y-auto px-2 pt-1 pb-6 shadow-[-1px_0_0_0_var(--color-line)]">
+          <aside
+            data-record-panel
+            aria-label="Record details"
+            className="w-[clamp(280px,calc((100vw-240px)/3),400px)] shrink-0 overflow-y-auto px-2 pt-1 pb-6 shadow-[-1px_0_0_0_var(--color-line)]"
+          >
             {panel}
           </aside>
         ) : null}

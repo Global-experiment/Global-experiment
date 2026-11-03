@@ -27,12 +27,8 @@ export function TransactionTags({ tags }: { tags: string[] }) {
     if (!box || !measure) return;
 
     const update = () => {
-      const tagWidths = [...measure.querySelectorAll<HTMLElement>("[data-measure=tag]")].map(
-        (node) => node.getBoundingClientRect().width,
-      );
-      const badgeWidths = [...measure.querySelectorAll<HTMLElement>("[data-measure=badge]")].map(
-        (node) => node.getBoundingClientRect().width,
-      );
+      const tagWidths = [...measure.querySelectorAll<HTMLElement>("[data-measure=tag]")].map((node) => node.getBoundingClientRect().width);
+      const badgeWidths = [...measure.querySelectorAll<HTMLElement>("[data-measure=badge]")].map((node) => node.getBoundingClientRect().width);
       const available = box.getBoundingClientRect().width;
       setVisible(fitTagCount(available, tagWidths, GAP_PX, (hidden) => badgeWidths[hidden - 1] ?? 0));
     };
@@ -48,10 +44,7 @@ export function TransactionTags({ tags }: { tags: string[] }) {
   const hidden = tags.length - shown.length;
 
   return (
-    <div
-      ref={boxRef}
-      className={`relative flex min-w-0 flex-1 gap-2 overflow-hidden whitespace-nowrap ${measured ? "" : "h-6 flex-wrap"}`}
-    >
+    <div ref={boxRef} className={`relative flex min-w-0 flex-1 gap-2 overflow-hidden whitespace-nowrap ${measured ? "" : "h-6 flex-wrap"}`}>
       {/* Screen readers hear every tag, whatever fits on screen; the chips are the visual. */}
       {tags.length > 0 ? <span className="sr-only">{tags.join(", ")}</span> : null}
       {shown.map((tag) => (

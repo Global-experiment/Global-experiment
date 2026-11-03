@@ -4,13 +4,7 @@ import type { AdminRequest } from "../auth/admin-area.js";
 import { UnauthenticatedError } from "../common/errors/api-error.js";
 import { z } from "zod";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
-import {
-  CreateDomainRequest,
-  CreateExpertiseRequest,
-  CreateFieldRequest,
-  ExpertiseSearchQuery,
-  RenameRequest,
-} from "./expertise.contracts.js";
+import { CreateDomainRequest, CreateExpertiseRequest, CreateFieldRequest, ExpertiseSearchQuery, RenameRequest } from "./expertise.contracts.js";
 import { ExpertiseService } from "./expertise.service.js";
 import { Requires, SignedIn } from "../access-control/requires.js";
 

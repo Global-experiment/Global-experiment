@@ -83,7 +83,8 @@ test.beforeAll(async ({ browser }, testInfo) => {
   await signIn(page, E2E_ADMIN.email, E2E_ADMIN.password);
   await expect(page.locator("#admin-sidebar")).toBeVisible({ timeout: 60_000 });
   page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") consoleIssues.push(`[${message.type()}] ${new URL(page.url()).pathname} :: ${message.text().slice(0, 300)}`);
+    if (message.type() === "error" || message.type() === "warning")
+      consoleIssues.push(`[${message.type()}] ${new URL(page.url()).pathname} :: ${message.text().slice(0, 300)}`);
   });
   page.on("pageerror", (error) => consoleIssues.push(`[pageerror] ${new URL(page.url()).pathname} :: ${error.message.slice(0, 300)}`));
   const response = await page.request.post("/api/admin/people", { data: { name: PERSON }, headers: { origin: origin() } });
@@ -94,7 +95,7 @@ test.afterAll(async () => {
   await page.context().close();
 });
 
-test("Accounts (p15): the columns, the views, and \"New invitation link\" — made at once, shown once, with a copy button (OPS-141)", async () => {
+test('Accounts (p15): the columns, the views, and "New invitation link" — made at once, shown once, with a copy button (OPS-141)', async () => {
   await page.goto("/admin/accounts");
   await expect(page).toHaveTitle("Accounts");
   // Description in place of Note (OPS-142, OPS-144).
@@ -127,7 +128,9 @@ test("Accounts (p15): the columns, the views, and \"New invitation link\" — ma
   await page.setViewportSize(FRAME);
 });
 
-test("whoever opens the invitation link makes an account (email + password), lands on an empty profile with no role, and fills in description and expertise (OPS-141, OPS-144, OPS-135)", async ({ browser }, testInfo) => {
+test("whoever opens the invitation link makes an account (email + password), lands on an empty profile with no role, and fills in description and expertise (OPS-141, OPS-144, OPS-135)", async ({
+  browser,
+}, testInfo) => {
   const newcomer = await newContext(browser, testInfo.project.use.baseURL);
   await newcomer.goto(inviteLink);
   await expect(newcomer.getByRole("heading", { name: "Join the Global experiment" })).toBeVisible();
@@ -186,7 +189,11 @@ test("Invitation links: the used one names its account; a pending one is revoked
   await expect(list.locator("[data-invitation=used]").first()).toContainText(NEWCOMER.name);
   // The list never shows a link again.
   await expect(list).not.toContainText("/admin/join#");
-  await list.locator("[data-invitation=pending]").first().getByRole("button", { name: /^Revoke/ }).click();
+  await list
+    .locator("[data-invitation=pending]")
+    .first()
+    .getByRole("button", { name: /^Revoke/ })
+    .click();
   await expect(list.locator("[data-invitation=revoked]").first()).toBeVisible();
   await axe();
   await page.screenshot({ path: join(SHOTS, "ops141-invitation-links-1440.png") });
@@ -198,7 +205,9 @@ test("Invitation links: the used one names its account; a pending one is revoked
   await visitor.context().close();
 });
 
-test("a Rootadmin gives the new account a role, edits its description and expertise; no Note, no Person (OPS-141, OPS-144, OPS-135, OPS-142, OPS-136)", async ({ browser }, testInfo) => {
+test("a Rootadmin gives the new account a role, edits its description and expertise; no Note, no Person (OPS-141, OPS-144, OPS-135, OPS-142, OPS-136)", async ({
+  browser,
+}, testInfo) => {
   await page.goto("/admin/accounts?view=no_role");
   await page.getByRole("group", { name: "Views" }).getByRole("button", { name: "No role", exact: true }).click();
   await rows().filter({ hasText: NEWCOMER.email }).getByRole("link").first().click();
@@ -350,10 +359,13 @@ test("Profile settings (p18): display name, description, expertise, appearance (
   await expect(page.getByRole("heading", { name: "Profile settings" })).toBeVisible();
   await expect(page.locator("[data-record-main]")).toContainText(/GE-\d{6}/);
   await expect(page.locator("[data-record-main]")).toContainText("Read only.");
-  expect(await properties(page)).toEqual(expect.arrayContaining(["Display name", "Description", "Expertise", "Profile picture", "Time zone", "Appearance", "Email", "Account ID"]));
+  expect(await properties(page)).toEqual(
+    expect.arrayContaining(["Display name", "Description", "Expertise", "Profile picture", "Time zone", "Appearance", "Email", "Account ID"]),
+  );
   await expect(page.getByRole("button", { name: "Save changes" })).toBeDisabled();
   const panel = page.locator("[data-record-panel]");
-  for (const action of ["Close", "Discard changes", "Change email", "Change password", "Sign out", "Deactivate account"]) await expect(panel.getByRole("button", { name: action })).toBeVisible();
+  for (const action of ["Close", "Discard changes", "Change email", "Change password", "Sign out", "Deactivate account"])
+    await expect(panel.getByRole("button", { name: action })).toBeVisible();
   for (const viewport of [FRAME, TABLET]) {
     await page.setViewportSize(viewport);
     await bothThemes(`profile-p18-${viewport.width}`);

@@ -125,7 +125,8 @@ export function checkMapping(table: CsvTable, headers: readonly string[], mappin
   for (const key of mapping) {
     if (key === null) continue;
     if (!keys.has(key)) throw new CsvMappingError(`Unknown field "${key}".`);
-    if (used.has(key)) throw new CsvMappingError(`Two columns are set to ${CSV_FIELDS[table].find((field) => field.key === key)!.label}: choose one, skip the other.`);
+    if (used.has(key))
+      throw new CsvMappingError(`Two columns are set to ${CSV_FIELDS[table].find((field) => field.key === key)!.label}: choose one, skip the other.`);
     used.add(key);
   }
   if (!used.has("name")) throw new CsvMappingError("Choose the column that holds the Name: every record needs one.");
@@ -160,7 +161,10 @@ function index(target: Indexes, ref: Ref, keys: { id: string | null; email: stri
   add(target.name, comparable(ref.name));
 }
 
-function findDuplicate(indexes: Indexes, keys: { id: string | null; email: string | null; website: string | null; name: string }): { what: string; ref: Ref } | null {
+function findDuplicate(
+  indexes: Indexes,
+  keys: { id: string | null; email: string | null; website: string | null; name: string },
+): { what: string; ref: Ref } | null {
   const checks: [string, Map<string, Ref>, string | null][] = [
     ["ID", indexes.id, keys.id?.toLowerCase() ?? null],
     ["email", indexes.email, keys.email ? keys.email.trim().toLowerCase() : null],
@@ -182,7 +186,10 @@ function valueLookups(snapshot: CsvSnapshot) {
   };
   const named = (refs: readonly Ref[]) => {
     const map = byName(refs);
-    return { options: [...refs].sort((a, b) => a.name.localeCompare(b.name)).map((ref) => ({ id: ref.id, label: ref.name })), find: (name: string) => map.get(comparable(name)) ?? [] };
+    return {
+      options: [...refs].sort((a, b) => a.name.localeCompare(b.name)).map((ref) => ({ id: ref.id, label: ref.name })),
+      find: (name: string) => map.get(comparable(name)) ?? [],
+    };
   };
   return {
     state: vocabulary(snapshot.states),
@@ -193,7 +200,13 @@ function valueLookups(snapshot: CsvSnapshot) {
   } satisfies Record<ValueField, { options: { id: string; label: string }[]; find: (name: string) => string[] }>;
 }
 
-const WHAT: Record<ValueField, string> = { state: "state", source: "source", contactChannels: "contact channel", organizations: "organization", expertise: "expertise" };
+const WHAT: Record<ValueField, string> = {
+  state: "state",
+  source: "source",
+  contactChannels: "contact channel",
+  organizations: "organization",
+  expertise: "expertise",
+};
 
 export function planCsvImport(
   input: { table: CsvTable; fileName: string; parsed: ParsedCsv; mapping: readonly (string | null)[]; include?: readonly number[]; choices?: ValueChoices },
@@ -202,7 +215,9 @@ export function planCsvImport(
   const { table, parsed, mapping } = input;
   checkMapping(table, parsed.headers, mapping);
   const fields = new Map(CSV_FIELDS[table].map((field) => [field.key, field]));
-  const columns = mapping.map((key, column) => (key ? { column, field: fields.get(key)! } : null)).filter((entry): entry is { column: number; field: CsvField } => entry !== null);
+  const columns = mapping
+    .map((key, column) => (key ? { column, field: fields.get(key)! } : null))
+    .filter((entry): entry is { column: number; field: CsvField } => entry !== null);
   const include = new Set(input.include ?? []);
   const lookups = valueLookups(snapshot);
   const choices = input.choices ?? {};
@@ -236,7 +251,13 @@ export function planCsvImport(
         const comparableItem = comparable(item);
         const listed = unknown.get(key) ?? new Map();
         unknown.set(key, listed);
-        const entry = listed.get(comparableItem) ?? { value: item, key: comparableItem, rows: 0, problem: found.length > 1 ? "several" : "unknown", lines: new Set<number>() };
+        const entry = listed.get(comparableItem) ?? {
+          value: item,
+          key: comparableItem,
+          rows: 0,
+          problem: found.length > 1 ? "several" : "unknown",
+          lines: new Set<number>(),
+        };
         entry.lines.add(row.line);
         entry.rows = entry.lines.size;
         listed.set(comparableItem, entry);
@@ -248,7 +269,8 @@ export function planCsvImport(
         else warnings.push(`${field.label}: no ${WHAT[key]} named "${item}"; imported without it.`);
         return null;
       };
-      const known = (key: ValueField) => (candidate: string) => lookups[key].find(candidate).length === 1 || choices[key]?.[comparable(candidate)] !== undefined;
+      const known = (key: ValueField) => (candidate: string) =>
+        lookups[key].find(candidate).length === 1 || choices[key]?.[comparable(candidate)] !== undefined;
       const many = (key: ValueField) => {
         const ids: string[] = [];
         for (const item of splitNames(value, known(key))) {
@@ -323,7 +345,12 @@ export function planCsvImport(
     }
     if (errors.length > 0) return { line: row.line, name, status: "error", errors, warnings, duplicate: null, included: false, request: null };
 
-    const keys = { id: recordId, email: (body.email as string | null | undefined) ?? null, website: (body.website as string | null | undefined) ?? null, name: String(body.name) };
+    const keys = {
+      id: recordId,
+      email: (body.email as string | null | undefined) ?? null,
+      website: (body.website as string | null | undefined) ?? null,
+      name: String(body.name),
+    };
     const known = findDuplicate(existing, keys);
     const earlier = known ? null : findDuplicate(inFile, keys);
     const duplicate: CsvDuplicate | null = known
@@ -345,7 +372,9 @@ export function planCsvImport(
       {
         field: key,
         label: fields.get(key)!.label,
-        values: [...values.values()].map(({ value, key, rows, problem, choice }) => ({ value, key, rows, problem, ...(choice !== undefined ? { choice } : {}) })).sort((a, b) => b.rows - a.rows || a.value.localeCompare(b.value)),
+        values: [...values.values()]
+          .map(({ value, key, rows, problem, choice }) => ({ value, key, rows, problem, ...(choice !== undefined ? { choice } : {}) }))
+          .sort((a, b) => b.rows - a.rows || a.value.localeCompare(b.value)),
         options: lookups[key].options,
       },
     ];

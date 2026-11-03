@@ -37,10 +37,7 @@ export function ContributeEmailLink({ email }: { email: string }) {
 
   return (
     <div className="flex items-center gap-1">
-      <a
-        href={`mailto:${email}`}
-        className="text-lead break-all text-text-primary underline underline-offset-2"
-      >
+      <a href={`mailto:${email}`} className="text-lead break-all text-text-primary underline underline-offset-2">
         {email}
       </a>
       <IconButton

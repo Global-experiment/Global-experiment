@@ -30,15 +30,30 @@ describe("record history (audit log)", () => {
 
   const feed = async (type: string, id: string) => (await admin.get(`/api/admin/history/${type}/${id}`).expect(200)).body;
   const createPerson = async (body: object) => (await admin.post("/api/admin/people", body).expect(201)).body;
-  type Item = { action: string; actor: { label: string; type: string }; changes: (AuditChange & { masked?: true; redacted?: true })[]; meta: Record<string, unknown>; comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean } };
+  type Item = {
+    action: string;
+    actor: { label: string; type: string };
+    changes: (AuditChange & { masked?: true; redacted?: true })[];
+    meta: Record<string, unknown>;
+    comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
+  };
 
   it("records 'created' with the actor and the record's label; one event per Submit with every changed field", async () => {
     const organization = (await admin.post("/api/admin/organizations", { name: "Civic Lab" }).expect(201)).body;
-    const person = await createPerson({ name: "Stanley Q.", website: "https://stanley.example", description: "Contact through email", email: "stanley@example.org" });
+    const person = await createPerson({
+      name: "Stanley Q.",
+      website: "https://stanley.example",
+      description: "Contact through email",
+      email: "stanley@example.org",
+    });
 
     let history = await feed("person", person.id);
     expect(history.items).toHaveLength(1);
-    expect(history.items[0]).toMatchObject({ action: "created", actor: { type: "admin", label: "owner" }, meta: { label: `PER-${person.personNumber} · Stanley Q.`, collection: "People" } });
+    expect(history.items[0]).toMatchObject({
+      action: "created",
+      actor: { type: "admin", label: "owner" },
+      meta: { label: `PER-${person.personNumber} · Stanley Q.`, collection: "People" },
+    });
     expect(history.createdBy).toMatchObject({ label: "owner" });
 
     now = new Date("2026-10-16T16:45:00Z");
@@ -69,7 +84,13 @@ describe("record history (audit log)", () => {
     // Contact details are masked in the history (the record itself shows them).
     expect(byField.email).toMatchObject({ before: "s•••@example.org", after: "s•••@example.net", masked: true });
     // The description is shared information (client, 2026-10-22): shown like any field, never masked.
-    expect(byField.description).toEqual({ field: "description", label: "Description", kind: "text", before: "Contact through email", after: "Contact through Workana" });
+    expect(byField.description).toEqual({
+      field: "description",
+      label: "Description",
+      kind: "text",
+      before: "Contact through email",
+      after: "Contact through Workana",
+    });
     expect(history.lastEditedBy).toMatchObject({ label: "owner", at: "2026-10-16T16:45:00.000Z" });
     // The organization linked by this Submit got its own event (both records show the link).
     const organizationHistory = await feed("organization", organization.id);
@@ -90,8 +111,12 @@ describe("record history (audit log)", () => {
     await admin.delete(`/api/admin/people/${person.id}/organizations/${organization.id}`).expect(204);
     const items = (await feed("person", person.id)).items as Item[];
     expect(items.map((item) => item.action)).toEqual(["updated", "updated", "updated", "created"]);
-    expect(items[0]!.changes).toEqual([{ field: "organizations", label: "Organizations", kind: "relation", before: [{ id: organization.id, label: "Harbor Collective" }], after: [] }]);
-    expect(items[1]!.changes).toEqual([{ field: "organizations", label: "Organizations", kind: "relation", before: [], after: [{ id: organization.id, label: "Harbor Collective" }] }]);
+    expect(items[0]!.changes).toEqual([
+      { field: "organizations", label: "Organizations", kind: "relation", before: [{ id: organization.id, label: "Harbor Collective" }], after: [] },
+    ]);
+    expect(items[1]!.changes).toEqual([
+      { field: "organizations", label: "Organizations", kind: "relation", before: [], after: [{ id: organization.id, label: "Harbor Collective" }] },
+    ]);
     expect(items[2]!.changes.map((change) => [change.field, change.before, change.after])).toEqual([
       ["website", null, "https://ada.example"],
       ["otherSocials", "https://previous.example", null],
@@ -110,7 +135,8 @@ describe("record history (audit log)", () => {
 
   it("archives (out of the default list, into Archived) and restores, both in the history", async () => {
     const person = await createPerson({ name: "Archived Person" });
-    const listed = async (query = "") => ((await admin.get(`/api/admin/people?pageSize=100${query}`).expect(200)).body.items as { id: string }[]).some((item) => item.id === person.id);
+    const listed = async (query = "") =>
+      ((await admin.get(`/api/admin/people?pageSize=100${query}`).expect(200)).body.items as { id: string }[]).some((item) => item.id === person.id);
     expect(await listed()).toBe(true);
     const archived = (await admin.post(`/api/admin/people/${person.id}/archive`).expect(200)).body;
     expect(archived.archivedAt).not.toBeNull();
@@ -129,7 +155,16 @@ describe("record history (audit log)", () => {
     const organization = (await admin.post("/api/admin/organizations", { name: "Not Deleted Either" }).expect(201)).body;
     const [entry] = await t.db
       .insert(treasuryEntries)
-      .values({ entryType: "expense", name: "Domain name", currency: "CHF", grossAmount: -1500, source: "manual", managedBy: "native", livemode: true, occurredOn: "2026-10-02" })
+      .values({
+        entryType: "expense",
+        name: "Domain name",
+        currency: "CHF",
+        grossAmount: -1500,
+        source: "manual",
+        managedBy: "native",
+        livemode: true,
+        occurredOn: "2026-10-02",
+      })
       .returning();
     expect((await admin.delete(`/api/admin/people/${person.id}`).send({ confirm: "Not Deleted" })).status).toBe(404);
     expect((await admin.delete(`/api/admin/organizations/${organization.id}`).send({ confirm: "Not Deleted Either" })).status).toBe(404);
@@ -140,7 +175,7 @@ describe("record history (audit log)", () => {
     expect((await t.db.select().from(auditEvents).where(eq(auditEvents.action, "deleted"))).length).toBe(0);
   });
 
-  it("keeps past \"deleted\" events readable, with what the record was", async () => {
+  it('keeps past "deleted" events readable, with what the record was', async () => {
     const gone = "00000000-0000-4000-8000-0000000000de";
     await t.db.insert(auditEvents).values({
       entityType: "treasury_entry",
@@ -151,7 +186,9 @@ describe("record history (audit log)", () => {
       source: "admin",
       meta: { label: "EXP-99 · −CHF 15.00", details: [{ label: "Name", value: "Old invoice" }] },
     });
-    const listed = (await admin.get("/api/admin/history?entityType=treasury_entry&pageSize=200").expect(200)).body.items.find((item: { entity: { id: string } }) => item.entity.id === gone);
+    const listed = (await admin.get("/api/admin/history?entityType=treasury_entry&pageSize=200").expect(200)).body.items.find(
+      (item: { entity: { id: string } }) => item.entity.id === gone,
+    );
     expect(listed).toMatchObject({ action: "deleted", entity: { exists: false }, meta: { details: [{ label: "Name", value: "Old invoice" }] } });
   });
 
@@ -159,7 +196,16 @@ describe("record history (audit log)", () => {
     const person = await createPerson({ name: "Contractor" });
     const [expense] = await t.db
       .insert(treasuryEntries)
-      .values({ entryType: "expense", name: "Development", currency: "USD", grossAmount: -20000, source: "manual", managedBy: "native", livemode: true, occurredOn: "2026-10-01" })
+      .values({
+        entryType: "expense",
+        name: "Development",
+        currency: "USD",
+        grossAmount: -20000,
+        source: "manual",
+        managedBy: "native",
+        livemode: true,
+        occurredOn: "2026-10-01",
+      })
       .returning();
     const updated = (await admin.patch(`/api/admin/people/${person.id}`, { expenseIds: [expense!.id] }).expect(200)).body;
     expect(updated.expenses).toEqual([{ id: expense!.id, entryNumber: expense!.entryNumber, currency: "USD", grossAmount: -20000 }]);
@@ -199,11 +245,17 @@ describe("record history (audit log)", () => {
     await admin.post(`/api/admin/history/person/${person.id}/comments`, { body: "I reviewed the profile." }).expect(204);
     let items = (await feed("person", person.id)).items as Item[];
     const comment = items[0]!.comment!;
-    expect(items[0]).toMatchObject({ action: "comment_added", comment: { body: "I reviewed the profile.", current: "I reviewed the profile.", mine: true, deleted: false } });
+    expect(items[0]).toMatchObject({
+      action: "comment_added",
+      comment: { body: "I reviewed the profile.", current: "I reviewed the profile.", mine: true, deleted: false },
+    });
 
     await admin.patch(`/api/admin/comments/${comment.id}`, { body: "I reviewed the profile and the links." }).expect(204);
     items = (await feed("person", person.id)).items as Item[];
-    expect(items[0]).toMatchObject({ action: "comment_edited", changes: [{ before: "I reviewed the profile.", after: "I reviewed the profile and the links." }] });
+    expect(items[0]).toMatchObject({
+      action: "comment_edited",
+      changes: [{ before: "I reviewed the profile.", after: "I reviewed the profile and the links." }],
+    });
     expect(items[1]).toMatchObject({ action: "comment_added", comment: { body: "I reviewed the profile.", current: "I reviewed the profile and the links." } });
 
     await admin.delete(`/api/admin/comments/${comment.id}`).expect(204);
@@ -222,12 +274,26 @@ describe("record history (audit log)", () => {
   it("archives and restores organizations and Treasury entries; archived entries leave the public Treasury", async () => {
     const organization = (await admin.post("/api/admin/organizations", { name: "To Archive" }).expect(201)).body;
     await admin.post(`/api/admin/organizations/${organization.id}/archive`).expect(200);
-    expect(((await admin.get("/api/admin/organizations?pageSize=100").expect(200)).body.items as { id: string }[]).some((item) => item.id === organization.id)).toBe(false);
-    expect((await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, organization.id))).map((event) => event.action)).toEqual(["created", "archived"]);
+    expect(
+      ((await admin.get("/api/admin/organizations?pageSize=100").expect(200)).body.items as { id: string }[]).some((item) => item.id === organization.id),
+    ).toBe(false);
+    expect((await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, organization.id))).map((event) => event.action)).toEqual([
+      "created",
+      "archived",
+    ]);
 
     const [entry] = await t.db
       .insert(treasuryEntries)
-      .values({ entryType: "expense", name: "Domain name", currency: "CHF", grossAmount: -1500, source: "manual", managedBy: "native", livemode: true, occurredOn: "2026-10-02" })
+      .values({
+        entryType: "expense",
+        name: "Domain name",
+        currency: "CHF",
+        grossAmount: -1500,
+        source: "manual",
+        managedBy: "native",
+        livemode: true,
+        occurredOn: "2026-10-02",
+      })
       .returning();
     await admin.post(`/api/admin/treasury/${entry!.id}/archive`).expect(200);
     await admin.post(`/api/admin/treasury/${entry!.id}/restore`).expect(200);
@@ -244,7 +310,10 @@ describe("record history (audit log)", () => {
     const changes = Object.fromEntries((history.items[0] as Item).changes.map((change) => [change.field, change]));
     expect(Object.keys(changes).sort()).toEqual(["description", "people"]);
     expect(((changes.people!.after as { label: string }[]) ?? []).map((person) => person.label).sort()).toEqual(["Ada Submit", "Ben Submit"]);
-    expect(((await feed("person", ada.id)).items as Item[])[0]).toMatchObject({ action: "updated", changes: [{ field: "organizations", after: [{ label: "Harbor Studio" }] }] });
+    expect(((await feed("person", ada.id)).items as Item[])[0]).toMatchObject({
+      action: "updated",
+      changes: [{ field: "organizations", after: [{ label: "Harbor Studio" }] }],
+    });
 
     // Replacing Ben by nobody: one more organization event, one on Ben, none on Ada.
     await admin.patch(`/api/admin/organizations/${organization.id}`, { personIds: [ada.id] }).expect(200);
@@ -258,7 +327,16 @@ describe("record history (audit log)", () => {
   it("a Treasury entry's Submit saves the internal note and the review status as one event", async () => {
     const [entry] = await t.db
       .insert(treasuryEntries)
-      .values({ entryType: "expense", name: "Printing", currency: "USD", grossAmount: -4200, source: "manual", managedBy: "native", livemode: true, occurredOn: "2026-10-03" })
+      .values({
+        entryType: "expense",
+        name: "Printing",
+        currency: "USD",
+        grossAmount: -4200,
+        source: "manual",
+        managedBy: "native",
+        livemode: true,
+        occurredOn: "2026-10-03",
+      })
       .returning();
     await admin.patch(`/api/admin/treasury/${entry!.id}`, { internalNote: "Invoice requested", reviewStatus: "pending_documents" }).expect(200);
     const history = await feed("treasury_entry", entry!.id);
@@ -284,11 +362,21 @@ describe("record history (audit log)", () => {
     expect((await admin.get("/api/admin/history?actor=automation").expect(200)).body.total).toBe(0);
     const [actor] = (await admin.get("/api/admin/history/actors").expect(200)).body;
     expect(actor).toMatchObject({ label: "owner" });
-    expect((await admin.get(`/api/admin/history?actor=${actor.id}&source=admin&from=2026-10-17&to=2026-10-17`).expect(200)).body.items.every((item: { occurredAt: string }) => item.occurredAt.startsWith("2026-10-17"))).toBe(true);
+    expect(
+      (await admin.get(`/api/admin/history?actor=${actor.id}&source=admin&from=2026-10-17&to=2026-10-17`).expect(200)).body.items.every(
+        (item: { occurredAt: string }) => item.occurredAt.startsWith("2026-10-17"),
+      ),
+    ).toBe(true);
     // The History page sends the viewer's own day as instants (from included, to excluded).
-    const zurichDay = (await admin.get(`/api/admin/history?from=${encodeURIComponent("2026-10-16T00:00:00+02:00")}&to=${encodeURIComponent("2026-10-17T00:00:00+02:00")}&pageSize=200`).expect(200)).body;
+    const zurichDay = (
+      await admin
+        .get(`/api/admin/history?from=${encodeURIComponent("2026-10-16T00:00:00+02:00")}&to=${encodeURIComponent("2026-10-17T00:00:00+02:00")}&pageSize=200`)
+        .expect(200)
+    ).body;
     expect(zurichDay.total).toBeGreaterThan(0);
-    expect(zurichDay.items.every((item: { occurredAt: string }) => item.occurredAt >= "2026-10-15T22:00:00.000Z" && item.occurredAt < "2026-10-16T22:00:00.000Z")).toBe(true);
+    expect(
+      zurichDay.items.every((item: { occurredAt: string }) => item.occurredAt >= "2026-10-15T22:00:00.000Z" && item.occurredAt < "2026-10-16T22:00:00.000Z"),
+    ).toBe(true);
     await admin.get("/api/admin/history?from=yesterday").expect(400);
     await admin.get("/api/admin/history?entityType=planet").expect(400);
   });

@@ -29,14 +29,16 @@ async function seed(db: Database) {
     { id: "sub_live1", livemode: true, status: "active", currency: "EUR", amount: 500, startedAt: new Date() },
   ]);
   const [testDonation] = await db.insert(treasuryEntries).values(stripeRow(false, "ch_test1")).returning({ id: treasuryEntries.id });
-  await db.insert(treasuryEntries).values([
-    stripeRow(false, "re_test1", { entryType: "refund", name: "Donation refund", grossAmount: -400, adjustsEntryId: testDonation!.id }),
-    stripeRow(false, "txn_test1", { entryType: "dispute", name: "Payment disputed", grossAmount: -600, adjustsEntryId: testDonation!.id }),
-    stripeRow(false, "ch_test2", { cadence: "monthly", recurrenceId: "sub_test1", grossAmount: 500 }),
-    stripeRow(true, "ch_live1"),
-    stripeRow(true, "ch_live2", { cadence: "monthly", recurrenceId: "sub_live1", grossAmount: 500 }),
-    { ...stripeRow(true, "manual-1"), source: "manual", externalTransactionId: null, entryType: "expense", name: "Hosting", grossAmount: -900 },
-  ]);
+  await db
+    .insert(treasuryEntries)
+    .values([
+      stripeRow(false, "re_test1", { entryType: "refund", name: "Donation refund", grossAmount: -400, adjustsEntryId: testDonation!.id }),
+      stripeRow(false, "txn_test1", { entryType: "dispute", name: "Payment disputed", grossAmount: -600, adjustsEntryId: testDonation!.id }),
+      stripeRow(false, "ch_test2", { cadence: "monthly", recurrenceId: "sub_test1", grossAmount: 500 }),
+      stripeRow(true, "ch_live1"),
+      stripeRow(true, "ch_live2", { cadence: "monthly", recurrenceId: "sub_live1", grossAmount: 500 }),
+      { ...stripeRow(true, "manual-1"), source: "manual", externalTransactionId: null, entryType: "expense", name: "Hosting", grossAmount: -900 },
+    ]);
   await db.insert(stripeEvents).values([
     { id: "evt_test1", type: "checkout.session.completed", livemode: false, stripeCreatedAt: new Date() },
     { id: "evt_live1", type: "checkout.session.completed", livemode: true, stripeCreatedAt: new Date() },
@@ -56,7 +58,11 @@ describe("purge of Stripe test-mode rows", () => {
     expect(await db.select().from(treasuryEntries)).toHaveLength(7);
 
     expect(await purgeTestDonations(db)).toEqual(plan);
-    expect((await db.select({ id: treasuryEntries.externalTransactionId, livemode: treasuryEntries.livemode }).from(treasuryEntries)).sort((a, b) => String(a.id).localeCompare(String(b.id)))).toEqual([
+    expect(
+      (await db.select({ id: treasuryEntries.externalTransactionId, livemode: treasuryEntries.livemode }).from(treasuryEntries)).sort((a, b) =>
+        String(a.id).localeCompare(String(b.id)),
+      ),
+    ).toEqual([
       { id: "ch_live1", livemode: true },
       { id: "ch_live2", livemode: true },
       { id: null, livemode: true },

@@ -16,8 +16,12 @@ export const importRuns = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     /** "dry_run" (nothing written but this row), "apply", or "failed" (rolled back). */
     mode: text("mode").notNull(),
-    counts: jsonb("counts").notNull().default(sql`'{}'::jsonb`),
-    issues: jsonb("issues").notNull().default(sql`'[]'::jsonb`),
+    counts: jsonb("counts")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    issues: jsonb("issues")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     /** Who started it, e.g. "cli:<os user>". */
     triggeredBy: text("triggered_by").notNull(),
   },

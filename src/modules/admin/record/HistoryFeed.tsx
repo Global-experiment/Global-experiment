@@ -39,7 +39,8 @@ function FieldLabel({ icon, children }: { icon: AdminIconName; children: ReactNo
 function Scalar({ value, kind, struck, timeZone }: { value: HistoryValue; kind: HistoryFieldKind; struck?: boolean; timeZone: string }) {
   const tone = struck ? "text-text-muted line-through" : "text-text-primary";
   if (isEmptyValue(value)) return <span className={struck ? "text-text-muted line-through" : "text-text-muted"}>Not set</span>;
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) return <span className={`${pill} ${struck ? "text-text-muted line-through" : ""}`}>{value.label}</span>;
+  if (typeof value === "object" && value !== null && !Array.isArray(value))
+    return <span className={`${pill} ${struck ? "text-text-muted line-through" : ""}`}>{value.label}</span>;
   if (typeof value === "boolean") return <span className={tone}>{value ? "Yes" : "No"}</span>;
   if (typeof value === "number") return <span className={`${tone} tabular-nums`}>{formatInteger(value)}</span>;
   const text = String(value);
@@ -77,7 +78,9 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
                 {item.label}
               </span>
             ))}
-            <span aria-label="changed to" className="text-text-muted">→</span>
+            <span aria-label="changed to" className="text-text-muted">
+              →
+            </span>
             {list(change.after).map((item) => (
               <span key={`+${item.id}`} className={chip}>
                 {item.label}
@@ -96,7 +99,11 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
               {item.label}
             </span>
           ))}
-          {removed.length > 0 && added.length > 0 ? <span aria-label="changed to" className="text-text-muted">→</span> : null}
+          {removed.length > 0 && added.length > 0 ? (
+            <span aria-label="changed to" className="text-text-muted">
+              →
+            </span>
+          ) : null}
           {added.map((item) => (
             <span key={`+${item.id}`} className={chip}>
               {item.label}
@@ -196,7 +203,8 @@ function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: st
   const facts: string[] = [];
   if (typeof meta.note === "string") facts.push(meta.note);
   if (item.action === "invited" && typeof meta.role === "string") facts.push(`Role: ${meta.role}.`);
-  if (item.action === "link_created" && typeof meta.purpose === "string") facts.push(`${meta.purpose}, valid ${linkValidity(item.occurredAt, meta.expiresAt)}, single use.`);
+  if (item.action === "link_created" && typeof meta.purpose === "string")
+    facts.push(`${meta.purpose}, valid ${linkValidity(item.occurredAt, meta.expiresAt)}, single use.`);
   if ((item.action === "activated" || item.action === "password_changed") && typeof meta.via === "string") facts.push(`With the ${meta.via.toLowerCase()}.`);
   if (item.action === "deactivated" && meta.self === true) facts.push("Deactivated from Profile settings.");
   if (item.action === "permission_denied" && typeof meta.route === "string") facts.push(`${meta.route} needs ${String(meta.permission)}.`);
@@ -260,7 +268,10 @@ function CommentBody({ item, onChanged }: { item: HistoryItem; onChanged: () => 
             className="w-full resize-y rounded-control bg-transparent p-2 text-meta text-text-primary ring-1 ring-line outline-none focus-visible:ring-text-primary"
           />
           <p className="flex gap-2">
-            <AdminButton onClick={() => void run(() => adminApi(`/comments/${comment.id}`, { method: "PATCH", body: { body: text } }))} disabled={busy || !text.trim()}>
+            <AdminButton
+              onClick={() => void run(() => adminApi(`/comments/${comment.id}`, { method: "PATCH", body: { body: text } }))}
+              disabled={busy || !text.trim()}
+            >
               {busy ? "Saving…" : "Save comment"}
             </AdminButton>
             <AdminButton
@@ -336,4 +347,3 @@ export function HistoryEvent({
     </li>
   );
 }
-

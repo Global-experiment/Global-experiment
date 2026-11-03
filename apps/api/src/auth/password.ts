@@ -16,9 +16,7 @@ export const MIN_PASSWORD_LENGTH = 12;
 function scrypt(password: string, salt: Buffer, log2N: number, r: number, p: number): Promise<Buffer> {
   const options: ScryptOptions = { N: 2 ** log2N, r, p, maxmem: 256 * 1024 * 1024 };
   return new Promise((resolve, reject) =>
-    scryptCallback(password.normalize("NFKC"), salt, KEY_LENGTH, options, (error, key) =>
-      error ? reject(error) : resolve(key),
-    ),
+    scryptCallback(password.normalize("NFKC"), salt, KEY_LENGTH, options, (error, key) => (error ? reject(error) : resolve(key))),
   );
 }
 

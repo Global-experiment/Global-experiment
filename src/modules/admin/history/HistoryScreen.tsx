@@ -61,7 +61,15 @@ function recordHref(entity: HistoryListItem["entity"], action: string, meta: His
   }
 }
 
-const NOUN: Record<string, string> = { person: "person", organization: "organization", treasury_entry: "entry", service: "service", access_grant: "permission", admin_user: "account", admin_invitation: "invitation link" };
+const NOUN: Record<string, string> = {
+  person: "person",
+  organization: "organization",
+  treasury_entry: "entry",
+  service: "service",
+  access_grant: "permission",
+  admin_user: "account",
+  admin_invitation: "invitation link",
+};
 
 /**
  * An event's ⋮ menu (client, 2026-10-23): Report issue and Send feedback,
@@ -85,7 +93,13 @@ function EventMenu({ eventId, title }: { eventId: string; title: string }) {
       >
         <AdminIcon name="more_vert" />
       </button>
-      <Popover open={open} onClose={() => setOpen(false)} triggerRef={trigger} label="Event options" className="top-[calc(100%+4px)] right-0 flex min-w-40 flex-col p-1">
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        triggerRef={trigger}
+        label="Event options"
+        className="top-[calc(100%+4px)] right-0 flex min-w-40 flex-col p-1"
+      >
         <Link href={reportHref("issue", source)} onClick={() => setOpen(false)} className={item}>
           Report issue
         </Link>

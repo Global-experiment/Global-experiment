@@ -111,7 +111,11 @@ export function ToastHost() {
       className="pointer-events-none fixed inset-x-0 top-auto z-50 m-0 ml-(--scrollbar-offset) flex w-auto justify-center overflow-visible border-0 bg-transparent p-0 text-inherit"
     >
       {toast ? (
-        <p key={toast.id} data-toast className="flex h-[2.125rem] items-center rounded-full bg-surface-raised px-3 text-body font-bold whitespace-nowrap text-text-primary">
+        <p
+          key={toast.id}
+          data-toast
+          className="flex h-[2.125rem] items-center rounded-full bg-surface-raised px-3 text-body font-bold whitespace-nowrap text-text-primary"
+        >
           {toast.message}
         </p>
       ) : null}

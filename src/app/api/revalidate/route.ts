@@ -11,7 +11,10 @@ import { PUBLIC_CACHE_TAGS } from "@/shared/config/publicApi";
  * stale copy (a donor checking the treasury right after donating).
  */
 const RevalidateRequest = z.strictObject({
-  tags: z.array(z.enum(Object.values(PUBLIC_CACHE_TAGS) as [string, ...string[]])).min(1).max(10),
+  tags: z
+    .array(z.enum(Object.values(PUBLIC_CACHE_TAGS) as [string, ...string[]]))
+    .min(1)
+    .max(10),
 });
 
 // Hashing first makes the comparison constant-time regardless of length.

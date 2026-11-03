@@ -27,8 +27,7 @@ export function ErrorState({ title, code, message, action }: ErrorStateProps) {
             <h1 className="text-body font-bold text-text-primary">Error</h1>
           </div>
           <p className="text-body">
-            <span className="font-bold text-text-primary">{title}</span>{" "}
-            <span className="text-text-muted">Error {code}</span>
+            <span className="font-bold text-text-primary">{title}</span> <span className="text-text-muted">Error {code}</span>
           </p>
           <p className="mt-3 text-lead text-text-primary">{message}</p>
         </div>

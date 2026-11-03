@@ -1,15 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type ComponentProps,
-  type ReactNode,
-  type RefObject,
-  type SelectHTMLAttributes,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, type ComponentProps, type ReactNode, type RefObject, type SelectHTMLAttributes } from "react";
 import { Icon } from "@/shared/ui/icons";
 import { AdminIcon, type AdminIconName } from "./adminIcons";
 
@@ -20,8 +12,7 @@ import { AdminIcon, type AdminIconName } from "./adminIcons";
  * space; boxes keep Figma's inner sizes. 4px corners, 14px text.
  */
 
-export const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
+export const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
 
 const buttonClasses = `inline-flex h-6 shrink-0 cursor-pointer items-center gap-2 rounded-control bg-surface-base px-2 text-body font-bold whitespace-nowrap text-text-primary ring-1 ring-line disabled:cursor-not-allowed disabled:text-text-muted ${focusRing}`;
 
@@ -60,12 +51,7 @@ export const toolbarBox = `relative flex h-8 items-center rounded-control bg-sur
  * Figma's filter/sort "chip" (p41: 24px, optional leading type icon,
  * trailing ▾) as a native <select> for keyboard and screen-reader support.
  */
-export function ChipSelect({
-  icon,
-  className = "",
-  children,
-  ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & { icon?: AdminIconName }) {
+export function ChipSelect({ icon, className = "", children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { icon?: AdminIconName }) {
   return (
     <span className={`relative inline-flex h-6 shrink-0 items-center rounded-control ring-1 ring-line ${className}`}>
       {icon ? <AdminIcon name={icon} className="pointer-events-none absolute left-2" /> : null}
@@ -88,12 +74,7 @@ export const chipInput = `h-6 rounded-control bg-surface-base px-2 text-body tex
  * glyphs, checked white, unchecked muted.
  */
 export function MenuCheck({ checked }: { checked: boolean }) {
-  return (
-    <Icon
-      name={checked ? "check_box" : "check_box_outline_blank"}
-      className={checked ? "text-text-primary" : "text-text-muted"}
-    />
-  );
+  return <Icon name={checked ? "check_box" : "check_box_outline_blank"} className={checked ? "text-text-primary" : "text-text-muted"} />;
 }
 
 /**

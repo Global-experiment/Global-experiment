@@ -91,7 +91,14 @@ export class CsvImportService {
     const parsed = this.parse(upload);
     try {
       return planCsvImport(
-        { table, fileName: cleanFileName(upload.fileName), parsed, mapping: options.mapping ?? autoMapping(table, parsed.headers), include: options.include, choices: options.choices },
+        {
+          table,
+          fileName: cleanFileName(upload.fileName),
+          parsed,
+          mapping: options.mapping ?? autoMapping(table, parsed.headers),
+          include: options.include,
+          choices: options.choices,
+        },
         snapshot,
       );
     } catch (error) {
@@ -127,14 +134,27 @@ export class CsvImportService {
       delimiter: parsed.delimiter,
       headers: parsed.headers,
       /** A few values per column, to recognise it when choosing its field. */
-      samples: parsed.headers.map((_header, column) => parsed.rows.map((row) => row.cells[column]!).filter((value) => value !== "").slice(0, 3)),
+      samples: parsed.headers.map((_header, column) =>
+        parsed.rows
+          .map((row) => row.cells[column]!)
+          .filter((value) => value !== "")
+          .slice(0, 3),
+      ),
       mapping: plan.mapping,
       fields: CSV_FIELDS[table].map(({ key, label, required }) => ({ key, label, required: required ?? false })),
       counts: csvCounts(plan),
       /** Values the admin doesn't have, each once, to map or skip on the Columns step (OPS-153). */
       unknown: plan.unknown,
       // The rows without their create requests (the page shows outcomes, not payloads).
-      rows: plan.rows.map((row) => ({ line: row.line, name: row.name, status: row.status, errors: row.errors, warnings: row.warnings, duplicate: row.duplicate, included: row.included })),
+      rows: plan.rows.map((row) => ({
+        line: row.line,
+        name: row.name,
+        status: row.status,
+        errors: row.errors,
+        warnings: row.warnings,
+        duplicate: row.duplicate,
+        included: row.included,
+      })),
     };
   }
 
@@ -163,7 +183,10 @@ export class CsvImportService {
           try {
             for (const row of plan.rows) {
               if (row.status !== "create") continue;
-              const id = table === "people" ? await this.people.create(tx, row.request as CreatePersonRequest) : await this.organizations.create(tx, row.request as CreateOrganizationRequest);
+              const id =
+                table === "people"
+                  ? await this.people.create(tx, row.request as CreatePersonRequest)
+                  : await this.organizations.create(tx, row.request as CreateOrganizationRequest);
               created.set(row.line, id);
               const record = table === "people" ? (await this.people.findById(id, tx))! : (await this.organizations.findById(id, tx))!;
               await recordAuditEvent(tx, {
@@ -173,7 +196,10 @@ export class CsvImportService {
                 actor,
                 source: "import",
                 meta: {
-                  label: table === "people" ? labelOfPerson(record as Parameters<typeof labelOfPerson>[0]) : labelOfOrganization(record as Parameters<typeof labelOfOrganization>[0]),
+                  label:
+                    table === "people"
+                      ? labelOfPerson(record as Parameters<typeof labelOfPerson>[0])
+                      : labelOfOrganization(record as Parameters<typeof labelOfOrganization>[0]),
                   collection: NOUN[table].collection,
                   importSource: "CSV import",
                   fileName,

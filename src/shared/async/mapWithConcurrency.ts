@@ -6,11 +6,7 @@
  * requests/second, so a small worker pool is used instead of
  * `Promise.all`, which has no such limit.
  */
-export async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
+export async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let next = 0;
 

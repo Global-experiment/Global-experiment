@@ -99,7 +99,14 @@ export class ServicesService {
     return this.db.transaction(async (tx) => {
       const id = await this.repository.createService(tx, input);
       const service = (await this.repository.findService(id, tx))!;
-      await this.audit.record(tx, { entityType: "service", entityId: id, action: "created", actor, source: "admin", meta: { label: serviceLabel(service), collection: "Services" } });
+      await this.audit.record(tx, {
+        entityType: "service",
+        entityId: id,
+        action: "created",
+        actor,
+        source: "admin",
+        meta: { label: serviceLabel(service), collection: "Services" },
+      });
       return service;
     });
   }
@@ -112,7 +119,16 @@ export class ServicesService {
       await this.repository.updateService(tx, id, input);
       const after = (await this.repository.findService(id, tx))!;
       const changes = diffRecord(SERVICE_FIELDS, before, after);
-      if (changes.length > 0) await this.audit.record(tx, { entityType: "service", entityId: id, action: "updated", actor, source: "admin", changes, meta: { label: serviceLabel(after) } });
+      if (changes.length > 0)
+        await this.audit.record(tx, {
+          entityType: "service",
+          entityId: id,
+          action: "updated",
+          actor,
+          source: "admin",
+          changes,
+          meta: { label: serviceLabel(after) },
+        });
       return after;
     });
   }
@@ -123,7 +139,14 @@ export class ServicesService {
       if (!before) throw new NotFoundError("Service not found.");
       if ((before.archivedAt !== null) === archived) return before;
       await this.repository.setServiceArchived(tx, id, actor.type === "admin" ? actor.id : null, archived);
-      await this.audit.record(tx, { entityType: "service", entityId: id, action: archived ? "archived" : "restored", actor, source: "admin", meta: { label: serviceLabel(before) } });
+      await this.audit.record(tx, {
+        entityType: "service",
+        entityId: id,
+        action: archived ? "archived" : "restored",
+        actor,
+        source: "admin",
+        meta: { label: serviceLabel(before) },
+      });
       return (await this.repository.findService(id, tx))!;
     });
   }
@@ -134,7 +157,8 @@ export class ServicesService {
     for (const key of input.categoryKeys ?? []) {
       if (!(await this.repository.knownKey("category", key))) issues.push({ path: "categoryKeys", message: "Unknown category." });
     }
-    if (input.hostingModelKey && !(await this.repository.knownKey("hosting", input.hostingModelKey))) issues.push({ path: "hostingModelKey", message: "Unknown hosting model." });
+    if (input.hostingModelKey && !(await this.repository.knownKey("hosting", input.hostingModelKey)))
+      issues.push({ path: "hostingModelKey", message: "Unknown hosting model." });
     if (issues.length > 0) throw new ValidationFailedError(issues);
   }
 
@@ -201,7 +225,14 @@ export class ServicesService {
   }
 
   /** A grant's own event, shown on the records it names before and after (OPS-151). */
-  private async recordGrant(tx: Executor, action: "updated" | "archived" | "restored", before: GrantDto, after: GrantDto, actor: AuditActor, extra: { changes?: ReturnType<typeof diffRecord> } = {}) {
+  private async recordGrant(
+    tx: Executor,
+    action: "updated" | "archived" | "restored",
+    before: GrantDto,
+    after: GrantDto,
+    actor: AuditActor,
+    extra: { changes?: ReturnType<typeof diffRecord> } = {},
+  ) {
     await this.audit.record(tx, {
       entityType: "access_grant",
       entityId: after.id,

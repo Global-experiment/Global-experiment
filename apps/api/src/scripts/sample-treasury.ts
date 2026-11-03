@@ -34,22 +34,127 @@ interface SampleExpense {
 
 /** USD adds up to 39,800 (the Figma's "39.8K"), spread over five months so the trends have a base. */
 export const SAMPLE_EXPENSES: readonly SampleExpense[] = [
-  { name: "Platform development", currency: "USD", amount: 12_000, daysAgo: 140, types: ["development_and_engineering", "design_and_product"], description: "Development of the contribution and donation flows." },
-  { name: "Server hosting", currency: "USD", amount: 1_250, daysAgo: 120, types: ["hosting_and_infrastructure"], description: "Hosting of the platform and its databases for the year." },
-  { name: "Association registration", currency: "CHF", amount: 700, daysAgo: 100, types: ["legal_and_compliance", "accounting_and_administration"], description: "Registration of the association in Switzerland." },
-  { name: "Accessibility audit", currency: "USD", amount: 3_600, daysAgo: 95, types: ["research_and_consulting", "design_and_product"], description: "An independent accessibility audit of the public pages." },
-  { name: "Design system", currency: "USD", amount: 5_400, daysAgo: 80, types: ["design_and_product"], description: "Design of the shared components and page templates." },
-  { name: "Legal advice", currency: "USD", amount: 2_800, daysAgo: 70, types: ["legal_and_compliance"], description: "Legal advice on the association's statutes." },
-  { name: "Accounting", currency: "USD", amount: 1_900, daysAgo: 60, types: ["accounting_and_administration"], description: "Annual accounts and bookkeeping set-up." },
-  { name: "Facilitation workshop", currency: "EUR", amount: 1_800, daysAgo: 50, types: ["general_operations", "communication_and_content"], description: "A facilitated workshop with the first contributors." },
-  { name: "Software subscriptions", currency: "USD", amount: 640, daysAgo: 45, types: ["software_and_subscriptions"], description: "Design, analytics and collaboration tools." },
-  { name: "Translation", currency: "USD", amount: 2_350, daysAgo: 35, types: ["communication_and_content"], description: "Translation of the documentation into Spanish." },
-  { name: "Frontend milestone", currency: "USD", amount: 6_500, daysAgo: 20, types: ["development_and_engineering"], description: "The public pages: directory, treasury and donate." },
+  {
+    name: "Platform development",
+    currency: "USD",
+    amount: 12_000,
+    daysAgo: 140,
+    types: ["development_and_engineering", "design_and_product"],
+    description: "Development of the contribution and donation flows.",
+  },
+  {
+    name: "Server hosting",
+    currency: "USD",
+    amount: 1_250,
+    daysAgo: 120,
+    types: ["hosting_and_infrastructure"],
+    description: "Hosting of the platform and its databases for the year.",
+  },
+  {
+    name: "Association registration",
+    currency: "CHF",
+    amount: 700,
+    daysAgo: 100,
+    types: ["legal_and_compliance", "accounting_and_administration"],
+    description: "Registration of the association in Switzerland.",
+  },
+  {
+    name: "Accessibility audit",
+    currency: "USD",
+    amount: 3_600,
+    daysAgo: 95,
+    types: ["research_and_consulting", "design_and_product"],
+    description: "An independent accessibility audit of the public pages.",
+  },
+  {
+    name: "Design system",
+    currency: "USD",
+    amount: 5_400,
+    daysAgo: 80,
+    types: ["design_and_product"],
+    description: "Design of the shared components and page templates.",
+  },
+  {
+    name: "Legal advice",
+    currency: "USD",
+    amount: 2_800,
+    daysAgo: 70,
+    types: ["legal_and_compliance"],
+    description: "Legal advice on the association's statutes.",
+  },
+  {
+    name: "Accounting",
+    currency: "USD",
+    amount: 1_900,
+    daysAgo: 60,
+    types: ["accounting_and_administration"],
+    description: "Annual accounts and bookkeeping set-up.",
+  },
+  {
+    name: "Facilitation workshop",
+    currency: "EUR",
+    amount: 1_800,
+    daysAgo: 50,
+    types: ["general_operations", "communication_and_content"],
+    description: "A facilitated workshop with the first contributors.",
+  },
+  {
+    name: "Software subscriptions",
+    currency: "USD",
+    amount: 640,
+    daysAgo: 45,
+    types: ["software_and_subscriptions"],
+    description: "Design, analytics and collaboration tools.",
+  },
+  {
+    name: "Translation",
+    currency: "USD",
+    amount: 2_350,
+    daysAgo: 35,
+    types: ["communication_and_content"],
+    description: "Translation of the documentation into Spanish.",
+  },
+  {
+    name: "Frontend milestone",
+    currency: "USD",
+    amount: 6_500,
+    daysAgo: 20,
+    types: ["development_and_engineering"],
+    description: "The public pages: directory, treasury and donate.",
+  },
   { name: "Office supplies", currency: "CHF", amount: 70, daysAgo: 15, types: ["general_operations"], description: "Office supplies for the association." },
-  { name: "Security assessment", currency: "USD", amount: 2_800, daysAgo: 12, types: ["research_and_consulting", "hosting_and_infrastructure"], description: "A security review of the platform and its hosting." },
-  { name: "Bank fees", currency: "EUR", amount: 18, daysAgo: 8, types: ["banking_and_payment_processing"], description: "Monthly fees of the association's bank account." },
-  { name: "Payment processing fees", currency: "USD", amount: 160, daysAgo: 5, types: ["banking_and_payment_processing"], description: "Card processing fees for the month." },
-  { name: "Monthly bookkeeping", currency: "USD", amount: 400, daysAgo: 2, types: ["accounting_and_administration", "general_operations"], description: "Bookkeeping for the month." },
+  {
+    name: "Security assessment",
+    currency: "USD",
+    amount: 2_800,
+    daysAgo: 12,
+    types: ["research_and_consulting", "hosting_and_infrastructure"],
+    description: "A security review of the platform and its hosting.",
+  },
+  {
+    name: "Bank fees",
+    currency: "EUR",
+    amount: 18,
+    daysAgo: 8,
+    types: ["banking_and_payment_processing"],
+    description: "Monthly fees of the association's bank account.",
+  },
+  {
+    name: "Payment processing fees",
+    currency: "USD",
+    amount: 160,
+    daysAgo: 5,
+    types: ["banking_and_payment_processing"],
+    description: "Card processing fees for the month.",
+  },
+  {
+    name: "Monthly bookkeeping",
+    currency: "USD",
+    amount: 400,
+    daysAgo: 2,
+    types: ["accounting_and_administration", "general_operations"],
+    description: "Bookkeeping for the month.",
+  },
 ];
 
 /** The Figma's "$ 91.3K +2.1%" and "1.4 +2.1%"; EUR and CHF in proportion. */
@@ -113,12 +218,25 @@ export async function seedSampleTreasury(db: Database, now: Date): Promise<Sampl
       .onConflictDoNothing({ target: organizations.id })
       .returning({ id: organizations.id, orgNumber: organizations.orgNumber, name: organizations.name });
     if (recipient) {
-      await recordAuditEvent(tx, { entityType: "organization", entityId: recipient.id, action: "created", actor: AUTOMATION, source: "system", meta: { label: organizationLabel(recipient), origin: "seed-sample-treasury" } }, now);
+      await recordAuditEvent(
+        tx,
+        {
+          entityType: "organization",
+          entityId: recipient.id,
+          action: "created",
+          actor: AUTOMATION,
+          source: "system",
+          meta: { label: organizationLabel(recipient), origin: "seed-sample-treasury" },
+        },
+        now,
+      );
     }
     for (const expense of SAMPLE_EXPENSES) {
       const day = new Date(now.getTime() - expense.daysAgo * 86_400_000);
       // A working-hours time on that day (UTC), varied per entry so the rows don't all read the same.
-      const occurredAt = new Date(`${day.toISOString().slice(0, 10)}T${String(8 + (expense.amount % 9)).padStart(2, "0")}:${String(expense.amount % 60).padStart(2, "0")}:00Z`);
+      const occurredAt = new Date(
+        `${day.toISOString().slice(0, 10)}T${String(8 + (expense.amount % 9)).padStart(2, "0")}:${String(expense.amount % 60).padStart(2, "0")}:00Z`,
+      );
       const [entry] = await tx
         .insert(treasuryEntries)
         .values({
@@ -140,15 +258,43 @@ export async function seedSampleTreasury(db: Database, now: Date): Promise<Sampl
           publicDescription: expense.description,
           internalNote: "Sample entry (before go-live): removed by purge-sample-treasury.",
         })
-        .returning({ id: treasuryEntries.id, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount, currency: treasuryEntries.currency });
+        .returning({
+          id: treasuryEntries.id,
+          entryNumber: treasuryEntries.entryNumber,
+          grossAmount: treasuryEntries.grossAmount,
+          currency: treasuryEntries.currency,
+        });
       await tx.insert(treasuryEntryExpenseTypes).values(expense.types.map((typeKey) => ({ entryId: entry!.id, typeKey })));
-      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: entry!.id, action: "created", actor: AUTOMATION, source: "system", meta: { label: entryLabel(entry!), origin: "seed-sample-treasury" } }, now);
+      await recordAuditEvent(
+        tx,
+        {
+          entityType: "treasury_entry",
+          entityId: entry!.id,
+          action: "created",
+          actor: AUTOMATION,
+          source: "system",
+          meta: { label: entryLabel(entry!), origin: "seed-sample-treasury" },
+        },
+        now,
+      );
     }
     await tx
       .insert(settings)
       .values({ key: SAMPLE_FIGURES_KEY, value: SAMPLE_FIGURES })
       .onConflictDoUpdate({ target: settings.key, set: { value: SAMPLE_FIGURES } });
-    await recordAuditEvent(tx, { entityType: "setting", entityId: SAMPLE_FIGURES_KEY, action: "updated", actor: AUTOMATION, source: "system", changes: [{ field: "value", label: "Value", kind: "text", before: null, after: "Sample figures" }], meta: { label: SAMPLE_FIGURES_KEY, origin: "seed-sample-treasury" } }, now);
+    await recordAuditEvent(
+      tx,
+      {
+        entityType: "setting",
+        entityId: SAMPLE_FIGURES_KEY,
+        action: "updated",
+        actor: AUTOMATION,
+        source: "system",
+        changes: [{ field: "value", label: "Value", kind: "text", before: null, after: "Sample figures" }],
+        meta: { label: SAMPLE_FIGURES_KEY, origin: "seed-sample-treasury" },
+      },
+      now,
+    );
     return planSampleSeed();
   });
 }
@@ -157,11 +303,23 @@ export async function seedSampleTreasury(db: Database, now: Date): Promise<Sampl
 export async function purgeSampleTreasury(db: Database): Promise<SamplePlan> {
   return db.transaction(async (tx) => {
     const samples = await tx
-      .select({ id: treasuryEntries.id, currency: treasuryEntries.currency, entryNumber: treasuryEntries.entryNumber, grossAmount: treasuryEntries.grossAmount })
+      .select({
+        id: treasuryEntries.id,
+        currency: treasuryEntries.currency,
+        entryNumber: treasuryEntries.entryNumber,
+        grossAmount: treasuryEntries.grossAmount,
+      })
       .from(treasuryEntries)
       .where(eq(treasuryEntries.sample, true));
     for (const sample of samples) {
-      await recordAuditEvent(tx, { entityType: "treasury_entry", entityId: sample.id, action: "deleted", actor: AUTOMATION, source: "system", meta: { label: entryLabel(sample), origin: "purge-sample-treasury" } });
+      await recordAuditEvent(tx, {
+        entityType: "treasury_entry",
+        entityId: sample.id,
+        action: "deleted",
+        actor: AUTOMATION,
+        source: "system",
+        meta: { label: entryLabel(sample), origin: "purge-sample-treasury" },
+      });
     }
     const ids = samples.map((row) => row.id);
     if (ids.length > 0) {
@@ -172,14 +330,32 @@ export async function purgeSampleTreasury(db: Database): Promise<SamplePlan> {
     // The sample recipient goes too, unless a real entry was linked to it since.
     const [linked] = await tx.select({ n: count() }).from(treasuryEntries).where(eq(treasuryEntries.recipientOrganizationId, SAMPLE_RECIPIENT.id));
     if ((linked?.n ?? 0) === 0) {
-      const removed = await tx.delete(organizations).where(eq(organizations.id, SAMPLE_RECIPIENT.id)).returning({ id: organizations.id, orgNumber: organizations.orgNumber, name: organizations.name });
+      const removed = await tx
+        .delete(organizations)
+        .where(eq(organizations.id, SAMPLE_RECIPIENT.id))
+        .returning({ id: organizations.id, orgNumber: organizations.orgNumber, name: organizations.name });
       for (const organization of removed) {
-        await recordAuditEvent(tx, { entityType: "organization", entityId: organization.id, action: "deleted", actor: AUTOMATION, source: "system", meta: { label: organizationLabel(organization), origin: "purge-sample-treasury" } });
+        await recordAuditEvent(tx, {
+          entityType: "organization",
+          entityId: organization.id,
+          action: "deleted",
+          actor: AUTOMATION,
+          source: "system",
+          meta: { label: organizationLabel(organization), origin: "purge-sample-treasury" },
+        });
       }
     }
     const removedFigures = await tx.delete(settings).where(eq(settings.key, SAMPLE_FIGURES_KEY)).returning({ key: settings.key });
     if (removedFigures.length > 0) {
-      await recordAuditEvent(tx, { entityType: "setting", entityId: SAMPLE_FIGURES_KEY, action: "updated", actor: AUTOMATION, source: "system", changes: [{ field: "value", label: "Value", kind: "text", before: "Sample figures", after: null }], meta: { label: SAMPLE_FIGURES_KEY, origin: "purge-sample-treasury" } });
+      await recordAuditEvent(tx, {
+        entityType: "setting",
+        entityId: SAMPLE_FIGURES_KEY,
+        action: "updated",
+        actor: AUTOMATION,
+        source: "system",
+        changes: [{ field: "value", label: "Value", kind: "text", before: "Sample figures", after: null }],
+        meta: { label: SAMPLE_FIGURES_KEY, origin: "purge-sample-treasury" },
+      });
     }
     return planOf(samples, removedFigures.length > 0);
   });

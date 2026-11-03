@@ -66,118 +66,121 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
 
   return (
     <AdminSessionProvider admin={admin}>
-    <ToastProvider sidebarWidth={collapsed ? 56 : 240}>
-      <div
-        data-admin
-        data-sidebar={collapsed ? "collapsed" : "expanded"}
-        className={`grid h-dvh overflow-hidden bg-surface-base font-normal text-text-primary transition-[grid-template-columns] duration-150 motion-reduce:transition-none ${
-          collapsed ? "grid-cols-[56px_minmax(0,1fr)]" : "grid-cols-[240px_minmax(0,1fr)]"
-        }`}
-      >
-        {/* The 1px rule sits on the column edge, outside its 240px (Figma), above the content. */}
-        <div id="admin-sidebar" className="relative z-10 flex h-dvh min-h-0 flex-col shadow-[1px_0_0_0_var(--color-line)]">
-          <div className={`flex shrink-0 gap-2 px-2 pt-2 ${collapsed ? "flex-col" : "items-center"}`}>
-            {collapsed ? (
+      <ToastProvider sidebarWidth={collapsed ? 56 : 240}>
+        <div
+          data-admin
+          data-sidebar={collapsed ? "collapsed" : "expanded"}
+          className={`grid h-dvh overflow-hidden bg-surface-base font-normal text-text-primary transition-[grid-template-columns] duration-150 motion-reduce:transition-none ${
+            collapsed ? "grid-cols-[56px_minmax(0,1fr)]" : "grid-cols-[240px_minmax(0,1fr)]"
+          }`}
+        >
+          {/* The 1px rule sits on the column edge, outside its 240px (Figma), above the content. */}
+          <div id="admin-sidebar" className="relative z-10 flex h-dvh min-h-0 flex-col shadow-[1px_0_0_0_var(--color-line)]">
+            <div className={`flex shrink-0 gap-2 px-2 pt-2 ${collapsed ? "flex-col" : "items-center"}`}>
+              {collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenu(false);
+                    requestAnimationFrame(() => searchRef.current?.focus());
+                  }}
+                  aria-label="Search the menu"
+                  title="Search the menu"
+                  className={`flex h-8 w-full cursor-pointer items-center justify-center rounded-control text-text-muted ring-1 ring-line hover:text-text-primary ${focusRing}`}
+                >
+                  <AdminIcon name="search" />
+                </button>
+              ) : (
+                <label className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-control pr-1 pl-2 ring-1 ring-line focus-within:ring-text-primary">
+                  <AdminIcon name="search" />
+                  <span className="sr-only">Search the menu</span>
+                  <input
+                    ref={searchRef}
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") setQuery("");
+                    }}
+                    placeholder="Search"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
+                  />
+                </label>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  setMenu(false);
-                  requestAnimationFrame(() => searchRef.current?.focus());
-                }}
-                aria-label="Search the menu"
-                title="Search the menu"
-                className={`flex h-8 w-full cursor-pointer items-center justify-center rounded-control text-text-muted ring-1 ring-line hover:text-text-primary ${focusRing}`}
+                onClick={() => setMenu(!collapsed)}
+                aria-controls="admin-sidebar"
+                aria-expanded={!collapsed}
+                aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+                title={collapsed ? "Expand menu" : "Collapse menu"}
+                data-sidebar-toggle
+                className={`flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-muted hover:bg-surface-raised hover:text-text-primary ${collapsed ? "w-full" : "w-8"} ${focusRing}`}
               >
-                <AdminIcon name="search" />
+                <AdminIcon name={collapsed ? "expand_menu" : "collapse_menu"} />
               </button>
-            ) : (
-              <label className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-control pr-1 pl-2 ring-1 ring-line focus-within:ring-text-primary">
-                <AdminIcon name="search" />
-                <span className="sr-only">Search the menu</span>
-                <input
-                  ref={searchRef}
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") setQuery("");
-                  }}
-                  placeholder="Search"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
-                />
-              </label>
-            )}
-            <button
-              type="button"
-              onClick={() => setMenu(!collapsed)}
-              aria-controls="admin-sidebar"
-              aria-expanded={!collapsed}
-              aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-              title={collapsed ? "Expand menu" : "Collapse menu"}
-              data-sidebar-toggle
-              className={`flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-muted hover:bg-surface-raised hover:text-text-primary ${collapsed ? "w-full" : "w-8"} ${focusRing}`}
-            >
-              <AdminIcon name={collapsed ? "expand_menu" : "collapse_menu"} />
-            </button>
+            </div>
+
+            <nav aria-label="Admin" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 pb-2">
+              {groups.length === 0 ? (
+                <p role="status" className="px-2 pt-4 text-body text-text-muted">
+                  No menu items match.
+                </p>
+              ) : (
+                groups.map(({ section, modules }, groupIndex) => (
+                  <div key={section}>
+                    <p className={collapsed ? "sr-only" : "flex h-10 items-end pb-2.5 pl-2 text-meta text-text-muted"}>{section}</p>
+                    {collapsed && groupIndex === 0 ? <div aria-hidden="true" className="h-2" /> : null}
+                    <ul className="flex flex-col gap-1 pl-2">
+                      {modules.map((item) => {
+                        const active = item.key === activeKey;
+                        const content = (
+                          <>
+                            <AdminIcon name={item.icon} />
+                            <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
+                          </>
+                        );
+                        const row = `flex h-8 items-center gap-1 rounded-control text-body ${collapsed ? "justify-center" : "pl-1"}`;
+                        return (
+                          <li key={item.key} data-module={item.key}>
+                            {item.status === "live" && item.href ? (
+                              <Link
+                                href={item.href}
+                                aria-current={active ? "page" : undefined}
+                                title={collapsed ? item.label : undefined}
+                                className={`${row} ${active ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"} ${focusRing}`}
+                              >
+                                {content}
+                              </Link>
+                            ) : (
+                              <span
+                                aria-disabled="true"
+                                title={collapsed ? `${item.label} — coming soon` : "Coming soon"}
+                                data-coming-soon
+                                className={`${row} cursor-not-allowed text-text-disabled`}
+                              >
+                                {content}
+                                <span className="sr-only"> (coming soon)</span>
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </nav>
+
+            <UserCard admin={admin} collapsed={collapsed} />
           </div>
-
-          <nav aria-label="Admin" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 pb-2">
-            {groups.length === 0 ? (
-              <p role="status" className="px-2 pt-4 text-body text-text-muted">
-                No menu items match.
-              </p>
-            ) : (
-              groups.map(({ section, modules }, groupIndex) => (
-                <div key={section}>
-                  <p className={collapsed ? "sr-only" : "flex h-10 items-end pb-2.5 pl-2 text-meta text-text-muted"}>
-                    {section}
-                  </p>
-                  {collapsed && groupIndex === 0 ? <div aria-hidden="true" className="h-2" /> : null}
-                  <ul className="flex flex-col gap-1 pl-2">
-                    {modules.map((item) => {
-                      const active = item.key === activeKey;
-                      const content = (
-                        <>
-                          <AdminIcon name={item.icon} />
-                          <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
-                        </>
-                      );
-                      const row = `flex h-8 items-center gap-1 rounded-control text-body ${collapsed ? "justify-center" : "pl-1"}`;
-                      return (
-                        <li key={item.key} data-module={item.key}>
-                          {item.status === "live" && item.href ? (
-                            <Link
-                              href={item.href}
-                              aria-current={active ? "page" : undefined}
-                              title={collapsed ? item.label : undefined}
-                              className={`${row} ${active ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"} ${focusRing}`}
-                            >
-                              {content}
-                            </Link>
-                          ) : (
-                            <span aria-disabled="true" title={collapsed ? `${item.label} — coming soon` : "Coming soon"} data-coming-soon className={`${row} cursor-not-allowed text-text-disabled`}>
-                              {content}
-                              <span className="sr-only"> (coming soon)</span>
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))
-            )}
-          </nav>
-
-          <UserCard admin={admin} collapsed={collapsed} />
+          <div data-admin-content className="relative h-dvh min-w-0 overflow-x-hidden overflow-y-auto overscroll-x-none">
+            {children}
+          </div>
         </div>
-        <div data-admin-content className="relative h-dvh min-w-0 overflow-x-hidden overflow-y-auto overscroll-x-none">
-          {children}
-        </div>
-      </div>
-    </ToastProvider>
+      </ToastProvider>
     </AdminSessionProvider>
   );
 }

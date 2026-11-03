@@ -29,9 +29,9 @@ export async function loadDirectoryFixtures(db: Database): Promise<void> {
       }
     }
 
-    await tx.insert(organizations).values(
-      FIXTURE_ORGANIZATIONS.map(({ id, name, description, website, email }) => ({ id, name, description, website, email })),
-    );
+    await tx
+      .insert(organizations)
+      .values(FIXTURE_ORGANIZATIONS.map(({ id, name, description, website, email }) => ({ id, name, description, website, email })));
     const organizationTags = FIXTURE_ORGANIZATIONS.flatMap((organization) =>
       organization.expertiseIds.map((expertiseId) => ({ organizationId: organization.id, expertiseId })),
     );
@@ -57,9 +57,7 @@ export async function loadDirectoryFixtures(db: Database): Promise<void> {
         updatedAt: person.createdAt,
       })),
     );
-    const memberships = FIXTURE_PEOPLE.flatMap((person) =>
-      person.organizationIds.map((organizationId) => ({ personId: person.id, organizationId })),
-    );
+    const memberships = FIXTURE_PEOPLE.flatMap((person) => person.organizationIds.map((organizationId) => ({ personId: person.id, organizationId })));
     if (memberships.length > 0) await tx.insert(peopleOrganizations).values(memberships);
     const personTags = FIXTURE_PEOPLE.flatMap((person) => person.expertiseIds.map((expertiseId) => ({ personId: person.id, expertiseId })));
     if (personTags.length > 0) await tx.insert(peopleExpertise).values(personTags);

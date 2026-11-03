@@ -34,13 +34,23 @@ const snapshot: CsvSnapshot = {
 
 const plan = (csv: string, options: { include?: number[]; mapping?: (string | null)[]; choices?: ValueChoices } = {}) => {
   const parsed = parseCsv(new TextEncoder().encode(csv));
-  return planCsvImport({ table: "people", fileName: "people.csv", parsed, mapping: options.mapping ?? autoMapping("people", parsed.headers), include: options.include, choices: options.choices }, snapshot);
+  return planCsvImport(
+    {
+      table: "people",
+      fileName: "people.csv",
+      parsed,
+      mapping: options.mapping ?? autoMapping("people", parsed.headers),
+      include: options.include,
+      choices: options.choices,
+    },
+    snapshot,
+  );
 };
 
 describe("CSV import plan (people)", () => {
   it("turns valid rows into the detail page's create request, relations found by name", () => {
     const result = plan(
-      'Name,Email,State,Source,Organizations,Expertise,Contact channels,Do not contact,Relevance score,First contact,Follow-up date,Website\n' +
+      "Name,Email,State,Source,Organizations,Expertise,Contact channels,Do not contact,Relevance score,First contact,Follow-up date,Website\n" +
         'Dana New,dana@example.net,collaborating,Other,"Acme, Inc.",facilitation,"Email; Signal",no,7,30.10.2026,2026-11-02,dana.test\n',
     );
     expect(result.rows).toHaveLength(1);
@@ -76,7 +86,12 @@ describe("CSV import plan (people)", () => {
         ["Relevance score: use a whole number from 0 to 10.", "First contact: use a date like 2026-10-30."],
         ['State: no state named "Unknown"; imported without it.', 'Organizations: no organization named "Nowhere Ltd"; imported without it.'],
       ],
-      [4, "error", ["ID (UUID): use the record's UUID (PER-, ORG- and GE- numbers aren't used)."], ['Organizations: several are named "Twin"; imported without it.']],
+      [
+        4,
+        "error",
+        ["ID (UUID): use the record's UUID (PER-, ORG- and GE- numbers aren't used)."],
+        ['Organizations: several are named "Twin"; imported without it.'],
+      ],
     ]);
     // Once the lookups pass, the request schema speaks: email, link and score range.
     const second = plan("Name,Email,Website,Relevance score\nGus,not-an-email,not a link,12\n,a@example.net,,\n");
@@ -129,7 +144,10 @@ describe("CSV import plan (people)", () => {
         [5, "error"],
       ]);
       expect(result.rows[0]!.request).toMatchObject({ expertiseIds: [id(21)], contactChannelKeys: ["email"] });
-      expect(result.rows[0]!.warnings).toEqual(['Expertise: no expertise named "Game design"; imported without it.', 'Contact channels: no contact channel named "Pigeon"; imported without it.']);
+      expect(result.rows[0]!.warnings).toEqual([
+        'Expertise: no expertise named "Game design"; imported without it.',
+        'Contact channels: no contact channel named "Pigeon"; imported without it.',
+      ]);
       // Case and extra spaces ignored.
       expect(result.rows[1]!.request).toMatchObject({ expertiseIds: [id(21)] });
       expect(result.rows[2]!.errors).toEqual(["Email: Invalid email address."]);
@@ -139,7 +157,9 @@ describe("CSV import plan (people)", () => {
 
     it("lists each unknown value once, with its rows and what it can be mapped to", () => {
       const result = plan(notion);
-      expect(result.unknown.map((field) => [field.field, field.label, field.values.map((value) => [value.value, value.key, value.rows, value.problem])])).toEqual([
+      expect(
+        result.unknown.map((field) => [field.field, field.label, field.values.map((value) => [value.value, value.key, value.rows, value.problem])]),
+      ).toEqual([
         ["contactChannels", "Contact channels", [["Pigeon", "pigeon", 2, "unknown"]]],
         ["expertise", "Expertise", [["Game design", "game design", 2, "unknown"]]],
       ]);
@@ -164,7 +184,13 @@ describe("CSV import plan (people)", () => {
       expect(plan(csv).rows[0]).toMatchObject({
         status: "create",
         warnings: [],
-        request: { stateKey: "collaborating", sourceKey: "other", contactChannelKeys: ["email", "signal"], organizationIds: [id(10)], expertiseIds: [id(20), id(22)] },
+        request: {
+          stateKey: "collaborating",
+          sourceKey: "other",
+          contactChannelKeys: ["email", "signal"],
+          organizationIds: [id(10)],
+          expertiseIds: [id(20), id(22)],
+        },
       });
       expect(plan(csv).unknown).toEqual([]);
     });
@@ -194,7 +220,10 @@ describe("CSV import plan (people)", () => {
     const parsed = parseCsv(new TextEncoder().encode("Name,Website,State\nNew Org,new.test,Sourced\nAcme, Inc.,,\n"));
     const mapping = autoMapping("organizations", parsed.headers);
     expect(mapping).toEqual(["name", "website", null]);
-    const result = planCsvImport({ table: "organizations", fileName: "orgs.csv", parsed, mapping }, { ...snapshot, records: [{ id: id(10), name: "Acme", email: null, website: null }] });
+    const result = planCsvImport(
+      { table: "organizations", fileName: "orgs.csv", parsed, mapping },
+      { ...snapshot, records: [{ id: id(10), name: "Acme", email: null, website: null }] },
+    );
     expect(result.rows.map((row) => [row.status, row.request])).toEqual([
       ["create", { name: "New Org", website: "new.test" }],
       // An unquoted comma inside a name: the row has more cells than the header.

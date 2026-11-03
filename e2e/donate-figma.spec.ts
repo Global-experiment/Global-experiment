@@ -207,9 +207,21 @@ test("p33 the ⋮ sheet: update line, partners, the five actions plus Currency a
   await page.waitForTimeout(400); // slide-up
   // One paragraph, the two sentences on consecutive lines (p32).
   const lead = sheet.locator("p").first();
-  await expect(lead).toHaveText(/^This page was updated on [A-Z][a-z]+ \d{1,2} at \d{1,2}:\d{2}(AM|PM)\.Stripe and Wise are the banking partners of the experiment\.$/);
+  await expect(lead).toHaveText(
+    /^This page was updated on [A-Z][a-z]+ \d{1,2} at \d{1,2}:\d{2}(AM|PM)\.Stripe and Wise are the banking partners of the experiment\.$/,
+  );
   await expect(lead.locator("br")).toHaveCount(1);
-  await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText(["Stripe", "Wise", "Currency: USD", "Donate", "Share page", "Send feedback", "Report issue", "Documentation", "Treasury"]);
+  await expect(sheet.getByRole("link").or(sheet.getByRole("button"))).toHaveText([
+    "Stripe",
+    "Wise",
+    "Currency: USD",
+    "Donate",
+    "Share page",
+    "Send feedback",
+    "Report issue",
+    "Documentation",
+    "Treasury",
+  ]);
   await sheet.screenshot({ path: join(SHOTS, "p32-menu.png") });
   await capture(page, "p33-menu-page");
 });
@@ -254,7 +266,8 @@ test("closed: 'Donations open soon', no payment rows; the private preview link o
     await expect(methods(page).getByRole("button")).toHaveCount(0);
     // The figures and amounts stay visible, but nothing can be chosen and the message stays.
     await expect(amounts(page).getByRole("button").first()).toHaveText("€2");
-    for (const control of await page.getByRole("group", { name: "Frequency" }).or(amounts(page)).getByRole("button").all()) await expect(control).toBeDisabled();
+    for (const control of await page.getByRole("group", { name: "Frequency" }).or(amounts(page)).getByRole("button").all())
+      await expect(control).toBeDisabled();
     await expect(soon.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
     await expect(amounts(page).getByRole("button").first()).toHaveCSS("cursor", "not-allowed");
     await capture(page, "closed-open-soon");
@@ -307,7 +320,10 @@ test("side-by-side comparisons", async ({ page }) => {
     await page.screenshot({ path: join(SHOTS, `compare-${shot}.png`) });
   }
   // The sheets: app sheet (left) and the partial Figma frame (right).
-  for (const [shot, frame, height] of [["p33-menu", "cp-33", 328], ["p35-menu", "cp-35", 218]] as const) {
+  for (const [shot, frame, height] of [
+    ["p33-menu", "cp-33", 328],
+    ["p35-menu", "cp-35", 218],
+  ] as const) {
     const app = join(SHOTS, `${shot}.png`);
     const figma = join(figmaDir!, `${frame}.png`);
     if (!existsSync(app) || !existsSync(figma)) continue;

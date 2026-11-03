@@ -21,8 +21,7 @@ export interface LocalListSpec<Row> {
   searchText: (row: Row) => (string | null)[];
 }
 
-const list = (value: FieldValue): string[] =>
-  value === null ? [] : Array.isArray(value) ? [...value] : [String(value as string | number)];
+const list = (value: FieldValue): string[] => (value === null ? [] : Array.isArray(value) ? [...value] : [String(value as string | number)]);
 const lower = (value: string) => value.toLocaleLowerCase();
 
 export function matchesFilter<Row>(spec: LocalListSpec<Row>, row: Row, rule: FilterRule): boolean {
@@ -59,8 +58,7 @@ export function applyListState<Row extends { id: string }>(rows: readonly Row[],
   const q = lower(state.search.trim());
   const filters = state.filters.filter(isCompleteFilter);
   const kept = rows.filter(
-    (row) =>
-      (!q || spec.searchText(row).some((text) => text !== null && lower(text).includes(q))) && filters.every((rule) => matchesFilter(spec, row, rule)),
+    (row) => (!q || spec.searchText(row).some((text) => text !== null && lower(text).includes(q))) && filters.every((rule) => matchesFilter(spec, row, rule)),
   );
   const sorted = [...kept].sort((a, b) => {
     for (const rule of state.sort) {

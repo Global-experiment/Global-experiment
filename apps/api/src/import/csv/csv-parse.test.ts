@@ -65,7 +65,9 @@ describe("column matching", () => {
 
 describe("cell values", () => {
   it("reads dates as written by spreadsheets and Notion, and refuses ambiguous or impossible ones", () => {
-    expect(["2026-10-30", "2026/10/30", "30.10.2026", "October 30, 2026", "Oct 30, 2026", "30 October 2026"].map(parseDate)).toEqual(Array(6).fill("2026-10-30"));
+    expect(["2026-10-30", "2026/10/30", "30.10.2026", "October 30, 2026", "Oct 30, 2026", "30 October 2026"].map(parseDate)).toEqual(
+      Array(6).fill("2026-10-30"),
+    );
     expect(["10/30/2026", "30/10/2026", "2026-02-30", "soon", ""].map(parseDate)).toEqual([null, null, null, null, null]);
     expect(parseInstant("2026-10-30T09:00:00+01:00")).toBe("2026-10-30T08:00:00.000Z");
     expect(parseInstant("2026-10-30 09:00")).toBeNull();

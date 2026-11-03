@@ -1,13 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { composerContextFromSearch, composerHref } from "./reportLinks";
-import {
-  clearReportDraft,
-  parseReportDraft,
-  readReportDraftRaw,
-  reportDraftKey,
-  serializeReportDraft,
-  writeReportDraft,
-} from "./reportDraft";
+import { clearReportDraft, parseReportDraft, readReportDraftRaw, reportDraftKey, serializeReportDraft, writeReportDraft } from "./reportDraft";
 import { knownTypes, reportKindForHref } from "./reportKinds";
 
 describe("report qualification links", () => {

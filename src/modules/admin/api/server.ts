@@ -3,10 +3,7 @@ import { connection } from "next/server";
 import { adminApiOrigin } from "@/shared/config/adminApi";
 import type { AdminPrincipal } from "./types";
 
-export type AdminSessionResult =
-  | { status: "signed-in"; admin: AdminPrincipal }
-  | { status: "signed-out" }
-  | { status: "unavailable" };
+export type AdminSessionResult = { status: "signed-in"; admin: AdminPrincipal } | { status: "signed-out" } | { status: "unavailable" };
 
 /**
  * Asks the API who is signed in, forwarding the visitor's own cookies.

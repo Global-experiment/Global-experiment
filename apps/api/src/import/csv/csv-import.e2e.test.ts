@@ -46,15 +46,31 @@ describe("CSV import API", () => {
       "Dee New;;;;\n",
   );
   const send = (agent: SignedInAdmin, step: "preview" | "confirm", file: Buffer | null, options: object = {}, table = "people") =>
-    agent.form(`/api/admin/imports/csv/${table}/${step}`, { options: JSON.stringify({ fileName: "contacts.csv", ...options }) }, file ? { field: "file", bytes: file, fileName: "contacts.csv" } : undefined);
+    agent.form(
+      `/api/admin/imports/csv/${table}/${step}`,
+      { options: JSON.stringify({ fileName: "contacts.csv", ...options }) },
+      file ? { field: "file", bytes: file, fileName: "contacts.csv" } : undefined,
+    );
 
   it("previews: columns matched, every row checked, duplicates flagged — and nothing written", async () => {
     const before = await t.db.$count(people);
     const preview = (await send(writer, "preview", PEOPLE).expect(201)).body;
-    expect(preview).toMatchObject({ fileName: "contacts.csv", delimiter: ";", headers: ["Name", "Email", "Organizations", "State", "Person ID"], mapping: ["name", "email", "organizations", "state", null] });
+    expect(preview).toMatchObject({
+      fileName: "contacts.csv",
+      delimiter: ";",
+      headers: ["Name", "Email", "Organizations", "State", "Person ID"],
+      mapping: ["name", "email", "organizations", "state", null],
+    });
     expect(preview.counts).toEqual({ fileName: "contacts.csv", rows: 4, create: 2, duplicates: 1, duplicatesIncluded: 0, errors: 1, warnings: 0 });
     expect(preview.unknown).toEqual([]);
-    expect(preview.rows.map((row: { line: number; status: string; errors: string[]; duplicate: { reason: string } | null }) => [row.line, row.status, row.errors, row.duplicate?.reason ?? null])).toEqual([
+    expect(
+      preview.rows.map((row: { line: number; status: string; errors: string[]; duplicate: { reason: string } | null }) => [
+        row.line,
+        row.status,
+        row.errors,
+        row.duplicate?.reason ?? null,
+      ]),
+    ).toEqual([
       [2, "create", [], null],
       [3, "duplicate", [], "Same name as Ada Existing"],
       [4, "error", ["Email: Invalid email address."], null],
@@ -92,17 +108,37 @@ describe("CSV import API", () => {
     expect((await owner.get("/api/admin/people?search=Ada%20Existing").expect(200)).body.items).toMatchObject([{ email: "ada@example.net" }]);
 
     const history = (await owner.get(`/api/admin/history/person/${bea.id}`).expect(200)).body.items;
-    expect(history[0]).toMatchObject({ action: "imported", actor: { type: "admin", label: expect.stringContaining("operations") }, meta: { importSource: "CSV import", fileName: "contacts.csv" } });
+    expect(history[0]).toMatchObject({
+      action: "imported",
+      actor: { type: "admin", label: expect.stringContaining("operations") },
+      meta: { importSource: "CSV import", fileName: "contacts.csv" },
+    });
 
     const [run] = await t.db.select().from(importRuns).where(eq(importRuns.id, done.runId));
-    expect(run).toMatchObject({ kind: "people_csv", mode: "apply", triggeredBy: "admin:operations@example.org", counts: { fileName: "contacts.csv", create: 2 } });
+    expect(run).toMatchObject({
+      kind: "people_csv",
+      mode: "apply",
+      triggeredBy: "admin:operations@example.org",
+      counts: { fileName: "contacts.csv", create: 2 },
+    });
     const [runEvent] = await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, done.runId));
-    expect(runEvent).toMatchObject({ entityType: "import_run", actorType: "admin", meta: expect.objectContaining({ label: "CSV import of People · contacts.csv" }) });
+    expect(runEvent).toMatchObject({
+      entityType: "import_run",
+      actorType: "admin",
+      meta: expect.objectContaining({ label: "CSV import of People · contacts.csv" }),
+    });
 
     // The report (OPS-150): every row, created records and the existing duplicate linked.
     const report = (await reader.get(`/api/admin/imports/csv/runs/${done.runId}`).expect(200)).body;
     expect(report).toMatchObject({ table: "people", mode: "apply", triggeredBy: "operations@example.org", counts: { create: 2, duplicates: 1, errors: 1 } });
-    expect(report.rows.map((row: { line: number; status: string; recordId: string | null; duplicate: { existing: { name: string } | null } | null }) => [row.line, row.status, row.recordId !== null, row.duplicate?.existing?.name ?? null])).toEqual([
+    expect(
+      report.rows.map((row: { line: number; status: string; recordId: string | null; duplicate: { existing: { name: string } | null } | null }) => [
+        row.line,
+        row.status,
+        row.recordId !== null,
+        row.duplicate?.existing?.name ?? null,
+      ]),
+    ).toEqual([
       [2, "created", true, null],
       [3, "duplicate", false, "Ada Existing"],
       [4, "error", false, null],
@@ -148,8 +184,14 @@ describe("CSV import API", () => {
   });
 
   it("imports rows with values the admin doesn't have, without them and with a warning; the admin maps or skips each one (OPS-153)", async () => {
-    const [domain] = await t.db.insert(expertiseDomains).values({ name: "Communication", stableId: "domain.03.communication", statusKey: "active" }).returning();
-    const [field] = await t.db.insert(expertiseFields).values({ name: "Writing", domainId: domain!.id, stableId: "field.03.01.writing", statusKey: "active" }).returning();
+    const [domain] = await t.db
+      .insert(expertiseDomains)
+      .values({ name: "Communication", stableId: "domain.03.communication", statusKey: "active" })
+      .returning();
+    const [field] = await t.db
+      .insert(expertiseFields)
+      .values({ name: "Writing", domainId: domain!.id, stableId: "field.03.01.writing", statusKey: "active" })
+      .returning();
     const [copywriting, editing] = await t.db
       .insert(expertiseItems)
       .values([
@@ -166,7 +208,12 @@ describe("CSV import API", () => {
     );
     const first = (await send(writer, "preview", file).expect(201)).body;
     expect(first.counts).toMatchObject({ create: 2, errors: 1, warnings: 2 });
-    expect(first.unknown.map((entry: { field: string; values: { value: string; rows: number }[] }) => [entry.field, entry.values.map((value) => [value.value, value.rows])])).toEqual([
+    expect(
+      first.unknown.map((entry: { field: string; values: { value: string; rows: number }[] }) => [
+        entry.field,
+        entry.values.map((value) => [value.value, value.rows]),
+      ]),
+    ).toEqual([
       ["contactChannels", [["Pigeon", 2]]],
       ["expertise", [["Copyediting", 1]]],
     ]);
@@ -174,7 +221,11 @@ describe("CSV import API", () => {
     // Copyediting → Editing; "Pigeon" skipped.
     const choices = { expertise: { copyediting: editing!.id }, contactChannels: { pigeon: null } };
     const preview = (await send(writer, "preview", file, { choices }).expect(201)).body;
-    expect(preview.rows.map((row: { warnings: string[] }) => row.warnings)).toEqual([['Contact channels: "Pigeon" skipped.'], ['Contact channels: "Pigeon" skipped.'], []]);
+    expect(preview.rows.map((row: { warnings: string[] }) => row.warnings)).toEqual([
+      ['Contact channels: "Pigeon" skipped.'],
+      ['Contact channels: "Pigeon" skipped.'],
+      [],
+    ]);
     const done = (await send(writer, "confirm", file, { mapping: preview.mapping, choices, expect: preview.counts }).expect(201)).body;
     const gil = (await owner.get("/api/admin/people?search=Gil%20Notion").expect(200)).body.items[0];
     expect(gil.expertise.map((item: { id: string }) => item.id)).toEqual([copywriting!.id, editing!.id]);
@@ -203,7 +254,12 @@ describe("CSV import API", () => {
         `Nia Notion,nia@example.net,"${notionSo("Copywriting")}",Other,\n` +
         `Oz Notion,oz@example.net,"${notionApp("Editing")}","${notionApp("Other")}",\n`,
     );
-    const imported = (await send(writer, "confirm", csv("Name,Email\nKai Before,kai@example.net\nLea Before,lea@example.net\n"), { mapping: ["name", "email"], expect: { fileName: "contacts.csv", rows: 2, create: 2, duplicates: 0, duplicatesIncluded: 0, errors: 0, warnings: 0 } }).expect(201)).body;
+    const imported = (
+      await send(writer, "confirm", csv("Name,Email\nKai Before,kai@example.net\nLea Before,lea@example.net\n"), {
+        mapping: ["name", "email"],
+        expect: { fileName: "contacts.csv", rows: 2, create: 2, duplicates: 0, duplicatesIncluded: 0, errors: 0, warnings: 0 },
+      }).expect(201)
+    ).body;
     expect(imported.counts.create).toBe(2);
     const before = (await owner.get("/api/admin/people?search=Before").expect(200)).body.items;
 
@@ -223,7 +279,9 @@ describe("CSV import API", () => {
     expect(mo.expertise.map((item: { name: string }) => item.name)).toEqual(["Copywriting", "Editing"]);
     expect(mo.contactChannels.map((channel: { key: string }) => channel.key)).toEqual(["email", "other"]);
     expect(mo.organizations.map((organization: { name: string }) => organization.name)).toEqual(["Civic Lab"]);
-    expect((await owner.get("/api/admin/people?search=Notion").expect(200)).body.items.filter((person: { name: string }) => /^(Nia|Oz) Notion$/.test(person.name))).toHaveLength(2);
+    expect(
+      (await owner.get("/api/admin/people?search=Notion").expect(200)).body.items.filter((person: { name: string }) => /^(Nia|Oz) Notion$/.test(person.name)),
+    ).toHaveLength(2);
     // The records already imported are untouched, and not imported twice.
     expect((await owner.get("/api/admin/people?search=Before").expect(200)).body.items).toEqual(before);
   });
@@ -246,7 +304,13 @@ describe("CSV import API", () => {
     // No Notion import any more (OPS-154): CSV is the only import.
     for (const kind of ["directory", "treasury", "taxonomy"]) expect((await owner.post(`/api/admin/imports/${kind}/dry-run`)).status).toBe(404);
     // No export route exists anywhere.
-    for (const path of ["/api/admin/treasury/export", "/api/admin/treasury/export.csv", "/api/admin/people/export", "/api/admin/organizations/export", "/api/admin/exports/treasury"]) {
+    for (const path of [
+      "/api/admin/treasury/export",
+      "/api/admin/treasury/export.csv",
+      "/api/admin/people/export",
+      "/api/admin/organizations/export",
+      "/api/admin/exports/treasury",
+    ]) {
       const status = (await owner.get(path)).status;
       expect([400, 404], path).toContain(status);
     }

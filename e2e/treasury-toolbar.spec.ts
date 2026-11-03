@@ -45,7 +45,9 @@ async function axe(page: Page) {
 }
 
 test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
-  test("with the toolbar on, the currency switch is the ⋮ menu's first row (the header keeps Share and ⋮), and the history is the chosen currency (USD)", async ({ page }) => {
+  test("with the toolbar on, the currency switch is the ⋮ menu's first row (the header keeps Share and ⋮), and the history is the chosen currency (USD)", async ({
+    page,
+  }) => {
     await page.goto("/treasury");
     await expect(page.getByRole("heading", { level: 2, name: /History/ })).toContainText("8");
     await expect(page.getByText("EUR 12.50")).toHaveCount(0);
@@ -67,7 +69,10 @@ test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
     await expect(page.locator("dialog[open]")).toHaveCount(0);
 
     await page.getByRole("button", { name: /^Sort: Amount/ }).click();
-    await page.getByRole("dialog", { name: "Sort by" }).getByRole("button", { name: /Amount/ }).click();
+    await page
+      .getByRole("dialog", { name: "Sort by" })
+      .getByRole("button", { name: /Amount/ })
+      .click();
     await expect(page).toHaveURL("/treasury?sort=amount_asc");
     await expect.poll(async () => (await amountsShown(page))[0]).toBe("+ USD 2");
   });
@@ -109,7 +114,8 @@ test.describe("Treasury toolbar (treasury.public_toolbar on)", () => {
     await page.getByRole("button", { name: "Filter the history" }).click();
     await page.getByRole("dialog", { name: "Filter" }).getByRole("button", { name: /^Date/ }).click();
     sheet = page.getByRole("dialog", { name: "Filter dates" });
-    for (const preset of ["This week", "This month", "Last 6 months", "This year", "All"]) await expect(sheet.getByRole("button", { name: preset })).toBeVisible();
+    for (const preset of ["This week", "This month", "Last 6 months", "This year", "All"])
+      await expect(sheet.getByRole("button", { name: preset })).toBeVisible();
     await sheet.getByLabel("From").fill("2026-09-01");
     await sheet.getByLabel("To").fill("2026-09-30");
     await sheet.getByRole("button", { name: "Apply filter" }).click();

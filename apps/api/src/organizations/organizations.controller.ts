@@ -4,11 +4,7 @@ import { actorFor } from "../audit/audit.service.js";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { UnauthenticatedError } from "../common/errors/api-error.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
-import {
-  CreateOrganizationRequest,
-  OrganizationsListQuery,
-  UpdateOrganizationRequest,
-} from "./organizations.contracts.js";
+import { CreateOrganizationRequest, OrganizationsListQuery, UpdateOrganizationRequest } from "./organizations.contracts.js";
 import { OrganizationsService } from "./organizations.service.js";
 import { Requires } from "../access-control/requires.js";
 

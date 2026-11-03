@@ -51,7 +51,9 @@ describe("migration 0011 — Description, link order", () => {
       { name: "Bea", description: null },
     ]);
     expect(await rows(client, "select column_name from information_schema.columns where table_name = 'people' and column_name = 'personal_note'")).toEqual([]);
-    expect(await rows(client, "select conname from pg_constraint where conname like 'people_%_length' and conname like '%description%'")).toEqual([{ conname: "people_description_length" }]);
+    expect(await rows(client, "select conname from pg_constraint where conname like 'people_%_length' and conname like '%description%'")).toEqual([
+      { conname: "people_description_length" },
+    ]);
     await expect(client.exec(`UPDATE people SET description = repeat('x', 5001) WHERE name = 'Ada'`)).rejects.toThrow(/people_description_length/);
   });
 
@@ -69,18 +71,28 @@ describe("migration 0011 — Description, link order", () => {
     `);
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
 
-    expect(await rows(client, "select o.name, po.position from people_organizations po join organizations o on o.id = po.organization_id order by po.position")).toEqual([
+    expect(
+      await rows(client, "select o.name, po.position from people_organizations po join organizations o on o.id = po.organization_id order by po.position"),
+    ).toEqual([
       { name: "Alpha Coop", position: 0 },
       { name: "Mid Works", position: 1 },
       { name: "Zeta Labs", position: 2 },
     ]);
-    const channels = await rows<{ channel_key: string; position: number }>(client, "select channel_key, position from person_contact_channels order by position");
-    const lookupOrder = (await rows<{ key: string }>(client, "select key from contact_channels where key in ('signal', 'email', 'phone') order by sort_order")).map((row) => row.key);
+    const channels = await rows<{ channel_key: string; position: number }>(
+      client,
+      "select channel_key, position from person_contact_channels order by position",
+    );
+    const lookupOrder = (
+      await rows<{ key: string }>(client, "select key from contact_channels where key in ('signal', 'email', 'phone') order by sort_order")
+    ).map((row) => row.key);
     expect(channels.map((row) => row.channel_key)).toEqual(lookupOrder);
     expect(channels.map((row) => row.position)).toEqual([0, 1, 2]);
     // New links default to position 0 until the application sets one.
-    expect(await rows(client, "select column_default, is_nullable from information_schema.columns where table_name = 'organization_expertise' and column_name = 'position'")).toEqual([
-      { column_default: "0", is_nullable: "NO" },
-    ]);
+    expect(
+      await rows(
+        client,
+        "select column_default, is_nullable from information_schema.columns where table_name = 'organization_expertise' and column_name = 'position'",
+      ),
+    ).toEqual([{ column_default: "0", is_nullable: "NO" }]);
   });
 });

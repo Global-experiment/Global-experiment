@@ -42,7 +42,11 @@ async function bothThemes(name: string) {
   await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
 }
 
-const file = (name: string, text: string | Buffer, mimeType = "text/csv") => ({ name, mimeType, buffer: typeof text === "string" ? Buffer.from(text, "utf8") : text });
+const file = (name: string, text: string | Buffer, mimeType = "text/csv") => ({
+  name,
+  mimeType,
+  buffer: typeof text === "string" ? Buffer.from(text, "utf8") : text,
+});
 
 test.beforeAll(async ({ browser }, testInfo) => {
   test.setTimeout(180_000);
@@ -54,7 +58,8 @@ test.beforeAll(async ({ browser }, testInfo) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.locator("#admin-sidebar")).toBeVisible({ timeout: 60_000 });
   page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") consoleIssues.push(`[${message.type()}] ${new URL(page.url()).pathname} :: ${message.text().slice(0, 300)}`);
+    if (message.type() === "error" || message.type() === "warning")
+      consoleIssues.push(`[${message.type()}] ${new URL(page.url()).pathname} :: ${message.text().slice(0, 300)}`);
   });
   page.on("pageerror", (error) => consoleIssues.push(`[pageerror] ${new URL(page.url()).pathname} :: ${error.message.slice(0, 300)}`));
   // A person of the test fixtures, to be met again as a possible duplicate.
@@ -214,14 +219,24 @@ test("values the admin doesn't have (as in Notion's export): listed once on the 
   await page.screenshot({ path: join(SHOTS, "ops153-report-warnings-1440.png") });
 
   // The imported person has both expertise: the one named in the file, and the mapped one.
-  const found = (await (await page.request.get(`/api/admin/people?search=${encodeURIComponent(notion)}`)).json()) as { items: { expertise: { name: string }[]; contactChannels: { label: string }[] }[] };
+  const found = (await (await page.request.get(`/api/admin/people?search=${encodeURIComponent(notion)}`)).json()) as {
+    items: { expertise: { name: string }[]; contactChannels: { label: string }[] }[];
+  };
   expect(found.items[0]!.expertise.map((item) => item.name).sort()).toEqual(["Interaction design", "Visual design"]);
   // "Other" is accepted as a contact channel.
   expect(found.items[0]!.contactChannels.map((channel) => channel.label)).toEqual(["Email", "Other"]);
 });
 
 test("Treasury and every other list offer no import or export", async () => {
-  for (const path of ["/admin/treasury/manage", "/admin/expertise", "/admin/fields", "/admin/domains", "/admin/services", "/admin/permissions", "/admin/accounts"]) {
+  for (const path of [
+    "/admin/treasury/manage",
+    "/admin/expertise",
+    "/admin/fields",
+    "/admin/domains",
+    "/admin/services",
+    "/admin/permissions",
+    "/admin/accounts",
+  ]) {
     await page.goto(path);
     // The list's toolbar is there (search box), so its actions are too.
     await expect(page.getByRole("searchbox", { name: /^Search (?!the menu)/ })).toBeVisible();

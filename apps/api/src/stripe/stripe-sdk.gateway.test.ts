@@ -45,12 +45,26 @@ const checkoutInput = {
   idempotencyKey: "donation-checkout:3b9d6bcd-bbfd-4b2b-9b13-4b7c8e9b1c11:0123456789abcdef",
 };
 
-const balance = (values: Record<string, unknown> = {}) => ({ object: "balance_transaction", id: "txn_1", currency: "eur", amount: 1000, fee: 59, net: 941, exchange_rate: null, ...values });
+const balance = (values: Record<string, unknown> = {}) => ({
+  object: "balance_transaction",
+  id: "txn_1",
+  currency: "eur",
+  amount: 1000,
+  fee: 59,
+  net: 941,
+  exchange_rate: null,
+  ...values,
+});
 
 describe("StripeSdkGateway", () => {
   it("creates a one-off donation Checkout: donate button, no customer, donation metadata, idempotency key", async () => {
-    const { gateway, calls } = gatewayAnswering(() => ({ body: { id: "cs_test_abc", object: "checkout.session", url: "https://checkout.stripe.com/c/pay/cs_test_abc" } }));
-    expect(await gateway.createCheckoutSession({ ...checkoutInput, mode: "payment" })).toEqual({ id: "cs_test_abc", url: "https://checkout.stripe.com/c/pay/cs_test_abc" });
+    const { gateway, calls } = gatewayAnswering(() => ({
+      body: { id: "cs_test_abc", object: "checkout.session", url: "https://checkout.stripe.com/c/pay/cs_test_abc" },
+    }));
+    expect(await gateway.createCheckoutSession({ ...checkoutInput, mode: "payment" })).toEqual({
+      id: "cs_test_abc",
+      url: "https://checkout.stripe.com/c/pay/cs_test_abc",
+    });
 
     const [call] = calls;
     expect(call!.method).toBe("POST");
@@ -65,7 +79,7 @@ describe("StripeSdkGateway", () => {
       "payment_method_types[0]": "card",
       "managed_payments[enabled]": "false",
       "adaptive_pricing[enabled]": "false",
-      "billing_address_collection": "auto",
+      billing_address_collection: "auto",
       "phone_number_collection[enabled]": "false",
       "tax_id_collection[enabled]": "false",
       "consent_collection[terms_of_service]": "none",
@@ -82,7 +96,9 @@ describe("StripeSdkGateway", () => {
   });
 
   it("creates a monthly donation Checkout as a subscription with a monthly price", async () => {
-    const { gateway, calls } = gatewayAnswering(() => ({ body: { id: "cs_test_sub", object: "checkout.session", url: "https://checkout.stripe.com/c/pay/cs_test_sub" } }));
+    const { gateway, calls } = gatewayAnswering(() => ({
+      body: { id: "cs_test_sub", object: "checkout.session", url: "https://checkout.stripe.com/c/pay/cs_test_sub" },
+    }));
     await gateway.createCheckoutSession({ ...checkoutInput, mode: "subscription", productName: "Monthly donation to the Global Experiment" });
     const params = Object.fromEntries(calls[0]!.params);
     expect(params).toMatchObject({
@@ -93,13 +109,14 @@ describe("StripeSdkGateway", () => {
     });
     // The same minimal data collection as one-off donations; no shipping address, no custom fields.
     expect(params).toMatchObject({
-      "billing_address_collection": "auto",
+      billing_address_collection: "auto",
       "phone_number_collection[enabled]": "false",
       "tax_id_collection[enabled]": "false",
       "consent_collection[terms_of_service]": "none",
       "wallet_options[link][display]": "never",
     });
-    for (const key of Object.keys(params)) expect(key).not.toMatch(/^(shipping_address_collection|custom_fields|name_collection|consent_collection[promotions])/);
+    for (const key of Object.keys(params))
+      expect(key).not.toMatch(/^(shipping_address_collection|custom_fields|name_collection|consent_collection[promotions])/);
     // One-off-only parameters are not sent (Stripe rejects them in subscription mode).
     for (const key of ["submit_type", "customer_creation", "payment_intent_data[metadata][kind]"]) expect(params).not.toHaveProperty(key);
   });
@@ -124,7 +141,16 @@ describe("StripeSdkGateway", () => {
 
   it("reads a Checkout session, recognising our donation marker", async () => {
     const { gateway } = gatewayAnswering(() => ({
-      body: { id: "cs_test_1", object: "checkout.session", mode: "payment", status: "complete", payment_status: "paid", payment_intent: "pi_1", subscription: null, metadata: { kind: "donation" } },
+      body: {
+        id: "cs_test_1",
+        object: "checkout.session",
+        mode: "payment",
+        status: "complete",
+        payment_status: "paid",
+        payment_intent: "pi_1",
+        subscription: null,
+        metadata: { kind: "donation" },
+      },
     }));
     expect(await gateway.getCheckoutSession("cs_test_1")).toEqual({
       id: "cs_test_1",
@@ -143,7 +169,16 @@ describe("StripeSdkGateway", () => {
         id: "pi_1",
         object: "payment_intent",
         metadata: { kind: "donation" },
-        latest_charge: { id: "ch_1", object: "charge", amount: 1000, currency: "eur", created: 1_760_520_600, status: "succeeded", metadata: {}, balance_transaction: balance() },
+        latest_charge: {
+          id: "ch_1",
+          object: "charge",
+          amount: 1000,
+          currency: "eur",
+          created: 1_760_520_600,
+          status: "succeeded",
+          metadata: {},
+          balance_transaction: balance(),
+        },
       },
     }));
     expect(await gateway.getPaymentIntentCharge("pi_1")).toEqual({
@@ -160,7 +195,17 @@ describe("StripeSdkGateway", () => {
 
   it("reports no balance while Stripe hasn't settled, and settlement in another currency", async () => {
     const pending = gatewayAnswering(() => ({
-      body: { id: "ch_1", object: "charge", amount: 2000, currency: "usd", created: 1, status: "succeeded", metadata: {}, balance_transaction: null, payment_intent: { id: "pi_1", metadata: { kind: "donation" } } },
+      body: {
+        id: "ch_1",
+        object: "charge",
+        amount: 2000,
+        currency: "usd",
+        created: 1,
+        status: "succeeded",
+        metadata: {},
+        balance_transaction: null,
+        payment_intent: { id: "pi_1", metadata: { kind: "donation" } },
+      },
     }));
     expect(await pending.gateway.getCharge("ch_1")).toMatchObject({ donation: true, balance: null });
 
@@ -184,7 +229,15 @@ describe("StripeSdkGateway", () => {
   });
 
   it("lists every refund of a charge across pages", async () => {
-    const refund = (id: string, status: string) => ({ id, object: "refund", amount: 100, currency: "eur", created: 2, status, balance_transaction: balance({ amount: -100, fee: 0, net: -100 }) });
+    const refund = (id: string, status: string) => ({
+      id,
+      object: "refund",
+      amount: 100,
+      currency: "eur",
+      created: 2,
+      status,
+      balance_transaction: balance({ amount: -100, fee: 0, net: -100 }),
+    });
     const { gateway, calls } = gatewayAnswering((call) =>
       call.params.get("starting_after")
         ? { body: { object: "list", data: [refund("re_3", "pending")], has_more: false, url: "/v1/refunds" } }
@@ -204,16 +257,37 @@ describe("StripeSdkGateway", () => {
     const { gateway, calls } = gatewayAnswering((call) => {
       if (call.path === "/v1/invoices/in_1")
         return {
-          body: { id: "in_1", object: "invoice", amount_paid: 1000, parent: { type: "subscription_details", subscription_details: { subscription: "sub_1", metadata: { kind: "donation" } } } },
+          body: {
+            id: "in_1",
+            object: "invoice",
+            amount_paid: 1000,
+            parent: { type: "subscription_details", subscription_details: { subscription: "sub_1", metadata: { kind: "donation" } } },
+          },
         };
       if (call.path === "/v1/invoice_payments")
-        return { body: { object: "list", has_more: false, url: "/v1/invoice_payments", data: [{ id: "inpay_1", object: "invoice_payment", status: "paid", payment: { type: "payment_intent", payment_intent: "pi_9" } }] } };
+        return {
+          body: {
+            object: "list",
+            has_more: false,
+            url: "/v1/invoice_payments",
+            data: [{ id: "inpay_1", object: "invoice_payment", status: "paid", payment: { type: "payment_intent", payment_intent: "pi_9" } }],
+          },
+        };
       return {
         body: {
           id: "pi_9",
           object: "payment_intent",
           metadata: {},
-          latest_charge: { id: "ch_9", object: "charge", amount: 1000, currency: "chf", created: 3, status: "succeeded", metadata: {}, balance_transaction: balance({ currency: "chf" }) },
+          latest_charge: {
+            id: "ch_9",
+            object: "charge",
+            amount: 1000,
+            currency: "chf",
+            created: 3,
+            status: "succeeded",
+            metadata: {},
+            balance_transaction: balance({ currency: "chf" }),
+          },
         },
       };
     });

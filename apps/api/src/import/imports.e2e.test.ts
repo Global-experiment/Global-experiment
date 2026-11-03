@@ -23,8 +23,24 @@ describe("admin imports API (CSV only)", () => {
 
   it("lists past runs, Notion ones included, newest first (imports.read)", async () => {
     await t.db.insert(importRuns).values([
-      { kind: "directory", mode: "dry_run", triggeredBy: "admin:o@example.org", startedAt: new Date("2026-10-20T10:00:00Z"), finishedAt: new Date("2026-10-20T10:00:05Z"), counts: { created: 1 }, issues: [] },
-      { kind: "people_csv", mode: "apply", triggeredBy: "admin:o@example.org", startedAt: new Date("2026-10-30T10:00:00Z"), finishedAt: new Date("2026-10-30T10:00:02Z"), counts: { fileName: "people.csv", create: 2 }, issues: [] },
+      {
+        kind: "directory",
+        mode: "dry_run",
+        triggeredBy: "admin:o@example.org",
+        startedAt: new Date("2026-10-20T10:00:00Z"),
+        finishedAt: new Date("2026-10-20T10:00:05Z"),
+        counts: { created: 1 },
+        issues: [],
+      },
+      {
+        kind: "people_csv",
+        mode: "apply",
+        triggeredBy: "admin:o@example.org",
+        startedAt: new Date("2026-10-30T10:00:00Z"),
+        finishedAt: new Date("2026-10-30T10:00:02Z"),
+        counts: { fileName: "people.csv", create: 2 },
+        issues: [],
+      },
     ]);
     const runs = (await admin.get("/api/admin/imports/runs").expect(200)).body;
     expect(runs.items.map((run: { kind: string }) => run.kind)).toEqual(["people_csv", "directory"]);

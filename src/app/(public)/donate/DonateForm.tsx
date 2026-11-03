@@ -89,8 +89,8 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
       : !open
         ? { tone: "info", ...copy.notices.openSoon }
         : initial.canceled
-        ? { tone: "info", ...copy.notices.canceled }
-        : null,
+          ? { tone: "info", ...copy.notices.canceled }
+          : null,
   );
   const [busy, setBusy] = useState<DonationMethodKey | null>(null);
   // The embedded card form (donations.checkout = embedded): open while it holds a PaymentIntent.
@@ -108,7 +108,12 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
       window.history.replaceState(
         null,
         "",
-        donateHref({ currency: initial.currency, amountText: initial.amountMinor === null ? null : minorToAmountText(initial.amountMinor), frequency: initial.frequency, preview: initial.preview }),
+        donateHref({
+          currency: initial.currency,
+          amountText: initial.amountMinor === null ? null : minorToAmountText(initial.amountMinor),
+          frequency: initial.frequency,
+          preview: initial.preview,
+        }),
       );
   }, [initial]);
 
@@ -132,7 +137,12 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
 
   const syncUrl = (next: { currency?: DonationCurrency; frequency?: DonationFrequency; amountText?: string | null }) => {
     router.replace(
-      donateHref({ currency: next.currency ?? currency, frequency: next.frequency ?? frequency, amountText: next.amountText === undefined ? amountText : next.amountText, preview }),
+      donateHref({
+        currency: next.currency ?? currency,
+        frequency: next.frequency ?? frequency,
+        amountText: next.amountText === undefined ? amountText : next.amountText,
+        preview,
+      }),
       { scroll: false },
     );
   };
@@ -142,9 +152,13 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
     const minimum = config?.minimum ?? 1;
     const maximum = config?.maximum ?? 10_000;
     if (minor === null)
-      return typed ? { tone: "warning", title: copy.notices.invalidAmount.title, message: copy.notices.format } : { tone: "warning", ...copy.notices.selectAmount };
-    if (minor < minimum * 100) return { tone: "warning", title: copy.notices.invalidAmount.title, message: copy.notices.minimum(formatWhole(minimum, currency)) };
-    if (minor > maximum * 100) return { tone: "warning", title: copy.notices.invalidAmount.title, message: copy.notices.maximum(formatWhole(maximum, currency)) };
+      return typed
+        ? { tone: "warning", title: copy.notices.invalidAmount.title, message: copy.notices.format }
+        : { tone: "warning", ...copy.notices.selectAmount };
+    if (minor < minimum * 100)
+      return { tone: "warning", title: copy.notices.invalidAmount.title, message: copy.notices.minimum(formatWhole(minimum, currency)) };
+    if (minor > maximum * 100)
+      return { tone: "warning", title: copy.notices.invalidAmount.title, message: copy.notices.maximum(formatWhole(maximum, currency)) };
     return null;
   };
 
@@ -396,7 +410,9 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
                 onClick={startOther}
                 disabled={!interactive}
                 aria-pressed={interactive ? selection?.kind === "other" : undefined}
-                aria-label={selection?.kind === "other" && amountMinor !== null ? `${copy.amount.otherLabel}: ${formatExact(amountMinor, currency)}` : undefined}
+                aria-label={
+                  selection?.kind === "other" && amountMinor !== null ? `${copy.amount.otherLabel}: ${formatExact(amountMinor, currency)}` : undefined
+                }
                 className={`h-10 rounded-control border text-body ${focusRing} ${
                   !interactive
                     ? inertControl
@@ -486,7 +502,17 @@ export function DonateForm({ config, summary, initial, lastUpdated }: DonateForm
 }
 
 /** One payment row: Common pages p28 geometry (40px, 1px #484848 stroke, 4px radius, marks from x=16). */
-function PaymentRow({ method, busy, busyLabel, onSelect }: { method: DonationMethodKey; busy: DonationMethodKey | null; busyLabel: string; onSelect: () => void }) {
+function PaymentRow({
+  method,
+  busy,
+  busyLabel,
+  onSelect,
+}: {
+  method: DonationMethodKey;
+  busy: DonationMethodKey | null;
+  busyLabel: string;
+  onSelect: () => void;
+}) {
   const isBusy = busy === method;
   const disabled = busy !== null;
   const { base, size, variant } = buttonClasses;
@@ -538,10 +564,7 @@ function rowContent(method: DonationMethodKey) {
 /** 16px, the size of the row's leading artwork; still under prefers-reduced-motion (no spin). */
 function Spinner() {
   return (
-    <span
-      aria-hidden="true"
-      className="inline-block h-4 w-4 shrink-0 rounded-full border-2 border-text-muted border-t-text-primary motion-safe:animate-spin"
-    />
+    <span aria-hidden="true" className="inline-block h-4 w-4 shrink-0 rounded-full border-2 border-text-muted border-t-text-primary motion-safe:animate-spin" />
   );
 }
 

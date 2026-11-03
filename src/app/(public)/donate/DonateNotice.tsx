@@ -23,15 +23,7 @@ export interface DonateNoticeContent {
  * Without `onDismiss` (a state of the page, e.g. "Donations open soon") there
  * is no ✕.
  */
-export function DonateNotice({
-  notice,
-  onDismiss,
-  ref,
-}: {
-  notice: DonateNoticeContent;
-  onDismiss?: () => void;
-  ref?: Ref<HTMLDivElement>;
-}) {
+export function DonateNotice({ notice, onDismiss, ref }: { notice: DonateNoticeContent; onDismiss?: () => void; ref?: Ref<HTMLDivElement> }) {
   const room = onDismiss ? "pr-6" : "";
   return (
     <div
@@ -40,9 +32,7 @@ export function DonateNotice({
       data-notice={notice.tone}
       className="relative mt-2 rounded-control bg-surface-raised px-2 pt-2 pb-2.5 text-text-primary"
     >
-      <p
-        className={`flex min-h-4 items-center gap-1 text-meta font-bold ${room}`}
-      >
+      <p className={`flex min-h-4 items-center gap-1 text-meta font-bold ${room}`}>
         {notice.tone === "warning" ? <Icon name="warning" /> : null}
         {notice.title}
       </p>

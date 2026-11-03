@@ -3,7 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatPersonNumber, type GrantRef, type Organization, type Page, type PeopleOptions, type Person, type PersonInput, type RecordHistory } from "../api/types";
+import {
+  formatPersonNumber,
+  type GrantRef,
+  type Organization,
+  type Page,
+  type PeopleOptions,
+  type Person,
+  type PersonInput,
+  type RecordHistory,
+} from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { personMissing } from "../completeness";
 import { ExpertiseField } from "../expertise/ExpertiseField";
@@ -211,15 +220,17 @@ function ExistingPersonRecord({ id }: { id: string }) {
           setFormError(null);
         },
         duplicate: canCreate ? duplicate : undefined,
-        duplicateAsDraft: !canCreate ? undefined : () => {
-          try {
-            // Like Duplicate: the copy's name ends in DUPLICATE (client, 2026-10-22).
-            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, name: duplicateName(draft.name), expenses: [] }));
-          } catch {
-            // Storage blocked: the draft page starts empty instead.
-          }
-          router.push("/admin/people/new");
-        },
+        duplicateAsDraft: !canCreate
+          ? undefined
+          : () => {
+              try {
+                // Like Duplicate: the copy's name ends in DUPLICATE (client, 2026-10-22).
+                sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draft, name: duplicateName(draft.name), expenses: [] }));
+              } catch {
+                // Storage blocked: the draft page starts empty instead.
+              }
+              router.push("/admin/people/new");
+            },
         archived: loaded.archivedAt !== null,
         setArchived,
         savedMessage: "People updated",
@@ -325,7 +336,16 @@ function showErrors(caught: unknown, setErrors: (errors: Record<string, string>)
     for (const issue of caught.issues) {
       // Array issues arrive as "expertiseIds.0"; map API paths onto form fields.
       const root = issue.path.split(".")[0] ?? "";
-      const key = root === "organizationIds" ? "organizations" : root === "expertiseIds" ? "expertise" : root === "expenseIds" ? "expenses" : root === "contactChannelKeys" ? "contactChannels" : root;
+      const key =
+        root === "organizationIds"
+          ? "organizations"
+          : root === "expertiseIds"
+            ? "expertise"
+            : root === "expenseIds"
+              ? "expenses"
+              : root === "contactChannelKeys"
+                ? "contactChannels"
+                : root;
       byField[key || "form"] = issue.message;
     }
     setErrors(byField);
@@ -392,13 +412,31 @@ function PersonFields({
         <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.personExpertise} />
       </PropertyRow>
       <PropertyRow icon="title" label="Description" htmlFor="person-description" error={errors.description}>
-        <AutoGrowTextarea id="person-description" value={draft.description} onChange={(e) => set("description", e.target.value)} maxLength={5000} placeholder="Add a description" />
+        <AutoGrowTextarea
+          id="person-description"
+          value={draft.description}
+          onChange={(e) => set("description", e.target.value)}
+          maxLength={5000}
+          placeholder="Add a description"
+        />
       </PropertyRow>
       <PropertyRow icon="select" label="Source" error={errors.sourceKey}>
-        <Pills label="Source" allowEmpty options={(options?.sources ?? []).map((source) => ({ value: source.key, label: source.label }))} value={draft.sourceKey} onChange={(value) => set("sourceKey", value)} />
+        <Pills
+          label="Source"
+          allowEmpty
+          options={(options?.sources ?? []).map((source) => ({ value: source.key, label: source.label }))}
+          value={draft.sourceKey}
+          onChange={(value) => set("sourceKey", value)}
+        />
       </PropertyRow>
       <PropertyRow icon="select" label="State" error={errors.stateKey}>
-        <Pills label="State" allowEmpty options={(options?.states ?? []).map((state) => ({ value: state.key, label: state.label }))} value={draft.stateKey} onChange={(value) => set("stateKey", value)} />
+        <Pills
+          label="State"
+          allowEmpty
+          options={(options?.states ?? []).map((state) => ({ value: state.key, label: state.label }))}
+          value={draft.stateKey}
+          onChange={(value) => set("stateKey", value)}
+        />
       </PropertyRow>
       {CONTACT_FIELDS.filter(({ field }) => visible(field)).map(({ field, label, icon, placeholder, type, inputMode }) => (
         <PropertyRow key={field} icon={icon} label={label} htmlFor={`person-${field}`} error={errors[field]}>
@@ -418,15 +456,30 @@ function PersonFields({
         </PropertyRow>
       ))}
       <PropertyRow icon="title" label="Other contact details" htmlFor="person-otherContact" error={errors.otherContact}>
-        <AutoGrowTextarea id="person-otherContact" value={draft.otherContact} onChange={(e) => set("otherContact", e.target.value)} maxLength={500} placeholder="Another way to reach them" />
+        <AutoGrowTextarea
+          id="person-otherContact"
+          value={draft.otherContact}
+          onChange={(e) => set("otherContact", e.target.value)}
+          maxLength={500}
+          placeholder="Another way to reach them"
+        />
       </PropertyRow>
       <PropertyRow icon="contact_channels" label="Contact channels" hint={PREFERRED_CHANNEL_HINT} error={errors.contactChannels}>
         <RelationPicker
           label="Contact channels"
           reorderable
           selected={draft.contactChannelKeys.map((key) => ({ id: key, label: channels.find((channel) => channel.key === key)?.label ?? key }))}
-          onChange={(next) => set("contactChannelKeys", next.map((option) => option.id))}
-          search={async (text) => channels.filter((channel) => channel.label.toLowerCase().includes(text.trim().toLowerCase())).map((channel) => ({ id: channel.key, label: channel.label }))}
+          onChange={(next) =>
+            set(
+              "contactChannelKeys",
+              next.map((option) => option.id),
+            )
+          }
+          search={async (text) =>
+            channels
+              .filter((channel) => channel.label.toLowerCase().includes(text.trim().toLowerCase()))
+              .map((channel) => ({ id: channel.key, label: channel.label }))
+          }
         />
       </PropertyRow>
       <PropertyRow icon="check_box" label="Do not contact">
@@ -513,7 +566,13 @@ function PersonFields({
         />
       </PropertyRow>
       <PropertyRow icon="calendar" label="Follow-up date" htmlFor="person-followup" error={errors.nextFollowupAt}>
-        <DateTimeField id="person-followup" label="Follow-up date" value={draft.nextFollowupAt} error={errors.nextFollowupAt} onChange={(value) => set("nextFollowupAt", value)} />
+        <DateTimeField
+          id="person-followup"
+          label="Follow-up date"
+          value={draft.nextFollowupAt}
+          error={errors.nextFollowupAt}
+          onChange={(value) => set("nextFollowupAt", value)}
+        />
       </PropertyRow>
       {meta ? (
         <>

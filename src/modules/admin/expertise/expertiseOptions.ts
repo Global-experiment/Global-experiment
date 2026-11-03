@@ -37,8 +37,7 @@ export function searchResultOption(item: ExpertiseSearchItem): RelationOption {
  * links, never stored. Sorted by name, each listed once.
  */
 export function expertiseRollup(selected: readonly RelationOption[]): { fields: EntityRef[]; domains: EntityRef[] } {
-  const unique = (refs: EntityRef[]) =>
-    [...new Map(refs.map((ref) => [ref.id, ref])).values()].sort((a, b) => a.name.localeCompare(b.name));
+  const unique = (refs: EntityRef[]) => [...new Map(refs.map((ref) => [ref.id, ref])).values()].sort((a, b) => a.name.localeCompare(b.name));
   const groups = selected.flatMap((option) => (option.group ? [option.group] : []));
   return { fields: unique(groups.map((group) => group.field)), domains: unique(groups.map((group) => group.domain)) };
 }

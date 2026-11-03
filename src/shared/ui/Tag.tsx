@@ -8,8 +8,6 @@ import type { ReactNode } from "react";
  */
 export function Tag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex min-h-6 items-center rounded-control border border-line px-[calc(0.25rem-1px)] text-meta text-text-primary">
-      {children}
-    </span>
+    <span className="inline-flex min-h-6 items-center rounded-control border border-line px-[calc(0.25rem-1px)] text-meta text-text-primary">{children}</span>
   );
 }

@@ -69,7 +69,13 @@ export function ViewTabs({
           >
             +{overflow.length}
           </button>
-          <Popover open={open} onClose={() => setOpen(false)} triggerRef={more} label="More views" className="top-[calc(100%+8px)] left-0 flex min-w-40 flex-col gap-2 p-2">
+          <Popover
+            open={open}
+            onClose={() => setOpen(false)}
+            triggerRef={more}
+            label="More views"
+            className="top-[calc(100%+8px)] left-0 flex min-w-40 flex-col gap-2 p-2"
+          >
             {overflow.map((view) => (
               <span key={view.id}>{tab(view)}</span>
             ))}

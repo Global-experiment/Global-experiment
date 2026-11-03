@@ -104,12 +104,16 @@ export const treasuryEntries = pgTable(
   },
   (table) => [
     uniqueIndex("treasury_entries_entry_number_unique").on(table.entryNumber),
-    uniqueIndex("treasury_entries_notion_page_id_unique").on(table.notionPageId).where(sql`${table.notionPageId} is not null`),
+    uniqueIndex("treasury_entries_notion_page_id_unique")
+      .on(table.notionPageId)
+      .where(sql`${table.notionPageId} is not null`),
     // Stripe and Wise syncs are idempotent: one row per provider transaction.
     uniqueIndex("treasury_entries_source_external_unique")
       .on(table.source, table.externalTransactionId)
       .where(sql`${table.externalTransactionId} is not null`),
-    index("treasury_entries_published_idx").on(table.occurredOn.desc()).where(sql`${table.publicationStatus} = 'published'`),
+    index("treasury_entries_published_idx")
+      .on(table.occurredOn.desc())
+      .where(sql`${table.publicationStatus} = 'published'`),
     index("treasury_entries_entry_type_idx").on(table.entryType),
     index("treasury_entries_currency_idx").on(table.currency),
     index("treasury_entries_recipient_person_idx").on(table.recipientPersonId),
@@ -117,10 +121,14 @@ export const treasuryEntries = pgTable(
     index("treasury_entries_adjusts_idx").on(table.adjustsEntryId),
     index("treasury_entries_recurrence_idx").on(table.recurrenceId),
     // Test-mode Stripe rows: hidden from the public, purged by the purge-test-donations command.
-    index("treasury_entries_test_mode_idx").on(table.createdAt).where(sql`not ${table.livemode}`),
+    index("treasury_entries_test_mode_idx")
+      .on(table.createdAt)
+      .where(sql`not ${table.livemode}`),
     // Sample entries (before go-live): removed by the purge-sample-treasury command.
     index("treasury_entries_archived_at_idx").on(table.archivedAt),
-    index("treasury_entries_sample_idx").on(table.createdAt).where(sql`${table.sample}`),
+    index("treasury_entries_sample_idx")
+      .on(table.createdAt)
+      .where(sql`${table.sample}`),
     // Fee reconciliation: Stripe entries whose fee isn't known yet.
     index("treasury_entries_fee_pending_idx")
       .on(table.createdAt)

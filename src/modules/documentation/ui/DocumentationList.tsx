@@ -7,11 +7,7 @@ import { ArticleAccordionItem } from "./ArticleAccordionItem";
 import { focusRow, initialAccordionState, isExpanded, queryChanged, toggleRow } from "./accordionState";
 import { slugFromHash } from "./documentationAnchor";
 import { buildSearchHaystack, searchArticles } from "./searchArticles";
-import type {
-  DocumentationArticle,
-  DocumentationArticleSummary,
-  DocumentationContentBlock,
-} from "@/modules/documentation/domain/types";
+import type { DocumentationArticle, DocumentationArticleSummary, DocumentationContentBlock } from "@/modules/documentation/domain/types";
 
 function subscribeToHash(onChange: () => void) {
   window.addEventListener("hashchange", onChange);
@@ -55,9 +51,7 @@ export function DocumentationList({
 }) {
   const [query, setQuery] = useState("");
   const [accordion, setAccordion] = useState(initialAccordionState);
-  const [bodies, setBodies] = useState<ReadonlyMap<string, DocumentationContentBlock[]> | "loading" | "error">(
-    "loading",
-  );
+  const [bodies, setBodies] = useState<ReadonlyMap<string, DocumentationContentBlock[]> | "loading" | "error">("loading");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -86,7 +80,11 @@ export function DocumentationList({
   const searching = query.trim() !== "";
 
   // The hash is client-only; the server render (and hydration) see "".
-  const hash = useSyncExternalStore(subscribeToHash, () => window.location.hash, () => "");
+  const hash = useSyncExternalStore(
+    subscribeToHash,
+    () => window.location.hash,
+    () => "",
+  );
   const target = slugFromHash(hash, slugs);
   const [appliedHash, setAppliedHash] = useState("");
   if (hash !== appliedHash) {
@@ -147,10 +145,7 @@ export function DocumentationList({
   return (
     <div>
       <div className="relative" hidden={variant === "admin"}>
-        <Icon
-          name="search"
-          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-primary"
-        />
+        <Icon name="search" className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-text-primary" />
         <label htmlFor="documentation-search" className="sr-only">
           Search documentation
         </label>

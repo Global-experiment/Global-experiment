@@ -86,7 +86,15 @@ function NewServiceControl() {
           <label htmlFor="new-service-name" className="text-text-muted">
             Name
           </label>
-          <input id="new-service-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required autoComplete="off" className={chipInput} />
+          <input
+            id="new-service-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={200}
+            required
+            autoComplete="off"
+            className={chipInput}
+          />
           {error ? (
             <p role="alert" className="text-text-primary">
               {error}
@@ -109,9 +117,29 @@ export function ServicesList() {
     () => [
       { id: "name", label: "Name", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
       { id: "number", label: "Service ID", icon: "title", operators: [], sort: "text" },
-      { id: "status", label: "Status", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.statuses), sort: "text" },
-      { id: "category", label: "Category", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.categories), sort: "text" },
-      { id: "hosting", label: "Hosting model", icon: "select", operators: ["is", "is_not", "is_empty"], options: vocabularyOptions(options.data?.hostingModels) },
+      {
+        id: "status",
+        label: "Status",
+        icon: "select",
+        operators: ["is", "is_not", "is_empty"],
+        options: vocabularyOptions(options.data?.statuses),
+        sort: "text",
+      },
+      {
+        id: "category",
+        label: "Category",
+        icon: "select",
+        operators: ["is", "is_not", "is_empty"],
+        options: vocabularyOptions(options.data?.categories),
+        sort: "text",
+      },
+      {
+        id: "hosting",
+        label: "Hosting model",
+        icon: "select",
+        operators: ["is", "is_not", "is_empty"],
+        options: vocabularyOptions(options.data?.hostingModels),
+      },
       { id: "review", label: "Access review", icon: "check_box", operators: ["is"], options: [{ value: "true", label: "Needs review" }] },
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },

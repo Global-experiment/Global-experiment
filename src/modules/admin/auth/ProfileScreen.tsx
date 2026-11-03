@@ -260,7 +260,13 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
           />
         </PropertyRow>
         <PropertyRow icon="title" label="Description" htmlFor="profile-description">
-          <AutoGrowTextarea id="profile-description" value={draft.description} onChange={(event) => set("description", event.target.value)} maxLength={5000} placeholder="Add a description" />
+          <AutoGrowTextarea
+            id="profile-description"
+            value={draft.description}
+            onChange={(event) => set("description", event.target.value)}
+            maxLength={5000}
+            placeholder="Add a description"
+          />
         </PropertyRow>
         <PropertyRow icon="expertise" label="Expertise">
           <ExpertiseField selected={draft.expertise} onChange={(next) => set("expertise", next)} limitMessage={LIMIT_HINTS.accountExpertise} />
@@ -339,7 +345,17 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
               <label htmlFor="new-email" className="text-text-muted">
                 New email
               </label>
-              <input id="new-email" type="email" inputMode="email" value={value} onChange={(e) => setValue(e.target.value)} maxLength={320} autoComplete="email" spellCheck={false} className={recordInput} />
+              <input
+                id="new-email"
+                type="email"
+                inputMode="email"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                maxLength={320}
+                autoComplete="email"
+                spellCheck={false}
+                className={recordInput}
+              />
             </>
           )}
           run={async (currentPassword, email) => {
@@ -368,7 +384,8 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
           action="Deactivate account"
           intro={
             <>
-              You&rsquo;ll be signed out everywhere and can&rsquo;t sign in again until a Rootadmin reactivates the account. Your history stays. The last active Rootadmin can&rsquo;t be deactivated.
+              You&rsquo;ll be signed out everywhere and can&rsquo;t sign in again until a Rootadmin reactivates the account. Your history stays. The last active
+              Rootadmin can&rsquo;t be deactivated.
             </>
           }
           onClose={() => setDialog(null)}
@@ -432,9 +449,7 @@ function PasswordDialog({
   }, []);
 
   const ready =
-    current.length > 0 &&
-    (extra ? value.trim().length > 0 : true) &&
-    (newPassword ? passwordAccepted(value, newPassword) && value === repeat : true);
+    current.length > 0 && (extra ? value.trim().length > 0 : true) && (newPassword ? passwordAccepted(value, newPassword) && value === repeat : true);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -451,7 +466,12 @@ function PasswordDialog({
   }
 
   return (
-    <dialog ref={dialog} aria-labelledby={titleId} onClose={onClose} className="m-auto w-[440px] max-w-[calc(100vw-32px)] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60">
+    <dialog
+      ref={dialog}
+      aria-labelledby={titleId}
+      onClose={onClose}
+      className="m-auto w-[440px] max-w-[calc(100vw-32px)] rounded-control border border-line bg-surface-base p-3 text-body text-text-primary backdrop:bg-black/60"
+    >
       <h2 id={titleId} className="font-bold">
         {title}
       </h2>
@@ -463,19 +483,44 @@ function PasswordDialog({
             <label htmlFor={`${titleId}-new`} className="text-text-muted">
               New password
             </label>
-            <input id={`${titleId}-new`} type="password" value={value} onChange={(e) => setValue(e.target.value)} maxLength={200} autoComplete="new-password" aria-describedby={rulesId} className={recordInput} />
+            <input
+              id={`${titleId}-new`}
+              type="password"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              maxLength={200}
+              autoComplete="new-password"
+              aria-describedby={rulesId}
+              className={recordInput}
+            />
             <PasswordChecklist id={rulesId} password={value} email={newPassword.email} name={newPassword.name} />
             <label htmlFor={`${titleId}-repeat`} className="text-text-muted">
               Repeat the new password
             </label>
-            <input id={`${titleId}-repeat`} type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} maxLength={200} autoComplete="new-password" className={recordInput} />
+            <input
+              id={`${titleId}-repeat`}
+              type="password"
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value)}
+              maxLength={200}
+              autoComplete="new-password"
+              className={recordInput}
+            />
             {repeat && repeat !== value ? <p className="text-meta">The two passwords differ.</p> : null}
           </>
         ) : null}
         <label htmlFor={`${titleId}-current`} className="text-text-muted">
           Current password
         </label>
-        <input id={`${titleId}-current`} type="password" value={current} onChange={(e) => setCurrent(e.target.value)} maxLength={200} autoComplete="current-password" className={recordInput} />
+        <input
+          id={`${titleId}-current`}
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          maxLength={200}
+          autoComplete="current-password"
+          className={recordInput}
+        />
         {error ? (
           <p role="alert" className="text-meta">
             {error}

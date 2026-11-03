@@ -88,13 +88,7 @@ export function splitNames(raw: string, known: (name: string) => boolean): strin
 }
 
 /** A name or label for comparing: case, accents and extra spaces ignored. */
-export const comparable = (value: string) =>
-  value
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+export const comparable = (value: string) => value.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
 /** A website for comparing: no scheme, no "www.", no trailing slash, lowercase. */
 export const comparableUrl = (value: string) =>

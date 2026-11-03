@@ -21,10 +21,7 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
  * Reads the URL leniently: anything unknown falls back to the defaults
  * instead of failing — a shared or hand-edited link always opens the page.
  */
-export function parseDonateParams(
-  params: SearchParams,
-  defaults: { currency: DonationCurrency; monthlyEnabled: boolean },
-): DonateUrlState {
+export function parseDonateParams(params: SearchParams, defaults: { currency: DonationCurrency; monthlyEnabled: boolean }): DonateUrlState {
   const currencyParam = first(params.currency)?.toUpperCase();
   const amountParam = first(params.amount);
   const frequencyParam = first(params.frequency);

@@ -71,7 +71,13 @@ export function DocumentationAdminList({ articles }: { articles: DocumentationRo
     return [
       { id: "title", label: "Title", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
       { id: "display_order", label: "Display order", icon: "numbers", operators: [], sort: "text" },
-      { id: "expertise", label: "Expertise", icon: "arrow_outward", operators: ["is", "is_not", "is_empty", "is_not_empty"], options: expertise.map((name) => ({ value: name, label: name })) },
+      {
+        id: "expertise",
+        label: "Expertise",
+        icon: "arrow_outward",
+        operators: ["is", "is_not", "is_empty", "is_not_empty"],
+        options: expertise.map((name) => ({ value: name, label: name })),
+      },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
       { id: "published", label: "Published", icon: "schedule", operators: [], sort: "dates" },
     ];

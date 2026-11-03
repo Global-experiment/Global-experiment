@@ -92,17 +92,36 @@ export function TreasuryFilterSheet({ open, onClose, state, options, today, onCh
       {panel === "main" ? (
         <ul>
           <li className={rowClasses}>
-            <Checkbox checked={donations} onChange={() => toggle("donation")} disabled={donations && !expenses} label={copy.donations} className="w-full py-2.5 [&_span]:font-bold" />
+            <Checkbox
+              checked={donations}
+              onChange={() => toggle("donation")}
+              disabled={donations && !expenses}
+              label={copy.donations}
+              className="w-full py-2.5 [&_span]:font-bold"
+            />
           </li>
           <li className={rowClasses}>
-            <Checkbox checked={expenses} onChange={() => toggle("expense")} disabled={expenses && !donations} label={copy.expenses} className="w-full py-2.5 [&_span]:font-bold" />
+            <Checkbox
+              checked={expenses}
+              onChange={() => toggle("expense")}
+              disabled={expenses && !donations}
+              label={copy.expenses}
+              className="w-full py-2.5 [&_span]:font-bold"
+            />
           </li>
           {hasDates ? <PanelRow label={copy.date} value={dateSummary(state, today)} onOpen={() => openPanel("date")} /> : null}
           <PanelRow label={copy.currency} value={copy.currencyNames[state.currency] ?? state.currency} onOpen={() => openPanel("currency")} />
           {expenseTypes.length > 0 ? (
             <PanelRow
               label={copy.expenseType}
-              value={state.expenseTypes.length > 0 ? expenseTypes.filter((type) => state.expenseTypes.includes(type.key)).map((type) => type.label).join(", ") || copy.all : copy.all}
+              value={
+                state.expenseTypes.length > 0
+                  ? expenseTypes
+                      .filter((type) => state.expenseTypes.includes(type.key))
+                      .map((type) => type.label)
+                      .join(", ") || copy.all
+                  : copy.all
+              }
               onOpen={() => openPanel("expenseType")}
             />
           ) : null}
@@ -110,7 +129,14 @@ export function TreasuryFilterSheet({ open, onClose, state, options, today, onCh
       ) : null}
 
       {panel === "date" ? (
-        <DatePanel from={draftFrom} to={draftTo} setFrom={setDraftFrom} setTo={setDraftTo} today={today} onApply={() => apply({ from: draftFrom || null, to: draftTo || null })} />
+        <DatePanel
+          from={draftFrom}
+          to={draftTo}
+          setFrom={setDraftFrom}
+          setTo={setDraftTo}
+          today={today}
+          onApply={() => apply({ from: draftFrom || null, to: draftTo || null })}
+        />
       ) : null}
       {panel === "currency" ? (
         <ChoicePanel
@@ -251,8 +277,7 @@ function ChoicePanel({
   onApply: (keys: string[]) => void;
   single?: boolean;
 }) {
-  const toggle = (key: string) =>
-    setDraft(single ? [key] : draft.includes(key) ? draft.filter((value) => value !== key) : [...draft, key]);
+  const toggle = (key: string) => setDraft(single ? [key] : draft.includes(key) ? draft.filter((value) => value !== key) : [...draft, key]);
   return (
     <div>
       <ul>

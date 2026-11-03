@@ -7,12 +7,7 @@ import { getNotionDocumentationEnv } from "@/shared/config/env";
 import { mapWithConcurrency } from "@/shared/async/mapWithConcurrency";
 import type { DocumentationRepository } from "@/modules/documentation/domain/DocumentationRepository";
 import type { DocumentationArticle, DocumentationArticleSummary } from "@/modules/documentation/domain/types";
-import {
-  isPubliclyVisible,
-  mapNotionPageProperties,
-  toArticleSummary,
-  type MappedNotionPage,
-} from "./notionPropertyMapper";
+import { isPubliclyVisible, mapNotionPageProperties, toArticleSummary, type MappedNotionPage } from "./notionPropertyMapper";
 
 interface MappedPage {
   pageId: string;
@@ -55,9 +50,7 @@ async function fetchAllMappedPages(): Promise<MappedPage[]> {
 }
 
 function publishedInOrder(pages: MappedPage[]): MappedPage[] {
-  return pages
-    .filter((entry) => isPubliclyVisible(entry.mapped))
-    .sort((a, b) => a.mapped.displayOrder - b.mapped.displayOrder);
+  return pages.filter((entry) => isPubliclyVisible(entry.mapped)).sort((a, b) => a.mapped.displayOrder - b.mapped.displayOrder);
 }
 
 export class NotionDocumentationRepository implements DocumentationRepository {

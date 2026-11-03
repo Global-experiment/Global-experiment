@@ -59,4 +59,5 @@ export function GrantChips({
 }
 
 /** Vocabulary entries as filter options. */
-export const vocabularyOptions = (entries: readonly VocabularyEntry[] | undefined) => (entries ?? []).map((entry) => ({ value: entry.key, label: entry.label }));
+export const vocabularyOptions = (entries: readonly VocabularyEntry[] | undefined) =>
+  (entries ?? []).map((entry) => ({ value: entry.key, label: entry.label }));

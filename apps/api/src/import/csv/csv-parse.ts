@@ -98,7 +98,7 @@ export function parseCsv(bytes: Uint8Array): ParsedCsv {
   try {
     text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
   } catch {
-    throw new CsvFileError("The file isn't UTF-8 text. Export it again as \"CSV UTF-8\".");
+    throw new CsvFileError('The file isn\'t UTF-8 text. Export it again as "CSV UTF-8".');
   }
   if (text.includes("\u0000")) throw new CsvFileError("This isn't a CSV text file.");
   const delimiter = detectDelimiter(text);

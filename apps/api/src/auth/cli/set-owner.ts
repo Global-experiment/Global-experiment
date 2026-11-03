@@ -43,7 +43,9 @@ function readHidden(prompt: string): Promise<string> {
 async function readPipedStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString("utf8").replace(/\r?\n$/, "");
+  return Buffer.concat(chunks)
+    .toString("utf8")
+    .replace(/\r?\n$/, "");
 }
 
 async function main() {

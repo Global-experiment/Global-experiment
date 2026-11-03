@@ -54,7 +54,9 @@ const failure = async (client: PGlite, query: string) => {
 describe("migration 0009 — audit log, comments, views", () => {
   it("keeps the audit log append-only: inserts work; updates, deletes and truncates are refused", async () => {
     const client = await databaseAt(journal.entries.length);
-    await client.exec(`INSERT INTO audit_events (entity_type, entity_id, action, actor_type, actor_label, source) VALUES ('person', 'x', 'created', 'automation', 'Automation', 'import')`);
+    await client.exec(
+      `INSERT INTO audit_events (entity_type, entity_id, action, actor_type, actor_label, source) VALUES ('person', 'x', 'created', 'automation', 'Automation', 'import')`,
+    );
     expect(await rows(client, "select action, actor_label from audit_events")).toEqual([{ action: "created", actor_label: "Automation" }]);
     expect(await failure(client, "UPDATE audit_events SET action = 'updated'")).toMatch(/append-only \(UPDATE refused\)/);
     expect(await failure(client, "DELETE FROM audit_events")).toMatch(/append-only \(DELETE refused\)/);
@@ -65,7 +67,10 @@ describe("migration 0009 — audit log, comments, views", () => {
   it("checks actions, actors and sources", async () => {
     const client = await databaseAt(journal.entries.length);
     const insert = (action: string, actor: string, source: string) =>
-      failure(client, `INSERT INTO audit_events (entity_type, entity_id, action, actor_type, actor_label, source) VALUES ('person', 'x', '${action}', '${actor}', 'Someone', '${source}')`);
+      failure(
+        client,
+        `INSERT INTO audit_events (entity_type, entity_id, action, actor_type, actor_label, source) VALUES ('person', 'x', '${action}', '${actor}', 'Someone', '${source}')`,
+      );
     expect(await insert("renamed", "admin", "admin")).toMatch(/audit_events_action_known/);
     expect(await insert("updated", "robot", "admin")).toMatch(/audit_events_actor_type_known/);
     expect(await insert("updated", "admin", "email")).toMatch(/audit_events_source_known/);
@@ -80,13 +85,18 @@ describe("migration 0010 — person fields, contact channels, archive", () => {
       INSERT INTO people (name, next_followup_on) VALUES ('Summer', '2026-07-01'), ('Winter', '2026-12-01'), ('None', NULL);
     `);
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
-    const migrated = await rows<{ name: string; at: string | null }>(client, "select name, to_char(next_followup_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI') as at from people order by name");
+    const migrated = await rows<{ name: string; at: string | null }>(
+      client,
+      "select name, to_char(next_followup_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI') as at from people order by name",
+    );
     expect(migrated).toEqual([
       { name: "None", at: null },
       { name: "Summer", at: "2026-07-01T07:00" }, // CEST, UTC+2
       { name: "Winter", at: "2026-12-01T08:00" }, // CET, UTC+1
     ]);
-    expect(await rows(client, "select column_name from information_schema.columns where table_name = 'people' and column_name = 'next_followup_on'")).toEqual([]);
+    expect(await rows(client, "select column_name from information_schema.columns where table_name = 'people' and column_name = 'next_followup_on'")).toEqual(
+      [],
+    );
   });
 
   it("seeds the contact channels in the decided order, Other last since 0014 (vocabulary, not demo data)", async () => {
@@ -110,8 +120,15 @@ describe("migration 0010 — person fields, contact channels, archive", () => {
     const client = await databaseAt(journal.entries.length);
     expect(await failure(client, "INSERT INTO people (name, relevance_score) VALUES ('A', 11)")).toMatch(/people_relevance_scores_range/);
     expect(await failure(client, "INSERT INTO people (name, ai_relevance_score) VALUES ('A', -1)")).toMatch(/people_relevance_scores_range/);
-    expect(await failure(client, "INSERT INTO people (name, first_contact_on, last_contact_on) VALUES ('A', '2026-10-02', '2026-10-01')")).toMatch(/people_contact_dates_order/);
-    expect(await failure(client, "INSERT INTO people (name, relevance_score, ai_relevance_score, first_contact_on, last_contact_on) VALUES ('A', 0, 10, '2026-10-01', '2026-10-01')")).toBeNull();
+    expect(await failure(client, "INSERT INTO people (name, first_contact_on, last_contact_on) VALUES ('A', '2026-10-02', '2026-10-01')")).toMatch(
+      /people_contact_dates_order/,
+    );
+    expect(
+      await failure(
+        client,
+        "INSERT INTO people (name, relevance_score, ai_relevance_score, first_contact_on, last_contact_on) VALUES ('A', 0, 10, '2026-10-01', '2026-10-01')",
+      ),
+    ).toBeNull();
   });
 
   it("archived entries leave the public Treasury view; existing rows are not archived", async () => {

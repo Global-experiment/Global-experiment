@@ -26,9 +26,13 @@ export class ImportRunsService implements OnModuleInit, OnApplicationBootstrap {
   ) {}
 
   onModuleInit(): void {
-    this.queue.define(IMPORT_QUEUE, async () => {
-      throw new Error("The Notion import was removed (OPS-154): CSV is the only import.");
-    }, { policy: "exclusive", retryLimit: 0, expireInSeconds: 60 });
+    this.queue.define(
+      IMPORT_QUEUE,
+      async () => {
+        throw new Error("The Notion import was removed (OPS-154): CSV is the only import.");
+      },
+      { policy: "exclusive", retryLimit: 0, expireInSeconds: 60 },
+    );
   }
 
   async onApplicationBootstrap(): Promise<void> {
