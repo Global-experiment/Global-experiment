@@ -1,26 +1,40 @@
 import { z } from "zod";
 
-const booleanFromString = z
-  .enum(["true", "false", "1", "0"])
-  .transform((value) => value === "true" || value === "1");
+const booleanFromString = z.enum(["true", "false", "1", "0"]).transform((value) => value === "true" || value === "1");
 
 /** A 5-field cron expression (minute hour day month weekday) or "off"; checked again by the job runner. */
 
 const originList = z
   .string()
-  .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean))
+  .transform((value) =>
+    value
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  )
   .pipe(z.array(z.url({ protocol: /^https?$/ }).transform((url) => new URL(url).origin)).min(1));
+
+/** `pglite:<folder>`: the local development database (zero install), never production. */
+export const PGLITE_URL = /^pglite:(.+)$/;
 
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     API_HOST: z.string().min(1).default("127.0.0.1"),
     API_PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
-    DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/, error: "DATABASE_URL must be a postgres:// connection string" }),
+    // Or `pglite:<folder>`: a local PGlite database for development (npm run setup), refused in production.
+    DATABASE_URL: z.union([z.url({ protocol: /^postgres(ql)?$/ }), z.string().regex(PGLITE_URL)], {
+      error: "DATABASE_URL must be a postgres:// connection string (or pglite:<folder> locally)",
+    }),
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).optional(),
     /** Origins allowed to make state-changing admin requests (CSRF Origin check). */
     ADMIN_ALLOWED_ORIGINS: originList.optional(),
-    ADMIN_SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(8 * 60),
+    ADMIN_SESSION_IDLE_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(24 * 60)
+      .default(8 * 60),
     ADMIN_SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(30).default(7),
     /** Number of reverse-proxy hops to trust for the client IP (0 = none). */
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
@@ -31,17 +45,34 @@ const envSchema = z
      * Stripe (donations). Server-side only. Test keys (sk_test_/rk_test_) are
      * the default; a live key is refused unless STRIPE_LIVE_ENABLED=true.
      */
-    STRIPE_SECRET_KEY: z.string().trim().regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe secret or restricted key").optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().trim().regex(/^whsec_[A-Za-z0-9]+$/, "must be a Stripe webhook signing secret").optional(),
+    STRIPE_SECRET_KEY: z
+      .string()
+      .trim()
+      .regex(/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe secret or restricted key")
+      .optional(),
+    STRIPE_WEBHOOK_SECRET: z
+      .string()
+      .trim()
+      .regex(/^whsec_[A-Za-z0-9]+$/, "must be a Stripe webhook signing secret")
+      .optional(),
     /** Public by design (the browser loads Stripe with it): the embedded card form on the donate page. */
-    STRIPE_PUBLISHABLE_KEY: z.string().trim().regex(/^pk_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe publishable key").optional(),
+    STRIPE_PUBLISHABLE_KEY: z
+      .string()
+      .trim()
+      .regex(/^pk_(test|live)_[A-Za-z0-9]+$/, "must be a Stripe publishable key")
+      .optional(),
     STRIPE_LIVE_ENABLED: booleanFromString.default(false),
     /** NODE_ENV=test only: the Playwright API answers from scripted Checkout sessions instead of Stripe (stripe-fixture.gateway.ts). */
     STRIPE_FIXTURE: booleanFromString.default(false),
     /** Stripe's no-code customer-portal login link (monthly donors manage their donation there). */
     STRIPE_CUSTOMER_PORTAL_URL: z.url({ protocol: /^https$/ }).optional(),
     /** Minutes between fee fill-in runs for Stripe entries whose fee wasn't known yet (0 = off). */
-    STRIPE_FEE_RECONCILE_MINUTES: z.coerce.number().int().min(0).max(24 * 60).default(15),
+    STRIPE_FEE_RECONCILE_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(24 * 60)
+      .default(15),
     /** The public site, for Checkout success/cancel URLs and the donation Origin check. */
     PUBLIC_SITE_URL: z.url({ protocol: /^https?$/ }).optional(),
     /** The Next.js server the API asks to revalidate public pages (internal address). */
@@ -72,7 +103,11 @@ const envSchema = z
      */
     JOBS_DRIVER: z.enum(["pgboss", "inprocess"]).optional(),
     /** Private preview link (/donate?preview=<token>): a test checkout while donations are closed. */
-    DONATIONS_PREVIEW_TOKEN: z.string().trim().regex(/^[A-Za-z0-9_-]{32,128}$/, "must be 32–128 letters, digits, - or _").optional(),
+    DONATIONS_PREVIEW_TOKEN: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9_-]{32,128}$/, "must be 32–128 letters, digits, - or _")
+      .optional(),
     DONATIONS_MONTHLY: booleanFromString.default(false),
     DONATIONS_EXTRA_METHODS: booleanFromString.default(false),
     DONATIONS_PAYPAL_MONTHLY: booleanFromString.default(false),
@@ -82,6 +117,13 @@ const envSchema = z
   })
   .transform((env, context) => {
     const production = env.NODE_ENV === "production";
+    const pglite = PGLITE_URL.test(env.DATABASE_URL);
+    if (pglite && production) {
+      context.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "pglite: is for local development only" });
+    }
+    if (pglite && env.JOBS_DRIVER === "pgboss") {
+      context.addIssue({ code: "custom", path: ["JOBS_DRIVER"], message: "pgboss needs a PostgreSQL server; leave it unset with pglite:" });
+    }
     if (production && !env.ADMIN_ALLOWED_ORIGINS) {
       context.addIssue({ code: "custom", path: ["ADMIN_ALLOWED_ORIGINS"], message: "is required in production" });
     }
@@ -142,7 +184,7 @@ const envSchema = z
         publicToolbar: env.TREASURY_PUBLIC_TOOLBAR,
       },
       fileStorageDir: env.FILE_STORAGE_DIR ?? (production ? "/var/lib/global-experiment/files" : ".data/files"),
-      jobsDriver: env.JOBS_DRIVER ?? (env.NODE_ENV === "test" ? "inprocess" : "pgboss"),
+      jobsDriver: env.JOBS_DRIVER ?? (env.NODE_ENV === "test" || pglite ? "inprocess" : "pgboss"),
       donationPreviewToken: id(env.DONATIONS_PREVIEW_TOKEN),
       donationDefaults: {
         enabled: env.DONATIONS_ENABLED,

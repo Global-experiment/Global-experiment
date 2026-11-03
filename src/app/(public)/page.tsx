@@ -4,6 +4,8 @@ import { NavHeader } from "@/shared/ui/NavHeader";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
 import { homePrimaryAction, homeWordmark } from "@/modules/home/ui/homeNavigation";
 import { HomeView } from "@/modules/home/ui/HomeView";
+import { notionMissingLocally } from "@/shared/config/env";
+import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
 
 // Editorial content is read live from Notion on every request, so edits in
 // Notion appear on the next refresh with no redeploy. No route cache, no
@@ -21,6 +23,8 @@ export const dynamic = "force-dynamic";
  * be removed on desktop, with no space reserved for it (`md:` = 768px).
  */
 export default async function Home() {
+  // A contributor's machine without Notion (never production): say so instead of failing.
+  if (notionMissingLocally("home")) return <NotionNotConnected title="Home" />;
   const content = await getHomeContent();
 
   return (

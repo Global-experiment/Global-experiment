@@ -10,6 +10,8 @@ import { DocumentationContent } from "@/modules/documentation/ui/DocumentationCo
 import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
 import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
+import { notionMissingLocally } from "@/shared/config/env";
+import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
 
 // getArticleBySlug() reads the same cached dataset the index page populates
 // (see getDocumentationDataset) rather than fetching fresh from Notion.
@@ -22,6 +24,7 @@ interface HistoryPageProps {
 }
 
 export async function generateMetadata({ params }: HistoryPageProps): Promise<Metadata> {
+  if (notionMissingLocally("documentation")) return { title: "Document history" };
   const { slug } = await params;
   const article = await loadArticle(slug);
   if (!article) return {};
@@ -41,6 +44,8 @@ export async function generateMetadata({ params }: HistoryPageProps): Promise<Me
  * genuine content instead of an empty page.
  */
 export default async function DocumentationHistoryPage({ params }: HistoryPageProps) {
+  // A contributor's machine without Notion (never production): say so instead of failing.
+  if (notionMissingLocally("documentation")) return <NotionNotConnected title="Documentation" backHref="/documentation" />;
   const { slug } = await params;
   const article = await loadArticle(slug);
 
@@ -60,16 +65,13 @@ export default async function DocumentationHistoryPage({ params }: HistoryPagePr
       />
       <Container className="pt-1">
         <p role="status" className="text-body text-text-muted">
-          No verifiable previous revision is available from the current data source: Notion&rsquo;s API
-          doesn&rsquo;t expose a page&rsquo;s edit history to this integration. Shown below is the current
-          published version — the only version this page can genuinely display.
+          No verifiable previous revision is available from the current data source: Notion&rsquo;s API doesn&rsquo;t expose a page&rsquo;s edit history to this
+          integration. Shown below is the current published version — the only version this page can genuinely display.
         </p>
 
         <div className="mt-6 border-t border-line pt-4">
           <p className="text-body font-bold text-text-primary">{article.title}</p>
-          <p className="mt-1 text-meta text-text-muted">
-            Published version {formatPublishedAt(article.publishedAt)}
-          </p>
+          <p className="mt-1 text-meta text-text-muted">Published version {formatPublishedAt(article.publishedAt)}</p>
           {article.expertise.length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {article.expertise.map((tag) => (

@@ -26,9 +26,20 @@ node_modules/
 
 # misc
 .DS_Store
+# keys and certificates (never committed)
 *.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
 # database dumps and backups (never committed)
 *.dump
+*.sql.gz
+*.backup
+/backups/
+# private notes and files (never committed)
+/private/
 
 # debug
 npm-debug.log*
@@ -36,11 +47,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env
-.env.local
-.env.*.local
-!.env.local.template
+# env files: every .env* file, except the documented example (no values)
+.env*
+!.env.example
 
 # vercel
 .vercel

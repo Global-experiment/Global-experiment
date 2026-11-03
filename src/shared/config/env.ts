@@ -2,9 +2,7 @@ import { z } from "zod";
 
 export class EnvValidationError extends Error {
   constructor(scope: string, issues: z.ZodIssue[]) {
-    const message = issues
-      .map((issue) => `- ${issue.path.join(".") || "(root)"}: ${issue.message}`)
-      .join("\n");
+    const message = issues.map((issue) => `- ${issue.path.join(".") || "(root)"}: ${issue.message}`).join("\n");
     super(`Invalid ${scope} environment configuration:\n${message}`);
     this.name = "EnvValidationError";
   }
@@ -50,13 +48,22 @@ const notionHomeEnvSchema = z.object({
 export const getNotionClientEnv = createLazyEnvAccessor("Notion client", notionClientEnvSchema);
 
 /** Which Notion database holds the Documentation articles. */
-export const getNotionDocumentationEnv = createLazyEnvAccessor(
-  "Notion Documentation",
-  notionDocumentationEnvSchema,
-);
+export const getNotionDocumentationEnv = createLazyEnvAccessor("Notion Documentation", notionDocumentationEnvSchema);
 
 /** Which Notion page holds the Home editorial content. */
 export const getNotionHomeEnv = createLazyEnvAccessor("Notion Home", notionHomeEnvSchema);
+
+/**
+ * Local development only (ADR 009, amended 2026-11-03): a contributor who
+ * has no Notion values sees a "Notion isn't connected" notice on Home and
+ * Documentation instead of an error — never stand-in content. Always false
+ * in production, where a missing value stays a loud error.
+ */
+export function notionMissingLocally(page: "home" | "documentation"): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  const id = page === "home" ? process.env.NOTION_HOME_PAGE_ID : process.env.NOTION_DOCUMENTATION_DB_ID;
+  return !process.env.NOTION_API_KEY || !id;
+}
 
 // No DATABASE_URL here: the Next.js app never connects to PostgreSQL. The
 // native API (apps/api) owns the database — see ADR 013.
