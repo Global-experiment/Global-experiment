@@ -183,7 +183,7 @@ test("values the admin doesn't have (as in Notion's export): listed once on the 
   const other = `Ola Notion ${RUN}`;
   const csv =
     "Name,Email,Expertise,Contact channels\n" +
-    `${notion},nils-${RUN}@example.net,"Interaction design (https://app.notion.com/p/Interaction-design-3d41dc64fd2881829739dcc486d08b9f?pvs=21), Game design (https://app.notion.com/p/Game-design-3d41?pvs=21)","Email, Other"\n` +
+    `${notion},nils-${RUN}@example.net,"Interaction design (https://app.notion.com/p/Interaction-design-0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f?pvs=21), Game design (https://app.notion.com/p/Game-design-0f0f?pvs=21)","Email, Other"\n` +
     `${other},ola-${RUN}@example.net,"  ux RESEARCH ",Pigeon\n` +
     `Broken ${RUN},not-an-email,Game design,\n`;
   await page.goto("/admin/imports/csv?table=people");

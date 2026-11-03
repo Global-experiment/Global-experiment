@@ -196,18 +196,16 @@ replaced:
 
 ### Local development database
 
-- PostgreSQL 17 on `localhost:5433` (a separate PostgreSQL 9.1 on 5432 is
-  unrelated to this project and must not be touched).
-- Databases `global_experiment_dev` (application) and
-  `global_experiment_test` (real-PostgreSQL tests), both owned by the
-  non-superuser role `ge_dev` (no SUPERUSER, CREATEDB, CREATEROLE,
-  REPLICATION or BYPASSRLS). The application never uses `postgres`.
+- By default `npm run setup` uses PGlite (no server to install). A local
+  PostgreSQL 17 is optional: a `*_dev` database (application) and a
+  `*_test` database (real-PostgreSQL tests, wiped by them), owned by a
+  non-superuser role (no SUPERUSER, CREATEDB, CREATEROLE, REPLICATION or
+  BYPASSRLS). The application never uses `postgres`.
 - `DATABASE_URL` / `TEST_DATABASE_URL` live only in the gitignored
-  `.env.local`; the superuser credential lives only in the developer's
-  `%APPDATA%\postgresql\pgpass.conf`.
-- Setup: `npm run db:migrate`, `npm run api:build`,
-  `npm run admin:set-owner -w @global-experiment/api -- --email=…`,
-  `npm run api:dev`.
+  `.env.local`; a local superuser password stays in the developer's own
+  PostgreSQL password file, never in the repository.
+- Setup: `npm run setup` (local settings, migrations, sample data, a local
+  Rootadmin), then `npm run dev:local` — see CONTRIBUTING.md.
 
 ## 10. Migration / cutover strategy
 

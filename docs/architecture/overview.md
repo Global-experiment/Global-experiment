@@ -370,9 +370,9 @@ Technical dashboard, and never holds secrets in its payload.
 Treasury supporting documents (invoices, receipts) are the only uploads in
 v0.1. Behind a `FileStorage` interface (`put`, `get`, `delete`, `exists`):
 
-- **v0.1 adapter: local disk** (built in 1b, `FILE_STORAGE_DIR`) on the VPS
-  (`/var/lib/global-experiment/files`, outside every web root, owned by the
-  API user, files 0600 written atomically), named by SHA-256, served
+- **v0.1 adapter: local disk** (built in 1b, `FILE_STORAGE_DIR`) on the
+  production server (a private folder outside every web root, readable only
+  by the API, files 0600 written atomically), named by SHA-256, served
   only through an authenticated API route with `Content-Disposition:
   attachment`. Included in the backup.
 - Later: an S3-compatible adapter (e.g. Hetzner Object Storage) with no
@@ -453,22 +453,22 @@ only, validated at startup).
 
 ## 5. Deployment and operations
 
-- **Environments:** local (developer machine, PostgreSQL 17 on 5433, `*_dev`
-  database), test (`*_test` databases, wiped by the test runs), production
-  (Hetzner VPS). A staging environment is **Q15** (proposal: a second
-  database and API port on the same VPS, deployed from `develop` before
-  `main`).
-- **Processes:** nginx → `global-experiment.service` (Next.js, :3000) and
-  `global-experiment-api.service` (NestJS, :4000), PostgreSQL 17, Stalwart
-  (when the email module ships). Configuration only from
-  `/etc/global-experiment/*.env`.
+- **Environments:** local (each contributor's machine: PGlite from
+  `npm run setup`, or a local PostgreSQL `*_dev` database), test (`*_test`
+  databases, wiped by the test runs), production (one virtual server). A
+  staging environment is **Q15** (proposal: a second database and API on the
+  same server, deployed from `develop` before `main`).
+- **Processes:** a reverse proxy in front of two services, the site
+  (Next.js) and the API (NestJS), with PostgreSQL 17 and, when the email
+  module ships, a mail server. Configuration only from the server's
+  environment files, outside the repository.
 - **Migrations:** Drizzle SQL files, reviewed in the pull request, applied
   explicitly on release (`db:migrate` with the production env), each in one
-  transaction, after a verified backup — as in the release runbooks in
-  `docs/operations/`.
+  transaction, after a verified backup — see
+  [docs/operations](../operations/README.md).
 - **Backups:** today manual per release. Proposal: nightly `pg_dump` (custom
-  format) + the file store, kept 30 days on the VPS and copied off-site
-  (Hetzner Storage Box), with a monthly restore test into a scratch
+  format) + the file store, kept 30 days on the server and copied
+  off-site, with a monthly restore test into a scratch
   database; the Technical dashboard shows the last backup.
 - **Monitoring:** external uptime check of `/`, `/api/health` and the admin
   login; journald logs; disk and backup-age alerts; Stripe webhook failures
