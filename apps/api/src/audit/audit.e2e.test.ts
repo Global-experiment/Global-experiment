@@ -277,10 +277,9 @@ describe("record history (audit log)", () => {
     expect(
       ((await admin.get("/api/admin/organizations?pageSize=100").expect(200)).body.items as { id: string }[]).some((item) => item.id === organization.id),
     ).toBe(false);
-    expect((await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, organization.id))).map((event) => event.action)).toEqual([
-      "created",
-      "archived",
-    ]);
+    expect(
+      (await t.db.select().from(auditEvents).where(eq(auditEvents.entityId, organization.id)).orderBy(auditEvents.id)).map((event) => event.action),
+    ).toEqual(["created", "archived"]);
 
     const [entry] = await t.db
       .insert(treasuryEntries)

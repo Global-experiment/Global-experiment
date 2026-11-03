@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { reportHref } from "@/shared/navigation/sourcePage";
 import type { Page, HistoryListItem } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
@@ -136,6 +136,7 @@ export function HistoryScreen() {
     to: params.get("to") ?? "",
   };
   const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
+  const pending = useRef<{ filters: typeof filters & { page: number }; search: string } | null>(null);
 
   const query = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (filters.entityType) query.set("entityType", filters.entityType);
@@ -146,8 +147,14 @@ export function HistoryScreen() {
   const list = useAdminData<Page<HistoryListItem>>(`/history?${query}`);
   const actors = useAdminData<{ id: string; label: string }[]>("/history/actors");
 
+  // The filters asked for but not yet in the URL: two quick changes (Actor, then a date) each build
+  // on the one before, instead of the second starting from the URL the first hasn't replaced yet.
+  const paramsKey = params.toString();
+  useEffect(() => {
+    if (pending.current?.search === paramsKey) pending.current = null;
+  }, [paramsKey]);
   const navigate = (changes: Partial<typeof filters> & { page?: number }) => {
-    const next = { ...filters, page: 1, ...changes };
+    const next = { ...(pending.current?.filters ?? filters), page: 1, ...changes };
     const url = new URLSearchParams();
     if (next.entityType) url.set("entity", next.entityType);
     if (next.actor) url.set("actor", next.actor);
@@ -156,6 +163,7 @@ export function HistoryScreen() {
     if (next.to) url.set("to", next.to);
     if (next.page > 1) url.set("page", String(next.page));
     const search = url.toString();
+    pending.current = { filters: next, search };
     router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
   };
   const filtered = Object.values(filters).some(Boolean);
