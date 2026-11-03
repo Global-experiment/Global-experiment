@@ -1,0 +1,3 @@
+# Git hooks are shell scripts: LF on every system, or they fail on Windows checkouts.
+.husky/* text eol=lf
+*.sh text eol=lf
