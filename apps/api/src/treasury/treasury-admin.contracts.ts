@@ -105,6 +105,8 @@ export interface TreasuryDocumentDto {
   sizeBytes: number;
   uploadedAt: string;
   uploadedBy: string | null;
+  /** Archived (ADR 017): hidden from the entry's documents, kept and restorable. */
+  archivedAt: string | null;
 }
 
 export interface TreasuryEntryDto extends TreasuryEntryRowDto {

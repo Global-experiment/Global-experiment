@@ -240,9 +240,15 @@ test("comments: add, edit and delete your own; every version stays in the histor
   await expect(edited).toContainText("Available from November 10.");
   await expect(page.locator("[data-history-item=comment_added]").first().locator("[data-comment-body]")).toContainText("Asked about availability in November.");
 
-  await page.locator("[data-history-item=comment_added]").first().getByRole("button", { name: "Delete" }).click();
-  await expect(page.locator("[data-history-item=comment_deleted]").first()).toContainText("deleted a comment");
-  await expect(page.locator("[data-history-item=comment_added]").first()).toContainText("Deleted.");
+  // Archive-only (ADR 017): no Delete; archived, kept for its author, restored.
+  const added = page.locator("[data-history-item=comment_added]").first();
+  await expect(added.getByRole("button", { name: "Delete" })).toHaveCount(0);
+  await added.getByRole("button", { name: "Archive" }).click();
+  await expect(page.locator("[data-history-item=comment_archived]").first()).toContainText("archived a comment");
+  await expect(added).toContainText("Archived — only you can see it.");
+  await added.getByRole("button", { name: "Restore" }).click();
+  await expect(page.locator("[data-history-item=comment_restored]").first()).toContainText("restored a comment");
+  await expect(added.getByRole("button", { name: "Archive" })).toBeVisible();
 });
 
 test("the panel's actions and counters stay fixed; only the History list scrolls, with the menu's scrollbar padding", async () => {

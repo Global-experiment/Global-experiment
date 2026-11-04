@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   Param,
@@ -64,11 +63,19 @@ export class TreasuryAdminController {
     return new StreamableFile(file.bytes);
   }
 
-  @Delete("documents/:documentId")
+  /** Archive-only (ADR 017): a supporting document is archived and restored, never deleted. */
+  @Post("documents/:documentId/archive")
   @Requires("treasury.update")
-  @HttpCode(204)
-  deleteDocument(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest) {
-    return this.treasury.deleteDocument(documentId, request.admin);
+  @HttpCode(200)
+  archiveDocument(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest) {
+    return this.treasury.setDocumentArchived(documentId, true, request.admin);
+  }
+
+  @Post("documents/:documentId/restore")
+  @Requires("treasury.update")
+  @HttpCode(200)
+  restoreDocument(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest) {
+    return this.treasury.setDocumentArchived(documentId, false, request.admin);
   }
 
   @Get(":id")

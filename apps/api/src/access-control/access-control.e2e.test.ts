@@ -76,13 +76,11 @@ function requirementLabel(route: Route): string {
  * endpoint, or a changed permission, must be added here on purpose.
  */
 const EXPECTED_ROUTES: Record<string, string> = {
-  "DELETE /api/admin/comments/:id": "signed in",
   "DELETE /api/admin/organizations/:id/expertise/:expertiseId": "directory.update",
   "DELETE /api/admin/organizations/:id/people/:personId": "directory.update",
   "DELETE /api/admin/people/:id/expertise/:expertiseId": "directory.update",
   "DELETE /api/admin/people/:id/organizations/:organizationId": "directory.update",
   "DELETE /api/admin/profile/picture": "signed in",
-  "DELETE /api/admin/treasury/documents/:documentId": "treasury.update",
   "GET /api/admin/access-grants": "access.read",
   "GET /api/admin/access-grants/:id": "access.read",
   "GET /api/admin/accounts": "accounts.read",
@@ -168,6 +166,13 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "PUT /api/admin/organizations/:id/people/:personId": "directory.update",
   "PUT /api/admin/people/:id/expertise/:expertiseId": "directory.update",
   "PUT /api/admin/people/:id/organizations/:organizationId": "directory.update",
+  "POST /api/admin/comments/:id/archive": "signed in",
+  "POST /api/admin/comments/:id/restore": "signed in",
+  "POST /api/admin/treasury/documents/:documentId/archive": "treasury.update",
+  "POST /api/admin/treasury/documents/:documentId/restore": "treasury.update",
+  "GET /api/admin/profile/pictures": "signed in",
+  "GET /api/admin/profile/pictures/:id": "signed in",
+  "POST /api/admin/profile/pictures/:id/restore": "signed in",
 };
 
 const FAKE_ID = "00000000-0000-4000-8000-000000000000";

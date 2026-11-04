@@ -5,7 +5,6 @@ import { DATABASE, type Database } from "../common/database/database.module.js";
 import type { Page, Sort } from "../common/listing/list-query.js";
 import { expertiseRefsByOwner } from "../expertise/expertise-refs.js";
 import { ServicesRepository, accountName } from "../services/services.repository.js";
-import { treasuryDocuments } from "../treasury/treasury-documents.schema.js";
 import type { AccountDto, AccountSortField, AccountsListQuery, InvitationDto, ProfileDto } from "./accounts.contracts.js";
 
 export type Executor = Pick<Database, "select" | "insert" | "update" | "delete">;
@@ -332,12 +331,6 @@ export class AccountsRepository {
   }
 
   /** Whether a stored file is still used by an account picture or a Treasury document (before removing it). */
-  async storageKeyInUse(key: string): Promise<boolean> {
-    const [picture] = await this.db.select({ id: adminUsers.id }).from(adminUsers).where(eq(adminUsers.pictureKey, key)).limit(1);
-    if (picture) return true;
-    const [document] = await this.db.select({ id: treasuryDocuments.id }).from(treasuryDocuments).where(eq(treasuryDocuments.storageKey, key)).limit(1);
-    return document !== undefined;
-  }
 }
 
 function toInvitation(

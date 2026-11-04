@@ -460,6 +460,8 @@ export interface TreasuryDocument {
   sizeBytes: number;
   uploadedAt: string;
   uploadedBy: string | null;
+  /** Archived (ADR 017): listed under "Archived documents", restorable. */
+  archivedAt: string | null;
 }
 
 export interface TreasuryRule {
@@ -539,7 +541,12 @@ export type HistoryAction =
   | "email_changed"
   | "deactivated"
   | "reactivated"
-  | "permission_denied";
+  | "permission_denied"
+  // Archive-only (ADR 017): comments, supporting documents and profile pictures.
+  | "comment_archived"
+  | "comment_restored"
+  | "file_archived"
+  | "file_restored";
 
 export interface HistoryItem {
   id: string;
@@ -558,7 +565,8 @@ export interface HistoryItem {
     details?: { label: string; value: string }[];
     [key: string]: unknown;
   };
-  comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
+  /** An archived comment's text reaches its author only: the others get "" (ADR 017). */
+  comment?: { id: string; body: string; current: string; mine: boolean; archived: boolean };
 }
 
 export interface RecordHistory {

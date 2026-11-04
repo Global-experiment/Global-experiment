@@ -32,7 +32,12 @@ export type AuditAction =
   | "email_changed"
   | "deactivated"
   | "reactivated"
-  | "permission_denied";
+  | "permission_denied"
+  // Archive-only (ADR 017, migration 0015): comments, supporting documents and profile pictures.
+  | "comment_archived"
+  | "comment_restored"
+  | "file_archived"
+  | "file_restored";
 
 /** How a field's value is shown in the history (old struck through → new). */
 export type FieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation";

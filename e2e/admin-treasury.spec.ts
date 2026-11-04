@@ -114,7 +114,7 @@ test("an expense copied from Notion earlier is an ordinary entry now: no Notion 
   await axe();
 });
 
-test("supporting documents: upload, list, download and delete (private, admins only)", async () => {
+test("supporting documents: upload, list, download, archive and restore (private, admins only; never deleted)", async () => {
   await openRecord("Platform development");
   await expect(page.getByText("No documents yet.")).toBeVisible();
   await page.locator("input[type=file]").setInputFiles({ name: "invoice-april.pdf", mimeType: "application/pdf", buffer: PDF });
@@ -129,8 +129,18 @@ test("supporting documents: upload, list, download and delete (private, admins o
   await page.locator("input[type=file]").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
   await expect(page.getByRole("alert").filter({ hasText: "Only PDF, PNG or JPEG" })).toBeVisible();
 
-  await documents.getByRole("button", { name: "Delete invoice-april.pdf" }).click();
-  await documents.getByRole("button", { name: "Delete", exact: true }).click();
+  // Archive-only (ADR 017): archived into "Archived documents", still downloadable, restored from there.
+  await expect(documents.getByRole("button", { name: /^Delete/ })).toHaveCount(0);
+  await documents.getByRole("button", { name: "Archive invoice-april.pdf" }).click();
+  await expect(page.getByText("No documents yet.")).toBeVisible();
+  await expect(page.locator("[data-history-item=file_archived]").first()).toContainText("archived a document");
+  await page.getByRole("button", { name: "Archived documents 1" }).click();
+  const archived = page.getByRole("list", { name: "Archived documents" });
+  await expect(archived.getByRole("link", { name: "invoice-april.pdf" })).toBeVisible();
+  await archived.getByRole("button", { name: "Restore invoice-april.pdf" }).click();
+  await expect(documents.getByRole("link", { name: "invoice-april.pdf" })).toBeVisible();
+  await expect(page.locator("[data-history-item=file_restored]").first()).toContainText("restored a document");
+  await documents.getByRole("button", { name: "Archive invoice-april.pdf" }).click();
   await expect(page.getByText("No documents yet.")).toBeVisible();
 
   // The download route itself needs a session.
@@ -147,8 +157,7 @@ test("a document over 10 MB reaches the API whole through the website's proxy (u
   await page.locator("input[type=file]").setInputFiles({ name: "scan-15mb.pdf", mimeType: "application/pdf", buffer: big });
   const documents = page.getByRole("list", { name: "Supporting documents" });
   await expect(documents.getByRole("link", { name: "scan-15mb.pdf" })).toBeVisible({ timeout: 30_000 });
-  await documents.getByRole("button", { name: "Delete scan-15mb.pdf" }).click();
-  await documents.getByRole("button", { name: "Delete", exact: true }).click();
+  await documents.getByRole("button", { name: "Archive scan-15mb.pdf" }).click();
   await expect(page.getByText("No documents yet.")).toBeVisible();
 });
 

@@ -1,8 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { actorFor, AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditActor } from "../audit/audit.types.js";
 import { diffRecord, type FieldSpec } from "../audit/record-fields.js";
 import { AuthRepository } from "../auth/auth.repository.js";
+import { adminUserPictures } from "../auth/auth.schema.js";
 import type { AdminPrincipal } from "../auth/auth.service.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { passwordProblems } from "../auth/password-strength.js";
@@ -260,6 +262,10 @@ export class AccountsService {
     return this.profile(principal);
   }
 
+  /**
+   * A new picture. The previous one is archived, not removed (ADR 017): it
+   * stays in the account's previous pictures and can be used again.
+   */
   async setPicture(principal: AdminPrincipal, file: { buffer: Buffer; size: number } | undefined): Promise<ProfileDto> {
     if (!file) throw new ValidationFailedError([{ path: "file", message: "Choose a picture." }]);
     if (file.size > PICTURE_MAX_BYTES) throw new ValidationFailedError([{ path: "file", message: "Pictures can be at most 2 MB." }]);
@@ -268,6 +274,16 @@ export class AccountsService {
     const previous = await this.repository.findProfile(principal.id);
     const { key } = await this.storage.put(file.buffer);
     await this.db.transaction(async (tx) => {
+      const now = this.clock();
+      await tx
+        .update(adminUserPictures)
+        .set({ archivedAt: now })
+        .where(and(eq(adminUserPictures.adminUserId, principal.id), isNull(adminUserPictures.archivedAt)));
+      // The same file as an earlier picture: that picture comes back.
+      await tx
+        .insert(adminUserPictures)
+        .values({ adminUserId: principal.id, storageKey: key, contentType: type, uploadedAt: now })
+        .onConflictDoUpdate({ target: [adminUserPictures.adminUserId, adminUserPictures.storageKey], set: { archivedAt: null, uploadedAt: now } });
       await this.repository.update(tx, principal.id, { pictureKey: key, pictureType: type });
       await this.audit.record(tx, {
         entityType: "admin_user",
@@ -279,26 +295,79 @@ export class AccountsService {
         meta: { label: previous?.name ?? principal.email },
       });
     });
-    if (previous?.pictureKey && previous.pictureKey !== key) await this.removeStoredFile(previous.pictureKey);
     return this.profile(principal);
   }
 
+  /** Removing the picture archives it (ADR 017): the account shows its initial again, and the picture stays restorable. */
   async removePicture(principal: AdminPrincipal): Promise<ProfileDto> {
     const previous = await this.repository.findProfile(principal.id);
     if (!previous?.pictureKey) return this.profile(principal);
     await this.db.transaction(async (tx) => {
+      const [archived] = await tx
+        .update(adminUserPictures)
+        .set({ archivedAt: this.clock() })
+        .where(and(eq(adminUserPictures.adminUserId, principal.id), isNull(adminUserPictures.archivedAt)))
+        .returning({ id: adminUserPictures.id });
       await this.repository.update(tx, principal.id, { pictureKey: null, pictureType: null });
       await this.audit.record(tx, {
         entityType: "admin_user",
         entityId: principal.id,
-        action: "updated",
+        action: "file_archived",
         actor: actorFor(principal),
         source: "admin",
         changes: [{ field: "picture", label: "Profile picture", kind: "text", before: "Set", after: null }],
-        meta: { label: previous.name },
+        meta: { label: previous.name, file: { kind: "picture", id: archived?.id ?? null, name: "Profile picture" } },
       });
     });
-    await this.removeStoredFile(previous.pictureKey);
+    return this.profile(principal);
+  }
+
+  /** The account's archived pictures, newest first (Profile → Previous pictures). */
+  async previousPictures(principal: AdminPrincipal): Promise<{ id: string; uploadedAt: string; archivedAt: string }[]> {
+    const rows = await this.db
+      .select({ id: adminUserPictures.id, uploadedAt: adminUserPictures.uploadedAt, archivedAt: adminUserPictures.archivedAt })
+      .from(adminUserPictures)
+      .where(and(eq(adminUserPictures.adminUserId, principal.id), isNotNull(adminUserPictures.archivedAt)))
+      .orderBy(desc(adminUserPictures.archivedAt), desc(adminUserPictures.uploadedAt));
+    return rows.map((row) => ({ id: row.id, uploadedAt: row.uploadedAt.toISOString(), archivedAt: row.archivedAt!.toISOString() }));
+  }
+
+  /** One of the account's own pictures (archived ones included), for the Previous pictures list. */
+  async ownPicture(principal: AdminPrincipal, pictureId: string): Promise<{ bytes: Buffer; type: string }> {
+    const [row] = await this.db
+      .select()
+      .from(adminUserPictures)
+      .where(and(eq(adminUserPictures.id, pictureId), eq(adminUserPictures.adminUserId, principal.id)));
+    if (!row) throw new NotFoundError("Picture not found.");
+    return { bytes: await this.storage.get(row.storageKey), type: row.contentType };
+  }
+
+  /** Uses an archived picture again; the current one, if any, is archived in its place. */
+  async restorePicture(principal: AdminPrincipal, pictureId: string): Promise<ProfileDto> {
+    const profile = await this.repository.findProfile(principal.id);
+    await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(adminUserPictures)
+        .where(and(eq(adminUserPictures.id, pictureId), eq(adminUserPictures.adminUserId, principal.id)));
+      if (!row) throw new NotFoundError("Picture not found.");
+      if (!row.archivedAt) return;
+      await tx
+        .update(adminUserPictures)
+        .set({ archivedAt: this.clock() })
+        .where(and(eq(adminUserPictures.adminUserId, principal.id), isNull(adminUserPictures.archivedAt)));
+      await tx.update(adminUserPictures).set({ archivedAt: null }).where(eq(adminUserPictures.id, row.id));
+      await this.repository.update(tx, principal.id, { pictureKey: row.storageKey, pictureType: row.contentType });
+      await this.audit.record(tx, {
+        entityType: "admin_user",
+        entityId: principal.id,
+        action: "file_restored",
+        actor: actorFor(principal),
+        source: "admin",
+        changes: [{ field: "picture", label: "Profile picture", kind: "text", before: profile?.pictureKey ? "Set" : null, after: "Set" }],
+        meta: { label: profile?.name ?? principal.email, file: { kind: "picture", id: row.id, name: "Profile picture" } },
+      });
+    });
     return this.profile(principal);
   }
 
@@ -494,9 +563,5 @@ export class AccountsService {
       changes,
       meta: { label: (after as AccountDto).name },
     });
-  }
-
-  private async removeStoredFile(key: string) {
-    if (!(await this.repository.storageKeyInUse(key))) await this.storage.delete(key);
   }
 }

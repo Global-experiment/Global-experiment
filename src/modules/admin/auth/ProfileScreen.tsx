@@ -86,6 +86,8 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
   const [dialog, setDialog] = useState<"email" | "password" | "deactivate" | null>(null);
   const [pictureVersion, setPictureVersion] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Archive-only (ADR 017): removed and replaced pictures are kept, and can be used again.
+  const previousPictures = useAdminData<{ id: string; uploadedAt: string; archivedAt: string }[]>("/profile/pictures");
 
   const loaded = profile.data;
   const version = loaded ? `${loaded.id}@${loaded.updatedAt}` : "";
@@ -169,6 +171,7 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
       await adminApi<Profile>("/profile/picture", { method: "POST", body: form });
       setPictureVersion((value) => value + 1);
       profile.reload();
+      previousPictures.reload();
       toast("Profile picture updated");
       router.refresh();
     } catch (caught) {
@@ -185,10 +188,28 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
     try {
       await adminApi<Profile>("/profile/picture", { method: "DELETE" });
       profile.reload();
+      previousPictures.reload();
       toast("Profile picture removed");
       router.refresh();
     } catch (caught) {
       setError(failure(caught, "Couldn't remove the picture."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function restorePreviousPicture(id: string) {
+    setBusy("picture");
+    setError(null);
+    try {
+      await adminApi<Profile>(`/profile/pictures/${id}/restore`, { method: "POST" });
+      setPictureVersion((value) => value + 1);
+      profile.reload();
+      previousPictures.reload();
+      toast("Profile picture updated");
+      router.refresh();
+    } catch (caught) {
+      setError(failure(caught, "Couldn't use that picture."));
     } finally {
       setBusy(null);
     }
@@ -298,6 +319,27 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
             <span className="w-full text-meta text-text-muted">PNG, JPEG or WebP, up to 2 MB.</span>
           </div>
         </PropertyRow>
+        {previousPictures.data && previousPictures.data.length > 0 ? (
+          <PropertyRow icon="image" label="Previous pictures">
+            <ul aria-label="Previous pictures" className="flex flex-wrap items-center gap-2">
+              {previousPictures.data.map((picture) => (
+                <li key={picture.id}>
+                  <button
+                    type="button"
+                    onClick={() => void restorePreviousPicture(picture.id)}
+                    disabled={busy !== null}
+                    aria-label="Use this picture again"
+                    title="Use this picture again"
+                    className={`flex rounded-full ${focusRing}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a private admin image behind the session, not optimisable */}
+                    <img src={`/api/admin/profile/pictures/${picture.id}`} alt="" width={32} height={32} className="size-8 rounded-full object-cover" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </PropertyRow>
+        ) : null}
         <PropertyRow icon="select" label="Time zone" htmlFor="profile-time-zone">
           <span className="relative flex">
             <select

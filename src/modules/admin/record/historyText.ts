@@ -71,6 +71,9 @@ export function grantedWhat(meta: HistoryItem["meta"] | undefined): { who: strin
   return { who: who || "access", on: meta.service };
 }
 
+/** What an archived or restored file was (ADR 017): a supporting document or a profile picture. */
+const fileKind = (meta: HistoryItem["meta"] | undefined) => (meta?.file as { kind?: string } | undefined)?.kind;
+
 /** The headline after the actor's name. `entity` names the record ("record", "entry"). */
 export function historyHeadline(item: Pick<HistoryItem, "action" | "changes"> & { meta?: HistoryItem["meta"] }, entity = "record"): string {
   switch (item.action) {
@@ -92,6 +95,14 @@ export function historyHeadline(item: Pick<HistoryItem, "action" | "changes"> & 
       return "edited a comment";
     case "comment_deleted":
       return "deleted a comment";
+    case "comment_archived":
+      return "archived a comment";
+    case "comment_restored":
+      return "restored a comment";
+    case "file_archived":
+      return fileKind(item.meta) === "picture" ? "removed the profile picture" : "archived a document";
+    case "file_restored":
+      return fileKind(item.meta) === "picture" ? "used a previous profile picture" : "restored a document";
     case "viewed":
       return "viewed this page";
     case "updated":

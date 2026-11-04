@@ -159,7 +159,8 @@ export function TreasuryRecord({ id }: { id: string }) {
       entityNoun="entry"
       recordLink={(other) => `/admin/treasury/${other}`}
       panelExtra={canPublish ? publishAction : null}
-      revision={loaded.updatedAt}
+      // A document archived, restored or uploaded is an event on the entry too: the history reloads.
+      revision={`${loaded.updatedAt}|${loaded.documentsList.map((document) => `${document.id}:${document.archivedAt ?? ""}`).join(",")}`}
       readOnly={!canUpdate && !canReview && !canPublish}
       actions={{
         submit,
@@ -382,8 +383,11 @@ function Documents({ entryId, documents, onChange, editable }: { entryId: string
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const current = documents.filter((document) => !document.archivedAt);
+  const archived = documents.filter((document) => document.archivedAt);
 
   async function upload(file: File) {
     setError(null);
@@ -404,56 +408,77 @@ function Documents({ entryId, documents, onChange, editable }: { entryId: string
     }
   }
 
-  async function remove(documentId: string) {
+  /** Archive-only (ADR 017): a document is archived (kept, file included) and restored, never deleted. */
+  async function setArchived(documentId: string, archive: boolean) {
     setError(null);
+    setBusy(documentId);
     try {
-      await adminApi(`/treasury/documents/${documentId}`, { method: "DELETE" });
-      toast("Document deleted");
+      await adminApi(`/treasury/documents/${documentId}/${archive ? "archive" : "restore"}`, { method: "POST" });
+      toast(archive ? "Document archived" : "Document restored");
       onChange();
     } catch (caught) {
-      setError(message(caught, "Couldn't delete the document."));
+      setError(message(caught, archive ? "Couldn't archive the document." : "Couldn't restore the document."));
     } finally {
-      setConfirming(null);
+      setBusy(null);
     }
   }
 
+  const row = (document: TreasuryDocument, isArchived: boolean) => (
+    <li key={document.id} className="flex min-h-8 items-center gap-2 border-b border-line px-2">
+      <AdminIcon name="insert_drive_file" />
+      <a
+        href={`/api/admin/treasury/documents/${document.id}`}
+        download={document.fileName}
+        className={`min-w-0 truncate underline underline-offset-2 ${isArchived ? "text-text-muted" : ""} ${focusRing}`}
+      >
+        {document.fileName}
+      </a>
+      <span className="shrink-0 text-meta text-text-muted">
+        {formatBytes(document.sizeBytes)} · <Timestamp value={document.uploadedAt} format="short" />
+        {document.uploadedBy ? ` · ${document.uploadedBy}` : ""}
+      </span>
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        {editable ? (
+          <AdminButton
+            icon={isArchived ? "restart_alt" : "approval"}
+            onClick={() => void setArchived(document.id, !isArchived)}
+            disabled={busy !== null}
+            aria-label={`${isArchived ? "Restore" : "Archive"} ${document.fileName}`}
+          >
+            {busy === document.id ? (isArchived ? "Restoring…" : "Archiving…") : isArchived ? "Restore" : "Archive"}
+          </AdminButton>
+        ) : null}
+      </span>
+    </li>
+  );
+
   return (
     <div className="flex max-w-[720px] flex-col gap-1">
-      {documents.length > 0 ? (
+      {current.length > 0 ? (
         <ul aria-label="Supporting documents" className="flex flex-col">
-          {documents.map((document) => (
-            <li key={document.id} className="flex min-h-8 items-center gap-2 border-b border-line px-2">
-              <AdminIcon name="insert_drive_file" />
-              <a
-                href={`/api/admin/treasury/documents/${document.id}`}
-                download={document.fileName}
-                className={`min-w-0 truncate underline underline-offset-2 ${focusRing}`}
-              >
-                {document.fileName}
-              </a>
-              <span className="shrink-0 text-meta text-text-muted">
-                {formatBytes(document.sizeBytes)} · <Timestamp value={document.uploadedAt} format="short" />
-                {document.uploadedBy ? ` · ${document.uploadedBy}` : ""}
-              </span>
-              <span className="ml-auto flex shrink-0 items-center gap-2">
-                {!editable ? null : confirming === document.id ? (
-                  <>
-                    <span className="text-meta">Delete this file?</span>
-                    <AdminButton onClick={() => void remove(document.id)}>Delete</AdminButton>
-                    <AdminButton onClick={() => setConfirming(null)}>Cancel</AdminButton>
-                  </>
-                ) : (
-                  <AdminButton icon="close" onClick={() => setConfirming(document.id)} aria-label={`Delete ${document.fileName}`}>
-                    Delete
-                  </AdminButton>
-                )}
-              </span>
-            </li>
-          ))}
+          {current.map((document) => row(document, false))}
         </ul>
       ) : (
         <p className="flex min-h-8 items-center px-2 text-text-muted">No documents yet.</p>
       )}
+      {archived.length > 0 ? (
+        <>
+          <button
+            type="button"
+            aria-expanded={showArchived}
+            onClick={() => setShowArchived((open) => !open)}
+            className={`flex min-h-8 items-center gap-1 self-start rounded-control px-2 text-meta text-text-muted hover:text-text-primary ${focusRing}`}
+          >
+            <AdminIcon name={showArchived ? "expand_less" : "expand_more"} />
+            Archived documents {archived.length}
+          </button>
+          {showArchived ? (
+            <ul aria-label="Archived documents" className="flex flex-col">
+              {archived.map((document) => row(document, true))}
+            </ul>
+          ) : null}
+        </>
+      ) : null}
       <input
         ref={input}
         type="file"

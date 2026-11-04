@@ -367,8 +367,9 @@ test.describe("signed in", () => {
     await page.goto("/admin/people");
     await expect(page).toHaveTitle("People");
     await rows(page).first().locator("a").first().click();
+    // The record's heading is empty until it has loaded.
+    await expect.poll(async () => (await page.getByRole("heading", { level: 1 }).innerText()).trim()).not.toBe("");
     const name = (await page.getByRole("heading", { level: 1 }).innerText()).trim();
-    expect(name).not.toBe("");
     await expect(page).toHaveTitle(`${name}`);
     await page.goto("/admin/organizations");
     await expect(page).toHaveTitle("Organizations");

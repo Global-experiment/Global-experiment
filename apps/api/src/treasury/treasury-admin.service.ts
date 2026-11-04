@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { PinoLogger } from "nestjs-pino";
 import { actorFor, AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditChange } from "../audit/audit.types.js";
@@ -311,27 +311,32 @@ export class TreasuryAdminService {
     if (!contentType) throw new ValidationFailedError([{ path: "file", message: "Only PDF, PNG or JPEG files can be uploaded." }]);
     const fileName = cleanFileName(file.originalname, contentType);
 
+    // Content-addressed and never removed (ADR 017): a file stored for nothing (a refused duplicate) is harmless.
     const stored = await this.storage.put(file.buffer);
     const entry = await this.load(entryId);
-    try {
-      const row = await this.db.transaction(async (tx) => {
-        const [inserted] = await tx
-          .insert(treasuryDocuments)
-          .values({ entryId, fileName, contentType, sizeBytes: file.size, sha256: stored.sha256, storageKey: stored.key, uploadedByAdminId: uploader.id })
-          .onConflictDoNothing({ target: [treasuryDocuments.entryId, treasuryDocuments.sha256] })
-          .returning({ id: treasuryDocuments.id });
-        if (!inserted) throw refused("duplicate_document", "This file is already attached to this entry.");
-        await this.recordEntry(tx, entry, uploader, "updated", [
-          { field: "documents", label: "Documents", kind: "relation", before: [], after: [{ id: inserted.id, label: fileName }] },
-        ]);
-        return inserted;
-      });
-      this.logger.info({ entryId, documentId: row.id, contentType, sizeBytes: file.size }, "Treasury document uploaded");
-      return (await this.repository.documents(entryId)).find((document) => document.id === row.id)!;
-    } catch (error) {
-      await this.removeIfUnused(stored.key);
-      throw error;
-    }
+    const row = await this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(treasuryDocuments)
+        .where(and(eq(treasuryDocuments.entryId, entryId), eq(treasuryDocuments.sha256, stored.sha256)));
+      if (existing && !existing.archivedAt) throw refused("duplicate_document", "This file is already attached to this entry.");
+      if (existing) {
+        // The same file again on an entry where it was archived: it comes back.
+        await tx.update(treasuryDocuments).set({ archivedAt: null, archivedByAdminId: null }).where(eq(treasuryDocuments.id, existing.id));
+        await this.recordDocument(tx, entry, uploader, "file_restored", existing);
+        return existing;
+      }
+      const [inserted] = await tx
+        .insert(treasuryDocuments)
+        .values({ entryId, fileName, contentType, sizeBytes: file.size, sha256: stored.sha256, storageKey: stored.key, uploadedByAdminId: uploader.id })
+        .returning({ id: treasuryDocuments.id });
+      await this.recordEntry(tx, entry, uploader, "updated", [
+        { field: "documents", label: "Documents", kind: "relation", before: [], after: [{ id: inserted!.id, label: fileName }] },
+      ]);
+      return inserted!;
+    });
+    this.logger.info({ entryId, documentId: row.id, contentType, sizeBytes: file.size }, "Treasury document uploaded");
+    return (await this.repository.documents(entryId)).find((document) => document.id === row.id)!;
   }
 
   async download(documentId: string, admin: AdminPrincipal | undefined): Promise<{ fileName: string; contentType: string; bytes: Buffer }> {
@@ -346,29 +351,44 @@ export class TreasuryAdminService {
     }
   }
 
-  async deleteDocument(documentId: string, admin: AdminPrincipal | undefined): Promise<void> {
+  /**
+   * Archive-only (ADR 017): the document leaves the entry's list but keeps
+   * its row and its file, and can be restored; both are History events.
+   */
+  async setDocumentArchived(documentId: string, archived: boolean, admin: AdminPrincipal | undefined): Promise<TreasuryDocumentDto> {
     const editor = this.assertTreasuryAdmin(admin);
-    const deleted = await this.db.transaction(async (tx) => {
-      const [row] = await tx.delete(treasuryDocuments).where(eq(treasuryDocuments.id, documentId)).returning();
+    const document = await this.db.transaction(async (tx) => {
+      const [row] = await tx.select().from(treasuryDocuments).where(eq(treasuryDocuments.id, documentId));
       if (!row) throw new NotFoundError("Document not found.");
+      if ((row.archivedAt !== null) === archived) return row;
+      await tx
+        .update(treasuryDocuments)
+        .set(archived ? { archivedAt: this.clock(), archivedByAdminId: editor.id } : { archivedAt: null, archivedByAdminId: null })
+        .where(eq(treasuryDocuments.id, documentId));
       const [entry] = await tx.select().from(treasuryEntries).where(eq(treasuryEntries.id, row.entryId));
-      if (entry)
-        await this.recordEntry(tx, entry, editor, "updated", [
-          { field: "documents", label: "Documents", kind: "relation", before: [{ id: row.id, label: row.fileName }], after: [] },
-        ]);
+      if (entry) await this.recordDocument(tx, entry, editor, archived ? "file_archived" : "file_restored", row);
       return row;
     });
-    await this.removeIfUnused(deleted.storageKey);
-    this.logger.info({ entryId: deleted.entryId, documentId }, "Treasury document deleted");
+    this.logger.info({ entryId: document.entryId, documentId }, archived ? "Treasury document archived" : "Treasury document restored");
+    return (await this.repository.documents(document.entryId)).find((item) => item.id === documentId)!;
   }
 
-  /** Content-addressed files are shared: delete the bytes only when no document uses them any more. */
-  private async removeIfUnused(storageKey: string, exceptId?: string): Promise<void> {
-    const [user] = await this.db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(treasuryDocuments)
-      .where(and(eq(treasuryDocuments.storageKey, storageKey), exceptId ? ne(treasuryDocuments.id, exceptId) : undefined));
-    if ((user?.n ?? 0) === 0) await this.storage.delete(storageKey);
+  /** "archived a document" / "restored a document" on the entry, naming the file. */
+  private async recordDocument(
+    tx: Executor,
+    entry: Entry,
+    admin: AdminPrincipal,
+    action: "file_archived" | "file_restored",
+    document: { id: string; fileName: string },
+  ) {
+    await this.audit.record(tx, {
+      entityType: "treasury_entry",
+      entityId: entry.id,
+      action,
+      actor: actorFor(admin),
+      source: "admin",
+      meta: { label: entryLabel(entry), file: { kind: "document", id: document.id, name: document.fileName } },
+    });
   }
 }
 

@@ -401,6 +401,12 @@ test("Profile settings (p18): display name, description, expertise, appearance (
   await expect(page.getByRole("status").filter({ hasText: "Profile updated" })).toBeVisible();
   await page.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Profile picture removed" })).toBeVisible();
+  // Archive-only (ADR 017): the removed picture is kept and can be used again.
+  const previous = page.getByRole("list", { name: "Previous pictures" });
+  await previous.getByRole("button", { name: "Use this picture again" }).first().click();
+  await expect(page.locator("#admin-sidebar img")).toHaveAttribute("src", /\/api\/admin\/accounts\/[0-9a-f-]{36}\/picture/);
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Profile picture removed" }).last()).toBeVisible();
 });
 
 test("a password reset link from the account, used on /admin/reset-password", async ({ browser }, testInfo) => {
