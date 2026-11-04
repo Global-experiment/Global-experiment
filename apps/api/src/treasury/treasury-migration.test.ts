@@ -145,7 +145,7 @@ describe("migration 0006 — treasury and donations", () => {
   it("carries a database at 0005 with existing rows over untouched", async () => {
     const client = await databaseAt(AT_0005);
     await client.exec(`
-      INSERT INTO admin_users (id, email, password_hash, display_name) VALUES ('cccccccc-0000-4000-8000-000000000001', 'owner@example.test', 'x', 'Owner');
+      INSERT INTO admin_users (id, email, password_hash, display_name) VALUES ('cccccccc-0000-4000-8000-000000000001', 'owner@example.com', 'x', 'Owner');
       INSERT INTO people (id, name) VALUES ('${PERSON}', 'Ada');
       INSERT INTO organizations (id, name) VALUES ('${ORG}', 'First');
     `);

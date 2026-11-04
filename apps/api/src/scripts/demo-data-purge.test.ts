@@ -49,7 +49,7 @@ describe("demo data purge", () => {
       .returning();
     const [organization] = await db
       .insert(organizations)
-      .values({ name: "Demo Day Association", email: "contact@demo-day.ch", description: "Organises sample-size studies" })
+      .values({ name: "Demo Day Association", email: "contact@demo-day.example.net", description: "Organises sample-size studies" })
       .returning();
     await db.insert(peopleExpertise).values({ personId: person!.id, expertiseId: item!.id });
     return { domain: domain!, field: field!, item: item!, person: person!, organization: organization! };

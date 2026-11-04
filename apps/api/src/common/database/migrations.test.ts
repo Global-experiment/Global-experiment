@@ -284,7 +284,7 @@ describe("0002 constraints", () => {
   it("checks organization emails like people's, and caps Wise recipient IDs at 100 characters of free text", async () => {
     const client = await ready();
     await rejects(client, "insert into organizations (name, email) values ('X', 'not-an-email')", /organizations_email_shape/);
-    await accepts(client, "insert into organizations (name, email) values ('X', 'hello@ngo.ch')");
+    await accepts(client, "insert into organizations (name, email) values ('X', 'hello@example.org')");
     await accepts(client, `insert into people (name, wise_recipient_id) values ('W', 'P-12 345 / any text')`);
     await rejects(client, `insert into people (name, wise_recipient_id) values ('W', '${"9".repeat(101)}')`, /people_wise_recipient_id_length/);
     await rejects(client, `insert into organizations (name, wise_recipient_id) values ('W', '${"9".repeat(101)}')`, /organizations_wise_recipient_id_length/);

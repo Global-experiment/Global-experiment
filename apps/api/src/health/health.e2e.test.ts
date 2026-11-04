@@ -49,7 +49,7 @@ describe("platform foundation (HTTP)", () => {
       .post("/api/admin/auth/login")
       .set("origin", "http://localhost:3000")
       .set("content-type", "application/json")
-      .send(JSON.stringify({ email: "a@b.co", password: "x".repeat(200 * 1024) }));
+      .send(JSON.stringify({ email: "a@example.com", password: "x".repeat(200 * 1024) }));
     expect(res.status).toBe(413);
     expect(res.body.error.code).toBe("payload_too_large");
   });
