@@ -580,97 +580,52 @@ erDiagram
   }
 ```
 
-## 5. CMS (Home and Documentation)
+## 5. CMS (Home and Documentation) (built: migration 0016)
 
-Notion "Documentation (1)" (10 real articles, all Published) and the Home
-page (one heading_4 tagline, a heading_2 and five heading_3 sections with
-paragraphs). Figma admin p5–p9: Home editor and document editor with the
-same toolbar (undo, redo, H1, Text, bulleted list, numbered list, link),
-right rail (Last publish, Created, Number, Discard changes, Duplicate as a
-draft, Submit changes) and History.
+Native since Delivery 6 (ADR 020; the editor is ADR 019). Figma admin p6–p11.
+The first revisions come from the one-time Notion import
+(`npm run api:cms-import-notion`), attributed to "Notion import".
 
-### 5.1 `documents`
+### 5.1 `cms_documents`
 
-| Column | Type | Rules | Notion |
-|---|---|---|---|
-| `id` | uuid PK | | |
-| `document_number` | integer identity | "Number 81" in Figma | — |
-| `kind` | text | `home`, `article` (CHECK); exactly one `home` (partial unique index). More kinds (Information notes, Constitution) are rows of the same table later (Q30) | — |
-| `notion_page_id` | uuid null | Unique | page id / Home page id |
-| `title` | text | 1–200 | Name |
-| `slug` | text null | Articles: required, `^[a-z0-9]+(-[a-z0-9]+)*$`, unique among articles; Home: null (CHECK) | Slug |
-| `status_key` | text → `document_statuses` | | Status |
-| `display_order` | integer null | ≥ 0; articles only | Display order |
-| `published_at` | timestamptz null | Set when first published | Published at |
-| `current_revision_id` | uuid null → content_revisions `restrict` | The revision the public site shows | — |
-| `created_by_admin_id`, `updated_by_admin_id` | uuid null → admin_users | | |
-| `created_at`, `updated_at` | timestamptz | "Created" in the right rail | |
+One row per page: Home (exactly one, partial unique index) or a
+Documentation article. `document_number` (DOC-n), `kind` (`home`,
+`article`), `display_order`, `latest_revision_id` (newest),
+`published_revision_id` (what visitors see; null = not on the website),
+`first_published_at` ("Published …"), `unpublished_at` (taken off after
+being published; never together with a published revision),
+`archived_at` (ADR 017), `source_ref` (`notion:<page id>`, unique: the
+import runs once), `created_by_id`, `created_at`, `updated_at`.
 
-Rule: `status = published ⇒ current_revision_id is not null and
-published_at is not null` (CHECK).
+State: archived → *Archived*; published revision → *Published* (with
+*draft changes* when the newest revision is newer); unpublished_at →
+*Unpublished*; otherwise *Draft*.
 
-`document_statuses` lookup: `draft` Draft, `published` Published,
-`unpublished` Unpublished, `archived` Archived (Figma pills = Notion options).
+### 5.2 `cms_revisions`
 
-### 5.2 `content_revisions`
+Every save is a row; a trigger refuses any change to its content and any
+delete. `number` (1, 2, 3… per document), `status` (`draft`,
+`published` — review statuses go between them later), `title` (1–200),
+`slug` (`^[a-z0-9]+(-[a-z0-9]+)*$`, ≤ 100; unique among the articles on the
+website or being edited, checked by the API), `expertise` (jsonb, ≤ 10
+tags, free text as in Notion), `content` (jsonb blocks, below), `summary`
+(≤ 500), `author_id` / `author_label`, `created_at`, `published_at` /
+`published_by_id` / `published_by_label`, `restored_from_id` (a restore
+copies another revision), `content_hash` (an unchanged save makes no
+revision).
 
-| Column | Type | Rules |
-|---|---|---|
-| `id` | uuid PK | |
-| `document_id` | uuid → documents `cascade` | |
-| `revision_number` | integer | Unique per document, from 1 |
-| `title` | text | Snapshot of the title |
-| `body` | jsonb | Block array (below); `jsonb_typeof(body) = 'array'` (CHECK); validated by the API |
-| `source` | text | `admin`, `notion_import` (CHECK) |
-| `created_by_admin_id` | uuid null → admin_users | |
-| `created_at` | timestamptz | "Last publish" when it is the current revision |
+Content blocks (apps/api/src/cms/content.ts): `heading` (level 1–4),
+`paragraph`, `list` (ordered or not, items), `image` (an uploaded image's
+id and its description). Text is runs of plain text and links (https,
+http, mailto, site paths, anchors). Never HTML.
 
-Each "Submit changes" writes a new revision (never edits one); "Discard
-changes" drops the unsaved draft in the browser; "Duplicate as a draft"
-creates a new document (status draft) with a copy of the current revision.
-The public article **history** page lists the revisions that were current
-while the document was published.
+### 5.3 `cms_images`
 
-**Block model** (the editor's toolbar, and what the Notion importer
-already produces): `heading` (level 1–3), `paragraph`, `bulleted_list`,
-`numbered_list` (items), each with rich text runs `{ text, bold, italic,
-link }`. Links are `https:`, `mailto:` or internal paths only. No raw HTML
-is stored.
-
-### 5.3 `document_expertise`
-
-`document_id` → documents `cascade`, `expertise_id` → expertise_items
-`restrict`, PK both; **≤ 10 per document** (Figma "Documents can have up to
-10 expertise", §3.5). Notion's Documentation "Expertise" is a separate
-38-label list, not the taxonomy (Q29): the importer maps labels to taxonomy
-items by exact name and reports the rest.
-
-```mermaid
-erDiagram
-  documents ||--|{ content_revisions : "revisions"
-  documents |o--o| content_revisions : "current"
-  documents }o--|| document_statuses : status
-  documents ||--o{ document_expertise : ""
-  expertise_items ||--o{ document_expertise : ""
-  documents {
-    uuid id PK
-    int document_number UK
-    text kind "home | article"
-    text title
-    text slug UK
-    text status_key FK
-    int display_order
-    timestamptz published_at
-    uuid current_revision_id FK
-  }
-  content_revisions {
-    uuid id PK
-    uuid document_id FK
-    int revision_number
-    jsonb body "blocks"
-    text source
-  }
-```
+Uploaded images (PNG, JPEG, WebP, GIF; ≤ 5 MB; from the bytes):
+`storage_key` (content-addressed file storage), `content_type`,
+`size_bytes`, `sha256` (unique: the same image is one row), `file_name`,
+uploader. Public only when a published revision of a page on the website
+uses the image. Never deleted.
 
 ## 6. Feedback and issues
 
