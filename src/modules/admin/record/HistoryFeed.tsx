@@ -21,6 +21,7 @@ const KIND_ICON: Record<HistoryFieldKind, AdminIconName> = {
   boolean: "check_box",
   select: "select",
   relation: "arrow_outward",
+  content: "view_all",
 };
 
 const chip = "inline-flex min-h-6 items-center rounded-control px-1 text-meta text-text-primary ring-1 ring-line";
@@ -64,6 +65,7 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
       </div>
     );
   }
+  if (change.kind === "content") return <ContentChange change={change} />;
   if (change.kind === "relation") {
     const { removed, added } = relationDiff(change);
     // Only the order changed (drag and drop): the old order struck through, then the new one.
@@ -128,6 +130,42 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
         )}
         <Scalar value={change.after} kind={change.kind} timeZone={timeZone} />
       </p>
+    </div>
+  );
+}
+
+/**
+ * A Home or Documentation content change (admin-desktop.pdf p7, p10): the
+ * blocks added, then the blocks removed struck through, in the body's
+ * rhythm — headings bold, list items as lines. At most 8 of each; the
+ * Versions page shows the whole comparison.
+ */
+function ContentChange({ change }: { change: HistoryChange }) {
+  const lines = (value: HistoryValue) => (Array.isArray(value) ? value : []);
+  const added = lines(change.after);
+  const removed = lines(change.before);
+  const line = (item: { id: string; label: string }, struck: boolean) => {
+    const style = item.id.split(":")[0] ?? "p";
+    const heading = /^h[1-4]$/.test(style);
+    const text = style === "img" ? `Image: ${item.label}` : item.label;
+    return (
+      <p
+        key={`${struck ? "-" : "+"}${item.id}`}
+        data-content-line={struck ? "removed" : "added"}
+        className={`mt-1 text-meta whitespace-pre-line ${heading ? "font-bold" : ""} ${struck ? "text-text-muted line-through" : "text-text-primary"}`}
+      >
+        {text}
+      </p>
+    );
+  };
+  const more = (count: number) => (count > 8 ? <p className="mt-1 text-meta text-text-muted">and {count - 8} more</p> : null);
+  return (
+    <div data-change={change.field}>
+      <FieldLabel icon="view_all">{change.label}</FieldLabel>
+      {added.slice(0, 8).map((item) => line(item, false))}
+      {more(added.length)}
+      {removed.slice(0, 8).map((item) => line(item, true))}
+      {more(removed.length)}
     </div>
   );
 }

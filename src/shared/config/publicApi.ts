@@ -1,6 +1,7 @@
 import { adminApiOrigin } from "./adminApi";
 import type { DonationCurrency } from "@/shared/donate/money";
 import type { DonationFrequency } from "@/shared/donate/donateParams";
+import type { ContentBlock } from "@/shared/content/types";
 
 /**
  * The native API's public routes, as the Next.js server reads them (server
@@ -11,13 +12,16 @@ import type { DonationFrequency } from "@/shared/donate/donateParams";
  * under the `treasury` tag and revalidated on demand — the API calls
  * /api/revalidate after every ledger write — with a 5-minute time-based
  * fallback. The donation configuration (flags from settings) and Checkout
- * session checks are never cached.
+ * session checks are never cached. Home and Documentation (native since
+ * Delivery 6, ADR 020) are cached the same way under the `home` and
+ * `documentation` tags, revalidated on every publication.
  */
-export const PUBLIC_API_PREFIXES = ["donations", "stripe", "treasury"] as const;
+export const PUBLIC_API_PREFIXES = ["donations", "stripe", "treasury", "cms"] as const;
 
 /** Tags the API may revalidate (apps/api/src/revalidation/revalidation.service.ts). */
-export const PUBLIC_CACHE_TAGS = { treasury: "treasury" } as const;
+export const PUBLIC_CACHE_TAGS = { treasury: "treasury", home: "home", documentation: "documentation" } as const;
 export const TREASURY_REVALIDATE_SECONDS = 300;
+export const CMS_REVALIDATE_SECONDS = 300;
 
 /** Same API process as the admin routes (single API instance in v0.1). */
 export const publicApiOrigin = adminApiOrigin;
@@ -192,4 +196,51 @@ export function fetchTreasuryEntries(query: TreasuryEntriesQuery): Promise<ApiRe
 
 export function fetchTreasuryEntry(number: number): Promise<ApiResult<PublicTreasuryEntry>> {
   return getJson(`/api/treasury/entries/${number}`, treasuryCache);
+}
+
+/** The published Home (apps/api/src/cms/cms.contracts.ts). 404 until Home has been published. */
+export interface PublicHome {
+  content: ContentBlock[];
+  publishedAt: string;
+}
+
+/** A published Documentation article: no author names, dates only. */
+export interface PublicArticle {
+  slug: string;
+  title: string;
+  displayOrder: number;
+  expertise: string[];
+  /** First publication ("Published …"). */
+  publishedAt: string;
+  /** When the words shown were written ("last updated …"). */
+  updatedAt: string;
+  content: ContentBlock[];
+}
+
+/** One published version of an article (the public Document history). */
+export interface PublicVersion {
+  number: number;
+  title: string;
+  expertise: string[];
+  publishedAt: string;
+  content: ContentBlock[];
+}
+
+export function fetchCmsHome(): Promise<ApiResult<PublicHome>> {
+  return getJson("/api/cms/home", { next: { revalidate: CMS_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.home] } });
+}
+
+const documentationCache = { next: { revalidate: CMS_REVALIDATE_SECONDS, tags: [PUBLIC_CACHE_TAGS.documentation] } };
+
+export function fetchCmsDocumentation(): Promise<ApiResult<{ articles: PublicArticle[] }>> {
+  return getJson("/api/cms/documentation", documentationCache);
+}
+
+export function fetchCmsVersions(slug: string): Promise<ApiResult<{ versions: PublicVersion[] }>> {
+  return getJson(`/api/cms/documentation/${encodeURIComponent(slug)}/versions`, documentationCache);
+}
+
+/** A renamed article's current slug (404 when the slug never belonged to a published article). */
+export function fetchCurrentSlug(slug: string): Promise<ApiResult<{ slug: string }>> {
+  return getJson(`/api/cms/documentation/${encodeURIComponent(slug)}/current-slug`, documentationCache);
 }

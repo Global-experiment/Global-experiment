@@ -341,3 +341,43 @@ html:has([data-admin]) body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * The Home and Documentation editor (admin-desktop.pdf p7, p10): the public
+ * body's rhythm — 14px on 18px lines, bold headings of the same size, 16px
+ * above a heading, one 18px line between blocks — so editors see the page
+ * as visitors will. Links are underlined, images at most the column's width.
+ */
+.cms-editor .ProseMirror > * + * {
+  margin-top: var(--spacing-paragraph);
+}
+.cms-editor .ProseMirror > :is(h1, h2, h3, h4) {
+  font-weight: 700;
+}
+.cms-editor .ProseMirror > * + :is(h1, h2, h3, h4) {
+  margin-top: 1rem;
+}
+.cms-editor .ProseMirror > :is(h1, h2, h3, h4) + * {
+  margin-top: 0.25rem;
+}
+.cms-editor .ProseMirror ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.cms-editor .ProseMirror ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.cms-editor .ProseMirror a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cms-editor .ProseMirror img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-control);
+}
+.cms-editor .ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-text-primary);
+}

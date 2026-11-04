@@ -96,7 +96,7 @@ export function ArticleAccordionItem({
             </div>
           ) : body === "error" ? (
             <p role="alert" className="text-body text-text-muted">
-              This article&rsquo;s text couldn&rsquo;t be loaded from Notion right now.{" "}
+              This article&rsquo;s text couldn&rsquo;t be loaded right now.{" "}
               <a href={`/documentation/${article.slug}`} className="underline underline-offset-2">
                 Open the article page
               </a>{" "}

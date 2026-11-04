@@ -1,9 +1,7 @@
 import type { HomeContent } from "./types";
 
 /**
- * v0.1 implementation: NotionHomeRepository (live Notion page). v1 will
- * replace it with a self-hosted source behind this same interface — see
- * docs/architecture/decisions/003-notion-temporary-adapter.md.
+ * The native API since Delivery 6 (ADR 020): infrastructure/getHomeRepository.ts.
  */
 export interface HomeRepository {
   get(): Promise<HomeContent>;

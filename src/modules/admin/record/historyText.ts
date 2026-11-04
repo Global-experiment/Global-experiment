@@ -42,6 +42,7 @@ function updateHeadline(changes: HistoryChange[], entity: string): string {
   if (changes.every((change) => change.privacy === "contact")) return "updated contact details";
   if (changes.length > 1) return `updated ${changes.length} fields`;
   const [change] = changes as [HistoryChange];
+  if (change.kind === "content") return `edited the ${entity} content`;
   if (change.privacy === "private_note") return "edited a note";
   if (change.field === "publication" && change.after && typeof change.after === "object" && "key" in change.after) {
     return change.after.key === "published" ? `published this ${entity}` : `unpublished this ${entity}`;
@@ -103,6 +104,10 @@ export function historyHeadline(item: Pick<HistoryItem, "action" | "changes"> & 
       return fileKind(item.meta) === "picture" ? "removed the profile picture" : "archived a document";
     case "file_restored":
       return fileKind(item.meta) === "picture" ? "used a previous profile picture" : "restored a document";
+    case "published":
+      return `published this ${entity}`;
+    case "unpublished":
+      return `unpublished this ${entity}`;
     case "viewed":
       return "viewed this page";
     case "updated":

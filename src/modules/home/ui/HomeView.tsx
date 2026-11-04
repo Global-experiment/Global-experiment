@@ -7,7 +7,7 @@ import { homeActions, homePrimaryAction } from "./homeNavigation";
 
 /**
  * Home's content under its header: the tagline, the action grid and the
- * Notion sections. Shared by the public page and the admin's public view
+ * content's sections. Shared by the public page and the admin's public view
  * (admin-desktop.pdf p6), which has its own header — there the tagline is a
  * second-level heading, since the admin header carries the page's <h1>.
  */

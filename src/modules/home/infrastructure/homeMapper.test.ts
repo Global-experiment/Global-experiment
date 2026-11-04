@@ -12,8 +12,8 @@ describe("mapHomeBlocks", () => {
     expect(home.tagline).toEqual(t("Tagline"));
     expect(home.sectionLabel).toEqual(t("Label"));
     expect(home.sections).toEqual([
-      { heading: t("First"), paragraphs: [t("a")] },
-      { heading: t("Second"), paragraphs: [t("b"), t("c")] },
+      { heading: t("First"), blocks: [p("a")] },
+      { heading: t("Second"), blocks: [p("b"), p("c")] },
     ]);
   });
 
@@ -23,40 +23,32 @@ describe("mapHomeBlocks", () => {
     expect(home.sectionLabel).toBeNull();
   });
 
-  it("keeps links in rich text", () => {
-    const link: ContentBlock = {
-      kind: "paragraph",
-      text: [{ kind: "link", value: "docs", href: "/documentation/x" }],
-    };
-    const home = mapHomeBlocks([h(4, "T"), h(3, "S"), link]);
-    expect(home.sections[0].paragraphs[0]).toEqual([{ kind: "link", value: "docs", href: "/documentation/x" }]);
+  it("keeps links, lists and images in their section", () => {
+    const link: ContentBlock = { kind: "paragraph", text: [{ kind: "link", value: "docs", href: "/documentation/x" }] };
+    const list: ContentBlock = { kind: "list", ordered: false, items: [t("one"), t("two")] };
+    const image: ContentBlock = { kind: "image", imageId: "00000000-0000-4000-8000-000000000001", alt: "A diagram" };
+    const home = mapHomeBlocks([h(4, "T"), h(3, "S"), link, list, image]);
+    expect(home.sections[0]!.blocks).toEqual([link, list, image]);
   });
 
-  it("skips empty blocks and unsupported blocks without losing real content", () => {
-    const home = mapHomeBlocks([
-      h(4, "T"),
-      p("   "),
-      { kind: "unsupported", type: "image" },
-      h(3, "S"),
-      { kind: "unsupported", type: "bulleted_list_item" },
-      p("kept"),
-    ]);
-    expect(home.sections).toEqual([{ heading: t("S"), paragraphs: [t("kept")] }]);
+  it("skips empty paragraphs and empty headings without losing real content", () => {
+    const home = mapHomeBlocks([h(4, "T"), p("   "), h(3, " "), h(3, "S"), p("kept")]);
+    expect(home.sections).toEqual([{ heading: t("S"), blocks: [p("kept")] }]);
   });
 
   it("does not lose a further top-level heading: it becomes a section, not a second label", () => {
     const home = mapHomeBlocks([h(4, "T"), h(2, "Label"), h(2, "Another"), p("x")]);
     expect(home.sectionLabel).toEqual(t("Label"));
-    expect(home.sections).toEqual([{ heading: t("Another"), paragraphs: [t("x")] }]);
+    expect(home.sections).toEqual([{ heading: t("Another"), blocks: [p("x")] }]);
   });
 
-  it("attaches stray paragraphs before any heading to a heading-less section", () => {
+  it("attaches stray content before any heading to a heading-less section", () => {
     const home = mapHomeBlocks([h(4, "T"), p("stray"), h(3, "S"), p("x")]);
-    expect(home.sections[0]).toEqual({ heading: null, paragraphs: [t("stray")] });
+    expect(home.sections[0]).toEqual({ heading: null, blocks: [p("stray")] });
   });
 
   it("rejects a page with no tagline instead of rendering it incomplete", () => {
-    expect(() => mapHomeBlocks([{ kind: "unsupported", type: "image" }])).toThrow(/no tagline/);
+    expect(() => mapHomeBlocks([{ kind: "list", ordered: false, items: [t("x")] }])).toThrow(/no tagline/);
     expect(() => mapHomeBlocks([])).toThrow(/no tagline/);
   });
 });

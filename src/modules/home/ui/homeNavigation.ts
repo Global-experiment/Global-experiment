@@ -5,7 +5,7 @@ import type { IconName } from "@/shared/ui/icons";
  * wordmark and the navigation controls (labels, destinations, Material
  * icons). These are interface elements, not editorial copy; all editorial
  * text on Home (the tagline, the section label, headings and paragraphs)
- * comes from the live Notion Home page via src/modules/home.
+ * is the published Home from the native API (ADR 020) via src/modules/home.
  *
  * Button set and order from the updated figma.pdf p1 (2026-09-24 export):
  * a full-width "Join waitlist" row, then a 2×2 grid — Documentation,

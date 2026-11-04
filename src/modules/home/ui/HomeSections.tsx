@@ -1,14 +1,15 @@
-import type { HomeContent } from "@/modules/home/domain/types";
+import type { HomeContent, HomeSectionBlock } from "@/modules/home/domain/types";
+import { ImageBlock, ListBlock, type ImageSource } from "@/shared/ui/ContentBlocks";
 import { RichText } from "@/shared/ui/RichText";
 
 /**
- * Presents the CMS text inside the Figma-defined structure (figma.pdf p1):
- * a bold 14px label, then per section a bold 14px heading with its
- * paragraphs 4px below, paragraphs separated by one 18px line, sections
- * separated by 16px. Only the words come from the CMS; sizes, weights,
- * colors and spacing are fixed here.
+ * Presents the content inside the Figma-defined structure (figma.pdf p1):
+ * a bold 14px label, then per section a bold 14px heading with its blocks
+ * 4px below, blocks separated by one 18px line, sections separated by 16px.
+ * Only the words (and images) come from the content; sizes, weights, colors
+ * and spacing are fixed here.
  */
-export function HomeSections({ content }: { content: Pick<HomeContent, "sectionLabel" | "sections"> }) {
+export function HomeSections({ content, imageSource }: { content: Pick<HomeContent, "sectionLabel" | "sections">; imageSource?: ImageSource }) {
   return (
     <div className="text-body text-text-primary">
       {content.sectionLabel ? (
@@ -25,14 +26,27 @@ export function HomeSections({ content }: { content: Pick<HomeContent, "sectionL
                 <RichText text={section.heading} />
               </h3>
             ) : null}
-            {section.paragraphs.map((paragraph, paragraphIndex) => (
-              <p key={paragraphIndex} className={paragraphIndex === 0 ? (section.heading ? "mt-1" : "") : "mt-paragraph"}>
-                <RichText text={paragraph} />
-              </p>
+            {section.blocks.map((block, blockIndex) => (
+              <SectionBlock
+                key={blockIndex}
+                block={block}
+                className={blockIndex === 0 ? (section.heading ? "mt-1" : "") : "mt-paragraph"}
+                imageSource={imageSource}
+              />
             ))}
           </section>
         ))}
       </div>
     </div>
+  );
+}
+
+function SectionBlock({ block, className, imageSource }: { block: HomeSectionBlock; className: string; imageSource?: ImageSource }) {
+  if (block.kind === "list") return <ListBlock block={block} className={className} />;
+  if (block.kind === "image") return <ImageBlock block={block} source={imageSource} className={className} />;
+  return (
+    <p className={className}>
+      <RichText text={block.text} />
+    </p>
   );
 }

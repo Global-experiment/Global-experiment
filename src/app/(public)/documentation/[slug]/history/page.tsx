@@ -10,12 +10,8 @@ import { DocumentationContent } from "@/modules/documentation/ui/DocumentationCo
 import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { formatPublishedAt } from "@/modules/documentation/ui/formatPublishedAt";
 import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
-import { notionMissingLocally } from "@/shared/config/env";
-import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
-
-// getArticleBySlug() reads the same cached dataset the index page populates
-// (see getDocumentationDataset) rather than fetching fresh from Notion.
-export const dynamic = "force-dynamic";
+import { fetchCmsVersions } from "@/shared/config/publicApi";
+import { ProviderError } from "@/shared/errors/app-error";
 
 const loadArticle = cache(getArticleBySlug);
 
@@ -24,7 +20,6 @@ interface HistoryPageProps {
 }
 
 export async function generateMetadata({ params }: HistoryPageProps): Promise<Metadata> {
-  if (notionMissingLocally("documentation")) return { title: "Document history" };
   const { slug } = await params;
   const article = await loadArticle(slug);
   if (!article) return {};
@@ -32,26 +27,18 @@ export async function generateMetadata({ params }: HistoryPageProps): Promise<Me
 }
 
 /**
- * figma.pdf p17's "Document history" screen shows several dated cards of
- * the same article. There is no real data source for that here: neither
- * the Notion export nor the public Notion API this app is built on exposes
- * page revision history (see the note on DocumentationRepository — this
- * was already investigated before this route existed). Rather than invent
- * timestamps or wording for past versions (explicitly ruled out — client
- * feedback item 19), this shows the one real, currently known version —
- * live from Notion, same as the article page — clearly labeled as the only
- * version available, so the client can see the card layout render with
- * genuine content instead of an empty page.
+ * figma.pdf p17's "Document history": one dated card per version of the
+ * article that was published, newest first (OPS-28) — real revisions from
+ * the native API, never invented ones. Drafts never appear here, and no
+ * author names: visitors see dates only.
  */
 export default async function DocumentationHistoryPage({ params }: HistoryPageProps) {
-  // A contributor's machine without Notion (never production): say so instead of failing.
-  if (notionMissingLocally("documentation")) return <NotionNotConnected title="Documentation" backHref="/documentation" />;
   const { slug } = await params;
   const article = await loadArticle(slug);
-
-  if (!article) {
-    notFound();
-  }
+  if (!article) notFound();
+  const result = await fetchCmsVersions(article.slug);
+  if (!result.ok) throw new ProviderError("The document history couldn't be loaded.");
+  const versions = result.data.versions;
 
   const articleHref = `/documentation/${article.slug}`;
 
@@ -64,26 +51,28 @@ export default async function DocumentationHistoryPage({ params }: HistoryPagePr
         menu={documentationMenu({ url: documentationAnchorHref(article.slug), title: article.title })}
       />
       <Container className="pt-1">
-        <p role="status" className="text-body text-text-muted">
-          No verifiable previous revision is available from the current data source: Notion&rsquo;s API doesn&rsquo;t expose a page&rsquo;s edit history to this
-          integration. Shown below is the current published version — the only version this page can genuinely display.
-        </p>
-
-        <div className="mt-6 border-t border-line pt-4">
-          <p className="text-body font-bold text-text-primary">{article.title}</p>
-          <p className="mt-1 text-meta text-text-muted">Published version {formatPublishedAt(article.publishedAt)}</p>
-          {article.expertise.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {article.expertise.map((tag) => (
-                <Tag key={tag}>{tag}</Tag>
-              ))}
-            </div>
-          ) : null}
-          <div className="mt-4">
-            <DocumentationContent blocks={article.content} headingLevelOffset={1} />
-          </div>
-          <FeedbackIssueActions className="mt-5" />
-        </div>
+        <p className="text-body text-text-muted">{versions.length === 1 ? "One published version." : `${versions.length} published versions, newest first.`}</p>
+        <ol aria-label="Published versions">
+          {versions.map((version, index) => (
+            <li key={version.number} data-version={version.number} className="mt-6 border-t border-line pt-4">
+              <p className="text-body font-bold text-text-primary">{version.title}</p>
+              <p className="mt-1 text-meta text-text-muted">
+                {index === 0 ? "Current version" : `Version ${version.number}`}, published {formatPublishedAt(new Date(version.publishedAt))}
+              </p>
+              {version.expertise.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {version.expertise.map((tag) => (
+                    <Tag key={tag}>{tag}</Tag>
+                  ))}
+                </div>
+              ) : null}
+              <div className="mt-4">
+                <DocumentationContent blocks={version.content} headingLevelOffset={1} />
+              </div>
+            </li>
+          ))}
+        </ol>
+        <FeedbackIssueActions className="mt-5" />
       </Container>
     </main>
   );

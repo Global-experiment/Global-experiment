@@ -9,8 +9,8 @@ export const metadata: Metadata = { title: "Home" };
 
 /**
  * Home as visitors see it, inside the admin (admin-desktop.pdf p6): the
- * admin header with "Administrate" (the read-only content view while Home
- * is managed in Notion), Share and ⋮, then the public page's content.
+ * admin header with "Administrate" (the Home editor, p7), Share and ⋮,
+ * then the published content as visitors see it.
  */
 export default async function AdminHomePage() {
   const content = await getHomeContent();
