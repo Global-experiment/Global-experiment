@@ -181,3 +181,16 @@ tests in `e2e/`. Test data (fixtures) only ever lives in test files.
 - Never use production keys locally. For Stripe, use your own test account.
 - If you think a secret was committed, tell the maintainer at once: it must
   be revoked and replaced, not just deleted.
+
+## For maintainers
+
+- **Release records and server notes never go in this repository**, which is
+  public. They live only in the maintainer's private operations folder,
+  outside any git working copy: the release records (commit, CI run, backup
+  name and checksum, counts, checks), server procedures, addresses, accounts,
+  paths and firewall details.
+- What goes in the repository is generic: the release process in
+  [docs/operations/README.md](docs/operations/README.md) and, for each
+  delivery, a plain-language note for the client in `docs/releases/`.
+- Before committing an operations document, check that it names no server,
+  address, account, path, backup or database that exists in production.

@@ -2,9 +2,12 @@
 
 How the site goes live, in general terms. Only the maintainer deploys and
 has access to the production server and its data; contributors never need
-either (see [CONTRIBUTING.md](../../CONTRIBUTING.md)). The detailed release
-records and server procedures are kept privately by the maintainer; the
-client-facing notes of each delivery are in [docs/releases](../releases).
+either (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
+
+**Release records and server notes are never kept in this repository**,
+which is public. They live only in the maintainer's private operations
+folder, outside any git working copy. Only the generic process below and the
+client-facing note of each delivery ([docs/releases](../releases)) are here.
 
 ## A release
 
@@ -31,9 +34,10 @@ client-facing notes of each delivery are in [docs/releases](../releases).
    the public pages and the admin sign-in page are opened, unsigned API
    requests must be refused, and the logs must show no error. Nothing is
    imported and no test data is created on production.
-7. **Records.** The maintainer keeps a private record of each release (the
-   commit, the CI run, the backup's checksum, the counts, the checks) and
-   the client gets a plain-language note in `docs/releases`.
+7. **Records.** The maintainer writes the release record (the commit, the CI
+   run, the backup's checksum, the counts, the checks) in the private
+   operations folder, never in the repository; the client gets a
+   plain-language note in `docs/releases`.
 
 ## Rollback
 
