@@ -12,8 +12,7 @@ import { E2E_REVALIDATE_SECRET } from "./e2e/testSettings";
  * download and dev-server startup; run on demand with `npm run test:e2e`.
  */
 // Set E2E_PORT to avoid colliding with another process on the default port.
-// The app has no fixture mode: these tests need real Notion credentials
-// (NOTION_API_KEY, NOTION_DOCUMENTATION_DB_ID, NOTION_HOME_PAGE_ID).
+// Home and Documentation come from the API's test fixtures (testing/fixtures/cms-content.json), loaded by e2e-setup.
 const port = Number(process.env.E2E_PORT ?? 3000);
 
 /**
@@ -72,6 +71,9 @@ export default defineConfig({
               // default (client review 2026-10-21) even with a key; donate-embedded.spec switches the embedded form on.
               STRIPE_PUBLISHABLE_KEY: "pk_test_e2estubkeynotarealstripekey",
               PUBLIC_SITE_URL: `http://localhost:${port}`,
+              // On-demand revalidation, as in production: a publication (Home, Documentation) or a ledger write refreshes the public pages.
+              WEB_INTERNAL_URL: `http://localhost:${port}`,
+              REVALIDATE_SECRET: E2E_REVALIDATE_SECRET,
             },
           },
         ]
@@ -100,7 +102,7 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore:
-        /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|admin-csv-import|treasury-toolbar|donate-embedded).spec.ts/,
+        /((admin|donate|treasury)-figma|admin-treasury|admin-public-pages|admin-detail-page|admin-detail-review|admin-accounts|admin-csv-import|admin-cms|treasury-toolbar|donate-embedded).spec.ts/,
       use: {
         browserName: "chromium",
         // Contribute's copy button correctly shows no confirmation at all when
@@ -154,6 +156,13 @@ export default defineConfig({
       name: "chromium-csv",
       dependencies: ["chromium-accounts"],
       testMatch: /admin-csv-import.spec.ts/,
+      use: { browserName: "chromium" },
+    },
+    // After everything: Home and Documentation are edited, published and restored (every change undone).
+    {
+      name: "chromium-cms",
+      dependencies: ["chromium-csv"],
+      testMatch: /admin-cms.spec.ts/,
       use: { browserName: "chromium" },
     },
     // Page centering with classic scrollbars must hold in Safari's engine

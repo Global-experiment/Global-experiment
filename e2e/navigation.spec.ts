@@ -282,12 +282,13 @@ test.describe("Documentation article and history", () => {
     await expect(page).toHaveURL("/documentation");
   });
 
-  test("the article overflow menu offers Document history, which shows real current content with an honest no-history note", async ({ page }) => {
+  test("the article overflow menu offers Document history: the real published versions (OPS-28)", async ({ page }) => {
     await page.goto("/documentation/introduction", { waitUntil: "load" });
     await page.getByRole("button", { name: "Page actions" }).click();
     await page.getByRole("link", { name: "Document history" }).click();
     await expect(page).toHaveURL("/documentation/introduction/history");
-    await expect(page.getByText("No verifiable previous revision is available")).toBeVisible();
+    await expect(page.getByText("One published version.")).toBeVisible();
+    await expect(page.getByRole("list", { name: "Published versions" }).getByRole("listitem")).toHaveCount(1);
     await expect(page.getByRole("heading", { name: "Summary" })).toBeVisible();
   });
 });

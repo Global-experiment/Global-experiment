@@ -8,9 +8,9 @@ import { E2E_ADMIN } from "./admin-credentials";
  * Public-first pages in the admin (admin-desktop.pdf p6, p8): Home,
  * Documentation and Treasury open on the public view inside the admin
  * shell, with "Administrate", Share and ⋮ at the top right; Administrate
- * leads to the backend view (Home content and the Documentation list are
- * read-only until the native editor; Treasury → the admin list). Home and
- * Documentation come from live Notion, as on the public site.
+ * leads to the backend view (Home's editor, the Documentation list,
+ * Treasury's admin list). Home and Documentation are the published native
+ * pages, as on the public site; editing them is admin-cms.spec.ts.
  */
 test.skip(!process.env.E2E_ADMIN_ENABLED, "TEST_DATABASE_URL isn't configured, so the admin stack isn't running.");
 test.describe.configure({ mode: "serial" });
@@ -77,7 +77,7 @@ async function headerGeometry() {
   near(title.x, 248, "title x");
 }
 
-test("Home (p6): the public page in the shell; Share copies the public address; Administrate → read-only content", async () => {
+test("Home (p6): the public page in the shell; Share copies the public address; Administrate → Home's editor", async () => {
   await page.locator("#admin-sidebar").getByRole("link", { name: "Home" }).click();
   await expect(page).toHaveURL("/admin/home");
   await expect(page).toHaveTitle("Home");
@@ -106,12 +106,10 @@ test("Home (p6): the public page in the shell; Share copies the public address; 
 
   await header().getByRole("link", { name: "Administrate" }).click();
   await expect(page).toHaveURL("/admin/home/manage");
-  await expect(page).toHaveTitle("Home content");
-  // No "Managed in Notion" label any more (2026-10-30): read-only shows by nothing being editable.
+  await expect(page).toHaveTitle("Home");
   await expect(page.getByText("Managed in Notion")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Tagline" })).toBeVisible();
-  // Read-only: nothing to type into.
-  await expect(page.locator("main input, main textarea, [data-record-main] input, [data-record-main] textarea")).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Home content" })).toBeVisible();
   await axe();
 });
 
@@ -144,13 +142,13 @@ test("Documentation (p8): the public list without its search; each article's Adm
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("tbody tr").first()).toContainText(title);
   const columns = (await page.locator("thead th").allInnerTexts()).map((text) => text.trim()).filter(Boolean);
-  expect(columns).toEqual(["Title", "Status", "Display order", "Expertise", "Last edited by", "Updated", "Published"]);
+  expect(columns).toEqual(["Name", "State", "Display order", "Expertise", "Last edited by", "Updated", "Last published"]);
   await expect(page.getByText("Managed in Notion")).toHaveCount(0);
   await axe();
 
   // Back to everything: the whole list, in display order.
   await page.goto("/admin/documentation/manage");
-  expect(await page.locator("tbody tr").count()).toBeGreaterThan(1);
+  await expect(page.locator("tbody tr")).toHaveCount(10);
   await page.screenshot({ path: join(SHOTS, "documentation-list-1440.png") });
 });
 

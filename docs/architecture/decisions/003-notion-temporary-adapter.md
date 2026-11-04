@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded — 2026-11-04 by ADR 020 (native Home and Documentation). The
+temporary Notion adapter is removed; the repository interfaces it sat
+behind now read the native API.
 
 ## Context
 
