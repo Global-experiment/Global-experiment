@@ -20,6 +20,7 @@ export const AUDITED_ENTITIES = [
   "access_grant",
   "admin_user",
   "admin_invitation",
+  "cms_document",
 ] as const;
 export type AuditedEntity = (typeof AUDITED_ENTITIES)[number];
 
@@ -45,7 +46,8 @@ export const auditEvents = pgTable(
      * since 0012: access_granted · access_changed · access_revoked (on the person, the account and the service) ·
      * invited · activated · link_created · link_revoked · password_changed · email_changed · deactivated · reactivated (accounts) · permission_denied;
      * since 0015 (archive-only, ADR 017): comment_archived · comment_restored · file_archived · file_restored (supporting documents, profile pictures).
-     * comment_deleted and deleted stay readable on past events; nothing writes them any more.
+     * comment_deleted and deleted stay readable on past events; nothing writes them any more;
+     * since 0016 (native Home and Documentation): published · unpublished.
      */
     action: text("action").notNull(),
     /** admin (a person signed in) or automation (imports, Stripe, scheduled jobs). */
@@ -72,7 +74,7 @@ export const auditEvents = pgTable(
     check("audit_events_entity_type_shape", sql`${table.entityType} ~ '^[a-z][a-z_]{1,39}$'`),
     check(
       "audit_events_action_known",
-      sql`${table.action} in ('created', 'imported', 'duplicated', 'updated', 'archived', 'restored', 'deleted', 'comment_added', 'comment_edited', 'comment_deleted', 'access_granted', 'access_changed', 'access_revoked', 'invited', 'activated', 'link_created', 'link_revoked', 'password_changed', 'email_changed', 'deactivated', 'reactivated', 'permission_denied', 'comment_archived', 'comment_restored', 'file_archived', 'file_restored')`,
+      sql`${table.action} in ('created', 'imported', 'duplicated', 'updated', 'archived', 'restored', 'deleted', 'comment_added', 'comment_edited', 'comment_deleted', 'access_granted', 'access_changed', 'access_revoked', 'invited', 'activated', 'link_created', 'link_revoked', 'password_changed', 'email_changed', 'deactivated', 'reactivated', 'permission_denied', 'comment_archived', 'comment_restored', 'file_archived', 'file_restored', 'published', 'unpublished')`,
     ),
     check("audit_events_actor_type_known", sql`${table.actorType} in ('admin', 'automation')`),
     check("audit_events_actor_label_present", sql`length(btrim(${table.actorLabel})) between 1 and 120`),

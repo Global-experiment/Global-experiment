@@ -82,7 +82,7 @@ export interface HistoryListItemDto extends HistoryItemDto {
 }
 
 /** Comments are supported on these record types (they have detail pages). */
-export const COMMENTABLE = ["person", "organization", "treasury_entry", "service", "access_grant", "admin_user"] as const;
+export const COMMENTABLE = ["person", "organization", "treasury_entry", "service", "access_grant", "admin_user", "cms_document"] as const;
 
 const FEED_LIMIT = 300;
 

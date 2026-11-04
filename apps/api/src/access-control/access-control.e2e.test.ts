@@ -173,6 +173,23 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "GET /api/admin/profile/pictures": "signed in",
   "GET /api/admin/profile/pictures/:id": "signed in",
   "POST /api/admin/profile/pictures/:id/restore": "signed in",
+  // Home and Documentation (ADR 020): cms.read sees, cms.update saves drafts and archives drafts, cms.create makes documents, cms.publish publishes.
+  "GET /api/admin/cms/documents": "cms.read",
+  "GET /api/admin/cms/documents/:id": "cms.read",
+  "GET /api/admin/cms/documents/:id/revisions": "cms.read",
+  "GET /api/admin/cms/documents/:id/revisions/:revisionId": "cms.read",
+  "GET /api/admin/cms/home": "cms.read",
+  "GET /api/admin/cms/images/:id": "cms.read",
+  "POST /api/admin/cms/documents": "cms.create",
+  "POST /api/admin/cms/documents/:id/archive": "cms.update",
+  "POST /api/admin/cms/documents/:id/duplicate": "cms.create",
+  "POST /api/admin/cms/documents/:id/publish": "cms.publish",
+  "POST /api/admin/cms/documents/:id/restore": "cms.update",
+  "POST /api/admin/cms/documents/:id/revisions": "cms.update",
+  "POST /api/admin/cms/documents/:id/revisions/:revisionId/restore": "cms.update",
+  "POST /api/admin/cms/documents/:id/unpublish": "cms.publish",
+  "POST /api/admin/cms/home/revisions": "cms.update",
+  "POST /api/admin/cms/images": "cms.update",
 };
 
 const FAKE_ID = "00000000-0000-4000-8000-000000000000";

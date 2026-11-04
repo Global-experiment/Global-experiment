@@ -6,6 +6,7 @@ import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/
 import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
 import { treasuryEntries } from "../treasury/treasury.schema.js";
+import { cmsDocuments, cmsRevisions } from "../cms/cms.schema.js";
 import type { Executor } from "./audit.service.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -64,6 +65,15 @@ export async function entityLabel(db: Executor, entityType: string, entityId: st
     return row?.name;
   }
   if (entityType === "admin_invitation") return "Invitation link";
+  if (entityType === "cms_document") {
+    const [row] = await db
+      .select({ kind: cmsDocuments.kind, documentNumber: cmsDocuments.documentNumber, title: cmsRevisions.title })
+      .from(cmsDocuments)
+      .innerJoin(cmsRevisions, eq(cmsRevisions.id, cmsDocuments.latestRevisionId))
+      .where(eq(cmsDocuments.id, entityId))
+      .limit(1);
+    return row ? (row.kind === "home" ? "Home" : `DOC-${row.documentNumber} · ${row.title}`) : undefined;
+  }
   return undefined;
 }
 
@@ -72,7 +82,7 @@ const grantTitle = sql<string>`coalesce(${accessGrants.name}, ${services.name})`
 const adminName = sql<string>`coalesce(${adminUsers.displayName}, split_part(${adminUsers.email}, '@', 1))`;
 
 /** "PER-81 · Stanley Qiang" → "Stanley Qiang": a stored label without its number. */
-export const titleOfLabel = (label: string) => label.replace(/^((PER|ORG|EXP)-\d+|#\d+) · /, "");
+export const titleOfLabel = (label: string) => label.replace(/^((PER|ORG|EXP|DOC)-\d+|#\d+) · /, "");
 
 /**
  * The current titles of the records a page of events is about (Monitoring →
@@ -132,5 +142,14 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
     for (const row of rows) titles.set(`admin_user:${row.id}`, row.name);
   }
   for (const id of idsOf("admin_invitation")) titles.set(`admin_invitation:${id}`, "Invitation link");
+  const documentIds = idsOf("cms_document");
+  if (documentIds.length > 0) {
+    const rows = await db
+      .select({ id: cmsDocuments.id, kind: cmsDocuments.kind, title: cmsRevisions.title })
+      .from(cmsDocuments)
+      .innerJoin(cmsRevisions, eq(cmsRevisions.id, cmsDocuments.latestRevisionId))
+      .where(inArray(cmsDocuments.id, documentIds));
+    for (const row of rows) titles.set(`cms_document:${row.id}`, row.kind === "home" ? "Home" : row.title);
+  }
   return titles;
 }

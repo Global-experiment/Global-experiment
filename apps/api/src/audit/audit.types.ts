@@ -1,7 +1,8 @@
 /** Shapes shared by the audit log, the record history feed and the History page. */
 
 /** Who made a change: a signed-in admin, or the platform itself (imports, Stripe, jobs) — "Automation". */
-export type AuditActor = { type: "admin"; id: string; label: string; role: string | null } | { type: "automation"; label: "Automation" };
+/** Automation is "Automation", or the tool that wrote it ("Notion import"). */
+export type AuditActor = { type: "admin"; id: string; label: string; role: string | null } | { type: "automation"; label: string };
 
 export const AUTOMATION: AuditActor = { type: "automation", label: "Automation" };
 
@@ -37,10 +38,13 @@ export type AuditAction =
   | "comment_archived"
   | "comment_restored"
   | "file_archived"
-  | "file_restored";
+  | "file_restored"
+  // Home and Documentation (migration 0016): a revision went live, or the page left the website.
+  | "published"
+  | "unpublished";
 
 /** How a field's value is shown in the history (old struck through → new). */
-export type FieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation";
+export type FieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation" | "content";
 
 /**
  * Field privacy (config, enforced by the API): `contact` values are masked
