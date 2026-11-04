@@ -32,7 +32,7 @@ const LOCAL_VALUES = [
   ["DATABASE_URL", "pglite:.data/pglite", "The local database: PGlite in .data/pglite (gitignored)."],
   ["REVALIDATE_SECRET", secret(36), "Generated for this machine: lets the API refresh the public pages."],
   ["DONATIONS_PREVIEW_TOKEN", secret(32), "Generated for this machine: /donate?preview=<token>."],
-  ["LOCAL_ADMIN_EMAIL", "rootadmin@local.test", "The local Rootadmin (this machine only)."],
+  ["LOCAL_ADMIN_EMAIL", "rootadmin@example.com", "The local Rootadmin (this machine only)."],
   ["LOCAL_ADMIN_PASSWORD", secret(18), null],
 ];
 

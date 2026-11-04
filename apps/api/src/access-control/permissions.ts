@@ -193,6 +193,7 @@ export const ENTITY_MODULE: Record<string, Module> = {
   admin_invitation: "accounts",
   setting: "settings",
   import_run: "imports",
+  cms_document: "cms",
 };
 
 /** Whether a set of permissions may read an entity type's history (history.read reads all). */

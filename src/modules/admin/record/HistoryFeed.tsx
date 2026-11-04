@@ -21,6 +21,7 @@ const KIND_ICON: Record<HistoryFieldKind, AdminIconName> = {
   boolean: "check_box",
   select: "select",
   relation: "arrow_outward",
+  content: "view_all",
 };
 
 const chip = "inline-flex min-h-6 items-center rounded-control px-1 text-meta text-text-primary ring-1 ring-line";
@@ -64,6 +65,7 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
       </div>
     );
   }
+  if (change.kind === "content") return <ContentChange change={change} />;
   if (change.kind === "relation") {
     const { removed, added } = relationDiff(change);
     // Only the order changed (drag and drop): the old order struck through, then the new one.
@@ -132,6 +134,42 @@ function ChangeRow({ change, timeZone }: { change: HistoryChange; timeZone: stri
   );
 }
 
+/**
+ * A Home or Documentation content change (admin-desktop.pdf p7, p10): the
+ * blocks added, then the blocks removed struck through, in the body's
+ * rhythm — headings bold, list items as lines. At most 8 of each; the
+ * Versions page shows the whole comparison.
+ */
+function ContentChange({ change }: { change: HistoryChange }) {
+  const lines = (value: HistoryValue) => (Array.isArray(value) ? value : []);
+  const added = lines(change.after);
+  const removed = lines(change.before);
+  const line = (item: { id: string; label: string }, struck: boolean) => {
+    const style = item.id.split(":")[0] ?? "p";
+    const heading = /^h[1-4]$/.test(style);
+    const text = style === "img" ? `Image: ${item.label}` : item.label;
+    return (
+      <p
+        key={`${struck ? "-" : "+"}${item.id}`}
+        data-content-line={struck ? "removed" : "added"}
+        className={`mt-1 text-meta whitespace-pre-line ${heading ? "font-bold" : ""} ${struck ? "text-text-muted line-through" : "text-text-primary"}`}
+      >
+        {text}
+      </p>
+    );
+  };
+  const more = (count: number) => (count > 8 ? <p className="mt-1 text-meta text-text-muted">and {count - 8} more</p> : null);
+  return (
+    <div data-change={change.field}>
+      <FieldLabel icon="view_all">{change.label}</FieldLabel>
+      {added.slice(0, 8).map((item) => line(item, false))}
+      {more(added.length)}
+      {removed.slice(0, 8).map((item) => line(item, true))}
+      {more(removed.length)}
+    </div>
+  );
+}
+
 /** How long a one-time link was valid: 72 hours for the account links, 7 days for an invitation link (OPS-141). */
 function linkValidity(occurredAt: string, expiresAt: unknown): string {
   const hours = typeof expiresAt === "string" ? Math.round((Date.parse(expiresAt) - Date.parse(occurredAt)) / 3_600_000) : NaN;
@@ -186,6 +224,15 @@ function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: st
   if (item.action === "comment_deleted" && typeof meta.body === "string") {
     return <p className="mt-2 text-meta whitespace-pre-line text-text-muted line-through">{meta.body}</p>;
   }
+  // An archived or restored supporting document: its name (the file is kept, ADR 017).
+  const file = meta.file as { kind?: string; name?: string } | undefined;
+  if ((item.action === "file_archived" || item.action === "file_restored") && file?.kind === "document" && file.name) {
+    return (
+      <p className="mt-2">
+        <span className={`${chip} ${item.action === "file_archived" ? "text-text-muted line-through" : ""}`}>{file.name}</span>
+      </p>
+    );
+  }
   // A permanently deleted Treasury entry: what it was, since its page is gone.
   if (item.action === "deleted" && Array.isArray(meta.details) && meta.details.length > 0) {
     return (
@@ -216,7 +263,11 @@ function Context({ item, recordLink }: { item: HistoryItem; recordLink?: (id: st
   return null;
 }
 
-/** A comment the viewer wrote: edit (the text, in place) or delete it; both stay in the history. */
+/**
+ * A comment: the viewer's own can be edited (the text, in place), archived
+ * and restored — never deleted (ADR 017). An archived comment is hidden from
+ * the other admins; its author still sees it, muted, with Restore.
+ */
 function CommentBody({ item, onChanged }: { item: HistoryItem; onChanged: () => void }) {
   const comment = item.comment!;
   const [editing, setEditing] = useState(false);
@@ -240,17 +291,29 @@ function CommentBody({ item, onChanged }: { item: HistoryItem; onChanged: () => 
 
   return (
     <div>
-      <p data-comment-body className={`mt-2 text-meta whitespace-pre-line ${comment.deleted ? "text-text-muted line-through" : "text-text-primary"}`}>
-        {comment.body}
-      </p>
-      {comment.deleted ? <p className="mt-1 text-meta text-text-muted">Deleted.</p> : null}
-      {comment.mine && !editing ? (
+      {comment.archived && !comment.mine ? (
+        <p data-comment-body className="mt-2 text-meta text-text-muted">
+          This comment was archived.
+        </p>
+      ) : (
+        <p data-comment-body className={`mt-2 text-meta whitespace-pre-line ${comment.archived ? "text-text-muted" : "text-text-primary"}`}>
+          {comment.body}
+        </p>
+      )}
+      {comment.archived && comment.mine ? <p className="mt-1 text-meta text-text-muted">Archived — only you can see it.</p> : null}
+      {comment.mine && comment.archived ? (
+        <p className="mt-2 flex justify-end gap-2">
+          <AdminButton onClick={() => void run(() => adminApi(`/comments/${comment.id}/restore`, { method: "POST" }))} disabled={busy}>
+            {busy ? "Restoring…" : "Restore"}
+          </AdminButton>
+        </p>
+      ) : comment.mine && !editing ? (
         <p className="mt-2 flex justify-end gap-2">
           <AdminButton onClick={() => setEditing(true)} disabled={busy}>
             Edit
           </AdminButton>
-          <AdminButton onClick={() => void run(() => adminApi(`/comments/${comment.id}`, { method: "DELETE" }))} disabled={busy}>
-            {busy ? "Deleting…" : "Delete"}
+          <AdminButton onClick={() => void run(() => adminApi(`/comments/${comment.id}/archive`, { method: "POST" }))} disabled={busy}>
+            {busy ? "Archiving…" : "Archive"}
           </AdminButton>
         </p>
       ) : null}

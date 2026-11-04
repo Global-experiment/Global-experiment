@@ -4,7 +4,7 @@ import { APP_CONFIG } from "../common/config/config.module.js";
 import type { AppConfig } from "../common/config/env.js";
 
 /** Cache tags the public site uses (src/shared/config/publicApi.ts). */
-export const PUBLIC_CACHE_TAGS = { treasury: "treasury" } as const;
+export const PUBLIC_CACHE_TAGS = { treasury: "treasury", home: "home", documentation: "documentation" } as const;
 export type PublicCacheTag = (typeof PUBLIC_CACHE_TAGS)[keyof typeof PUBLIC_CACHE_TAGS];
 
 /**

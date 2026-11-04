@@ -22,11 +22,11 @@ function subscribeToHash(onChange: () => void) {
  * Search control (32px outlined field, Material Sharp `search` glyph, 14px
  * placeholder — figma.pdf p15) above the accordion rows.
  *
- * Metadata-first: rows render from `articles` (title, tags, dates — one
- * cached Notion query) and the bodies arrive through `content`, a promise
+ * Metadata-first: rows render from `articles` (title, tags, dates) and the
+ * bodies arrive through `content`, a promise
  * the server streams in behind them. Until it resolves, search covers title
  * and tags (and says so); afterwards full article text, case-insensitively
- * (client feedback item 15), with zero extra Notion calls per keystroke —
+ * (client feedback item 15), with no request per keystroke —
  * each article's searchable text is computed once. A failed body load is
  * reported as such, never shown as an empty article.
  *
@@ -179,7 +179,7 @@ export function DocumentationList({
         <p role="status" className="mt-3 text-meta text-text-muted">
           {bodies === "loading"
             ? "Searching titles and tags — article text is still loading."
-            : "Article text couldn’t be loaded from Notion, so only titles and tags are searched."}
+            : "Article text couldn’t be loaded, so only titles and tags are searched."}
         </p>
       ) : null}
 

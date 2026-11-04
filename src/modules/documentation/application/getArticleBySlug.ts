@@ -2,10 +2,8 @@ import { getDocumentationDataset } from "@/modules/documentation/application/get
 import type { DocumentationArticle } from "@/modules/documentation/domain/types";
 
 /**
- * Reads from the same cached dataset the index page uses, rather than
- * issuing its own fresh Notion fetch — visiting an article directly (or its
- * history) no longer re-fetches everything Notion already gave the index
- * moments earlier.
+ * Reads from the same cached dataset the index page uses (one cached API
+ * response for every article), so an article page needs no request of its own.
  */
 export async function getArticleBySlug(slug: string): Promise<DocumentationArticle | null> {
   const dataset = await getDocumentationDataset();

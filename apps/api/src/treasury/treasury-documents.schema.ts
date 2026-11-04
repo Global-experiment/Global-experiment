@@ -12,6 +12,7 @@ export type DocumentContentType = (typeof DOCUMENT_CONTENT_TYPES)[number];
  * Supporting documents of a Treasury entry (invoices, receipts) —
  * data-model.md §4.3, migration 0007. Private entirely: the bytes live in the
  * file storage (storage_key, never a path), served only to authorized admins.
+ * Never deleted (ADR 017, migration 0015): removing one archives it.
  */
 export const treasuryDocuments = pgTable(
   "treasury_documents",
@@ -29,6 +30,9 @@ export const treasuryDocuments = pgTable(
     storageKey: text("storage_key").notNull(),
     uploadedByAdminId: uuid("uploaded_by_admin_id").references(() => adminUsers.id, { onDelete: "set null" }),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Archive-only (ADR 017): an archived document is hidden from the entry but kept, file included, and can be restored. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedByAdminId: uuid("archived_by_admin_id").references(() => adminUsers.id, { onDelete: "set null" }),
   },
   (table) => [
     index("treasury_documents_entry_idx").on(table.entryId, table.uploadedAt),

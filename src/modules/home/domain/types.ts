@@ -1,15 +1,18 @@
-import type { RichText } from "@/shared/content/types";
+import type { ContentBlock, RichText } from "@/shared/content/types";
 
 /**
  * Editorial content of the Home page, as owned by the application. The
- * Figma design controls layout and presentation; the CMS supplies only
- * these text values. Nothing here knows about Notion.
+ * Figma design controls layout and presentation; the content supplies only
+ * these values (ADR 020: native, edited in the admin).
  */
 
+/** What a section holds under its heading: paragraphs, lists and images. */
+export type HomeSectionBlock = Exclude<ContentBlock, { kind: "heading" }>;
+
 export interface HomeSection {
-  /** null only for stray paragraphs that appear before any heading. */
+  /** null only for stray content that appears before any heading. */
   heading: RichText[] | null;
-  paragraphs: RichText[][];
+  blocks: HomeSectionBlock[];
 }
 
 export interface HomeContent {

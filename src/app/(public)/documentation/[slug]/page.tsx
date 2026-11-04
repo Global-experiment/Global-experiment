@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
@@ -10,16 +10,10 @@ import { DocumentationContent } from "@/modules/documentation/ui/DocumentationCo
 import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
 import { formatPublishedAt, formatUpdatedAt } from "@/modules/documentation/ui/formatPublishedAt";
 import { documentationAnchorHref } from "@/modules/documentation/ui/documentationAnchor";
-import { notionMissingLocally } from "@/shared/config/env";
-import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
-
-// getArticleBySlug() reads the same cached dataset the index page populates
-// (see getDocumentationDataset) rather than fetching fresh from Notion.
-export const dynamic = "force-dynamic";
+import { fetchCurrentSlug } from "@/shared/config/publicApi";
 
 // generateMetadata and the page both need the article; memoize within one
-// request so the dataset cache is read once per request, not twice. This is
-// per-request de-duplication only, on top of the persistent cache below it.
+// request (the API response itself is cached under the `documentation` tag).
 const loadArticle = cache(getArticleBySlug);
 
 interface DocumentationArticlePageProps {
@@ -27,7 +21,6 @@ interface DocumentationArticlePageProps {
 }
 
 export async function generateMetadata({ params }: DocumentationArticlePageProps): Promise<Metadata> {
-  if (notionMissingLocally("documentation")) return { title: "Documentation" };
   const { slug } = await params;
   const article = await loadArticle(slug);
   if (!article) return {};
@@ -37,14 +30,16 @@ export async function generateMetadata({ params }: DocumentationArticlePageProps
 /**
  * The standalone article page uses the expanded-row layout from
  * figma.pdf p15 (metadata, tags, body, actions) under the sub-page header.
+ * A slug an article had before it was renamed redirects to its new address,
+ * so links already shared keep working.
  */
 export default async function DocumentationArticlePage({ params }: DocumentationArticlePageProps) {
-  // A contributor's machine without Notion (never production): say so instead of failing.
-  if (notionMissingLocally("documentation")) return <NotionNotConnected title="Documentation" backHref="/documentation" />;
   const { slug } = await params;
   const article = await loadArticle(slug);
 
   if (!article) {
+    const renamed = await fetchCurrentSlug(slug);
+    if (renamed.ok) permanentRedirect(`/documentation/${renamed.data.slug}`);
     notFound();
   }
 

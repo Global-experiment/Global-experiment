@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CLOCK } from "../common/clock/clock.js";
 import { treasuryEntries } from "../treasury/treasury.schema.js";
-import { signedInAdmin, type SignedInAdmin } from "../testing/admin-session.js";
+import { signedInAdmin, signedInAs, type SignedInAdmin } from "../testing/admin-session.js";
 import { createTestApp, type TestApp } from "../testing/test-app.js";
 import { auditEvents, recordComments } from "./audit.schema.js";
 import { canRead, maskText, visibleChanges } from "./record-fields.js";
@@ -35,7 +35,7 @@ describe("record history (audit log)", () => {
     actor: { label: string; type: string };
     changes: (AuditChange & { masked?: true; redacted?: true })[];
     meta: Record<string, unknown>;
-    comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
+    comment?: { id: string; body: string; current: string; mine: boolean; archived: boolean };
   };
 
   it("records 'created' with the actor and the record's label; one event per Submit with every changed field", async () => {
@@ -240,14 +240,14 @@ describe("record history (audit log)", () => {
     await admin.post(`/api/admin/history/planet/${person.id}/views`).expect(400);
   });
 
-  it("comments: added, edited and deleted by their author, every version kept in the history", async () => {
+  it("comments: added, edited, archived and restored by their author, every version kept in the history", async () => {
     const person = await createPerson({ name: "Commented" });
     await admin.post(`/api/admin/history/person/${person.id}/comments`, { body: "I reviewed the profile." }).expect(204);
     let items = (await feed("person", person.id)).items as Item[];
     const comment = items[0]!.comment!;
     expect(items[0]).toMatchObject({
       action: "comment_added",
-      comment: { body: "I reviewed the profile.", current: "I reviewed the profile.", mine: true, deleted: false },
+      comment: { body: "I reviewed the profile.", current: "I reviewed the profile.", mine: true, archived: false },
     });
 
     await admin.patch(`/api/admin/comments/${comment.id}`, { body: "I reviewed the profile and the links." }).expect(204);
@@ -258,11 +258,29 @@ describe("record history (audit log)", () => {
     });
     expect(items[1]).toMatchObject({ action: "comment_added", comment: { body: "I reviewed the profile.", current: "I reviewed the profile and the links." } });
 
-    await admin.delete(`/api/admin/comments/${comment.id}`).expect(204);
+    // Archive-only (ADR 017): no delete route; archiving hides the comment from the others, keeps it, and its author restores it.
+    expect((await admin.delete(`/api/admin/comments/${comment.id}`)).status).toBe(404);
+    await admin.post(`/api/admin/comments/${comment.id}/archive`).expect(204);
     items = (await feed("person", person.id)).items as Item[];
-    expect(items[0]).toMatchObject({ action: "comment_deleted", meta: { body: "I reviewed the profile and the links." } });
-    expect(items[2]!.comment).toMatchObject({ mine: false, deleted: true });
+    expect(items[0]).toMatchObject({ action: "comment_archived", meta: { commentId: comment.id } });
+    expect(items[2]!.comment).toMatchObject({ mine: true, archived: true, current: "I reviewed the profile and the links." });
+    expect((await t.db.select().from(recordComments).where(eq(recordComments.id, comment.id))).length).toBe(1);
     await admin.patch(`/api/admin/comments/${comment.id}`, { body: "Again" }).expect(404);
+    await admin.post(`/api/admin/comments/${comment.id}/archive`).expect(404);
+
+    // Another admin sees that a comment was archived, never its text (not even in its edits).
+    const other = await signedInAs(t, "admin");
+    const seen = (await other.get(`/api/admin/history/person/${person.id}`).expect(200)).body.items as Item[];
+    expect(seen.find((item) => item.action === "comment_added")!.comment).toMatchObject({ mine: false, archived: true, body: "", current: "" });
+    expect(seen.find((item) => item.action === "comment_edited")!.changes).toEqual([]);
+    expect(JSON.stringify(seen)).not.toContain("I reviewed the profile");
+    await other.post(`/api/admin/comments/${comment.id}/restore`).expect(403);
+
+    await admin.post(`/api/admin/comments/${comment.id}/restore`).expect(204);
+    items = (await feed("person", person.id)).items as Item[];
+    expect(items[0]).toMatchObject({ action: "comment_restored" });
+    expect(items[3]!.comment).toMatchObject({ mine: true, archived: false, current: "I reviewed the profile and the links." });
+    await admin.post(`/api/admin/comments/${comment.id}/restore`).expect(404);
 
     // Someone else's comment (here: a former account's) can't be changed.
     const [foreign] = await t.db.insert(recordComments).values({ entityType: "person", entityId: person.id, authorId: null, body: "Not yours" }).returning();

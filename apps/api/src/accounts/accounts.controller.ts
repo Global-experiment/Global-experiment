@@ -166,10 +166,37 @@ export class ProfileController {
     return this.accounts.setPicture(principal(request), file);
   }
 
+  /** Archives the current picture (ADR 017): it moves to the previous pictures. */
   @Delete("picture")
   @SignedIn()
   removePicture(@Req() request: AdminRequest) {
     return this.accounts.removePicture(principal(request));
+  }
+
+  @Get("pictures")
+  @SignedIn()
+  previousPictures(@Req() request: AdminRequest) {
+    return this.accounts.previousPictures(principal(request));
+  }
+
+  @Get("pictures/:id")
+  @SignedIn()
+  async ownPicture(@Param("id", IdParam) id: string, @Req() request: AdminRequest, @Res({ passthrough: true }) response: Response) {
+    const picture = await this.accounts.ownPicture(principal(request), id);
+    response.set({
+      "Content-Type": picture.type,
+      "Content-Length": String(picture.bytes.length),
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-cache",
+    });
+    return new StreamableFile(picture.bytes);
+  }
+
+  @Post("pictures/:id/restore")
+  @HttpCode(200)
+  @SignedIn()
+  restorePicture(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    return this.accounts.restorePicture(principal(request), id);
   }
 
   @Post("email")

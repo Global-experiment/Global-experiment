@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { z } from "zod";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
@@ -93,11 +93,19 @@ export class AuditController {
     await this.audit.editComment(id, signedIn(request), body.body);
   }
 
-  @Delete("comments/:id")
+  /** Archive-only (ADR 017): a comment is archived and restored by its author, never deleted. */
+  @Post("comments/:id/archive")
   @SignedIn()
   @HttpCode(204)
-  async deleteComment(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
-    await this.audit.deleteComment(id, signedIn(request));
+  async archiveComment(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    await this.audit.setCommentArchived(id, signedIn(request), true);
+  }
+
+  @Post("comments/:id/restore")
+  @SignedIn()
+  @HttpCode(204)
+  async restoreComment(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
+    await this.audit.setCommentArchived(id, signedIn(request), false);
   }
 
   private async label(type: string, id: string): Promise<string> {

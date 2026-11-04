@@ -1,18 +1,10 @@
+import { connection } from "next/server";
 import { Button } from "@/shared/ui/Button";
 import { StickyActionBar } from "@/shared/ui/StickyActionBar";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { getHomeContent } from "@/modules/home/application/getHomeContent";
 import { homePrimaryAction, homeWordmark } from "@/modules/home/ui/homeNavigation";
 import { HomeView } from "@/modules/home/ui/HomeView";
-import { notionMissingLocally } from "@/shared/config/env";
-import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
-
-// Editorial content is read live from Notion on every request, so edits in
-// Notion appear on the next refresh with no redeploy. No route cache, no
-// data cache, no build-time snapshot. Deliberately no Suspense boundary
-// either (ADR 007): it would commit an HTTP 200 before a Notion failure
-// could surface as a real error status.
-export const dynamic = "force-dynamic";
 
 /**
  * figma.pdf p1 (mobile, 2026-09-24 export): 44px identity row, 16px
@@ -21,10 +13,14 @@ export const dynamic = "force-dynamic";
  * left-aligned sections — the earlier rule under the grid is gone in this
  * export. The sticky bottom CTA is mobile-only: the client asked for it to
  * be removed on desktop, with no space reserved for it (`md:` = 768px).
+ *
+ * The content is the published Home from the native API (ADR 020), cached
+ * under the `home` tag and revalidated whenever Home is published. The page
+ * renders per request (`connection()`, never at build time); deliberately no
+ * Suspense boundary (ADR 007): an API failure surfaces as a real error status.
  */
 export default async function Home() {
-  // A contributor's machine without Notion (never production): say so instead of failing.
-  if (notionMissingLocally("home")) return <NotionNotConnected title="Home" />;
+  await connection();
   const content = await getHomeContent();
 
   return (

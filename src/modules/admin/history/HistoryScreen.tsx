@@ -27,6 +27,7 @@ const ENTITY_LABELS: Record<string, string> = {
   service: "Services",
   access_grant: "Permissions",
   admin_user: "Accounts",
+  cms_document: "Home and Documentation",
 };
 
 const SOURCE_LABELS: Record<string, string> = { admin: "Admin", import: "Import", stripe: "Stripe", system: "System" };
@@ -56,6 +57,8 @@ function recordHref(entity: HistoryListItem["entity"], action: string, meta: His
       return `/admin/permissions/${entity.id}`;
     case "admin_user":
       return `/admin/accounts/${entity.id}`;
+    case "cms_document":
+      return entity.label === "Home" ? "/admin/home/manage" : `/admin/documentation/${entity.id}`;
     default:
       return undefined;
   }
@@ -69,6 +72,7 @@ const NOUN: Record<string, string> = {
   access_grant: "permission",
   admin_user: "account",
   admin_invitation: "invitation link",
+  cms_document: "document",
 };
 
 /**

@@ -7,6 +7,7 @@ import { PermissionGuard } from "./access-control/permission.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { CsrfOriginGuard } from "./auth/csrf-origin.guard.js";
 import { ClockModule } from "./common/clock/clock.js";
+import { CmsModule } from "./cms/cms.module.js";
 import { ConfigModule } from "./common/config/config.module.js";
 import type { AppConfig } from "./common/config/env.js";
 import { DatabaseModule } from "./common/database/database.module.js";
@@ -56,6 +57,7 @@ export class AppModule {
         DonationsModule,
         ServicesModule,
         AccountsModule,
+        CmsModule,
       ],
       providers: [
         // Global guards run in this order.

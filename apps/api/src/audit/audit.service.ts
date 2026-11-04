@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, desc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { AdminPrincipal } from "../auth/auth.service.js";
 import { adminUsers } from "../auth/auth.schema.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
@@ -48,8 +48,11 @@ export interface HistoryItemDto {
   actor: { type: "admin" | "automation"; label: string };
   changes: VisibleChange[];
   meta: Record<string, unknown>;
-  /** For comment events: the comment, and whether the viewer may still edit or delete it (their own, not deleted). */
-  comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
+  /**
+   * For comment events: the comment, whether it's the viewer's own (they may edit, archive or restore it) and
+   * whether it's archived. An archived comment's text reaches its author only (ADR 017): the others get "".
+   */
+  comment?: { id: string; body: string; current: string; mine: boolean; archived: boolean };
 }
 
 export interface RecordHistoryDto {
@@ -79,7 +82,7 @@ export interface HistoryListItemDto extends HistoryItemDto {
 }
 
 /** Comments are supported on these record types (they have detail pages). */
-export const COMMENTABLE = ["person", "organization", "treasury_entry", "service", "access_grant", "admin_user"] as const;
+export const COMMENTABLE = ["person", "organization", "treasury_entry", "service", "access_grant", "admin_user", "cms_document"] as const;
 
 const FEED_LIMIT = 300;
 
@@ -306,27 +309,34 @@ export class AuditService {
     });
   }
 
-  /** Authors delete their own comments; the text stays in the history (decision 10). */
-  async deleteComment(commentId: string, author: AdminPrincipal): Promise<void> {
+  /**
+   * Archive-only (ADR 017): authors archive their own comments — hidden from
+   * the other admins, kept, and restorable by the author. Both are events.
+   */
+  async setCommentArchived(commentId: string, author: AdminPrincipal, archived: boolean): Promise<void> {
     await this.db.transaction(async (tx) => {
-      const comment = await this.ownComment(tx, commentId, author);
-      await tx.update(recordComments).set({ deletedAt: this.clock() }).where(eq(recordComments.id, commentId));
+      const comment = await this.ownComment(tx, commentId, author, { archived: !archived });
+      await tx
+        .update(recordComments)
+        .set({ archivedAt: archived ? this.clock() : null })
+        .where(eq(recordComments.id, commentId));
       await this.record(tx, {
         entityType: comment.entityType,
         entityId: comment.entityId,
-        action: "comment_deleted",
+        action: archived ? "comment_archived" : "comment_restored",
         actor: actorFor(author),
         source: "admin",
-        meta: { label: await this.labelOf(tx, comment.entityType, comment.entityId), commentId, body: comment.body },
+        meta: { label: await this.labelOf(tx, comment.entityType, comment.entityId), commentId },
       });
     });
   }
 
-  private async ownComment(tx: Executor, commentId: string, author: AdminPrincipal) {
+  /** The author's own comment, in the state the change starts from (live to edit or archive, archived to restore). */
+  private async ownComment(tx: Executor, commentId: string, author: AdminPrincipal, { archived = false } = {}) {
     const [comment] = await tx
       .select()
       .from(recordComments)
-      .where(and(eq(recordComments.id, commentId), isNull(recordComments.deletedAt)))
+      .where(and(eq(recordComments.id, commentId), archived ? isNotNull(recordComments.archivedAt) : isNull(recordComments.archivedAt)))
       .limit(1);
     if (!comment) throw new NotFoundError("Comment not found.");
     if (comment.authorId !== author.id) throw new ForbiddenError("Only its author can change a comment.");
@@ -362,15 +372,22 @@ export class AuditService {
       changes: visibleChanges(event.changes as AuditChange[], viewer.role),
       meta,
     };
+    const comment = typeof meta.commentId === "string" ? comments.get(meta.commentId) : undefined;
+    const mine = comment !== undefined && comment.authorId === viewer.id;
+    // An archived comment's text, in its own event and in its edits, reaches its author only.
+    const hidden = comment?.archivedAt != null && !mine;
     if (event.action === "comment_added" && typeof meta.commentId === "string") {
-      const comment = comments.get(meta.commentId);
       item.comment = {
         id: meta.commentId,
-        body: typeof meta.body === "string" ? meta.body : (comment?.body ?? ""),
-        current: comment?.body ?? "",
-        mine: comment !== undefined && comment.deletedAt === null && comment.authorId === viewer.id,
-        deleted: comment?.deletedAt != null,
+        body: hidden ? "" : typeof meta.body === "string" ? meta.body : (comment?.body ?? ""),
+        current: hidden ? "" : (comment?.body ?? ""),
+        mine,
+        archived: comment?.archivedAt != null,
       };
+    }
+    if (hidden) {
+      item.changes = [];
+      item.meta = Object.fromEntries(Object.entries(meta).filter(([key]) => key !== "body"));
     }
     return item;
   }

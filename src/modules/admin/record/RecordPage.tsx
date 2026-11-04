@@ -26,6 +26,8 @@ export interface RecordActions {
   savedMessage: string;
   dirty: boolean;
   busy: string | null;
+  /** Home's editor (admin-desktop.pdf p7): Discard changes is its own button above Submit changes, with no More options. */
+  inlineDiscard?: boolean;
 }
 
 /**
@@ -50,10 +52,12 @@ export function RecordPage({
   entityNoun = "record",
   actions,
   panelExtra,
+  panelTop,
   children,
   recordLink,
   readOnly = false,
   revision,
+  afterSubmit,
 }: {
   backHref: string;
   backLabel: string;
@@ -64,6 +68,10 @@ export function RecordPage({
   actions?: RecordActions;
   /** Record-specific panel actions (Treasury: publish), between Submit changes and More options. */
   panelExtra?: ReactNode;
+  /** Rows above the panel's buttons (Home's editor, p7: Last publish, Created). */
+  panelTop?: ReactNode;
+  /** After a successful submit: stay on the page (Home's editor) instead of going back. */
+  afterSubmit?: "back" | "stay";
   children: ReactNode;
   recordLink?: (id: string) => string;
   /** Shown without edit actions (the fields should be read-only too). */
@@ -94,6 +102,10 @@ export function RecordPage({
     event.preventDefault();
     if (readOnly || !actions || !actions.dirty || actions.busy) return;
     if (await actions.submit()) {
+      if (afterSubmit === "stay") {
+        reload();
+        return;
+      }
       guard.release();
       // Back to where the visitor came from (the list, a linked record…), or the list.
       if (cameFromAdminPage()) router.back();
@@ -140,7 +152,7 @@ export function RecordPage({
                 {entity ? <Counters history={history} /> : null}
               </div>
             ) : (
-              <RecordPanelTop actions={actions!} history={entity ? history : undefined} panelExtra={panelExtra} />
+              <RecordPanelTop actions={actions!} history={entity ? history : undefined} panelExtra={panelExtra} panelTop={panelTop} />
             )}
             {entity ? <HistoryList entity={entity} history={history} entityNoun={entityNoun} recordLink={recordLink} /> : null}
           </aside>
@@ -152,13 +164,29 @@ export function RecordPage({
 
 type HistoryData = ReturnType<typeof useAdminData<RecordHistory>>;
 
-function RecordPanelTop({ actions, history, panelExtra }: { actions: RecordActions; history?: HistoryData; panelExtra?: ReactNode }) {
+function RecordPanelTop({
+  actions,
+  history,
+  panelExtra,
+  panelTop,
+}: {
+  actions: RecordActions;
+  history?: HistoryData;
+  panelExtra?: ReactNode;
+  panelTop?: ReactNode;
+}) {
   const [more, setMore] = useState(false);
   const menuId = useId();
   const busy = actions.busy !== null;
   return (
     <div data-record-panel-top className="shrink-0 px-2 pt-2">
+      {panelTop}
       <div className="flex flex-col gap-2">
+        {actions.inlineDiscard ? (
+          <PanelButton icon="restart_alt" onClick={actions.discard} disabled={!actions.dirty || busy}>
+            Discard changes
+          </PanelButton>
+        ) : null}
         {actions.duplicate ? (
           <PanelButton
             icon="content_copy"
@@ -173,13 +201,17 @@ function RecordPanelTop({ actions, history, panelExtra }: { actions: RecordActio
           {actions.busy === "saving" ? "Submitting…" : "Submit changes"}
         </PanelButton>
         {panelExtra}
-        <PanelButton icon="expand_more" aria-expanded={more} aria-controls={menuId} onClick={() => setMore((open) => !open)}>
-          More options
-        </PanelButton>
-        <div id={menuId} hidden={!more} className="flex flex-col gap-2">
-          <PanelButton icon="restart_alt" onClick={actions.discard} disabled={!actions.dirty || busy}>
-            Discard changes
+        {actions.inlineDiscard && !actions.duplicateAsDraft && !actions.setArchived ? null : (
+          <PanelButton icon="expand_more" aria-expanded={more} aria-controls={menuId} onClick={() => setMore((open) => !open)}>
+            More options
           </PanelButton>
+        )}
+        <div id={menuId} hidden={!more} className="flex flex-col gap-2">
+          {actions.inlineDiscard ? null : (
+            <PanelButton icon="restart_alt" onClick={actions.discard} disabled={!actions.dirty || busy}>
+              Discard changes
+            </PanelButton>
+          )}
           {actions.duplicateAsDraft ? (
             <PanelButton icon="content_copy" onClick={actions.duplicateAsDraft} disabled={busy}>
               Duplicate as a draft

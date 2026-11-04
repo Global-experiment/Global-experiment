@@ -26,16 +26,42 @@ permanently options, only archive."
   default views, shows in "Archived", and is restored from there.
 - Past "deleted" History events stay readable, with what the record was
   (the Treasury details kept since Delivery 3).
-- Not records, so unchanged: removing a link between two records (a
-  person's organization or expertise), deleting a comment (kept struck
-  through in the history), removing a profile picture, and deleting a
-  Treasury supporting document.
-- **Next delivery (client, 2026-11-03):** comments, supporting documents
-  and pictures become archive-only too: removing one hides it but keeps it
-  recoverable, with a History event. Until then they are deleted as above.
+- Removing a link between two records (a person's organization or
+  expertise) is not a deletion: both records stay, and the history shows
+  the link's removal.
+- Comments, supporting documents and pictures are archive-only too
+  (amendment below, Delivery 6).
 - The `*.delete` permission keys stay in `admin_permissions` and the role
   matrix, unused, until the teams and memberships model replaces the
   fixed roles (Later cleanup of decision 016).
+
+## Amendment — Delivery 6 (2026-11-04): comments, documents, pictures
+
+Asked by the client on 2026-11-03. Nothing a person added is deleted, in
+the admin or through the API; removing it archives it.
+
+- **Comments.** "Delete" becomes **Archive**: the comment is hidden from
+  the other admins (they see "This comment was archived.", never its text,
+  not even in its edits), kept, and its author restores it. Events:
+  `comment_archived`, `comment_restored`. `DELETE /api/admin/comments/:id`
+  is gone; `POST …/comments/:id/archive` and `…/restore` replace it.
+  Comments deleted before migration 0015 became archived, so they can be
+  restored too; their old "deleted a comment" events stay as they were.
+- **Treasury supporting documents.** "Delete" becomes **Archive**: the
+  document moves to "Archived documents" on the entry, stays downloadable
+  for the Treasury roles, and is restored from there (or by uploading the
+  same file again). Events: `file_archived`, `file_restored`, naming the
+  file. `DELETE /api/admin/treasury/documents/:id` is gone;
+  `POST …/documents/:id/archive` and `…/restore` replace it.
+- **Profile pictures.** Removing or replacing a picture archives it: it is
+  listed under "Previous pictures" on Profile and can be used again.
+  Events: `file_archived` / `file_restored` on the account.
+- **Files are never removed from the storage.** The storage interface has
+  no delete any more; files are content-addressed, so keeping them never
+  stores the same file twice. Pictures and documents removed before
+  migration 0015 were already deleted and can't be recovered.
+- Home and Documentation images (Delivery 6, ADR 020) follow the same
+  rule: every revision keeps the images it used.
 
 ## Consequences
 

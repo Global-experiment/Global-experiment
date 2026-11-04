@@ -451,14 +451,14 @@ describe("native directory API", () => {
       const created = await createOrganization({
         name: "Civic Lab",
         description: "Builds participation tools.",
-        email: " hello@civic-lab.org ",
+        email: " hello@civic-lab.example.org ",
         wiseRecipientId: "98765432",
       });
       expect(created).toMatchObject({
         orgNumber: expect.any(Number),
         notionPageId: null,
         description: "Builds participation tools.",
-        email: "hello@civic-lab.org",
+        email: "hello@civic-lab.example.org",
         wiseRecipientId: "98765432",
       });
       expect(created).not.toHaveProperty("note");
@@ -475,13 +475,13 @@ describe("native directory API", () => {
       await admin.post("/api/admin/organizations", { name: "X", note: "old field" }).expect(400);
       await admin.post("/api/admin/organizations", { name: "X", wiseRecipientId: "9".repeat(101) }).expect(400);
 
-      await createOrganization({ name: "With email", email: "team@ngo.ch", description: "Water access" });
+      await createOrganization({ name: "With email", email: "team@water.example.net", description: "Water access" });
       await createOrganization({ name: "Without email" });
       const names = async (query: string) => (await admin.get(`/api/admin/organizations?${query}`).expect(200)).body.items.map((o: { name: string }) => o.name);
       expect(await names("filter=email:is_not_empty")).toEqual(["With email"]);
-      expect(await names("filter=email:contains:ngo.ch")).toEqual(["With email"]);
+      expect(await names("filter=email:contains:water.example.net")).toEqual(["With email"]);
       expect(await names("filter=description:contains:water")).toEqual(["With email"]);
-      expect(await names("search=ngo.ch")).toEqual(["With email"]);
+      expect(await names("search=water.example.net")).toEqual(["With email"]);
       expect(await names("sort=number:desc")).toEqual(["Without email", "With email"]);
       await admin.get("/api/admin/organizations?filter=note:is_empty").expect(400);
     });

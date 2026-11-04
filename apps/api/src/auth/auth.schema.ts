@@ -86,6 +86,32 @@ export const adminUsers = pgTable(
 );
 
 /**
+ * Every profile picture an account has had (archive-only, ADR 017;
+ * migration 0015). admin_users.picture_key is the current one; replacing or
+ * removing it archives its row here, and the file stays in the storage, so
+ * a previous picture can be used again.
+ */
+export const adminUserPictures = pgTable(
+  "admin_user_pictures",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "restrict" }),
+    storageKey: text("storage_key").notNull(),
+    contentType: text("content_type").notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("admin_user_pictures_account_idx").on(table.adminUserId, table.uploadedAt),
+    // The same file twice is one picture of that account.
+    uniqueIndex("admin_user_pictures_account_key_unique").on(table.adminUserId, table.storageKey),
+    check("admin_user_pictures_type_known", sql`${table.contentType} in ('image/png', 'image/jpeg', 'image/webp')`),
+  ],
+);
+
+/**
  * Server-side sessions. Only a SHA-256 of the opaque cookie token is stored,
  * so a database read never yields a usable session.
  */

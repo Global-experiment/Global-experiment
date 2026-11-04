@@ -280,11 +280,12 @@ export class TreasuryAdminRepository {
         sizeBytes: treasuryDocuments.sizeBytes,
         uploadedAt: treasuryDocuments.uploadedAt,
         uploadedBy: sql<string | null>`coalesce(${adminUsers.displayName}, ${adminUsers.email})`,
+        archivedAt: treasuryDocuments.archivedAt,
       })
       .from(treasuryDocuments)
       .leftJoin(adminUsers, eq(adminUsers.id, treasuryDocuments.uploadedByAdminId))
       .where(eq(treasuryDocuments.entryId, entryId))
       .orderBy(desc(treasuryDocuments.uploadedAt));
-    return rows.map((row) => ({ ...row, uploadedAt: row.uploadedAt.toISOString() }));
+    return rows.map((row) => ({ ...row, uploadedAt: row.uploadedAt.toISOString(), archivedAt: row.archivedAt?.toISOString() ?? null }));
   }
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { RichText as RichTextModel } from "@/shared/content/types";
 import { isInternalHref } from "@/shared/content/internalLinks";
+import { isSafeHref } from "@/shared/content/safeHref";
 import { Highlight } from "./Highlight";
 
 const linkClassName =
@@ -16,7 +17,8 @@ export function RichText({ text, highlight }: { text: RichTextModel[]; highlight
   return (
     <>
       {text.map((item, index) => {
-        if (item.kind === "text") {
+        // A link that isn't https, http, mailto or this site is shown as its words only.
+        if (item.kind === "text" || !isSafeHref(item.href)) {
           return (
             <span key={index}>
               <Highlight text={item.value} query={highlight} />

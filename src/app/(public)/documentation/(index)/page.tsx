@@ -1,22 +1,10 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Container } from "@/shared/ui/Container";
 import { NavHeader } from "@/shared/ui/NavHeader";
 import { getDocumentationDataset, getDocumentationSummaries } from "@/modules/documentation/application/getDocumentationDataset";
 import { DocumentationList } from "@/modules/documentation/ui/DocumentationList";
 import { documentationMenu } from "@/modules/documentation/ui/documentationMenu";
-import { notionMissingLocally } from "@/shared/config/env";
-import { NotionNotConnected } from "@/shared/ui/NotionNotConnected";
-
-// getDocumentationDataset() is cached server-side (unstable_cache, 60s
-// revalidate — see that file), so this no longer hits Notion on every
-// request; force-dynamic stays only so the route keeps rendering per
-// request rather than being statically generated at build time, which
-// would require Notion to be reachable during `next build`.
-//
-// loading.tsx now gives this route a Suspense boundary (see that file for
-// the professional-loading-state rationale and the narrow ADR 007 trade-off
-// it reopens).
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Documentation",
@@ -26,12 +14,15 @@ export const metadata: Metadata = {
  * figma.pdf p15 top to bottom: header row (back, title, share, overflow),
  * search, page heading, intro, accordion rows. No desktop-specific frame
  * exists for this page; it uses the same centered column as desktop Home.
+ *
+ * The articles come from the native API (ADR 020), cached under the
+ * `documentation` tag and revalidated on every publication; the page renders
+ * per request (`connection()`). loading.tsx gives the route its Suspense
+ * boundary (see that file for the ADR 007 trade-off).
  */
 export default async function DocumentationIndexPage() {
-  // A contributor's machine without Notion (never production): say so instead of failing.
-  if (notionMissingLocally("documentation")) return <NotionNotConnected title="Documentation" backHref="/" />;
-  // Rows wait only for the one metadata query; bodies stream in behind them.
-  // Both share the same 60s cache window, so warm loads resolve together.
+  await connection();
+  // Rows wait for the summaries; the bodies (the same cached response) stream in behind them.
   const content = getDocumentationDataset();
   // The client reports a body failure itself; this only keeps a rejection
   // from going unhandled if the summaries fail first and the page errors.

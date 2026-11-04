@@ -283,6 +283,41 @@ describe("admin accounts", () => {
       expect((await owner.get("/api/admin/auth/session").expect(200)).body.admin.hasPicture).toBe(false);
     });
 
+    it("archives a removed or replaced picture instead of deleting it (ADR 017); a previous picture can be used again", async () => {
+      const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]);
+      await owner.upload("/api/admin/profile/picture", "file", PNG, "first.png").expect(201);
+      await owner.upload("/api/admin/profile/picture", "file", JPEG, "second.jpg").expect(201);
+      let previous = (await owner.get("/api/admin/profile/pictures").expect(200)).body;
+      expect(previous).toHaveLength(1);
+      const first = await owner.get(`/api/admin/profile/pictures/${previous[0].id}`).expect(200);
+      expect(first.headers["content-type"]).toBe("image/png");
+
+      await owner.delete("/api/admin/profile/picture").expect(200);
+      previous = (await owner.get("/api/admin/profile/pictures").expect(200)).body;
+      expect(previous).toHaveLength(2);
+      const session = (await owner.get("/api/admin/auth/session").expect(200)).body.admin;
+      expect(session.hasPicture).toBe(false);
+      let [event] = (await owner.get(`/api/admin/history/admin_user/${session.id}`).expect(200)).body.items;
+      expect(event).toMatchObject({ action: "file_archived", meta: { file: { kind: "picture" } } });
+
+      const types = await Promise.all(
+        previous.map(async (picture: { id: string }) => (await owner.get(`/api/admin/profile/pictures/${picture.id}`)).headers["content-type"]),
+      );
+      expect([...types].sort()).toEqual(["image/jpeg", "image/png"]);
+      const png = previous[types.indexOf("image/png")];
+      await owner.post(`/api/admin/profile/pictures/${png.id}/restore`).expect(200);
+      expect((await owner.get("/api/admin/auth/session").expect(200)).body.admin.hasPicture).toBe(true);
+      expect((await owner.get(`/api/admin/accounts/${session.id}/picture`).expect(200)).headers["content-type"]).toBe("image/png");
+      [event] = (await owner.get(`/api/admin/history/admin_user/${session.id}`).expect(200)).body.items;
+      expect(event).toMatchObject({ action: "file_restored", meta: { file: { kind: "picture", id: png.id } } });
+      expect((await owner.get("/api/admin/profile/pictures").expect(200)).body).toHaveLength(1);
+
+      // Only one's own pictures.
+      const other = await signedInAs(t, "admin");
+      await other.get(`/api/admin/profile/pictures/${png.id}`).expect(404);
+      await other.post(`/api/admin/profile/pictures/${png.id}/restore`).expect(404);
+    });
+
     it("changes the email and the password only with the current password; a new password signs out the other sessions", async () => {
       await owner.post("/api/admin/profile/email", { currentPassword: "wrong", email: "new@example.org" }).expect(403);
       await owner.post("/api/admin/profile/email", { currentPassword: "a long and unique passphrase", email: "newcomer@example.org" }).expect(409);

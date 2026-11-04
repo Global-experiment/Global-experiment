@@ -10,6 +10,7 @@ import { checkLocalDatabase } from "./local-database-check.js";
 import * as schema from "../common/database/schema.js";
 import { people } from "../people/people.schema.js";
 import { treasuryEntries } from "../treasury/treasury.schema.js";
+import { loadCmsFixtures } from "./fixtures/load-cms-fixtures.js";
 import { loadDirectoryFixtures } from "./fixtures/load-directory-fixtures.js";
 import { loadTreasuryFixtures } from "./fixtures/load-treasury-fixtures.js";
 
@@ -18,8 +19,9 @@ const MIGRATIONS = fileURLToPath(new URL("../../drizzle", import.meta.url));
 /**
  * The contributor's local database (`npm run setup`, scripts/setup.mjs):
  * apply the migrations, fill an EMPTY database with the test fixtures
- * (testing/fixtures — made-up people, organizations and Treasury entries),
- * and set the local Rootadmin. LOCAL ONLY: it refuses production, any
+ * (testing/fixtures — made-up people, organizations and Treasury entries;
+ * Home and Documentation whenever there are none), and set the local
+ * Rootadmin. LOCAL ONLY: it refuses production, any
  * database that isn't PGlite (`pglite:<folder>`) or a PostgreSQL server on
  * this machine whose name ends in `_dev` or `_test`, and it never seeds a
  * database that already holds records.
@@ -70,6 +72,9 @@ async function main() {
     } else {
       console.log("The database already has data: left as it is (npm run setup -- --reset starts again).");
     }
+    // Home and Documentation (native since Delivery 6): sample pages when there are none yet, even in an older local database.
+    const pages = await loadCmsFixtures(db);
+    if (pages > 0) console.log(`Sample Home and Documentation loaded (${pages} pages).`);
     const result = await new AuthRepository(db).upsertOwner(email, await hashPassword(password));
     console.log(`Local Rootadmin ${result}.`);
   } finally {

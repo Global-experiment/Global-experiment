@@ -1,12 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
-import { notionMissingLocally } from "@/shared/config/env";
+import { describe, expect, it } from "vitest";
 
 /**
- * Guard: the running application must only ever use live Notion content.
- * Scans runtime (non-test) source for fixture/mock CMS repositories,
- * static Home copy, and runtime "is Notion configured?" switches.
+ * Guard (ADR 009, ADR 020): the running website shows only the content the
+ * native API publishes. Scans runtime (non-test) source for fixture or mock
+ * CMS repositories, static Home copy, and any remaining Notion runtime.
+ * (Sample pages exist for tests and local setup only, in the API's
+ * testing/fixtures, which is never part of a build.)
  */
 function runtimeSourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -27,29 +28,15 @@ describe("no CMS fixtures in the running application", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("has no runtime code selecting a fixture repository or checking whether Notion is configured", () => {
-    const offenders = files.filter((f) => {
-      const text = readFileSync(f, "utf8");
-      return /FixtureDocumentationRepository|FixtureHomeRepository|isNotionConfigured|home-content/.test(text);
-    });
+  it("has no runtime code selecting a fixture repository", () => {
+    const offenders = files.filter((f) => /FixtureDocumentationRepository|FixtureHomeRepository|home-content/.test(readFileSync(f, "utf8")));
     expect(offenders).toEqual([]);
   });
 
-  // ADR 009, amended 2026-11-03: the one exception is a contributor's machine without Notion,
-  // which shows a "not connected" notice (no content) — and never in production.
-  it("shows the local 'Notion isn't connected' notice only outside production", () => {
-    vi.stubEnv("NOTION_API_KEY", "");
-    vi.stubEnv("NOTION_HOME_PAGE_ID", "");
-    vi.stubEnv("NODE_ENV", "development");
-    expect(notionMissingLocally("home")).toBe(true);
-    expect(notionMissingLocally("documentation")).toBe(true);
-    vi.stubEnv("NODE_ENV", "production");
-    expect(notionMissingLocally("home")).toBe(false);
-    expect(notionMissingLocally("documentation")).toBe(false);
-    vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("NOTION_API_KEY", "set");
-    vi.stubEnv("NOTION_HOME_PAGE_ID", "set");
-    expect(notionMissingLocally("home")).toBe(false);
-    vi.unstubAllEnvs();
+  it("no longer reads Home or Documentation from Notion (Delivery 6)", () => {
+    const offenders = files.filter((f) =>
+      /@notionhq\/client|NOTION_(API_KEY|HOME_PAGE_ID|DOCUMENTATION_DB_ID)|integrations\/notion/.test(readFileSync(f, "utf8")),
+    );
+    expect(offenders).toEqual([]);
   });
 });

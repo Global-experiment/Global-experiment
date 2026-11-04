@@ -6,6 +6,7 @@ import { AuthRepository } from "../auth/auth.repository.js";
 import { hashPassword } from "../auth/password.js";
 import type { Database } from "../common/database/database.module.js";
 import * as schema from "../common/database/schema.js";
+import { loadCmsFixtures } from "./fixtures/load-cms-fixtures.js";
 import { loadDirectoryFixtures } from "./fixtures/load-directory-fixtures.js";
 import { loadTreasuryFixtures } from "./fixtures/load-treasury-fixtures.js";
 
@@ -32,6 +33,7 @@ async function main() {
     await migrate(db as never, { migrationsFolder: fileURLToPath(new URL("../../drizzle", import.meta.url)) });
     await loadDirectoryFixtures(db);
     await loadTreasuryFixtures(db);
+    await loadCmsFixtures(db);
     await new AuthRepository(db).upsertOwner(email, await hashPassword(password));
     console.log(`E2E database "${name}" reset, migrated and seeded.`);
   } finally {

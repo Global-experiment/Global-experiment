@@ -65,11 +65,12 @@ Start again from empty sample data with `npm run setup -- --reset` (stop
 
 ### What works without extra keys
 
-Everything except three things that need outside services:
+Everything, Home and Documentation included (`npm run setup` loads sample
+pages — a copy of the public text — that you edit in the admin), except
+what needs outside services:
 
 | Part | Without keys | To work on it |
 |---|---|---|
-| Home and Documentation | Say "Notion isn't connected in this local setup" (they're written in Notion) | Ask the maintainer for read access; add `NOTION_API_KEY`, `NOTION_HOME_PAGE_ID`, `NOTION_DOCUMENTATION_DB_ID` to `.env.local` |
 | Donations | The donate page says "Donations are unavailable" | Your **own** Stripe account's test keys (`sk_test_…`, `pk_test_…`) and `DONATIONS_ENABLED=true` — see [docs/operations/stripe.md](docs/operations/stripe.md) |
 | Email, AI | Not built yet | — |
 
@@ -82,7 +83,6 @@ src/                 The website and the admin (Next.js App Router)
   app/               Routes: (public) pages, admin/, api/ proxies
   modules/           Features: admin/ (the admin screens), documentation/, home/
   shared/            Shared UI (shared/ui), configuration, formatting, validation
-  integrations/      Outside services (Notion)
 apps/api/            The API (NestJS) — the only part that talks to the database
   src/<module>/      One folder per area: people, organizations, treasury, accounts…
                      (controller, service, repository, *.schema.ts tables, tests)
@@ -156,7 +156,7 @@ Optional, with a PostgreSQL 17 server on your machine and a database named
 
 ```bash
 npm run api:test:pg   # API tests on real PostgreSQL
-npm run test:e2e      # browser tests (Playwright; the public-page suites also need the Notion values)
+npm run test:e2e      # browser tests (Playwright)
 ```
 
 Add or update tests with every change: unit tests next to the code
@@ -181,3 +181,16 @@ tests in `e2e/`. Test data (fixtures) only ever lives in test files.
 - Never use production keys locally. For Stripe, use your own test account.
 - If you think a secret was committed, tell the maintainer at once: it must
   be revoked and replaced, not just deleted.
+
+## For maintainers
+
+- **Release records and server notes never go in this repository**, which is
+  public. They live only in the maintainer's private operations folder,
+  outside any git working copy: the release records (commit, CI run, backup
+  name and checksum, counts, checks), server procedures, addresses, accounts,
+  paths and firewall details.
+- What goes in the repository is generic: the release process in
+  [docs/operations/README.md](docs/operations/README.md) and, for each
+  delivery, a plain-language note for the client in `docs/releases/`.
+- Before committing an operations document, check that it names no server,
+  address, account, path, backup or database that exists in production.

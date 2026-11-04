@@ -1,12 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 
 /**
  * File storage (docs/architecture/overview.md §3.4): Treasury supporting
- * documents are the only uploads in v0.1. The database stores an opaque
- * `storage_key`, never a path, so an S3-compatible adapter can replace the
- * local disk later without a schema change.
+ * documents, profile pictures and the images of Home and Documentation. The
+ * database stores an opaque `storage_key`, never a path, so an
+ * S3-compatible adapter can replace the local disk later without a schema
+ * change.
+ *
+ * Archive-only (ADR 017): there is no delete. A file removed in the admin is
+ * archived in the database and its bytes stay here, so it can be restored.
+ * Files are content-addressed, so keeping them never stores one twice.
  */
 export const FILE_STORAGE = Symbol("FILE_STORAGE");
 
@@ -14,8 +19,6 @@ export interface FileStorage {
   /** Stores the bytes under their SHA-256 (content-addressed: the same file is stored once). */
   put(bytes: Buffer): Promise<{ key: string; sha256: string }>;
   get(key: string): Promise<Buffer>;
-  /** Removes the stored file; a missing file is not an error. */
-  delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
 }
 
@@ -59,10 +62,6 @@ export class LocalDiskStorage implements FileStorage {
 
   get(key: string): Promise<Buffer> {
     return readFile(this.path(key));
-  }
-
-  async delete(key: string): Promise<void> {
-    await rm(this.path(key), { force: true });
   }
 
   async exists(key: string): Promise<boolean> {

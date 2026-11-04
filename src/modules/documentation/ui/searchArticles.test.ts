@@ -33,9 +33,17 @@ describe("buildSearchHaystack", () => {
     expect(haystack).not.toContain("shared civic infrastructure");
   });
 
-  it("skips unsupported blocks without throwing", () => {
-    const haystack = buildSearchHaystack(article({ content: [{ kind: "unsupported", type: "image" }] }));
-    expect(haystack).toContain("introduction");
+  it("reaches list items and image descriptions too", () => {
+    const haystack = buildSearchHaystack(
+      article({
+        content: [
+          { kind: "list", ordered: false, items: [[{ kind: "text", value: "Participatory budgeting" }]] },
+          { kind: "image", imageId: "00000000-0000-4000-8000-000000000001", alt: "A map of the regions" },
+        ],
+      }),
+    );
+    expect(haystack).toContain("participatory budgeting");
+    expect(haystack).toContain("a map of the regions");
   });
 });
 

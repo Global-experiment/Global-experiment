@@ -503,7 +503,7 @@ describe("Treasury API", () => {
     describe("supporting documents", () => {
       const send = (id: string, bytes: Buffer, name: string) => admin.upload(`/api/admin/treasury/${id}/documents`, "file", bytes, name);
 
-      it("uploads, lists, downloads and deletes a document on any entry (Notion-managed too)", async () => {
+      it("uploads, lists, downloads, archives and restores a document on any entry (Notion-managed too); never deletes a file", async () => {
         const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, recipientPersonId: (await recipient()).id }));
         const uploaded = (await send(entry.id, PDF, '../../etc/Invoice "May".pdf').expect(201)).body;
         expect(uploaded).toMatchObject({ fileName: "Invoice May.pdf", contentType: "application/pdf", sizeBytes: PDF.length, uploadedBy: expect.any(String) });
@@ -511,6 +511,7 @@ describe("Treasury API", () => {
         const record = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
         expect(record.documents).toBe(1);
         expect(record.documentsList).toEqual([uploaded]);
+        expect(uploaded.archivedAt).toBeNull();
         expect((await admin.get(`/api/admin/treasury/${entry.id}/documents`).expect(200)).body).toEqual([uploaded]);
 
         const download = await admin
@@ -535,11 +536,25 @@ describe("Treasury API", () => {
         const files = async () => (await readdir(storageDir, { recursive: true })).filter((name) => /[0-9a-f]{64}$/.test(name));
         expect(await files()).toHaveLength(1);
 
-        await admin.delete(`/api/admin/treasury/documents/${uploaded.id}`).expect(204);
+        // Archive-only (ADR 017): no delete route; archiving keeps the row and the file, and restoring brings it back.
+        expect((await admin.delete(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(404);
+        const archived = (await admin.post(`/api/admin/treasury/documents/${uploaded.id}/archive`).expect(200)).body;
+        expect(archived.archivedAt).toEqual(expect.any(String));
+        await admin.post(`/api/admin/treasury/documents/${shared.id}/archive`).expect(200);
         expect(await files()).toHaveLength(1);
-        await admin.delete(`/api/admin/treasury/documents/${shared.id}`).expect(204);
-        expect(await files()).toHaveLength(0);
-        await admin.get(`/api/admin/treasury/documents/${uploaded.id}`).expect(404);
+        await admin.get(`/api/admin/treasury/documents/${uploaded.id}`).expect(200);
+        const after = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
+        expect(after.documentsList).toEqual([{ ...uploaded, archivedAt: archived.archivedAt }]);
+        let events = (await admin.get(`/api/admin/history/treasury_entry/${entry.id}`).expect(200)).body.items;
+        expect(events[0]).toMatchObject({ action: "file_archived", meta: { file: { kind: "document", id: uploaded.id, name: "Invoice May.pdf" } } });
+
+        // Uploading the archived file again restores it, as does Restore.
+        expect((await send(other.id, PDF, "copy again.pdf").expect(201)).body).toMatchObject({ id: shared.id, archivedAt: null });
+        expect((await admin.post(`/api/admin/treasury/documents/${uploaded.id}/restore`).expect(200)).body.archivedAt).toBeNull();
+        events = (await admin.get(`/api/admin/history/treasury_entry/${entry.id}`).expect(200)).body.items;
+        expect(events[0]).toMatchObject({ action: "file_restored", meta: { file: { id: uploaded.id } } });
+        expect(await files()).toHaveLength(1);
+        await admin.post(`/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000/archive`).expect(404);
       });
 
       it("accepts only PDF, PNG and JPEG, judged from the bytes, up to 20 MB", async () => {
@@ -559,17 +574,18 @@ describe("Treasury API", () => {
         const uploaded = (await send(entry.id, PDF, "a.pdf").expect(201)).body;
         expect((await anonymous().get(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(401);
         expect((await anonymous().post(`/api/admin/treasury/${entry.id}/documents`).set("origin", TEST_ORIGIN).attach("file", PDF, "a.pdf")).status).toBe(401);
-        expect((await anonymous().delete(`/api/admin/treasury/documents/${uploaded.id}`).set("origin", TEST_ORIGIN)).status).toBe(401);
+        expect((await anonymous().post(`/api/admin/treasury/documents/${uploaded.id}/archive`).set("origin", TEST_ORIGIN)).status).toBe(401);
 
         // A Moderator has no Treasury permission at all; Compliance reads and reviews but never edits or publishes.
         const moderator = await signedInAs(t, "moderation");
         expect((await moderator.get(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(403);
-        expect((await moderator.delete(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(403);
+        expect((await moderator.post(`/api/admin/treasury/documents/${uploaded.id}/archive`)).status).toBe(403);
         expect((await moderator.upload(`/api/admin/treasury/${entry.id}/documents`, "file", PDF, "a.pdf")).status).toBe(403);
         expect((await moderator.post(`/api/admin/treasury/${entry.id}/unpublish`)).status).toBe(403);
         expect((await moderator.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" })).status).toBe(403);
         const compliance = await signedInAs(t, "compliance");
         await compliance.get(`/api/admin/treasury/documents/${uploaded.id}`).expect(200);
+        expect((await compliance.post(`/api/admin/treasury/documents/${uploaded.id}/archive`)).status).toBe(403);
         expect((await compliance.post(`/api/admin/treasury/${entry.id}/unpublish`)).status).toBe(403);
         // The route allows review or update; the field decides: the internal note is treasury.update.
         expect((await compliance.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" })).status).toBe(403);

@@ -2,6 +2,11 @@
 
 ## Status
 
+Amended 2026-11-04 (Delivery 6, ADR 020): Home and Documentation are native.
+The rule stays — the running website shows only real, published content,
+never a fixture or a fallback copy — but its source is now the native API's
+published revisions, not Notion. See "Amendment (2026-11-04)" below.
+
 Accepted (supersedes the earlier "production fixture safety" decision, which
 kept a development-only fixture fallback).
 
@@ -42,7 +47,23 @@ my machine" depended on which mode the machine was in.
   normalised to internal routes; other external links stay external
   (`target=_blank`, `rel=noopener noreferrer`); `mailto:` stays a plain link.
 
-## Amendment (2026-11-03): contributors without Notion
+## Amendment (2026-11-04): native content, no Notion at run time
+
+- Home and Documentation are read from the native API (`/api/cms`): the
+  published revision of each page (ADR 020). The website no longer calls
+  Notion; the Notion client, its settings (`NOTION_API_KEY`,
+  `NOTION_HOME_PAGE_ID`, `NOTION_DOCUMENTATION_DB_ID`) and the local
+  "Notion isn't connected" notice described below are removed.
+- Still no fixture in the running application: when the API can't answer,
+  the page fails with an error status (ADR 007). A guard test scans the
+  website's source for fixture repositories and for any Notion runtime.
+- Sample pages exist for tests and local setup only (the API's
+  `testing/fixtures`, never built, never loaded into production).
+- Caching: the pages' API requests are cached under the `home` and
+  `documentation` tags and revalidated on every publication, with a
+  5-minute fallback. The Caching section below describes the Notion era.
+
+## Amendment (2026-11-03): contributors without Notion (superseded 2026-11-04)
 
 Contributors work locally without any production secret (Delivery 5a,
 client decision of 2026-11-03). On their machine, when the Notion values

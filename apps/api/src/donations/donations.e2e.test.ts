@@ -187,7 +187,7 @@ describe("donations API (HTTP, Stripe test double)", () => {
         checkoutBody({ method: "bitcoin" }),
         checkoutBody({ attemptId: "not-a-uuid" }),
         checkoutBody({ amount: 10 }),
-        { ...checkoutBody(), email: "donor@example.test" }, // never accepts donor data
+        { ...checkoutBody(), email: "donor@example.net" }, // never accepts donor data
         {},
       ]) {
         const res = await checkout(body);

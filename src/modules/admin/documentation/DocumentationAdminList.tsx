@@ -2,32 +2,36 @@
 
 import { useCallback, useMemo } from "react";
 import { Highlight } from "@/shared/ui/Highlight";
+import type { CmsDocumentListItem, CmsState } from "../api/types";
+import { useAdminData } from "../api/useAdminData";
+import { useCan } from "../session";
 import { AdminListPage } from "../table/AdminListPage";
 import type { TableColumn } from "../table/DataTable";
 import type { ListField } from "../table/fields";
 import type { ListState } from "../table/listState";
 import { applyListState, type LocalListSpec } from "../table/localList";
-import { ViewTabs } from "../table/ViewTabs";
+import { AdminButtonLink, StatusMessage } from "../ui/controls";
 
-export interface DocumentationRow {
-  id: string;
-  title: string;
-  slug: string;
-  displayOrder: number;
-  expertise: string[];
-  /** ISO timestamps. */
-  publishedAt: string;
-  updatedAt: string;
-}
+export const STATE_LABELS: Record<CmsState, string> = { published: "Published", draft: "Draft", unpublished: "Unpublished", archived: "Archived" };
 
-const dateTime = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Zurich" });
-const when = (iso: string) => <time dateTime={iso}>{dateTime.format(new Date(iso))}</time>;
+const dateTime = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
+const when = (iso: string | null) => (iso ? <time dateTime={iso}>{dateTime.format(new Date(iso))}</time> : <span className="text-text-muted">Not yet</span>);
 
-/** Decision 3 of 2026-10-19: Title, Status, Display order, Expertise, Last edited by, Updated, Published. */
-const COLUMNS: TableColumn<DocumentationRow>[] = [
-  { id: "title", label: "Title", icon: "title", width: 280, render: (row, search) => <Highlight text={row.title} query={search} /> },
-  // Only published articles are read from Notion today.
-  { id: "status", label: "Status", icon: "select", width: 110, render: () => "Published" },
+/** admin-desktop.pdf p9 (whose columns are the People template's): Name, State, Expertise, and the documentation's own Display order, editor and dates. */
+const COLUMNS: TableColumn<CmsDocumentListItem>[] = [
+  { id: "title", label: "Name", icon: "title", width: 280, render: (row, search) => <Highlight text={row.title} query={search} /> },
+  {
+    id: "state",
+    label: "State",
+    icon: "select",
+    width: 150,
+    render: (row) => (
+      <span>
+        {STATE_LABELS[row.state]}
+        {row.hasDraft ? <span className="text-text-muted"> · draft changes</span> : null}
+      </span>
+    ),
+  },
   { id: "display_order", label: "Display order", icon: "numbers", width: 120, render: (row) => <span className="tabular-nums">{row.displayOrder}</span> },
   {
     id: "expertise",
@@ -42,34 +46,44 @@ const COLUMNS: TableColumn<DocumentationRow>[] = [
       </span>
     ),
   },
-  // Notion's editor names aren't imported yet: shown once the CMS is native (Step 5b).
-  { id: "last_edited_by", label: "Last edited by", icon: "title", width: 140, render: () => <span className="text-text-muted">Notion</span> },
+  { id: "slug", label: "Slug", icon: "title", width: 220, defaultHidden: true, render: (row) => row.slug },
+  { id: "last_edited_by", label: "Last edited by", icon: "person", width: 150, render: (row) => row.lastEditedBy },
   { id: "updated", label: "Updated", icon: "schedule", width: 180, render: (row) => when(row.updatedAt) },
-  { id: "published", label: "Published", icon: "schedule", width: 180, render: (row) => when(row.publishedAt) },
+  { id: "published", label: "Last published", icon: "schedule", width: 180, render: (row) => when(row.lastPublishedAt) },
 ];
 
-const SPEC: LocalListSpec<DocumentationRow> = {
+const SPEC: LocalListSpec<CmsDocumentListItem> = {
   values: {
     title: (row) => row.title,
+    state: (row) => row.state,
     display_order: (row) => row.displayOrder,
     expertise: (row) => row.expertise,
     updated: (row) => row.updatedAt,
-    published: (row) => row.publishedAt,
+    published: (row) => row.lastPublishedAt ?? "",
   },
-  searchText: (row) => [row.title, ...row.expertise],
+  searchText: (row) => [row.title, row.slug, ...row.expertise],
 };
 
 /**
- * /admin/documentation/manage — the Documentation list behind
- * "Administrate", READ-ONLY while cms.mode = notion (decision 1): the
- * articles are edited in Notion and the site reads them from there. The
- * list toolbar (search, sort, filters, columns) runs in the browser.
+ * /admin/documentation/manage — every Documentation article (p9), drafts
+ * and unpublished ones included; Archived in its own view (decision 12).
+ * Search, sort, filters and columns run in the browser (a few dozen rows).
  */
-export function DocumentationAdminList({ articles }: { articles: DocumentationRow[] }) {
+export function DocumentationAdminList() {
+  const documents = useAdminData<CmsDocumentListItem[]>("/cms/documents");
+  const canCreate = useCan("cms.create");
+  const rows = useMemo(() => documents.data ?? [], [documents.data]);
   const fields = useMemo<ListField[]>(() => {
-    const expertise = [...new Set(articles.flatMap((article) => article.expertise))].sort((a, b) => a.localeCompare(b));
+    const expertise = [...new Set(rows.flatMap((row) => row.expertise))].sort((a, b) => a.localeCompare(b));
     return [
-      { id: "title", label: "Title", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
+      { id: "title", label: "Name", icon: "title", operators: ["contains", "not_contains"], sort: "text" },
+      {
+        id: "state",
+        label: "State",
+        icon: "select",
+        operators: ["is", "is_not"],
+        options: (["published", "draft", "unpublished"] as const).map((value) => ({ value, label: STATE_LABELS[value] })),
+      },
       { id: "display_order", label: "Display order", icon: "numbers", operators: [], sort: "text" },
       {
         id: "expertise",
@@ -79,13 +93,26 @@ export function DocumentationAdminList({ articles }: { articles: DocumentationRo
         options: expertise.map((name) => ({ value: name, label: name })),
       },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
-      { id: "published", label: "Published", icon: "schedule", operators: [], sort: "dates" },
+      { id: "published", label: "Last published", icon: "schedule", operators: [], sort: "dates" },
     ];
-  }, [articles]);
-  const load = useCallback((state: ListState, pageSize: number) => applyListState(articles, SPEC, state, pageSize), [articles]);
+  }, [rows]);
+  const load = useCallback(
+    (state: ListState, pageSize: number) => {
+      if (!documents.data) return undefined;
+      const archived = state.view === "archived";
+      return applyListState(
+        rows.filter((row) => (row.state === "archived") === archived),
+        SPEC,
+        { ...state, filters: state.filters.filter((filter) => filter.field !== "archived") },
+        pageSize,
+      );
+    },
+    [rows, documents.data],
+  );
 
+  if (documents.error) return <StatusMessage tone="error">Couldn&rsquo;t load the documentation: {documents.error.message}</StatusMessage>;
   return (
-    <AdminListPage<DocumentationRow>
+    <AdminListPage<CmsDocumentListItem>
       config={{
         title: "Documentation",
         noun: "articles",
@@ -94,7 +121,13 @@ export function DocumentationAdminList({ articles }: { articles: DocumentationRo
         defaultSort: [{ field: "display_order", direction: "asc" }],
         fields,
         columns: COLUMNS,
-        views: <ViewTabs views={[{ id: "all", label: "All" }]} current="all" />,
+        recordHref: (row) => `/admin/documentation/${row.id}`,
+        archivedView: true,
+        actions: canCreate ? (
+          <AdminButtonLink href="/admin/documentation/new" icon="add">
+            New document
+          </AdminButtonLink>
+        ) : null,
       }}
     />
   );

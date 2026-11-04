@@ -460,6 +460,8 @@ export interface TreasuryDocument {
   sizeBytes: number;
   uploadedAt: string;
   uploadedBy: string | null;
+  /** Archived (ADR 017): listed under "Archived documents", restorable. */
+  archivedAt: string | null;
 }
 
 export interface TreasuryRule {
@@ -496,9 +498,10 @@ export interface TreasuryOptions {
 export const formatEntryNumber = (number: number) => `EXP-${number}`;
 
 /** The record types that have a detail page with a history. */
-export type HistoryEntityType = "person" | "organization" | "treasury_entry" | "service" | "access_grant" | "admin_user";
+export type HistoryEntityType = "person" | "organization" | "treasury_entry" | "service" | "access_grant" | "admin_user" | "cms_document";
 
-export type HistoryFieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation";
+/** `content`: a Home or Documentation content change — the blocks removed (before) and added (after), as { id: "h2:3", label: text }. */
+export type HistoryFieldKind = "text" | "email" | "url" | "number" | "date" | "datetime" | "boolean" | "select" | "relation" | "content";
 export type HistoryValue = string | number | boolean | null | { key: string; label: string } | { id: string; label: string }[];
 
 /** One changed field of a history event (old struck through → new). */
@@ -539,7 +542,15 @@ export type HistoryAction =
   | "email_changed"
   | "deactivated"
   | "reactivated"
-  | "permission_denied";
+  | "permission_denied"
+  // Archive-only (ADR 017): comments, supporting documents and profile pictures.
+  | "comment_archived"
+  | "comment_restored"
+  | "file_archived"
+  | "file_restored"
+  // Home and Documentation (ADR 020).
+  | "published"
+  | "unpublished";
 
 export interface HistoryItem {
   id: string;
@@ -558,7 +569,8 @@ export interface HistoryItem {
     details?: { label: string; value: string }[];
     [key: string]: unknown;
   };
-  comment?: { id: string; body: string; current: string; mine: boolean; deleted: boolean };
+  /** An archived comment's text reaches its author only: the others get "" (ADR 017). */
+  comment?: { id: string; body: string; current: string; mine: boolean; archived: boolean };
 }
 
 export interface RecordHistory {
@@ -573,4 +585,59 @@ export interface RecordHistory {
 export interface HistoryListItem extends HistoryItem {
   /** `title`: the record's current title (or its last known one); `exists`: false once it's deleted. */
   entity: { type: string; id: string; label: string; title: string; exists: boolean };
+}
+
+/** Home and Documentation (apps/api/src/cms/cms.contracts.ts, ADR 020). */
+export type CmsState = "published" | "draft" | "unpublished" | "archived";
+
+export interface CmsRevision {
+  id: string;
+  number: number;
+  status: "draft" | "published";
+  title: string;
+  slug: string;
+  expertise: string[];
+  content: import("@/shared/content/types").ContentBlock[];
+  summary: string | null;
+  author: string;
+  createdAt: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  restoredFrom: number | null;
+}
+
+export type CmsRevisionSummary = Omit<CmsRevision, "content" | "expertise" | "slug"> & { live: boolean; latest: boolean };
+
+export interface CmsDocument {
+  id: string;
+  number: number;
+  kind: "home" | "article";
+  displayOrder: number;
+  state: CmsState;
+  hasDraft: boolean;
+  firstPublishedAt: string | null;
+  unpublishedAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  latest: CmsRevision;
+  live: { id: string; number: number; publishedAt: string; publishedBy: string | null } | null;
+  permissions: { edit: boolean; publish: boolean };
+}
+
+export interface CmsDocumentListItem {
+  id: string;
+  number: number;
+  title: string;
+  slug: string;
+  state: CmsState;
+  hasDraft: boolean;
+  expertise: string[];
+  displayOrder: number;
+  firstPublishedAt: string | null;
+  lastPublishedAt: string | null;
+  updatedAt: string;
+  createdAt: string;
+  lastEditedBy: string;
 }

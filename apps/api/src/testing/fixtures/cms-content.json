@@ -1,0 +1,1697 @@
+{
+  "home": {
+    "editedAt": "2026-10-17T18:29:00.000Z",
+    "content": [
+      {
+        "kind": "heading",
+        "level": 4,
+        "text": [
+          {
+            "kind": "text",
+            "value": "A global platform for democratic participation and collective decision-making."
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "level": 2,
+        "text": [
+          {
+            "kind": "text",
+            "value": "Purpose and principles"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "level": 3,
+        "text": [
+          {
+            "kind": "text",
+            "value": "Shared democratic infrastructure"
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "The Global Experiment seeks to establish a shared civic infrastructure capable of operating across national and jurisdictional boundaries. It integrates democratic governance, public administration, institutional transparency, and economic participation within a single, interoperable framework underpinned by privacy-by-design principles, thereby ensuring that individuals may participate securely and without undue restriction."
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "level": 3,
+        "text": [
+          {
+            "kind": "text",
+            "value": "Open and transparent"
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "The platform is intended to let participants submit ideas, consider different perspectives, revise proposals, and vote on decisions. Decision-making authority is designed to be distributed across the community and governed by clear, published rules rather than controlled by one person or institution."
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "The experiment’s core software is being developed as free and open source so it can be inspected, reused, and improved. Governance rules, finances, decisions, and development work are documented publicly to support scrutiny and accountability."
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "level": 3,
+        "text": [
+          {
+            "kind": "text",
+            "value": "Protection of privacy"
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "Participation should not require people to give up control over their personal information. Privacy is therefore treated as a foundational requirement."
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "The platform is being designed to limit access to private data. Public discussions, results, and statistics are intended to reduce the risk of linking information to identifiable participants. Administrative access and actions are restricted and recorded. Each participant controls which profile information is made public and retains the rights provided by applicable data-protection law."
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "level": 3,
+        "text": [
+          {
+            "kind": "text",
+            "value": "Why it matters"
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "Many decisions have consequences across borders, while the people affected have limited opportunities to participate in them. The experiment explores whether democratic decision-making can become more inclusive, continuous, and accountable."
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "The Global Experiment is a work in progress, not a finished model. Its institutions, rules, and platform are being developed openly. Contributions from different regions, disciplines, and lived experiences can help identify assumptions, limitations, and practical needs."
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "level": 3,
+        "text": [
+          {
+            "kind": "text",
+            "value": "Early development"
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "text": [
+          {
+            "kind": "text",
+            "value": "The first version is intended to establish the foundations of a distributed organisation. It will include basic administrative processes, public statistics, and a documented history of administrative decisions."
+          }
+        ]
+      }
+    ]
+  },
+  "articles": [
+    {
+      "title": "Introduction",
+      "slug": "introduction",
+      "displayOrder": 1,
+      "expertise": [
+        "Civic technology",
+        "Participatory democracy",
+        "Privacy engineering",
+        "Plain-language writing"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The Global Experiment is an initiative to develop shared civic infrastructure for democratic participation across borders. The documentation explains the experiment's current public release, operating structure, finances, privacy approach, technology, and future direction."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "The experiment"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The experiment explores how public discussion, collective decision-making, transparent administration, and economic participation could operate within one global framework. Privacy, openness, accessibility, and accountable administration are treated as foundational requirements."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Purpose of the documentation"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Each article addresses one defined subject so that visitors, contributors, developers, and other interested people can find detailed information without reading the entire documentation. Technical and operational claims distinguish between what is currently implemented, what is required for version 0.1, and what remains part of the future vision."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Current phase"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The experiment is in early development. Version 0.1 establishes its public presence and operational foundations, but it is not yet the interactive democratic platform described by the long-term vision. The Version 0.1 scope article defines the exact boundary of the current release."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Version 0.1 scope",
+      "slug": "version-0-1-scope",
+      "displayOrder": 2,
+      "expertise": [
+        "Civic technology",
+        "Platform governance",
+        "Nonprofit management",
+        "Data governance"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 is a public information website that introduces the experiment, opens a waitlist, provides contribution and contact routes, accepts donations, publishes the treasury, and displays documentation. It does not include participant accounts or democratic decision-making tools."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Purpose of the release"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 creates the public, financial, legal, and technical foundations required before the interactive platform can be developed and released responsibly."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Dynamic information"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Financial amounts, dates, transaction counts, update times, and other values shown in design material are examples. The deployed website retrieves validated current values from the approved data sources rather than hard-coding design examples."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Interface source"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The reference interface is the "
+            },
+            {
+              "kind": "link",
+              "value": "version 0.1 release design",
+              "href": "https://example.org/design"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Vision and what comes next",
+      "slug": "vision-and-what-comes-next",
+      "displayOrder": 3,
+      "expertise": [
+        "Civic technology",
+        "Participatory democracy",
+        "Platform governance",
+        "Privacy engineering"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The long-term vision is shared civic infrastructure for democratic participation across borders. Later releases are intended to add accounts, proposals, deliberation, voting, transparent administration, and progressively distributed authority."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Vision"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The Global Experiment explores whether democratic participation can become more inclusive, continuous, transparent, and accountable at a global scale. The intended platform connects public discussion, collective decision-making, administration, and economic participation within one open framework."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Participation"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Later versions are intended to allow participants to create accounts, submit ideas, consider different perspectives, revise proposals, and vote on decisions. Results should explain who participated, how a decision was reached, and what the available data can and cannot represent."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Governance"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The intended direction is to replace temporary concentrated authority with published rules, reviewable administrative actions, and progressively distributed responsibilities. This direction is an objective rather than a description of capabilities currently available."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Privacy and openness"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Future participation should preserve meaningful privacy and give people control over what information becomes public. Core software, governance rules, financial records, decisions, and development work are intended to remain inspectable so that the system can be scrutinised, reused, and improved."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Next product phase"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The next phase is expected to move from a public information website to the first interactive platform. Priorities include secure account foundations, participant input, proposal and review workflows, transparent administrative history, tested moderation, and mechanisms that reduce reliance on a root administrator."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Conditions"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Future features should be introduced only when their security, privacy, accessibility, legal, operational, and governance requirements are sufficiently defined and tested. Release names and dates are not commitments until the corresponding scope has been approved."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Role of version 0.1"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 provides the public and operational foundation from which the interactive platform can be developed. Its records, feedback, and technical lessons inform later decisions without predetermining them."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Administration and reporting",
+      "slug": "organisation-and-responsibilities",
+      "displayOrder": 4,
+      "expertise": [
+        "Platform governance",
+        "Nonprofit management",
+        "Compliance",
+        "Financial reporting"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 uses a temporary, top-down administration model led by the root administrator. Version 1 is intended to replace unilateral authority with collegial decisions, distributed power, and transparent reporting."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Administration in version 0.1"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The root administrator monitors feedback, prioritises the roadmap, and coordinates delivery toward the version 1 vision."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Contributors may receive administrative access to the services needed for their work. This access supports development and operations, but version 0.1 does not yet contain the administration and governance tools planned for the platform. Strategic and operational management therefore remains largely centralised."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Current teams"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The current administration is organised across six teams: Moderation, Compliance, Treasury, Communication, Operations, and Technology."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The root administrator currently coordinates and remains responsible for all teams except access to the association's bank account. Only MN Associates has access to the bank account, reflecting the compliance and financial expertise required to administer it. Public financial reporting is documented in "
+            },
+            {
+              "kind": "link",
+              "value": "Donations and public treasury",
+              "href": "/documentation/public-treasury"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Administration in version 1"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 1 is intended to introduce the administrative processes required by a user-generated-content platform. These include promotion and demotion, issue assessment, ratings, comments, reports, moderation, and other operational decisions."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The system should require collegial review so that no administrative action can be performed unilaterally. Decisions should result from defined multi-person processes, with authority distributed across the relevant teams."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Reporting and accountability"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Administrative processes should produce transparent, non-identifying records that allow the community to understand how decisions were reached, audit the exercise of authority, and challenge outcomes through defined procedures."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "This model follows the balance between participant privacy and institutional accountability described in "
+            },
+            {
+              "kind": "link",
+              "value": "Privacy",
+              "href": "/documentation/privacy-and-personal-data"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Core values",
+      "slug": "privacy-and-personal-data",
+      "displayOrder": 5,
+      "expertise": [
+        "Privacy engineering",
+        "Data protection law",
+        "Platform governance",
+        "Participatory democracy"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The experiment is built around a central tension: people must be able to participate without being exposed, while the administration of the platform must remain visible and accountable. Both requirements serve the experiment's primary value: democracy."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Privacy for participants"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Personal information and participation data should be separated, minimised, and anonymised so that public activity cannot be traced back to an individual. The platform should not expose the information needed to identify, profile, target, or dox a participant."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Privacy protects participation itself. People should be able to express views and take part in collective decisions without placing their identity or safety at unnecessary risk."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Accountability for administration"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Privacy for participants must not create secrecy for those exercising administrative power. Administrative decisions should pass through a decentralised and thorough process rather than depend on one person or an unreviewable authority."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Access to sensitive information should remain limited, justified, and auditable. Administrative actions should be attributable to the process and role responsible for them without exposing participant data."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Transparency for the community"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The platform should publish its rules, procedures, decisions, reasoning, and non-identifying reports in a form the community can inspect. Participants should be able to audit how authority is exercised, question decisions, identify failures, and challenge outcomes through defined processes."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Transparency applies to institutions, power, and procedures. It does not require transparency of a participant's identity or private activity."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Democracy as the purpose"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Privacy, accountability, and transparency are not separate goals. They are conditions for a democratic platform in which every human being can participate with equal civic power."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The long-term objective is for participants to build the platform and its constitution collectively. No identity, position, wealth, nationality, expertise, or administrative role should grant greater democratic power than another person's. The broader direction is documented in "
+            },
+            {
+              "kind": "link",
+              "value": "Vision and what comes next",
+              "href": "/documentation/vision-and-what-comes-next"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "The balance"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Participants should be protected from exposure. Administrators should be constrained by reviewable processes. Institutions should remain open to scrutiny. Democracy determines why this balance matters and who the platform ultimately serves."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Technology and infrastructure",
+      "slug": "technology-infrastructure-and-accessibility",
+      "displayOrder": 6,
+      "expertise": [
+        "Open-source development",
+        "Privacy engineering",
+        "Systems administration",
+        "Backup & recovery",
+        "Data governance",
+        "Digital accessibility"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 is a responsive public website built on maintainable infrastructure and limited external services. Its technical priorities are privacy, transparency, reliability, security, and free and open-source technology where suitable."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Application"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The website implements the journeys defined in "
+            },
+            {
+              "kind": "link",
+              "value": "Version 0.1 scope",
+              "href": "/documentation/version-0-1-scope"
+            },
+            {
+              "kind": "text",
+              "value": ". The Figma release file defines the interface and behaviour without prescribing a particular programming language or framework."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Infrastructure"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The deployment targets Hetzner infrastructure with HTTPS, controlled access, backups, monitoring, error reporting, and documented recovery. Deployment should be reproducible and containerised where useful."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Technology choices"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Free and open-source technology is preferred when it is suitable and maintainable. Proprietary services may be used for regulated or operational functions when their role is documented."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Integrations"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Notion supplies approved documentation and treasury publication data. Stripe processes donations. Wise supplies banking data. Self-hosted Plausible provides website analytics. Credentials remain server-side and every integration receives only the permissions it requires."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Security"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Secrets must not enter the public repository or browser. Administrative access requires strong authentication, controlled ownership, recorded changes, maintained dependencies, and a recovery process."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Analytics and consent"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Plausible is used only to understand website use and performance. Analytics must not be used to infer sensitive characteristics, political views, or future participant profiles."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Analytics begins only after a clear choice. Declining or closing the request records refusal and does not restrict the website. The stored consent record should contain only what is needed to remember the choice and allow it to be changed or withdrawn."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Any change to the provider, hosting, data collected, or purpose must be reflected in the consent interface before the new processing begins. The governing principles are defined in "
+            },
+            {
+              "kind": "link",
+              "value": "Privacy",
+              "href": "/documentation/privacy-and-personal-data"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Ownership and handover"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The association should control the repository, infrastructure, domains, integrations, and production accounts. Handover documentation must cover deployment, configuration, backups, recovery, monitoring, and third-party dependencies."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Interface source"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The reference interface is the "
+            },
+            {
+              "kind": "link",
+              "value": "version 0.1 release design",
+              "href": "https://example.org/design"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Accessibility",
+      "slug": "accessibility",
+      "displayOrder": 7,
+      "expertise": [
+        "Digital accessibility",
+        "UX design",
+        "Information design",
+        "Plain-language writing"
+      ],
+      "publishedAt": "2026-08-30T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 should be usable by as many people as reasonably possible across devices, abilities, languages, and connection conditions. The release targets WCAG 2.2 AA."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Interface requirements"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The website uses semantic structure, keyboard access, visible focus, clear labels, sufficient contrast, understandable errors, and reduced-motion support where relevant."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Responsive access"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Content and essential actions should work across current desktop and mobile browsers without requiring a precise screen size, pointer device, or high-performance connection."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Testing"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Accessibility is part of release acceptance. Automated checks should be combined with keyboard testing, screen-reader testing, zoom and reflow checks, and review of the principal user journeys."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Ongoing work"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Reported barriers should enter the issue process described in "
+            },
+            {
+              "kind": "link",
+              "value": "Waitlist, contributing, feedback, and issue reporting",
+              "href": "/documentation/contributing-feedback-and-issues"
+            },
+            {
+              "kind": "text",
+              "value": ". Accessibility requirements should be reviewed whenever the interface or content changes."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Waitlist, contributing, feedback, and issue reporting",
+      "slug": "contributing-feedback-and-issues",
+      "displayOrder": 8,
+      "expertise": [
+        "Community organising",
+        "Content design",
+        "Plain-language writing",
+        "Data protection law"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 lets visitors join the launch waitlist, offer help, send feedback, or report an issue. These routes support development but do not create participant accounts or governance rights."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Waitlist"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The waitlist stores an email address to send one notification when the first interactive platform is available. It is not used for newsletters, promotion, fundraising, or profiling. The address should be deleted when it is no longer needed, subject to defined operational or legal requirements."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Contributing"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The Contribute route is for people offering relevant development, design, research, testing, translation, legal, communication, or other expertise. It leads to the current contribution process outside the future participant platform."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Feedback"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The feedback route accepts comments, suggestions, concerns, and observations about the experiment, documentation, or website."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Issue reporting"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The issue route is for broken behaviour, inaccurate information, accessibility barriers, privacy concerns, security concerns, and other specific problems. Sensitive reports must have a confidential destination that does not request unnecessary personal information."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Responses and boundaries"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Forms should confirm successful submission and explain errors without revealing internal details or another person's information. A submission does not create ownership, authority, preferential access, or a commitment that a suggestion will be implemented."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The treatment of submitted personal information follows the principles in "
+            },
+            {
+              "kind": "link",
+              "value": "Privacy",
+              "href": "/documentation/privacy-and-personal-data"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Treasury and economics",
+      "slug": "public-treasury",
+      "displayOrder": 9,
+      "expertise": [
+        "Treasury management",
+        "Financial reporting",
+        "Budgeting",
+        "Nonprofit management",
+        "Data governance"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 accepts one-time and monthly donations through Stripe and publishes a non-identifying view of the experiment's finances. Donations support the Swiss non-profit association without purchasing ownership, influence, control, or access."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Donations"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Donors choose an amount, currency, and one-time or monthly frequency before confirmation. Stripe handles payment credentials and available payment methods. Detailed payment and accounting records remain with Stripe, Wise, and the association's accountants."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Monthly donations and refunds"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Monthly donations continue until cancelled through Stripe's customer portal. Cancellation prevents future payments but does not automatically refund a completed donation."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Duplicated, mistaken, or unauthorised payments may be submitted for review. Approved refunds return through Stripe to the original payment method. Support requests can be sent to "
+            },
+            {
+              "kind": "link",
+              "value": "donations@globalexperiment.org",
+              "href": "mailto:donations@globalexperiment.org"
+            },
+            {
+              "kind": "text",
+              "value": " without including card credentials."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Public treasury"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The treasury shows the current balance, sustainability score, median donation, total expenses, and transaction history. Notion provides the qualified publication data but is not the accounting ledger."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Financial indicators"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Balance is the amount available in the Wise account after the latest successful synchronisation. Median donation is the middle eligible donation after amounts are ordered. Total expenses include recorded paid expenses under the approved methodology."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The sustainability score converts estimated runway into a value from 0.01 to 10: max(0.01, min(10, 10 × ln(1 + runway months) ÷ ln(37))). Runway uses the current balance and average monthly expenses over the previous six months. Missing or invalid inputs produce an unavailable result rather than a misleading score."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Transaction publication"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Donations appear without donor identities. Expenses may show their date, native amount, public category, and description. Unsupported classifications remain Not qualified."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Account details, payment credentials, invoices, complete references, and unapproved donor or contractor identities remain private in accordance with "
+            },
+            {
+              "kind": "link",
+              "value": "Privacy",
+              "href": "/documentation/privacy-and-personal-data"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Reconciliation"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Synchronisation reconciles Stripe and Wise records, prevents duplicates, accounts for reversals, disputes, refunds, fees, and currency differences, and avoids presenting provisional data as final. The target is a complete update at least every four hours while retaining the last valid public state if a source fails."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Documentation and roadmap",
+      "slug": "documentation-publishing-and-synchronisation",
+      "displayOrder": 10,
+      "expertise": [
+        "Editing",
+        "Content design",
+        "Plain-language writing",
+        "Strategic communications",
+        "Platform governance",
+        "Localization"
+      ],
+      "publishedAt": "2026-08-29T00:00:00.000Z",
+      "editedAt": "2026-09-29T12:51:00.000Z",
+      "content": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Summary"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 0.1 uses Notion as the content management system for the experiment's public documentation. Access is currently centralised, while version 1 is intended to introduce collaborative documentation, information notes, collegial publication, and a participatory roadmap."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Documentation in v0.1"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Only the root administrator currently has access to the documentation workspace. The root administrator writes and publishes the documentation while consulting people with the relevant subject-matter and legal expertise to keep it accurate, understandable, and legally sound."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Published Notion articles are synchronised with the documentation section of the website. This arrangement is temporary and reflects the top-down administration of version 0.1."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Collaborative documentation in v1"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The Communication administration team is intended to co-write, review, and publish documentation collectively."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Publication should follow the same decentralised principle as issue review: changes pass through a defined collegial process and cannot be approved unilaterally. The wider administration model is described in "
+            },
+            {
+              "kind": "link",
+              "value": "Administration and reporting",
+              "href": "/documentation/organisation-and-responsibilities"
+            },
+            {
+              "kind": "text",
+              "value": "."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Information notes"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "The Communication administration team will be able to publish information notes: short news posts that allow the community to follow recent activity, completed deliveries, and significant developments."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Information notes should report what happened without replacing the permanent documentation or the roadmap. Their publication will follow the same collegial review process as other communication content."
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 1,
+          "text": [
+            {
+              "kind": "text",
+              "value": "Public roadmap"
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Version 1 is intended to include a public roadmap containing proposed ideas and planned developments. The roadmap should make ideas accessible to the community and allow participants to comment on and rate them."
+            }
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Community input should inform prioritisation without making an idea an automatic commitment. Decisions and their reasoning should remain visible so prioritisation can be understood and challenged."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
