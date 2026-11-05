@@ -34,9 +34,8 @@ if (testDatabaseUrl) process.env.E2E_ADMIN_ENABLED = "1";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
-  // The Documentation index now preloads every article body from Notion on
-  // every request (client feedback items 15–16, no cache); a cold/slow
-  // live fetch can occasionally take longer than Playwright's 30s default.
+  // A cold `next dev` compile of the admin and Documentation routes on a
+  // loaded machine can occasionally take longer than Playwright's 30s default.
   timeout: 60_000,
   // `next dev` compiles a route on its first visit, which on a loaded machine
   // can exceed the 5s default of a navigation assertion (toHaveURL after a
@@ -80,13 +79,12 @@ export default defineConfig({
       : []),
     {
       command: `npx next dev -p ${port}`,
-      // A page with no live-Notion dependency: server readiness mustn't hinge
-      // on a third-party API (Home is a 500 while Notion is unreachable).
+      // A page with no API dependency: server readiness mustn't hinge on the
+      // API being up first (Home is an error page while the API is unreachable).
       url: `http://localhost:${port}/waitlist`,
       reuseExistingServer: true,
-      // The readiness probe's own request can land on the Documentation
-      // route's live, uncached Notion preload (same reason as `timeout`
-      // above) — 30s was occasionally too tight for that one request.
+      // The readiness probe's own request includes the first compile — 30s
+      // was occasionally too tight for that one request.
       timeout: 90_000,
       // The revalidation hook lets a suite that switches a setting refresh the cached public pages.
       env: { ADMIN_API_ORIGIN: `http://127.0.0.1:${apiPort}`, REVALIDATE_SECRET: E2E_REVALIDATE_SECRET },

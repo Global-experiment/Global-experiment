@@ -27,10 +27,11 @@ test.describe("No CSP violations or hydration failures on any page", () => {
   });
 });
 
-// These run against the live Notion workspace — the application has no
+// These run against the published revisions the test API serves (the
+// sample pages loaded by the e2e setup) — the application itself has no
 // fixture or placeholder content. They assert structure that any valid
 // editorial content must satisfy, plus stable published article titles.
-test.describe("Home renders live Notion content", () => {
+test.describe("Home renders the published content", () => {
   test("has a non-empty tagline heading and at least one editorial paragraph", async ({ page }) => {
     const response = await page.goto("/");
     expect(response?.status()).toBe(200);

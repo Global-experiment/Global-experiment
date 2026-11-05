@@ -14,8 +14,7 @@ export interface DocumentationRepository {
    * instantly and search full article text client-side, with no per-row
    * fetch (client feedback items 15–16) — at the cost of always fetching
    * every body up front. Only sensible while the article count is small
-   * (currently 10); see NotionDocumentationRepository for the concurrency
-   * strategy this uses against Notion's API.
+   * (currently 10): the API returns them in one cached response.
    */
   listPublishedWithContent(): Promise<DocumentationArticle[]>;
 }
