@@ -21,6 +21,9 @@ function runtimeSourceFiles(dir: string): string[] {
 
 const srcDir = path.resolve(import.meta.dirname, "../..");
 const files = runtimeSourceFiles(srcDir);
+const apiSrcDir = path.resolve(import.meta.dirname, "../../../apps/api/src");
+/** The Notion SDK, its API host, any NOTION_* setting, or the old integration folder. */
+const NOTION_RUNTIME = /@notionhq\/client|api\.notion\.com|NOTION_[A-Z_]+|integrations\/notion/;
 
 describe("no CMS fixtures in the running application", () => {
   it("has no fixture/mock/placeholder-named runtime files", () => {
@@ -34,9 +37,12 @@ describe("no CMS fixtures in the running application", () => {
   });
 
   it("no longer reads Home or Documentation from Notion (Delivery 6)", () => {
-    const offenders = files.filter((f) =>
-      /@notionhq\/client|NOTION_(API_KEY|HOME_PAGE_ID|DOCUMENTATION_DB_ID)|integrations\/notion/.test(readFileSync(f, "utf8")),
-    );
+    const offenders = files.filter((f) => NOTION_RUNTIME.test(readFileSync(f, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it("has no Notion setting or client left in the API either, now that the one-time import is gone", () => {
+    const offenders = runtimeSourceFiles(apiSrcDir).filter((f) => NOTION_RUNTIME.test(readFileSync(f, "utf8")));
     expect(offenders).toEqual([]);
   });
 });

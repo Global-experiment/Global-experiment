@@ -72,8 +72,8 @@ export interface TestApp {
 
 /**
  * Boots the full application (guards, filters, middleware) against a fresh
- * database. `providers` replaces injected services (e.g. the import source,
- * so no test ever calls Notion).
+ * database. `providers` replaces injected services (e.g. the Stripe gateway
+ * or the website revalidation, so no test calls a third party).
  */
 export async function createTestApp(env: NodeJS.ProcessEnv = {}, providers: { provide: unknown; useValue: unknown }[] = []): Promise<TestApp> {
   const config = testConfig(env);

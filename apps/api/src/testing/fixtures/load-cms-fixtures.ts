@@ -8,8 +8,8 @@ import type { Database } from "../../common/database/database.module.js";
 
 /**
  * Home and Documentation for tests and a contributor's machine (TEST AND
- * LOCAL ONLY — never production, where the one-time Notion import writes
- * the real pages). cms-content.json is a copy of the public pages' text as
+ * LOCAL ONLY — never production, where the real pages were imported from
+ * Notion once, on 2026-11-05, and are edited in the admin). cms-content.json is a copy of the public pages' text as
  * published on 4 November 2026 (no personal data), so the website looks and
  * searches as it does live. Loaded only into empty tables.
  */
