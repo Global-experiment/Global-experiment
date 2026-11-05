@@ -52,13 +52,6 @@ interface RevisionInput {
   restoredFromId?: string | null;
 }
 
-/** An actor writing revisions: an admin, or the one-time import ("Notion import"). */
-export type RevisionAuthor = { kind: "admin"; admin: AdminPrincipal } | { kind: "import"; label: string };
-
-const authorActor = (author: RevisionAuthor): AuditActor => (author.kind === "admin" ? actorFor(author.admin) : { type: "automation", label: author.label });
-const authorLabel = (author: RevisionAuthor) => (author.kind === "admin" ? actorFor(author.admin).label : author.label);
-const authorId = (author: RevisionAuthor) => (author.kind === "admin" ? author.admin.id : null);
-
 function sniffImage(bytes: Buffer): (typeof import("./cms.schema.js").CMS_IMAGE_TYPES)[number] | null {
   if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
@@ -174,10 +167,10 @@ export class CmsService {
     const id = await this.db.transaction(async (tx) => {
       await this.checkArticle(tx, body.slug, null);
       await this.checkImages(tx, body.content);
-      const document = await this.insertDocument(tx, "article", body.displayOrder, { kind: "admin", admin }, null);
-      const revision = await this.insertRevision(tx, document, 1, { ...body, summary: body.summary }, { kind: "admin", admin });
+      const document = await this.insertDocument(tx, "article", body.displayOrder, admin);
+      const revision = await this.insertRevision(tx, document, 1, { ...body, summary: body.summary }, admin);
       await this.record(tx, document, revision.title, actorFor(admin), "created", [], { revision: 1, ...(body.summary ? { summary: body.summary } : {}) });
-      if (body.publish) await this.publishIn(tx, document, revision, { kind: "admin", admin });
+      if (body.publish) await this.publishIn(tx, document, revision, admin);
       return document.id;
     });
     if (body.publish) await this.revalidate("article");
@@ -192,7 +185,7 @@ export class CmsService {
       if (document.kind !== "article") throw new NotFoundError("Document not found.");
       if (document.archivedAt) throw refused("archived", "Restore this document before editing it.");
       await this.checkArticle(tx, body.slug, document.id);
-      return this.saveIn(tx, document, body, { kind: "admin", admin }, { displayOrder: body.displayOrder });
+      return this.saveIn(tx, document, body, admin, { displayOrder: body.displayOrder });
     });
     if (visible) await this.revalidate("article");
     return this.get(id, admin);
@@ -205,19 +198,13 @@ export class CmsService {
       if (!document) {
         if (body.baseRevisionId) throw refused("stale", "Home was changed since you opened it. Reload to see the current version.");
         await this.checkImages(tx, body.content);
-        document = await this.insertDocument(tx, "home", 0, { kind: "admin", admin }, null);
-        const revision = await this.insertRevision(
-          tx,
-          document,
-          1,
-          { ...HOME, expertise: [], content: body.content, summary: body.summary },
-          { kind: "admin", admin },
-        );
+        document = await this.insertDocument(tx, "home", 0, admin);
+        const revision = await this.insertRevision(tx, document, 1, { ...HOME, expertise: [], content: body.content, summary: body.summary }, admin);
         await this.record(tx, document, HOME.title, actorFor(admin), "created", [], { revision: 1 });
-        if (body.publish) await this.publishIn(tx, document, revision, { kind: "admin", admin });
+        if (body.publish) await this.publishIn(tx, document, revision, admin);
         return { id: document.id, visible: body.publish };
       }
-      const visible = await this.saveIn(tx, document, { ...HOME, expertise: [], ...body }, { kind: "admin", admin }, {});
+      const visible = await this.saveIn(tx, document, { ...HOME, expertise: [], ...body }, admin, {});
       return { id: document.id, visible };
     });
     if (id.visible) await this.revalidate("home");
@@ -234,7 +221,7 @@ export class CmsService {
       if (revisionId === document.publishedRevisionId) return null;
       const [revision] = await tx.select().from(cmsRevisions).where(eq(cmsRevisions.id, revisionId));
       if (document.kind === "article") await this.checkArticle(tx, revision!.slug, document.id);
-      await this.publishIn(tx, document, revision!, { kind: "admin", admin });
+      await this.publishIn(tx, document, revision!, admin);
       return document.kind as CmsKind;
     });
     if (kind) await this.revalidate(kind);
@@ -307,7 +294,7 @@ export class CmsService {
           baseRevisionId: document.latestRevisionId,
           restoredFromId: source.id,
         },
-        { kind: "admin", admin },
+        admin,
         {},
         { restoredFrom: source.number },
       );
@@ -324,15 +311,9 @@ export class CmsService {
       if (source.kind !== "article") throw refused("home", "Home can't be duplicated.");
       const [latest] = await tx.select().from(cmsRevisions).where(eq(cmsRevisions.id, source.latestRevisionId!));
       const slug = await this.freeSlug(tx, `${latest!.slug}-copy`.slice(0, 100).replace(/-+$/, ""));
-      const document = await this.insertDocument(tx, "article", source.displayOrder, { kind: "admin", admin }, null);
+      const document = await this.insertDocument(tx, "article", source.displayOrder, admin);
       const title = `${latest!.title} (copy)`.slice(0, 200);
-      await this.insertRevision(
-        tx,
-        document,
-        1,
-        { title, slug, expertise: latest!.expertise, content: latest!.content, summary: null },
-        { kind: "admin", admin },
-      );
+      await this.insertRevision(tx, document, 1, { title, slug, expertise: latest!.expertise, content: latest!.content, summary: null }, admin);
       await this.record(tx, document, title, actorFor(admin), "duplicated", [], {
         revision: 1,
         duplicatedFrom: { id: source.id, label: documentLabel(source, latest!.title) },
@@ -344,7 +325,7 @@ export class CmsService {
 
   // ── Images ───────────────────────────────────────────────────────────────
 
-  async uploadImage(file: { buffer: Buffer; size: number; originalname: string } | undefined, author: RevisionAuthor): Promise<CmsImageDto> {
+  async uploadImage(file: { buffer: Buffer; size: number; originalname: string } | undefined, author: AdminPrincipal): Promise<CmsImageDto> {
     if (!file || file.size === 0) throw new ValidationFailedError([{ path: "file", message: "Choose an image." }]);
     if (file.size > CMS_IMAGE_MAX_BYTES) throw new ValidationFailedError([{ path: "file", message: "Images can be at most 5 MB." }]);
     // The real type, from the bytes; never SVG (it can carry script).
@@ -367,8 +348,8 @@ export class CmsService {
         sizeBytes: file.size,
         sha256: stored.sha256,
         fileName,
-        uploadedById: authorId(author),
-        uploadedByLabel: authorLabel(author),
+        uploadedById: author.id,
+        uploadedByLabel: actorFor(author).label,
       })
       .onConflictDoNothing({ target: cmsImages.sha256 });
     const [row] = await this.db.select().from(cmsImages).where(eq(cmsImages.sha256, stored.sha256));
@@ -526,22 +507,19 @@ export class CmsService {
     if (rows.length !== ids.length) throw new ValidationFailedError([{ path: "content", message: "An image in this page wasn't uploaded. Add it again." }]);
   }
 
-  async insertDocument(
-    tx: Executor,
-    kind: CmsKind,
-    displayOrder: number,
-    author: RevisionAuthor,
-    sourceRef: string | null,
-    at = this.clock(),
-  ): Promise<Document> {
-    const [document] = await tx
-      .insert(cmsDocuments)
-      .values({ kind, displayOrder, createdById: authorId(author), sourceRef, createdAt: at, updatedAt: at })
-      .returning();
+  private async insertDocument(tx: Executor, kind: CmsKind, displayOrder: number, author: AdminPrincipal, at = this.clock()): Promise<Document> {
+    const [document] = await tx.insert(cmsDocuments).values({ kind, displayOrder, createdById: author.id, createdAt: at, updatedAt: at }).returning();
     return document!;
   }
 
-  async insertRevision(tx: Executor, document: Document, number: number, input: RevisionInput, author: RevisionAuthor, at = this.clock()): Promise<Revision> {
+  private async insertRevision(
+    tx: Executor,
+    document: Document,
+    number: number,
+    input: RevisionInput,
+    author: AdminPrincipal,
+    at = this.clock(),
+  ): Promise<Revision> {
     const [revision] = await tx
       .insert(cmsRevisions)
       .values({
@@ -553,8 +531,8 @@ export class CmsService {
         expertise: input.expertise,
         content: input.content,
         summary: input.summary,
-        authorId: authorId(author),
-        authorLabel: authorLabel(author),
+        authorId: author.id,
+        authorLabel: actorFor(author).label,
         createdAt: at,
         restoredFromId: input.restoredFromId ?? null,
         contentHash: contentHash(input),
@@ -566,11 +544,11 @@ export class CmsService {
   }
 
   /** Makes a revision the one visitors see, with its History event. */
-  async publishIn(tx: Executor, document: Document, revision: Revision, author: RevisionAuthor, at = this.clock()): Promise<void> {
+  private async publishIn(tx: Executor, document: Document, revision: Revision, author: AdminPrincipal, at = this.clock()): Promise<void> {
     const wasLive = document.publishedRevisionId !== null;
     await tx
       .update(cmsRevisions)
-      .set({ status: "published", publishedAt: at, publishedById: authorId(author), publishedByLabel: authorLabel(author) })
+      .set({ status: "published", publishedAt: at, publishedById: author.id, publishedByLabel: actorFor(author).label })
       .where(eq(cmsRevisions.id, revision.id));
     await tx
       .update(cmsDocuments)
@@ -580,7 +558,7 @@ export class CmsService {
     document.firstPublishedAt ??= at;
     const from = wasLive ? "published" : document.unpublishedAt ? "unpublished" : "draft";
     document.unpublishedAt = null;
-    await this.record(tx, document, revision.title, authorActor(author), "published", from === "published" ? [] : [statusChange(from, "published")], {
+    await this.record(tx, document, revision.title, actorFor(author), "published", from === "published" ? [] : [statusChange(from, "published")], {
       revision: revision.number,
     });
   }
@@ -593,7 +571,7 @@ export class CmsService {
     tx: Executor,
     document: Document,
     body: RevisionInput & { publish: boolean; baseRevisionId: string | null },
-    author: RevisionAuthor,
+    author: AdminPrincipal,
     fields: { displayOrder?: number },
     meta: Record<string, unknown> = {},
   ): Promise<boolean> {
@@ -618,7 +596,7 @@ export class CmsService {
       current = await this.insertRevision(tx, document, latest!.number + 1, body, author, now);
     }
     if (changes.length > 0 || current !== latest)
-      await this.record(tx, document, current.title, authorActor(author), "updated", changes, {
+      await this.record(tx, document, current.title, actorFor(author), "updated", changes, {
         revision: current.number,
         ...(current !== latest && body.summary ? { summary: body.summary } : {}),
         ...meta,

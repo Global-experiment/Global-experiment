@@ -37,7 +37,7 @@ export const cmsDocuments = pgTable(
     /** Taken off the website after being published ("Unpublished"). */
     unpublishedAt: timestamp("unpublished_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
-    /** Where the first revision came from ("notion:<page id>" for the one-time import), so the import never runs twice. */
+    /** Where the first revision came from: "notion:<page id>" on the 11 pages imported from Notion on 2026-11-05, null otherwise. Kept as history. */
     sourceRef: text("source_ref"),
     createdById: uuid("created_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -78,7 +78,7 @@ export const cmsRevisions = pgTable(
     /** What changed, in the author's words (optional). */
     summary: text("summary"),
     authorId: uuid("author_id").references(() => adminUsers.id, { onDelete: "set null" }),
-    /** The author's name when saved ("Notion import" for the first revisions), kept if the account goes away. */
+    /** The author's name when saved, kept if the account goes away ("Notion import" on the imported pages' version 1). */
     authorLabel: text("author_label").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -125,7 +125,7 @@ export const cmsImages = pgTable(
     /** As uploaded (admins only); the website shows the block's description instead. */
     fileName: text("file_name").notNull(),
     uploadedById: uuid("uploaded_by_id").references(() => adminUsers.id, { onDelete: "set null" }),
-    /** "Notion import" for the imported images. */
+    /** The uploader's name when uploaded, kept if the account goes away. */
     uploadedByLabel: text("uploaded_by_label").notNull(),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
   },

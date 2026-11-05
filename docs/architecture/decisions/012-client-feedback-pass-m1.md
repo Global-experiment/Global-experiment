@@ -4,6 +4,8 @@
 
 Accepted
 
+**Note (2026-11-06):** since 2026-11-05 Home and Documentation are native (ADR [020](./020-native-home-and-documentation.md)): the website reads them from the API, and nothing reads Notion at runtime. The Notion API costs measured here no longer apply, and the Document history lists real versions. The text below is kept as the record.
+
 ## Context
 
 The client's first detailed M1 frontend review raised ~30 concrete UI/UX

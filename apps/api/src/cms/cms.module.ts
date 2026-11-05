@@ -154,7 +154,7 @@ export class CmsAdminController {
   @Requires("cms.update")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: CMS_IMAGE_MAX_BYTES + 1, files: 1, fields: 0, parts: 2 } }))
   upload(@UploadedFile() file: { buffer: Buffer; size: number; originalname: string } | undefined, @Req() request: AdminRequest) {
-    return this.cms.uploadImage(file, { kind: "admin", admin: signedIn(request) });
+    return this.cms.uploadImage(file, signedIn(request));
   }
 
   @Get("images/:id")

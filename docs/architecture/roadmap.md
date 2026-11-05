@@ -23,7 +23,8 @@ right seams (overview §7); nothing v1.0 is built ahead.
 | Admin shell (Figma) | — | Sidebar, search, toasts, list toolbar | — |
 | Donations (module 1, Stripe sandbox phase) | 0006 | — | `/donate` (Once / Monthly, card, Apple Pay, Google Pay, PayPal, SEPA in EUR), `/donate/thank-you`; figures from the database |
 | Treasury (module 1b) | 0007, 0008 | Treasury list and record, supporting documents, Treasury import | `/treasury` and the expense and donation pages, from the database; sample data marked "Test" until go-live |
-| Public site shells | — | — | Home, Documentation (live Notion), Waitlist, Feedback, Issue, Contribute (inert forms) |
+| CMS: Home and Documentation (Delivery 6, 2026-11-05) | 0016 | Home editor, Documentation list and record, Versions (view, compare, restore), images | Home, Documentation, article history from the published revisions |
+| Public site shells | — | — | Waitlist, Feedback, Issue, Contribute (inert forms); Home and Documentation were live Notion until the CMS |
 
 ## 2. Build order (v0.1)
 
@@ -167,6 +168,11 @@ numbers as built and the current plan.
 - **Limit triggers (2 h).**
 
 ### 3. CMS (30 h)
+
+**Built differently (Delivery 6, 2026-11-05; ADR 019, ADR 020):** no
+scheduled importer and no read-only phase. Home and the 10 articles were
+imported once, the editor shipped with the module, and the import was
+removed afterwards. The plan below is kept for the record.
 
 Migration 0009; Notion importer for the 10 real Documentation articles
 and the Home page into `documents` + `content_revisions` (a new revision
@@ -344,7 +350,8 @@ for client*.
 - **Q29 — Documentation expertise.** Notion's Documentation "Expertise" is
   a separate list of 38 labels, not the taxonomy. Map them to taxonomy
   items by name (some won't match), or keep a separate documentation tag
-  list? *Waiting for client.*
+  list? *Waiting for client.* (Since Delivery 6 the tags are kept as free
+  text on each revision, as in Notion.)
 - **Q30 — Home page content.** Is the Home page one rich-text page (as in
   Notion today, admin p5–p6), or will it get structured blocks (stats,
   buttons) the editor must handle? *Waiting for client.*

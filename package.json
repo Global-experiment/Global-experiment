@@ -29,8 +29,7 @@
     "api:purge-demo-data": "npm run api:build && npm run purge-demo-data -w @global-experiment/api --",
     "api:purge-test-donations": "npm run api:build && npm run purge-test-donations -w @global-experiment/api --",
     "api:seed-sample-treasury": "npm run api:build && npm run seed-sample-treasury -w @global-experiment/api --",
-    "api:purge-sample-treasury": "npm run api:build && npm run purge-sample-treasury -w @global-experiment/api --",
-    "api:cms-import-notion": "npm run api:build && npm run cms:import-notion -w @global-experiment/api --"
+    "api:purge-sample-treasury": "npm run api:build && npm run purge-sample-treasury -w @global-experiment/api --"
   },
   "dependencies": {
     "@next/env": "^16.3.5",

@@ -9,15 +9,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    setupFiles: ["./vitest.setup.ts"],
     // e2e/ contains Playwright specs (run via `npm run test:e2e`), not
     // Vitest tests — Vitest's default include pattern would otherwise
     // also match *.spec.ts there and try to run them with the wrong API.
-    // The live Notion smoke test is excluded from the deterministic suite
-    // (`npm test`) and run on its own via `npm run test:smoke`: it depends
-    // on the network and Notion's API latency, and must not be able to
-    // fail the normal unit-test run.
     // apps/api has its own Vitest config (SWC for Nest decorators): `npm run api:test`.
-    exclude: ["**/node_modules/**", "**/e2e/**", "**/*.smoke.test.ts", "apps/**"],
+    exclude: ["**/node_modules/**", "**/e2e/**", "apps/**"],
   },
 });

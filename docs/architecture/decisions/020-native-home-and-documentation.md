@@ -65,12 +65,13 @@ only, with dates, never author names.
 `published`, `unpublished`, `archived`, `restored`, `duplicated`,
 `imported`), with comments and views like other records.
 
-**The one-time import** (`npm run api:cms-import-notion`) reads Notion
+**The one-time import** (run on production on 2026-11-05: Home and 10
+articles, then removed from the code with its npm script) read Notion
 only, maps the pages with the same rules the website used, and writes
 revision 1 of each page attributed to "Notion import" (published pages
-published, others as drafts or archived). It is a dry run by default, with
-a report; `--apply` needs a fresh backup and empty tables, and runs in one
-transaction.
+published, others as drafts or archived). It was a dry run by default,
+with a report; `--apply` needed a fresh backup and empty tables, and ran
+in one transaction.
 
 ## Consequences
 

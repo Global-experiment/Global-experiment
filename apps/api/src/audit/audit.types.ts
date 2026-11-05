@@ -1,7 +1,7 @@
 /** Shapes shared by the audit log, the record history feed and the History page. */
 
 /** Who made a change: a signed-in admin, or the platform itself (imports, Stripe, jobs) — "Automation". */
-/** Automation is "Automation", or the tool that wrote it ("Notion import"). */
+/** Automation is "Automation", or the tool that wrote it (e.g. "Notion import", on the events of the 2026-11-05 import). */
 export type AuditActor = { type: "admin"; id: string; label: string; role: string | null } | { type: "automation"; label: string };
 
 export const AUTOMATION: AuditActor = { type: "automation", label: "Automation" };

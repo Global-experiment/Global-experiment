@@ -39,6 +39,9 @@ from vector geometry. If the client's Figma token differs by a pixel,
 
 ## Document history — no real data source
 
+**Resolved (2026-11-05, ADR 020):** the history lists the article's real
+published versions from the native revisions. Kept for the record:
+
 Neither the Notion export nor the public Notion API exposes page revision
 history. `/documentation/[slug]/history` shows the article's one real,
 live version with an explicit note instead of fabricated past versions —

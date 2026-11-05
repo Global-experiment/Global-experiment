@@ -43,7 +43,7 @@ if (added.length > 0) {
   const lines = added.flatMap(([name, value, note]) => [...(note ? [`# ${note}`] : []), `${name}=${value}`]);
   const header = existing
     ? "\n# --- Added by npm run setup (local development only) ---\n"
-    : "# Local development only — written by npm run setup. Gitignored: never commit it.\n# Every variable is described in .env.example. Optional ones (Stripe test keys, Notion) can be added below.\n\n";
+    : "# Local development only — written by npm run setup. Gitignored: never commit it.\n# Every variable is described in .env.example. Optional ones (e.g. Stripe test keys) can be added below.\n\n";
   writeFileSync(envFile, `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${header}${lines.join("\n")}\n`);
   console.log(`.env.local: added ${added.map(([name]) => name).join(", ")}.`);
 } else {
