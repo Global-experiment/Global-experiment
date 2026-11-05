@@ -4,6 +4,8 @@
 
 Accepted
 
+**Note (2026-11-06):** since 2026-11-05 Home and Documentation are native (ADR [020](./020-native-home-and-documentation.md)): the website reads them from the API, and nothing reads Notion at runtime. The sheet and dialog still hold; article bodies come from the cached API, so Notion's rate limit no longer applies. The text below is kept as the record.
+
 ## Context
 
 The Figma v0.1 design (figma.pdf) establishes two presentation patterns

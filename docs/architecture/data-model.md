@@ -583,8 +583,11 @@ erDiagram
 ## 5. CMS (Home and Documentation) (built: migration 0016)
 
 Native since Delivery 6 (ADR 020; the editor is ADR 019). Figma admin p6–p11.
-The first revisions come from the one-time Notion import
-(`npm run api:cms-import-notion`), attributed to "Notion import".
+The first revisions came from a one-time Notion import, run on production
+on 2026-11-05: 11 pages, each with version 1 attributed to "Notion import"
+(`author_label`, no `author_id`), `source_ref` = `notion:<page id>`, and
+its `imported` and `published` History events. The import was then
+removed from the code; those rows stay as they are.
 
 ### 5.1 `cms_documents`
 

@@ -7,6 +7,10 @@ system becomes two deployables. Builds on [002](./002-postgresql-supabase-infras
 (plain Postgres via `DATABASE_URL` + Drizzle) and [005](./005-v0-to-v1-evolution.md)
 (folders and tables only when a phase needs them).
 
+**Note (2026-11-06):** the migration is done for Home and Documentation
+(ADR [020](./020-native-home-and-documentation.md), 2026-11-05); nothing
+reads Notion at runtime any more.
+
 ## Context
 
 The agreed target architecture moves operational data (People,

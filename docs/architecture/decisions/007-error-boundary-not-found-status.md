@@ -4,6 +4,8 @@
 
 Accepted
 
+**Note (2026-11-06):** since 2026-11-05 Home and Documentation are native (ADR [020](./020-native-home-and-documentation.md)): the website reads them from the API, and nothing reads Notion at runtime. The status-code rule still holds; a failure now comes from the API, not Notion. The text below is kept as the record.
+
 ## Context
 
 While verifying the Documentation feature's behavior against a production

@@ -37,7 +37,6 @@ flowchart LR
   api --> pg[(PostgreSQL 17)]
   api --> files[(File storage)]
   api -- jobs --> worker["Job runner (pg-boss, same process)"]
-  worker --> notion[Notion API]
   worker --> ai[AI provider]
   worker --> mail[Stalwart mail]
   api --> stripeapi[Stripe API]
@@ -53,8 +52,9 @@ flowchart LR
   each other only through exported services, never through each other's
   tables.
 - **PostgreSQL is the system of record** for everything the admin edits.
-  Notion is an import source (§4.1), not a live dependency, once a module
-  is native (today only Home and Documentation are still read live).
+  Nothing reads Notion at runtime: Home and Documentation are native since
+  2026-11-05 (ADR [020](./decisions/020-native-home-and-documentation.md)),
+  and People and Organizations come in by CSV only (ADR 016).
 
 ## 2. Module map
 
@@ -69,7 +69,7 @@ tables.
 | **Directory — Organizations** | Organizations people belong to; expense recipients | `organizations`, `organization_expertise` | `/api/admin/organizations` | Other → Organizations | none | Taxonomy, People, Audit |
 | **Taxonomy** | Domain → Field → Expertise vocabulary, teams | `expertise_domains`, `expertise_fields`, `expertise_items`, `teams`, `expertise_teams`, `taxonomy_statuses` | `/api/admin/expertise/*` (read-only in v0.1) | Other → Expertise, Fields, Domains | Expertise tags on documents and expenses | Imports |
 | **Treasury** | Donations and expenses, review and publication, Stripe donations; Wise later | `treasury_entries`, `treasury_review_statuses`, `treasury_expense_types`, `treasury_entry_expense_types`, `treasury_documents`, `stripe_events` | `/api/admin/treasury/*`, public `/api/treasury/*`, `/api/donations/checkout`, `/api/stripe/webhook` | Admin → Treasury | `/treasury`, expense and donation detail, `/donate`, `/donate/thank-you` | People, Organizations, Files, Jobs, Audit |
-| **CMS** | Home and Documentation content, editor, revisions | `documents` (Home is one of kind `home`), `document_statuses`, `content_revisions`, `document_expertise` | `/api/admin/cms/*`, public `/api/content/*` | Communication → Home, Documentation | `/`, `/documentation`, article and its history | Taxonomy, Audit, Imports |
+| **CMS** | Home and Documentation content, editor, revisions, versions, images | `cms_documents` (Home is the one of kind `home`), `cms_revisions`, `cms_images` (data-model §5) | `/api/admin/cms/*`, public `/api/cms/*` | Communication → Home, Documentation | `/`, `/documentation`, article and its history | Audit, Files |
 | **Feedback and issues** | Public submissions, AI-assisted triage, decisions | `submissions`, `submission_types`, `submission_type_links`, `submission_statuses`, `submission_expertise` | public `POST /api/submissions`, `/api/admin/submissions` | Admin → Feedbacks and issues | Send feedback, Report issue composers | Taxonomy, AI, Jobs, Audit |
 | **Waitlist** | Email sign-ups for the launch | `waitlist_entries` | public `POST /api/waitlist`, `/api/admin/waitlist` | Other → Waitlist | `/waitlist` | Email, People (link), Audit |
 | **Messages (Contribute)** | Inbound mail to contribute@ / waitlist@ / donations@, linked to people | `mailboxes`, `mail_threads`, `mail_messages` | `/api/admin/messages` | Admin → Messages | `/contribute` (address only) | Email, People, Audit |
@@ -89,10 +89,13 @@ Module notes:
   / "Expenses" rows, come from Services and Treasury once those exist —
   read through those modules' services, not stored on `people`.
 - **Treasury** is first in the build order (roadmap, due 24 October).
-- **CMS** replaces the live Notion read of Home and Documentation: Notion's
-  10 real articles and the Home page are imported into revisions and the
-  public site reads the database. In v0.1 Notion stays their editing tool
-  (§2.1); the admin editor is enabled at the module's v1.0 cut-over.
+- **CMS** is built (Delivery 6, migration 0016, ADR 020): Home and
+  Documentation are edited in the admin (ADR 019, Tiptap), every save is a
+  revision (draft → published), with versions to view, compare and
+  restore. The public site reads the published revisions from the API and
+  is revalidated on publish. The Home page and the 10 articles were copied
+  from Notion once, on 2026-11-05 (version 1 by "Notion import"); the
+  import was then removed.
 - **Messages and Emails** are one integration (Stalwart) with two admin
   views: inbound conversations, and the outbound delivery log.
 - **Analytics and the Technical dashboard** have no tables of their own:
@@ -161,7 +164,7 @@ Module specifics:
 |---|---|
 | Directory | People and Organizations switch together (shared links); `person_number` / `org_number` identities moved past Notion's highest PER-n / ORG-n. |
 | Taxonomy | Switch after Directory (links point to items); new items get Stable IDs in the admin (format checks already in the database). |
-| CMS | Enables the admin editor (toolbar, revisions on Submit); the last imported revision becomes the current one. Home and Documentation can switch separately (`module.cms_home.mode`, `module.cms_documentation.mode`). |
+| CMS | **Done 2026-11-05, without a mode switch** (ADR 020): one import, then the admin editor; Home and Documentation switched together. |
 | Treasury | Expenses switch; donations and refunds are always native (Stripe). Later, Wise sync writes native expense entries directly. |
 | Feedback and issues | Notion-made submissions become native; website submissions were native from the start. |
 | Services and access grants | Switch together (grants point to services). |
@@ -216,7 +219,7 @@ later needs no code change. Built in the step named (plan:
 
 | # | Decision | Where it lives | Step |
 |---|---|---|---|
-| 1 | Home and Documentation get the native CMS now. `cms.mode` = `notion` (default) \| `native`: while `notion`, "Administrate" opens the list, record and editor read-only with the "Managed in Notion" badge and a link to Notion, and the importer keeps the content in sync; `native` is the documented cut-over (§2.1). | setting `cms.mode` | 5b |
+| 1 | Home and Documentation get the native CMS now. `cms.mode` = `notion` (default) \| `native`: while `notion`, "Administrate" opens the list, record and editor read-only with the "Managed in Notion" badge and a link to Notion, and the importer keeps the content in sync; `native` is the documented cut-over (§2.1). **Replaced on 2026-11-05 by ADR 020:** no mode, the content is native and edited in the admin. | — | 6 |
 | 2 | Public Treasury: the header is back, title and share; the stats use `treasury.stats_currency` (USD); the history lists every currency, latest first. Search, sort, filter and the currency switch stay in the code behind `treasury.public_toolbar` (false). | settings | 2 |
 | 3 | Documentation list columns: Title, Status, Display order, Expertise, Last edited by, Updated, Published. | list config | 5b |
 | 4 | Accounts page: "Role" column; views All / Active / Invited / Deactivated; "New account" creates an invitation; rows open a view-only profile; no inline editing. **Changed 2026-11-03 (decision 018):** "New invitation link" makes a link with no input, used once within 7 days by whoever creates their own account, with no role until a Rootadmin gives one; views All / Active / No role / Deactivated; Description replaces Note. | list config | 7 |
@@ -444,7 +447,7 @@ only, validated at startup).
 
 | Integration | Used by | Direction | Notes |
 |---|---|---|---|
-| **Notion** | Import of People and Organizations only since 2026-10-30 (ADR 016); Home and Documentation read live | read-only | The **editing tool in v0.1** (§2.1): importers on demand and on a schedule, writing only `managed_by = notion` records; switched off per module at the v1.0 cut-over. Dry run → report → apply; demo records skipped; idempotent. Home and Documentation are read live until the CMS module ships. |
+| **Notion** | Nothing since 2026-11-05 | — | No runtime use and no settings left: the People and Organizations import is CSV only (ADR 016, Notion's export links are accepted in the file), the Notion import was removed on 2026-11-03 (OPS-154), and Home and Documentation were imported once on 2026-11-05, then the import was removed (ADR 020). |
 | **Stripe** | Treasury (donations) | both | Hosted Checkout, one-off; **monthly behind the `donations.monthly` flag (off)**, no yearly; webhooks with signature check, exactly-once processing, refunds as negative entries, fees from balance transactions; Stripe sends the email receipts. Test mode until the client says otherwise. |
 | **Wise** | Treasury (later) | read | Balance and statement sync into `treasury_entries` (`source = wise`), then payouts in v1.0. Not in v0.1 unless asked. |
 | **Stalwart** | Messages, Emails, Waitlist | both | JMAP inbound, SMTP outbound. |
