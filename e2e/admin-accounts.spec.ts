@@ -46,8 +46,18 @@ async function properties(target: Page) {
 async function axe(target = page) {
   // A record page sets its tab title once the record has loaded: check the page after that.
   await expect.poll(() => target.title()).not.toBe("");
-  const results = await new AxeBuilder({ page: target }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
+  const scan = async () =>
+    (await new AxeBuilder({ page: target }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations.map(
+      (violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`,
+    );
+  let violations = await scan();
+  // A view switch is a soft navigation: while it swaps the <title> element, the document has none for a moment.
+  // Only when that was all axe saw, and the title is back, scan once more; a page without a title still fails.
+  if (violations.length === 1 && violations[0]!.startsWith("document-title:")) {
+    await expect.poll(() => target.title()).not.toBe("");
+    violations = await scan();
+  }
+  expect(violations).toEqual([]);
 }
 
 /** Dark (the default) and light, each checked with axe and captured. */

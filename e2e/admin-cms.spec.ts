@@ -26,11 +26,32 @@ const ARTICLE = { title: "E2E sample article", slug: "e2e-sample-article" };
 const editor = () => page.locator("[data-cms-editor] [contenteditable=true]");
 const toolbar = () => page.getByRole("toolbar", { name: "Formatting" });
 const panel = () => page.locator("[data-record-panel]");
-/** The cursor at the very end of the content (the last line of the last paragraph). */
+/**
+ * The cursor at the very end of the content. Set through the browser selection, which the editor follows:
+ * arrow keys depend on how the last paragraph wraps, and sometimes stopped short of its end.
+ */
 const toEnd = async () => {
   await editor().locator("p").last().click();
-  for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("End");
+  await editor().evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element.lastElementChild ?? element);
+    range.collapse(false);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+  });
+  await expect
+    .poll(() =>
+      editor().evaluate((element) => {
+        const selection = window.getSelection()!;
+        const last = element.lastElementChild;
+        if (!selection.isCollapsed || !last || !selection.focusNode || !last.contains(selection.focusNode)) return false;
+        const after = document.createRange();
+        after.setStart(selection.focusNode, selection.focusOffset);
+        after.setEnd(last, last.childNodes.length);
+        return after.toString() === "";
+      }),
+    )
+    .toBe(true);
 };
 const toast = (text: string | RegExp) => page.getByRole("status").filter({ hasText: text });
 async function axe() {
@@ -100,6 +121,7 @@ test("Home's editor (p7): toolbar, panel and history; a published edit reaches v
   await toEnd();
   await page.keyboard.press("Enter");
   await page.keyboard.type("Edited by the e2e suite.");
+  await expect(editor().locator("p").last()).toHaveText("Edited by the e2e suite.");
   await page.getByLabel("What changed (optional, shown in Versions)").fill("E2E edit");
   await panel().getByRole("button", { name: "Submit changes" }).click();
   await expect(toast("Home published")).toBeVisible();
