@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { auditEvents } from "../audit/audit.schema.js";
-import { adminInvitations, adminSessions, adminUsers } from "../auth/auth.schema.js";
+import { adminInvitations, adminSessions, adminUserPictures, adminUsers } from "../auth/auth.schema.js";
 import { CLOCK } from "../common/clock/clock.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { FILE_STORAGE, LocalDiskStorage } from "../files/file-storage.js";
@@ -299,6 +299,10 @@ describe("admin accounts", () => {
       expect(session.hasPicture).toBe(false);
       let [event] = (await owner.get(`/api/admin/history/admin_user/${session.id}`).expect(200)).body.items;
       expect(event).toMatchObject({ action: "file_archived", meta: { file: { kind: "picture" } } });
+      // Both pictures are still rows, archived, never deleted.
+      const rows = await t.db.select().from(adminUserPictures).where(eq(adminUserPictures.adminUserId, session.id));
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.archivedAt !== null)).toBe(true);
 
       const types = await Promise.all(
         previous.map(async (picture: { id: string }) => (await owner.get(`/api/admin/profile/pictures/${picture.id}`)).headers["content-type"]),

@@ -14,6 +14,8 @@ import type { Database } from "../../common/database/database.module.js";
  * searches as it does live. Loaded only into empty tables.
  */
 const LABEL = "Sample content";
+/** The author and actor label production's imported pages carry. */
+export const IMPORTED_LABEL = "Notion import";
 
 interface FixtureArticle {
   title: string;
@@ -25,7 +27,15 @@ interface FixtureArticle {
   content: unknown;
 }
 
-export async function loadCmsFixtures(db: Database, at = new Date()): Promise<number> {
+/**
+ * `as: "imported"` writes the pages exactly as production's one-time Notion
+ * import did on 2026-11-05 (version 1 by "Notion import", `source_ref`
+ * `notion:…`, "imported" and "published" History events), so tests can
+ * check the live data model without a copy of production.
+ */
+export async function loadCmsFixtures(db: Database, at = new Date(), options: { as?: "sample" | "imported" } = {}): Promise<number> {
+  const imported = options.as === "imported";
+  const label = imported ? IMPORTED_LABEL : LABEL;
   const [{ n }] = (await db.select({ n: count() }).from(cmsDocuments)) as [{ n: number }];
   if (n > 0) return 0;
   const fixture = JSON.parse(readFileSync(new URL("./cms-content.json", import.meta.url), "utf8")) as {
@@ -48,7 +58,10 @@ export async function loadCmsFixtures(db: Database, at = new Date()): Promise<nu
   await db.transaction(async (tx) => {
     for (const page of pages) {
       const content = Content.parse(page.content);
-      const [document] = await tx.insert(cmsDocuments).values({ kind: page.kind, displayOrder: page.displayOrder, createdAt: at, updatedAt: at }).returning();
+      const [document] = await tx
+        .insert(cmsDocuments)
+        .values({ kind: page.kind, displayOrder: page.displayOrder, sourceRef: imported ? `notion:fixture-${page.slug}` : null, createdAt: at, updatedAt: at })
+        .returning();
       const [revision] = await tx
         .insert(cmsRevisions)
         .values({
@@ -59,10 +72,11 @@ export async function loadCmsFixtures(db: Database, at = new Date()): Promise<nu
           slug: page.slug,
           expertise: page.expertise,
           content,
-          authorLabel: LABEL,
+          summary: imported ? "Copied from Notion" : null,
+          authorLabel: label,
           createdAt: new Date(page.editedAt),
           publishedAt: at,
-          publishedByLabel: LABEL,
+          publishedByLabel: label,
           contentHash: contentHash({ ...page, content }),
         })
         .returning();
@@ -70,18 +84,25 @@ export async function loadCmsFixtures(db: Database, at = new Date()): Promise<nu
         .update(cmsDocuments)
         .set({ latestRevisionId: revision!.id, publishedRevisionId: revision!.id, firstPublishedAt: new Date(page.publishedAt) })
         .where(eq(cmsDocuments.id, document!.id));
-      await recordAuditEvent(
-        tx,
-        {
-          entityType: "cms_document",
-          entityId: document!.id,
-          action: "created",
-          actor: { type: "automation", label: LABEL },
-          source: "system",
-          meta: { label: documentLabel(document!, page.title), revision: 1 },
-        },
-        at,
-      );
+      const event = (action: "created" | "imported" | "published", meta: Record<string, unknown>) =>
+        recordAuditEvent(
+          tx,
+          {
+            entityType: "cms_document",
+            entityId: document!.id,
+            action,
+            actor: { type: "automation", label },
+            source: imported ? "import" : "system",
+            meta: { label: documentLabel(document!, page.title), ...meta },
+          },
+          at,
+        );
+      if (imported) {
+        await event("imported", { importSource: "Notion", revision: 1, editedInNotionAt: page.editedAt });
+        await event("published", { revision: 1 });
+      } else {
+        await event("created", { revision: 1 });
+      }
     }
   });
   return pages.length;
