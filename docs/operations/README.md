@@ -57,5 +57,5 @@ contributor: `npm run setup` gives every machine its own local values
 ## Also here
 
 - [stripe.md](stripe.md) — how donations connect to Stripe
-- [github-collaboration.md](github-collaboration.md) — branch protection
-  for `main` and `develop` (prepared, not applied)
+- [github-collaboration.md](github-collaboration.md) — the rules GitHub
+  enforces on `main` and `develop` (ruleset "Secu", applied 2026-11-09)

@@ -140,6 +140,19 @@ commit them (`docs/design/` is ignored).
 - **Only the maintainer merges to `main` and deploys.** Contributors never
   need, and never get, access to the server or production data.
 
+GitHub enforces this on `main` and `develop`
+([details](docs/operations/github-collaboration.md)):
+
+- a direct push is refused; every change goes through a pull request;
+- the checks `conventions`, `build` and `api-postgres` must pass, on a
+  branch up to date with `develop` (use **Update branch** on the pull
+  request, or rebase);
+- 1 approval from the code owner, given again after any new push, and every
+  review conversation resolved;
+- commits that land are signed. Your pull request is **squash merged**, and
+  GitHub signs that commit, so you don't need to sign yours (you may: see
+  the details).
+
 ## Tests
 
 ```bash
