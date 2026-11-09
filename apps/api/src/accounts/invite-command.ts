@@ -55,7 +55,9 @@ export async function inviteByCommand(db: Database, input: InviteCommandInput, p
       .update(adminTokens)
       .set({ usedAt: now })
       .where(and(eq(adminTokens.adminUserId, id), isNull(adminTokens.usedAt)));
-    await tx.insert(adminTokens).values({ adminUserId: id, purpose: "invite", tokenHash: hashSessionToken(token), expiresAt, createdById: null });
+    await tx
+      .insert(adminTokens)
+      .values({ adminUserId: id, purpose: "invite", tokenHash: hashSessionToken(token), expiresAt, createdById: null, createdAt: now });
     await recordAuditEvent(
       tx,
       existing

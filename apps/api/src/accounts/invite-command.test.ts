@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { adminUsers } from "../auth/auth.schema.js";
+import { adminTokens, adminUsers } from "../auth/auth.schema.js";
 import { signedInAdmin, type SignedInAdmin } from "../testing/admin-session.js";
 import { createTestApp, TEST_ORIGIN, type TestApp } from "../testing/test-app.js";
 import { inviteByCommand } from "./invite-command.js";
@@ -42,5 +42,17 @@ describe("admin:invite command", () => {
     await inspect(tokenOf(second.link)).expect(200);
     await expect(inviteByCommand(t.db, { email: "owner@example.org", role: "owner" }, "https://globalexperiment.org")).rejects.toThrow(/already active/);
     await expect(inviteByCommand(t.db, { email: "x@example.org", role: "superadmin" }, "https://globalexperiment.org")).rejects.toThrow(/Unknown role/);
+  });
+
+  it("stamps the link's creation and expiry from the time it is given, whatever today's date", async () => {
+    for (const at of ["2020-01-01T00:00:00Z", "2040-06-30T12:00:00Z"]) {
+      const now = new Date(at);
+      const email = `command-${at.slice(0, 4)}@example.org`;
+      await inviteByCommand(t.db, { email, role: "tech" }, "https://globalexperiment.org", now);
+      const [account] = await t.db.select().from(adminUsers).where(eq(adminUsers.email, email));
+      const [token] = await t.db.select().from(adminTokens).where(eq(adminTokens.adminUserId, account!.id));
+      expect(token!.createdAt.toISOString()).toBe(now.toISOString());
+      expect(token!.expiresAt.getTime() - now.getTime()).toBe(72 * 3_600_000);
+    }
   });
 });
