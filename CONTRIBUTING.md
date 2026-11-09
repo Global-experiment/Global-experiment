@@ -2,7 +2,8 @@
 
 Thank you for helping. This guide is everything you need to work on the site
 and the admin on your own machine. You never need a production password,
-key or database to do so.
+key or database to do so. The short rules (what to change, what to ask about
+first, what never to do) are in [AGENTS.md](AGENTS.md).
 
 ## Requirements
 
@@ -102,7 +103,8 @@ what you know: read the guide for what you touch in
 The screens follow the client's Figma files: layout, spacing, sizes, colors
 and icons come from there (ask the maintainer for access). Colors and sizes
 are theme tokens (`src/app/globals.css`); don't hard-code new ones. Icons are
-the Figma assets in `public/assets/icons/figma/`. Every screen works in light
+the Figma assets in `public/assets/icons/figma/`, nothing else; if one is
+missing, ask the maintainer. Every screen works in light
 and dark, on mobile and desktop. Design exports stay on your machine: never
 commit them (`docs/design/` is ignored).
 
@@ -123,8 +125,8 @@ commit them (`docs/design/` is ignored).
   `ci`, `build`), an optional scope in brackets, then what changed. Mention
   the OPS card when there is one (`… (OPS-153)`).
 - Git hooks (installed by `npm ci`) check this for you:
-  - **before each commit**: ESLint and Prettier fix and format the files you
-    staged (only those, so it's quick);
+  - **before each commit**: ESLint and Prettier fix and format the code and
+    CSS files you staged (only those, so it's quick);
   - **on the message**: commitlint refuses a message that isn't a
     Conventional Commit. The hooks never change your message.
 
@@ -137,6 +139,9 @@ commit them (`docs/design/` is ignored).
 - **CI must pass** (lint, types, tests, builds, commit messages, formatting).
 - **A review is required**: the maintainer reviews every pull request.
 - Keep a pull request to one change; rebase on `develop` if it falls behind.
+- Ask the maintainer before changing the API (`apps/api/`), migrations, the
+  database schema, `.env*` files, CI, `CODEOWNERS` or dependencies (see
+  [AGENTS.md](AGENTS.md)).
 - **Only the maintainer merges to `main` and deploys.** Contributors never
   need, and never get, access to the server or production data.
 
@@ -164,13 +169,16 @@ npm run api:test      # API tests on PGlite (no database to install)
 npm run format:check  # formatting
 ```
 
-Optional, with a PostgreSQL 17 server on your machine and a database named
-`…_test` (it is wiped by the tests) in `TEST_DATABASE_URL`:
+With a PostgreSQL 17 server on your machine and a database named `…_test`
+(it is wiped by the tests) in `TEST_DATABASE_URL`:
 
 ```bash
 npm run api:test:pg   # API tests on real PostgreSQL
 npm run test:e2e      # browser tests (Playwright)
 ```
+
+Run the browser tests for every UI change. If you can't (no local
+PostgreSQL), say so in the pull request and the maintainer runs them.
 
 Add or update tests with every change: unit tests next to the code
 (`*.test.ts`), API tests in `apps/api/src/<module>/*.e2e.test.ts`, browser
