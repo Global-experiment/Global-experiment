@@ -208,11 +208,12 @@ export class AccountsRepository {
   /** A new link replaces the account's unused ones (only the latest works). */
   async createToken(
     tx: Executor,
-    values: { adminUserId: string; purpose: "invite" | "reset"; tokenHash: string; expiresAt: Date; createdById: string | null },
+    values: { adminUserId: string; purpose: "invite" | "reset"; tokenHash: string; expiresAt: Date; createdById: string | null; createdAt: Date },
   ): Promise<void> {
+    // createdAt comes from the caller's clock, like expiresAt: the row's "expires after creation" rule then holds whatever the clock says.
     await tx
       .update(adminTokens)
-      .set({ usedAt: new Date() })
+      .set({ usedAt: values.createdAt })
       .where(and(eq(adminTokens.adminUserId, values.adminUserId), isNull(adminTokens.usedAt)));
     await tx.insert(adminTokens).values(values);
   }

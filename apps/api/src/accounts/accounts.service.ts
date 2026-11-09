@@ -528,8 +528,9 @@ export class AccountsService {
 
   private async issueLink(tx: Executor, adminUserId: string, purpose: "invite" | "reset", createdById: string): Promise<OneTimeLinkDto> {
     const token = generateSessionToken();
-    const expiresAt = new Date(this.clock().getTime() + LINK_HOURS * 3_600_000);
-    await this.repository.createToken(tx, { adminUserId, purpose, tokenHash: hashSessionToken(token), expiresAt, createdById });
+    const now = this.clock();
+    const expiresAt = new Date(now.getTime() + LINK_HOURS * 3_600_000);
+    await this.repository.createToken(tx, { adminUserId, purpose, tokenHash: hashSessionToken(token), expiresAt, createdById, createdAt: now });
     // The token rides in the fragment: browsers never send it, so no server or proxy log records it.
     const path = purpose === "invite" ? "/admin/welcome" : "/admin/reset-password";
     return { link: `${this.config.publicSiteUrl}${path}#${token}`, purpose, expiresAt: expiresAt.toISOString() };
