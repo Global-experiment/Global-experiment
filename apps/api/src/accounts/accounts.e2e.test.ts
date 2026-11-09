@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { auditEvents } from "../audit/audit.schema.js";
-import { adminInvitations, adminSessions, adminUserPictures, adminUsers } from "../auth/auth.schema.js";
+import { adminInvitations, adminSessions, adminTokens, adminUserPictures, adminUsers } from "../auth/auth.schema.js";
 import { CLOCK } from "../common/clock/clock.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { FILE_STORAGE, LocalDiskStorage } from "../files/file-storage.js";
@@ -162,6 +162,23 @@ describe("admin accounts", () => {
     await accept(tokenOf(reset.link), "A completely new phrase 2026").expect(200);
     await operations.get("/api/admin/auth/session").expect(401);
     expect(await historyOf(account!.id)).toEqual(expect.arrayContaining(["link_created", "password_changed"]));
+  });
+
+  it("stamps a link's creation and expiry from the same clock, whatever today's date", async () => {
+    try {
+      for (const at of ["2020-01-01T00:00:00Z", "2040-06-30T12:00:00Z"]) {
+        now = new Date(at);
+        const email = `clock-${at.slice(0, 4)}@example.org`;
+        const [invited] = await t.db.insert(adminUsers).values({ email, role: "treasury", status: "invited", passwordHash: null }).returning();
+        const link = (await owner.post(`/api/admin/accounts/${invited!.id}/link`).expect(201)).body;
+        const [token] = await t.db.select().from(adminTokens).where(eq(adminTokens.adminUserId, invited!.id));
+        expect(token!.createdAt.toISOString()).toBe(now.toISOString());
+        expect(token!.expiresAt.getTime() - token!.createdAt.getTime()).toBe(72 * 3_600_000);
+        await accept(tokenOf(link.link), "Gentle rain falls on 9 hills").expect(200);
+      }
+    } finally {
+      now = new Date("2026-11-03T09:00:00Z");
+    }
   });
 
   it("never deactivates or demotes the last active Rootadmin", async () => {
