@@ -43,7 +43,7 @@ Ask the maintainer **before** changing any of these:
 
 ## Design
 
-- Follow the client's Figma files and the existing design system: layout, spacing, sizes, colours and icons come from there.
+- Follow the project's Figma files and the existing design system: layout, spacing, sizes, colours and icons come from there.
 - Reuse an existing component (`src/shared/ui/`, `src/modules/*/`) before creating one. Extend it rather than copying it.
 - Icons: only the exact Figma assets in `public/assets/icons/figma/`. If the icon you need isn't there, stop and ask; don't draw, download or substitute one.
 - No inline styles and no hard-coded colours or sizes where a theme token exists (`src/app/globals.css`).
