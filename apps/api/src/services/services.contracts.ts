@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { listQuerySchema } from "../common/listing/list-query.js";
-import { INVALID_LINK, isWebLink } from "../common/web-link.js";
+import { FIELD_MESSAGES, isWebLink } from "../common/field-rules.js";
 
 /** Request contracts and response shapes for /api/admin/services and /api/admin/access-grants. */
 
@@ -16,7 +16,7 @@ const optionalLink = z
   .string()
   .max(2048)
   .transform((value) => value.trim() || null)
-  .refine((value) => value === null || isWebLink(value), INVALID_LINK)
+  .refine((value) => value === null || isWebLink(value), FIELD_MESSAGES.link)
   .nullable()
   .optional();
 const optionalDay = z.iso.date().nullable().optional();

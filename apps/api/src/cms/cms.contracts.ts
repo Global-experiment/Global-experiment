@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FIELD_MESSAGES, isSlug } from "../common/field-rules.js";
 import { Content, type ContentBlock } from "./content.js";
 
 /** A slug: lowercase words joined by hyphens ("version-0-1-scope"), as in the public URL. */
@@ -7,7 +8,8 @@ export const Slug = z
   .trim()
   .min(1, "Add a slug.")
   .max(100, "Slugs can be at most 100 characters.")
-  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Use lowercase letters, numbers and single hyphens (like version-0-1-scope).");
+  // The shared rule (common/field-rules.ts): the page checks the same when the field is left.
+  .refine(isSlug, FIELD_MESSAGES.slug);
 
 /** Up to 10 expertise tags (admin-desktop.pdf p10: "Documents can have up to 10 expertise"). */
 export const Expertise = z

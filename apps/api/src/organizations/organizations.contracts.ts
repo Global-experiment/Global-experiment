@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { listQuerySchema } from "../common/listing/list-query.js";
 import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
-import { INVALID_LINK, isWebLink } from "../common/web-link.js";
+import { FIELD_MESSAGES, isEmail, isWebLink } from "../common/field-rules.js";
 import type { EntityRef, ExpertiseRef } from "../people/people.contracts.js";
 
 const optionalText = (max: number) =>
@@ -12,13 +12,13 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
-/** A link field: trimmed, "" clears it, otherwise a valid web address (web-link.ts). */
+/** A link field: trimmed, "" clears it, otherwise a valid web address (common/field-rules.ts). */
 const optionalLink = (max: number) =>
   z
     .string()
     .max(max)
     .transform((value) => value.trim() || null)
-    .refine((value) => value === null || isWebLink(value), INVALID_LINK)
+    .refine((value) => value === null || isWebLink(value), FIELD_MESSAGES.link)
     .nullable()
     .optional();
 
@@ -30,7 +30,7 @@ const organizationFields = {
     .string()
     .max(320)
     .transform((value) => value.trim() || null)
-    .pipe(z.email("Invalid email address.").nullable())
+    .refine((value) => value === null || isEmail(value), FIELD_MESSAGES.email)
     .nullable()
     .optional(),
   /** Free text: no Wise ID format is assumed (data-model.md §3). */

@@ -6,6 +6,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
 import { AdminIcon } from "../ui/adminIcons";
 import { focusRing } from "../ui/controls";
+import { useFieldValidation } from "../ui/fieldValidation";
+import { errorIdFor, FieldError, invalidProps } from "../ui/RecordForm";
+import { FIELD_LIMITS, FIELD_MESSAGES, isEmail } from "@/shared/validation/fieldRules";
 import { Field } from "./LoginForm";
 import { PasswordChecklist } from "./PasswordChecklist";
 import { passwordAccepted } from "./passwordRules";
@@ -13,7 +16,9 @@ import { passwordAccepted } from "./passwordRules";
 type State = { status: "checking" } | { status: "invalid" } | { status: "ready"; token: string };
 
 const INVALID = "This link has expired or was already used.";
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+/** The fields with a rule, in the form's order (the first invalid one gets the focus on submit; OPS-70). */
+const JOIN_FIELDS = ["email", "password", "repeat"] as const;
+type JoinField = (typeof JOIN_FIELDS)[number];
 
 /**
  * /admin/join — an invitation link (OPS-141): whoever opens it makes their
@@ -33,6 +38,13 @@ export function JoinForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const rulesId = useId();
+  const validation = useFieldValidation(JOIN_FIELDS, (field) => `join-${field}`);
+  const errors: Partial<Record<JoinField, string>> = {};
+  if (!email.trim()) errors.email = "Enter your email address.";
+  else if (!isEmail(email)) errors.email = FIELD_MESSAGES.email;
+  if (!passwordAccepted(password, { email: email.trim(), name: null })) errors.password = "Choose a password that meets every rule below.";
+  if (repeat !== password) errors.repeat = "The two passwords differ.";
+  const shown = validation.shown(errors);
   // Read once: the address bar loses it straight away, and an effect can run twice (React's development checks).
   const tokenRef = useRef<string | null>(null);
 
@@ -60,9 +72,7 @@ export function JoinForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (state.status !== "ready") return;
-    if (!EMAIL.test(email.trim())) return setError("Enter your email address.");
-    if (!passwordAccepted(password, { email: email.trim(), name: null })) return setError("The password doesn't meet the rules yet.");
-    if (password !== repeat) return setError("The two passwords differ.");
+    if (!validation.checkAll(errors)) return;
     setPending(true);
     setError(null);
     try {
@@ -108,27 +118,34 @@ export function JoinForm() {
             <p className="px-2 text-body text-text-muted">Create your account: your email and a password. You&rsquo;ll then fill in your profile.</p>
             <Field icon="alternate_email">
               <input
+                id="join-email"
                 aria-label="Email address"
                 placeholder="Email address"
                 type="email"
                 inputMode="email"
                 autoComplete="username"
-                maxLength={320}
+                maxLength={FIELD_LIMITS.email}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                onBlur={() => validation.leave("email")}
+                {...invalidProps("join-email", shown.email)}
                 className={input}
               />
             </Field>
+            <FieldError fieldId="join-email" message={shown.email} />
             <Field icon="lock">
               <input
+                id="join-password"
                 aria-label="Password"
-                aria-describedby={rulesId}
+                aria-invalid={shown.password ? true : undefined}
+                aria-describedby={shown.password ? `${errorIdFor("join-password")} ${rulesId}` : rulesId}
                 placeholder="Password"
                 type={show ? "text" : "password"}
                 autoComplete="new-password"
                 maxLength={200}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                onBlur={() => validation.leave("password")}
                 className={input}
               />
               <button
@@ -141,11 +158,13 @@ export function JoinForm() {
                 <AdminIcon name="visibility" />
               </button>
             </Field>
+            <FieldError fieldId="join-password" message={shown.password} />
             <div className="px-2">
               <PasswordChecklist id={rulesId} password={password} email={email.trim()} name={null} />
             </div>
             <Field icon="lock">
               <input
+                id="join-repeat"
                 aria-label="Repeat the password"
                 placeholder="Repeat the password"
                 type={show ? "text" : "password"}
@@ -153,9 +172,12 @@ export function JoinForm() {
                 maxLength={200}
                 value={repeat}
                 onChange={(event) => setRepeat(event.target.value)}
+                onBlur={() => validation.leave("repeat")}
+                {...invalidProps("join-repeat", shown.repeat)}
                 className={input}
               />
             </Field>
+            <FieldError fieldId="join-repeat" message={shown.repeat} />
             {error ? (
               <p role="alert" className="px-2 text-body">
                 {error}

@@ -14,6 +14,7 @@ import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, DateField, invalidProps, PanelButton, Pills, PropertyRow, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useCan } from "../session";
+import { useFieldValidation } from "../ui/fieldValidation";
 import { useToast } from "../ui/Toast";
 import { parseAmount, recipientFromOption, recipientOption, searchRecipients, searchTypes, toAmountText, typeOption } from "./expenseFields";
 import { CADENCE_LABEL, formatMoney, modeLabel, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
@@ -41,6 +42,10 @@ const ERROR_FIELDS = ["name", "occurredOn", "amount", "fee", "recipient", "expen
 type ErrorField = (typeof ERROR_FIELDS)[number];
 type FieldErrors = Partial<Record<ErrorField, string>>;
 const isErrorField = (field: string): field is ErrorField => (ERROR_FIELDS as readonly string[]).includes(field);
+/** The fields the page checks itself (OPS-70: when left, then live), in the form's order. */
+const CHECKED = ["name", "occurredOn", "amount", "fee"] as const;
+type CheckedField = (typeof CHECKED)[number];
+const FIELD_IDS: Record<CheckedField, string> = { name: "treasury-name", occurredOn: "treasury-date", amount: "treasury-amount", fee: "treasury-fee" };
 
 const REVIEWED = new Set(["qualified", "not_required"]);
 const CADENCES = ["one_off", "monthly", "yearly"].map((value) => ({ value, label: CADENCE_LABEL[value]! }));
@@ -81,7 +86,9 @@ export function TreasuryRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The API's field messages after a refused save; the page's own come from the validation below.
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const validation = useFieldValidation(CHECKED, (field) => FIELD_IDS[field]);
 
   if (entry.error || !entry.data) {
     return (
@@ -145,12 +152,14 @@ export function TreasuryRecord({ id }: { id: string }) {
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => {
     setEdit({ version, draft: { ...draft, [key]: value } });
     if (isErrorField(key)) setFieldErrors((errors) => ({ ...errors, [key]: undefined }));
+    // A date is chosen, not typed: picking one counts as leaving the field.
+    if (key === "occurredOn") validation.leave("occurredOn");
   };
   const number = formatEntryNumber(loaded.number);
 
   /** What the page can tell before asking the API (the API checks everything again). */
-  function check(): FieldErrors {
-    const errors: FieldErrors = {};
+  function check(): Partial<Record<CheckedField, string>> {
+    const errors: Partial<Record<CheckedField, string>> = {};
     if (!editsExpense) return errors;
     if (!draft.name.trim()) errors.name = "Give the entry a name.";
     if (!draft.occurredOn) errors.occurredOn = "Choose a date.";
@@ -160,10 +169,10 @@ export function TreasuryRecord({ id }: { id: string }) {
     return errors;
   }
 
+  const shownErrors: FieldErrors = { ...fieldErrors, ...validation.shown(check()) };
+
   async function submit(): Promise<boolean> {
-    const errors = check();
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return false;
+    if (!validation.checkAll(check())) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -235,7 +244,7 @@ export function TreasuryRecord({ id }: { id: string }) {
         icon="arrow_outward"
         label="Recipient"
         hint={editsExpense ? "A person or an organization." : undefined}
-        error={fieldErrors.recipient}
+        error={shownErrors.recipient}
       >
         {editsExpense ? (
           <RelationPicker
@@ -261,7 +270,7 @@ export function TreasuryRecord({ id }: { id: string }) {
       </PropertyRow>
     ) : null,
     expenseTypes: isExpense ? (
-      <PropertyRow key="expenseTypes" icon="select" label="Expense types" error={fieldErrors.expenseTypes}>
+      <PropertyRow key="expenseTypes" icon="select" label="Expense types" error={shownErrors.expenseTypes}>
         {editsExpense ? (
           <RelationPicker
             label="Expense types"
@@ -275,7 +284,7 @@ export function TreasuryRecord({ id }: { id: string }) {
       </PropertyRow>
     ) : null,
     name: (
-      <PropertyRow key="name" icon="title" label="Name" htmlFor={editsExpense ? "treasury-name" : undefined} error={fieldErrors.name}>
+      <PropertyRow key="name" icon="title" label="Name" htmlFor={editsExpense ? "treasury-name" : undefined} error={shownErrors.name}>
         {editsExpense ? (
           <input
             id="treasury-name"
@@ -283,7 +292,8 @@ export function TreasuryRecord({ id }: { id: string }) {
             value={draft.name}
             maxLength={200}
             onChange={(event) => set("name", event.target.value)}
-            {...invalidProps("treasury-name", fieldErrors.name)}
+            onBlur={() => validation.leave("name")}
+            {...invalidProps("treasury-name", shownErrors.name)}
           />
         ) : (
           <ReadOnly>{loaded.name}</ReadOnly>
@@ -297,7 +307,7 @@ export function TreasuryRecord({ id }: { id: string }) {
         label="Public description"
         htmlFor={editsExpense ? "treasury-description" : undefined}
         hint="Shown on the public Treasury page once the entry is qualified."
-        error={fieldErrors.publicDescription}
+        error={shownErrors.publicDescription}
       >
         {editsExpense ? (
           <AutoGrowTextarea
@@ -306,7 +316,7 @@ export function TreasuryRecord({ id }: { id: string }) {
             onChange={(event) => set("publicDescription", event.target.value)}
             maxLength={2000}
             placeholder="What the money paid for, in plain words…"
-            {...invalidProps("treasury-description", fieldErrors.publicDescription)}
+            {...invalidProps("treasury-description", shownErrors.publicDescription)}
           />
         ) : (
           <ReadOnly>{loaded.publicDescription}</ReadOnly>
@@ -319,7 +329,7 @@ export function TreasuryRecord({ id }: { id: string }) {
         icon="approval"
         label="Review status"
         hint={permissions.review.allowed ? "Qualified and Not required need a recipient." : (permissions.review.reason ?? undefined)}
-        error={fieldErrors.reviewStatus}
+        error={shownErrors.reviewStatus}
       >
         {permissions.review.allowed ? (
           <Pills
@@ -339,9 +349,9 @@ export function TreasuryRecord({ id }: { id: string }) {
       </PropertyRow>
     ),
     date: (
-      <PropertyRow key="date" icon="calendar" label="Date" htmlFor={editsExpense ? "treasury-date" : undefined} error={fieldErrors.occurredOn}>
+      <PropertyRow key="date" icon="calendar" label="Date" htmlFor={editsExpense ? "treasury-date" : undefined} error={shownErrors.occurredOn}>
         {editsExpense ? (
-          <DateField id="treasury-date" label="Date" value={draft.occurredOn} onChange={(value) => set("occurredOn", value)} error={fieldErrors.occurredOn} />
+          <DateField id="treasury-date" label="Date" value={draft.occurredOn} onChange={(value) => set("occurredOn", value)} error={shownErrors.occurredOn} />
         ) : (
           <ReadOnly>{loaded.occurredAt ? <Timestamp value={loaded.occurredAt} format="full" /> : formatDateOnly(loaded.occurredOn)}</ReadOnly>
         )}
@@ -354,7 +364,7 @@ export function TreasuryRecord({ id }: { id: string }) {
         label="Amount"
         htmlFor={editsExpense ? "treasury-amount" : undefined}
         hint={editsExpense ? `Money out, in ${loaded.currency}.` : undefined}
-        error={fieldErrors.amount}
+        error={shownErrors.amount}
       >
         {editsExpense ? (
           <input
@@ -363,7 +373,8 @@ export function TreasuryRecord({ id }: { id: string }) {
             inputMode="decimal"
             value={draft.amount}
             onChange={(event) => set("amount", event.target.value)}
-            {...invalidProps("treasury-amount", fieldErrors.amount)}
+            onBlur={() => validation.leave("amount")}
+            {...invalidProps("treasury-amount", shownErrors.amount)}
           />
         ) : (
           money(loaded.grossAmount)
@@ -371,7 +382,7 @@ export function TreasuryRecord({ id }: { id: string }) {
       </PropertyRow>
     ),
     fee: (
-      <PropertyRow key="fee" icon="numbers" label="Fee" htmlFor={editsExpense ? "treasury-fee" : undefined} error={fieldErrors.fee}>
+      <PropertyRow key="fee" icon="numbers" label="Fee" htmlFor={editsExpense ? "treasury-fee" : undefined} error={shownErrors.fee}>
         {editsExpense ? (
           <input
             id="treasury-fee"
@@ -380,7 +391,8 @@ export function TreasuryRecord({ id }: { id: string }) {
             value={draft.fee}
             placeholder="No fee"
             onChange={(event) => set("fee", event.target.value)}
-            {...invalidProps("treasury-fee", fieldErrors.fee)}
+            onBlur={() => validation.leave("fee")}
+            {...invalidProps("treasury-fee", shownErrors.fee)}
           />
         ) : (
           money(loaded.feeAmount)
@@ -562,6 +574,7 @@ export function TreasuryRecord({ id }: { id: string }) {
           setEdit(null);
           setError(null);
           setFieldErrors({});
+          validation.reset();
         },
         archived: loaded.archivedAt !== null,
         setArchived: !canUpdate

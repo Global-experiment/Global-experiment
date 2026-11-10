@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { adminApi, AdminApiError } from "../api/client";
 import { AdminIcon } from "../ui/adminIcons";
 import { focusRing } from "../ui/controls";
+import { useFieldValidation } from "../ui/fieldValidation";
+import { errorIdFor, FieldError, invalidProps } from "../ui/RecordForm";
 import { Field } from "./LoginForm";
 import { PasswordChecklist } from "./PasswordChecklist";
 import { passwordAccepted } from "./passwordRules";
@@ -37,6 +39,12 @@ export function SetPasswordForm({ purpose }: { purpose: LinkInfo["purpose"] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const rulesId = useId();
+  // OPS-70: each field is checked when left, then as it changes; submitting checks both and focuses the first to fix.
+  const validation = useFieldValidation(["password", "repeat"] as const, (field) => `set-password-${field}`);
+  const errors: Partial<Record<"password" | "repeat", string>> = {};
+  if (state.status === "ready" && !passwordAccepted(password, state.info)) errors.password = "Choose a password that meets every rule below.";
+  if (repeat !== password) errors.repeat = "The two passwords differ.";
+  const shown = validation.shown(errors);
   // Read once: the address bar loses it straight away, and an effect can run twice (React's development checks).
   const tokenRef = useRef<string | null>(null);
 
@@ -67,8 +75,7 @@ export function SetPasswordForm({ purpose }: { purpose: LinkInfo["purpose"] }) {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (state.status !== "ready") return;
-    if (!passwordAccepted(password, state.info)) return setError("The password doesn't meet the rules yet.");
-    if (password !== repeat) return setError("The two passwords differ.");
+    if (!validation.checkAll(errors)) return;
     setPending(true);
     setError(null);
     try {
@@ -130,14 +137,17 @@ export function SetPasswordForm({ purpose }: { purpose: LinkInfo["purpose"] }) {
             <input type="email" name="username" autoComplete="username" value={state.info.email} readOnly hidden />
             <Field icon="lock">
               <input
+                id="set-password-password"
                 aria-label="New password"
-                aria-describedby={rulesId}
+                aria-invalid={shown.password ? true : undefined}
+                aria-describedby={shown.password ? `${errorIdFor("set-password-password")} ${rulesId}` : rulesId}
                 placeholder="New password"
                 type={show ? "text" : "password"}
                 autoComplete="new-password"
                 maxLength={200}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                onBlur={() => validation.leave("password")}
                 className={input}
               />
               <button
@@ -150,11 +160,13 @@ export function SetPasswordForm({ purpose }: { purpose: LinkInfo["purpose"] }) {
                 <AdminIcon name="visibility" />
               </button>
             </Field>
+            <FieldError fieldId="set-password-password" message={shown.password} />
             <div className="px-2">
               <PasswordChecklist id={rulesId} password={password} email={state.info.email} name={state.info.name} />
             </div>
             <Field icon="lock">
               <input
+                id="set-password-repeat"
                 aria-label="Repeat the new password"
                 placeholder="Repeat the new password"
                 type={show ? "text" : "password"}
@@ -162,9 +174,12 @@ export function SetPasswordForm({ purpose }: { purpose: LinkInfo["purpose"] }) {
                 maxLength={200}
                 value={repeat}
                 onChange={(event) => setRepeat(event.target.value)}
+                onBlur={() => validation.leave("repeat")}
+                {...invalidProps("set-password-repeat", shown.repeat)}
                 className={input}
               />
             </Field>
+            <FieldError fieldId="set-password-repeat" message={shown.repeat} />
             {error ? (
               <p role="alert" className="px-2 text-body">
                 {error}

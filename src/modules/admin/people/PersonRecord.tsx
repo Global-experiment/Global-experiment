@@ -26,9 +26,21 @@ import { CompletenessRow } from "../ui/CompletenessRow";
 import { AdminButton, AdminButtonLink, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, CheckboxField, DateField, DateTimeField, invalidProps, Pills, PropertyRow, ReadOnlyValue, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { useFieldValidation } from "../ui/fieldValidation";
 import { useToast } from "../ui/Toast";
 import { formatDate } from "./peopleTable";
-import { draftFromPerson, expenseOption, hasChanges, personCreateBody, personDraftErrors, personPatch, type PersonDraft } from "./personForm";
+import {
+  draftFromPerson,
+  expenseOption,
+  hasChanges,
+  PERSON_CHECKED,
+  personCreateBody,
+  personDraftErrors,
+  personFieldId,
+  personPatch,
+  type PersonCheckedField,
+  type PersonDraft,
+} from "./personForm";
 import { PERSON_RECORD_CONFIG } from "./personRecordConfig";
 
 /** The info card on Contact channels (client, 2026-10-22); the order is set by drag and drop. */
@@ -76,10 +88,13 @@ export async function searchExpenses(text: string, signal: AbortSignal): Promise
   }));
 }
 
-/** Field errors as shown: the draft's own problems for the fields left (or all, after Submit), then the API's. */
-function shownErrors(draft: PersonDraft, touched: ReadonlySet<string>, server: Record<string, string>) {
-  const found = personDraftErrors(draft);
-  return { ...server, ...Object.fromEntries(Object.entries(found).filter(([key]) => touched.has(key))) };
+/** Field errors as shown: the API's, then the draft's own for the fields left (or all, after Submit; OPS-70). */
+function shownErrors(
+  draft: PersonDraft,
+  validation: { shown: (errors: Partial<Record<PersonCheckedField, string>>) => Record<string, string> },
+  server: Record<string, string>,
+) {
+  return { ...server, ...validation.shown(personDraftErrors(draft)) };
 }
 
 /** A copy made with "Duplicate as a draft" travels to /admin/people/new in the tab's session storage (never saved until Submit). */
@@ -118,9 +133,9 @@ function ExistingPersonRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ baseId: string; base: PersonDraft; draft: PersonDraft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
-  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
+  const validation = useFieldValidation(PERSON_CHECKED, personFieldId);
+  const touch = (key: string) => validation.leave(key as PersonCheckedField);
 
   if (person.error || !person.data) {
     return (
@@ -157,12 +172,7 @@ function ExistingPersonRecord({ id }: { id: string }) {
   };
 
   async function submit(): Promise<boolean> {
-    const found = personDraftErrors(draft);
-    if (Object.keys(found).length > 0) {
-      setTouched(new Set([...touched, ...Object.keys(found)]));
-      setFormError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(personDraftErrors(draft))) return false;
     setBusy("saving");
     setFormError(null);
     try {
@@ -216,7 +226,7 @@ function ExistingPersonRecord({ id }: { id: string }) {
         discard: () => {
           setEdit(null);
           setErrors({});
-          setTouched(new Set());
+          validation.reset();
           setFormError(null);
         },
         duplicate: canCreate ? duplicate : undefined,
@@ -242,7 +252,7 @@ function ExistingPersonRecord({ id }: { id: string }) {
         draft={draft}
         set={set}
         touch={touch}
-        errors={shownErrors(draft, touched, errors)}
+        errors={shownErrors(draft, validation, errors)}
         formError={formError}
         options={options.data}
         access={{ personId: loaded.id, grants: loaded.permissions, archived: loaded.archivedAt !== null }}
@@ -266,9 +276,9 @@ function NewPersonRecord() {
   const [draft, setDraft] = useState<PersonDraft | null>(() => (typeof window === "undefined" ? null : readStoredDraft()));
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
-  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
+  const validation = useFieldValidation(PERSON_CHECKED, personFieldId);
+  const touch = (key: string) => validation.leave(key as PersonCheckedField);
 
   if (!draft) {
     return (
@@ -280,12 +290,7 @@ function NewPersonRecord() {
   const set = <Key extends keyof PersonDraft>(key: Key, value: PersonDraft[Key]) => setDraft({ ...draft, [key]: value });
 
   async function submit(): Promise<boolean> {
-    const found = personDraftErrors(draft!);
-    if (Object.keys(found).length > 0) {
-      setTouched(new Set([...touched, ...Object.keys(found)]));
-      setFormError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(personDraftErrors(draft!))) return false;
     setBusy("saving");
     setFormError(null);
     try {
@@ -316,6 +321,7 @@ function NewPersonRecord() {
         discard: () => {
           setDraft(readStoredDraft());
           setErrors({});
+          validation.reset();
         },
         savedMessage: "Person created",
         dirty: true,
@@ -325,7 +331,7 @@ function NewPersonRecord() {
       <p role="status" className="px-2 text-meta text-text-muted">
         A draft copy: nothing is saved until “Submit changes”.
       </p>
-      <PersonFields draft={draft} set={set} touch={touch} errors={shownErrors(draft, touched, errors)} formError={formError} options={options.data} />
+      <PersonFields draft={draft} set={set} touch={touch} errors={shownErrors(draft, validation, errors)} formError={formError} options={options.data} />
     </RecordPage>
   );
 }

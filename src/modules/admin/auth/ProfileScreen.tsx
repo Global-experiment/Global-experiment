@@ -15,7 +15,9 @@ import { useCan } from "../session";
 import { AccountAvatar } from "../ui/AccountAvatar";
 import { AdminIcon, type AdminIconName } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, Pills, PropertyRow, ReadOnlyValue, recordInput, RecordLayout } from "../ui/RecordForm";
+import { AutoGrowTextarea, errorIdFor, FieldError, invalidProps, Pills, PropertyRow, ReadOnlyValue, recordInput, RecordLayout } from "../ui/RecordForm";
+import { useFieldValidation } from "../ui/fieldValidation";
+import { FIELD_LIMITS, FIELD_MESSAGES, isEmail } from "@/shared/validation/fieldRules";
 import type { RelationOption } from "../ui/RelationPicker";
 import { useToast } from "../ui/Toast";
 import { PasswordChecklist } from "./PasswordChecklist";
@@ -382,24 +384,7 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
           title="Change email"
           action="Change email"
           onClose={() => setDialog(null)}
-          extra={(value, setValue) => (
-            <>
-              <label htmlFor="new-email" className="text-text-muted">
-                New email
-              </label>
-              <input
-                id="new-email"
-                type="email"
-                inputMode="email"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                maxLength={320}
-                autoComplete="email"
-                spellCheck={false}
-                className={recordInput}
-              />
-            </>
-          )}
+          newEmail
           run={async (currentPassword, email) => {
             await adminApi<Profile>("/profile/email", { method: "POST", body: { currentPassword, email: email.trim() } });
             profile.reload();
@@ -458,14 +443,15 @@ function MenuRow({ icon, children, ...rest }: { icon: AdminIconName; children: R
 }
 
 /**
- * A dialog that asks for the current password, plus a new email
- * (`extra`) or a new password with its checklist (`newPassword`).
+ * A dialog that asks for the current password, plus a new email (`newEmail`) or a new password with its
+ * checklist (`newPassword`). Each field is checked when it is left, then as it changes; submitting checks
+ * all of them and focuses the first one to fix (OPS-70).
  */
 function PasswordDialog({
   title,
   action,
   intro,
-  extra,
+  newEmail = false,
   newPassword,
   onClose,
   run,
@@ -473,7 +459,7 @@ function PasswordDialog({
   title: string;
   action: string;
   intro?: ReactNode;
-  extra?: (value: string, setValue: (value: string) => void) => ReactNode;
+  newEmail?: boolean;
   newPassword?: { email: string; name: string | null };
   onClose: () => void;
   run: (currentPassword: string, value: string) => Promise<void>;
@@ -486,16 +472,23 @@ function PasswordDialog({
   const [repeat, setRepeat] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ids = { value: `${titleId}-value`, repeat: `${titleId}-repeat`, current: `${titleId}-current` } as const;
+  const validation = useFieldValidation(["value", "repeat", "current"] as const, (field) => ids[field]);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
 
-  const ready =
-    current.length > 0 && (extra ? value.trim().length > 0 : true) && (newPassword ? passwordAccepted(value, newPassword) && value === repeat : true);
+  const errors: Partial<Record<"value" | "repeat" | "current", string>> = {};
+  if (newEmail && !value.trim()) errors.value = "Enter the new email.";
+  else if (newEmail && !isEmail(value)) errors.value = FIELD_MESSAGES.email;
+  if (newPassword && !passwordAccepted(value, newPassword)) errors.value = "Choose a password that meets every rule below.";
+  if (newPassword && repeat !== value) errors.repeat = "The two passwords differ.";
+  if (!current) errors.current = "Enter your current password.";
+  const shown = validation.shown(errors);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!ready) return;
+    if (!validation.checkAll(errors)) return;
     setBusy(true);
     setError(null);
     try {
@@ -519,50 +512,84 @@ function PasswordDialog({
       </h2>
       <form onSubmit={(event) => void submit(event)} noValidate className="mt-3 flex flex-col gap-2">
         {intro ? <p className="text-text-muted">{intro}</p> : null}
-        {extra?.(value, setValue)}
-        {newPassword ? (
-          <>
-            <label htmlFor={`${titleId}-new`} className="text-text-muted">
-              New password
+        {newEmail ? (
+          <div>
+            <label htmlFor={ids.value} className="text-text-muted">
+              New email
             </label>
             <input
-              id={`${titleId}-new`}
-              type="password"
+              id={ids.value}
+              type="email"
+              inputMode="email"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              maxLength={200}
-              autoComplete="new-password"
-              aria-describedby={rulesId}
+              onBlur={() => validation.leave("value")}
+              {...invalidProps(ids.value, shown.value)}
+              maxLength={FIELD_LIMITS.email}
+              autoComplete="email"
+              spellCheck={false}
               className={recordInput}
             />
+            <FieldError fieldId={ids.value} message={shown.value} />
+          </div>
+        ) : null}
+        {newPassword ? (
+          <>
+            <div>
+              <label htmlFor={ids.value} className="text-text-muted">
+                New password
+              </label>
+              <input
+                id={ids.value}
+                type="password"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onBlur={() => validation.leave("value")}
+                maxLength={200}
+                autoComplete="new-password"
+                aria-invalid={shown.value ? true : undefined}
+                aria-describedby={shown.value ? `${errorIdFor(ids.value)} ${rulesId}` : rulesId}
+                className={recordInput}
+              />
+              <FieldError fieldId={ids.value} message={shown.value} />
+            </div>
             <PasswordChecklist id={rulesId} password={value} email={newPassword.email} name={newPassword.name} />
-            <label htmlFor={`${titleId}-repeat`} className="text-text-muted">
-              Repeat the new password
-            </label>
-            <input
-              id={`${titleId}-repeat`}
-              type="password"
-              value={repeat}
-              onChange={(e) => setRepeat(e.target.value)}
-              maxLength={200}
-              autoComplete="new-password"
-              className={recordInput}
-            />
-            {repeat && repeat !== value ? <p className="text-meta">The two passwords differ.</p> : null}
+            <div>
+              <label htmlFor={ids.repeat} className="text-text-muted">
+                Repeat the new password
+              </label>
+              <input
+                id={ids.repeat}
+                type="password"
+                value={repeat}
+                onChange={(e) => setRepeat(e.target.value)}
+                onBlur={() => validation.leave("repeat")}
+                {...invalidProps(ids.repeat, shown.repeat)}
+                maxLength={200}
+                autoComplete="new-password"
+                className={recordInput}
+              />
+              <FieldError fieldId={ids.repeat} message={shown.repeat} />
+            </div>
           </>
         ) : null}
-        <label htmlFor={`${titleId}-current`} className="text-text-muted">
-          Current password
-        </label>
-        <input
-          id={`${titleId}-current`}
-          type="password"
-          value={current}
-          onChange={(e) => setCurrent(e.target.value)}
-          maxLength={200}
-          autoComplete="current-password"
-          className={recordInput}
-        />
+        <div>
+          <label htmlFor={ids.current} className="text-text-muted">
+            Current password
+          </label>
+          <input
+            id={ids.current}
+            type="password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            onBlur={() => validation.leave("current")}
+            {...invalidProps(ids.current, shown.current)}
+            maxLength={200}
+            autoComplete="current-password"
+            className={recordInput}
+          />
+          <FieldError fieldId={ids.current} message={shown.current} />
+        </div>
         {error ? (
           <p role="alert" className="text-meta">
             {error}
@@ -572,7 +599,7 @@ function PasswordDialog({
           <AdminButton onClick={() => dialog.current?.close()} disabled={busy}>
             Cancel
           </AdminButton>
-          <AdminButton type="submit" disabled={!ready || busy}>
+          <AdminButton type="submit" disabled={busy}>
             {busy ? "Working…" : action}
           </AdminButton>
         </p>
