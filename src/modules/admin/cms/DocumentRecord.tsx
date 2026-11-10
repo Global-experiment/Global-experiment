@@ -12,12 +12,13 @@ import { useCan } from "../session";
 import { AdminIcon } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
 import { invalidProps, PanelButton, Pills, PropertyRow, recordInput } from "../ui/RecordForm";
+import { FIELD_MESSAGES, isSlug, isWholeNumber } from "@/shared/validation/fieldRules";
+import { useFieldValidation } from "../ui/fieldValidation";
 import { useToast } from "../ui/Toast";
 import { CmsEditor } from "./CmsEditor";
 import { sameBlocks } from "./editorContent";
 
 const MAX_EXPERTISE = 10;
-const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** "Version 0.1 scope" → "version-0-1-scope". */
 export const slugify = (title: string) =>
@@ -55,12 +56,18 @@ const toDraft = (document: CmsDocument): Draft => ({
 
 const EMPTY: Draft = { title: "", slug: "", slugEdited: false, expertise: [], displayOrder: "0", content: [], summary: "", status: "draft" };
 
-function errorsOf(draft: Draft): Partial<Record<"title" | "slug" | "displayOrder", string>> {
-  const errors: Partial<Record<"title" | "slug" | "displayOrder", string>> = {};
+/** The fields with a rule, in the form's order (the first invalid one gets the focus on submit). */
+const CHECKED = ["title", "slug", "displayOrder"] as const;
+type CheckedField = (typeof CHECKED)[number];
+const FIELD_IDS: Record<CheckedField, string> = { title: "document-title", slug: "document-slug", displayOrder: "document-order" };
+
+/** Field errors found before sending, with the API's own rules (fieldRules.ts, cms.contracts.ts). */
+function errorsOf(draft: Draft): Partial<Record<CheckedField, string>> {
+  const errors: Partial<Record<CheckedField, string>> = {};
   if (!draft.title.trim()) errors.title = "Add a title.";
   if (!draft.slug) errors.slug = "Add a slug.";
-  else if (!SLUG.test(draft.slug)) errors.slug = "Use lowercase letters, numbers and single hyphens (like version-0-1-scope).";
-  if (!/^-?\d+$/.test(draft.displayOrder.trim())) errors.displayOrder = "Use a whole number.";
+  else if (!isSlug(draft.slug)) errors.slug = FIELD_MESSAGES.slug;
+  if (!isWholeNumber(draft.displayOrder)) errors.displayOrder = FIELD_MESSAGES.wholeNumber;
   return errors;
 }
 
@@ -111,8 +118,8 @@ export function DocumentRecord({ id }: { id: string | null }) {
   // Discard puts the saved content back into the editor.
   const [resets, setResets] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
-  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
+  const validation = useFieldValidation(CHECKED, (field) => FIELD_IDS[field]);
+  const touch = validation.leave;
   const suggestions = useMemo(() => [...new Set((all.data ?? []).flatMap((row) => row.expertise))].sort((a, b) => a.localeCompare(b)), [all.data]);
 
   const loaded = id ? document.data : null;
@@ -160,7 +167,7 @@ export function DocumentRecord({ id }: { id: string | null }) {
   const archived = loaded?.state === "archived";
   const editable = id ? canEdit && !archived : canCreate;
   const found = errorsOf(draft);
-  const fieldErrors = Object.fromEntries(Object.entries(found).filter(([key]) => touched.has(key)));
+  const fieldErrors = validation.shown(found);
   const published = loaded?.state === "published";
 
   const body = () => ({
@@ -173,11 +180,7 @@ export function DocumentRecord({ id }: { id: string | null }) {
   });
 
   async function submit(): Promise<boolean> {
-    if (Object.keys(found).length > 0) {
-      setTouched(new Set([...touched, ...Object.keys(found)]));
-      setError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(found)) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -253,7 +256,7 @@ export function DocumentRecord({ id }: { id: string | null }) {
         discard: () => {
           setEdit(null);
           setError(null);
-          setTouched(new Set());
+          validation.reset();
           setResets((count) => count + 1);
         },
         duplicate:

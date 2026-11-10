@@ -1,5 +1,5 @@
 import { formatMoney } from "@/shared/format/numbers";
-import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
+import { FIELD_MESSAGES, isEmail, isScore, isWebLink } from "@/shared/validation/fieldRules";
 import type { ExpenseRef, Person, PersonInput } from "../api/types";
 import { linkedExpertiseOption } from "../expertise/expertiseOptions";
 import type { RelationOption } from "../ui/RelationPicker";
@@ -93,25 +93,29 @@ const sameIds = (a: RelationOption[], b: RelationOption[]) => a.length === b.len
 const sameOrder = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((key, index) => key === b[index]);
 const ids = (options: RelationOption[]) => options.map((option) => option.id);
 
-/** Like the API's email check: something@domain.tld, no spaces. */
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-export const EMAIL_MESSAGE = "Invalid email address.";
 const LINK_FIELDS = ["website", "x", "linkedin", "otherSocials"] as const;
 
-/** A score as typed: a whole number from 0 to 10, or empty. */
-const SCORE = /^(?:[0-9]|10)$/;
-export const SCORE_MESSAGE = "Use a whole number from 0 to 10.";
+/** The fields with a rule, in the record's order (the first invalid one gets the focus on submit). */
+export const PERSON_CHECKED = ["name", "email", "website", "x", "linkedin", "otherSocials", "aiRelevanceScore", "relevanceScore", "lastContactOn"] as const;
+export type PersonCheckedField = (typeof PERSON_CHECKED)[number];
+const FIELD_IDS: Partial<Record<PersonCheckedField, string>> = {
+  aiRelevanceScore: "person-ai-score",
+  relevanceScore: "person-score",
+  lastContactOn: "person-last-contact",
+};
+/** The id of a field's input (PersonRecord). */
+export const personFieldId = (field: PersonCheckedField) => FIELD_IDS[field] ?? `person-${field}`;
 
-/** Field errors found before sending (the API checks the same rules). */
-export function personDraftErrors(draft: PersonDraft): Record<string, string> {
-  const errors: Record<string, string> = {};
+/** Field errors found before sending, with the API's own rules (fieldRules.ts; the API refuses the same values). */
+export function personDraftErrors(draft: PersonDraft): Partial<Record<PersonCheckedField, string>> {
+  const errors: Partial<Record<PersonCheckedField, string>> = {};
   if (!draft.name.trim()) errors.name = "Name is required.";
-  if (draft.email.trim() && !EMAIL.test(draft.email.trim())) errors.email = EMAIL_MESSAGE;
+  if (draft.email.trim() && !isEmail(draft.email)) errors.email = FIELD_MESSAGES.email;
   for (const field of LINK_FIELDS) {
-    if (draft[field].trim() && !isWebLink(draft[field])) errors[field] = INVALID_LINK;
+    if (draft[field].trim() && !isWebLink(draft[field])) errors[field] = FIELD_MESSAGES.link;
   }
   for (const field of ["aiRelevanceScore", "relevanceScore"] as const) {
-    if (draft[field].trim() && !SCORE.test(draft[field].trim())) errors[field] = SCORE_MESSAGE;
+    if (draft[field].trim() && !isScore(draft[field])) errors[field] = FIELD_MESSAGES.score;
   }
   if (draft.firstContactOn && draft.lastContactOn && draft.firstContactOn > draft.lastContactOn)
     errors.lastContactOn = "The last contact can't be before the first contact.";

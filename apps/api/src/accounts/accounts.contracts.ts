@@ -1,11 +1,13 @@
 import { z } from "zod";
+import { FIELD_MESSAGES, isEmail } from "../common/field-rules.js";
 import { ROLE_KEYS } from "../access-control/permissions.js";
 import { listQuerySchema } from "../common/listing/list-query.js";
 import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
 
 /** Request contracts and response shapes for accounts, the profile, invitation links and the one-time links. */
 
-const email = z.string().trim().max(320).pipe(z.email("Invalid email address."));
+/** The shared rule (common/field-rules.ts): the same check the page makes when the field is left. */
+const email = z.string().trim().max(320, FIELD_MESSAGES.email).refine(isEmail, FIELD_MESSAGES.email);
 const displayName = z
   .string()
   .transform((value) => value.trim())

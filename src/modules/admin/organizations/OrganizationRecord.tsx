@@ -13,7 +13,8 @@ import { CompletenessRow } from "../ui/CompletenessRow";
 import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
 import { AdminButton, StatusMessage } from "../ui/controls";
-import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
+import { FIELD_MESSAGES, isEmail, isWebLink } from "@/shared/validation/fieldRules";
+import { useFieldValidation } from "../ui/fieldValidation";
 import { AutoGrowTextarea, invalidProps, PropertyRow, recordInput } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useCan } from "../session";
@@ -64,14 +65,16 @@ function patchFor(base: Draft, draft: Draft): OrganizationInput {
   return patch;
 }
 
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+/** The fields with a rule, in the form's order (the first invalid one gets the focus on submit). */
+const CHECKED = ["name", "website", "email"] as const;
+type CheckedField = (typeof CHECKED)[number];
 
-/** Field errors found before sending (the API checks the same rules), shown once a field is left. */
-export function organizationDraftErrors(draft: Pick<Draft, "name" | "email" | "website">): Record<string, string> {
-  const errors: Record<string, string> = {};
+/** Field errors found before sending, with the API's own rules (fieldRules.ts); shown once a field is left. */
+export function organizationDraftErrors(draft: Pick<Draft, CheckedField>): Partial<Record<CheckedField, string>> {
+  const errors: Partial<Record<CheckedField, string>> = {};
   if (!draft.name.trim()) errors.name = "Name is required.";
-  if (draft.email.trim() && !EMAIL.test(draft.email.trim())) errors.email = "Invalid email address.";
-  if (draft.website.trim() && !isWebLink(draft.website)) errors.website = INVALID_LINK;
+  if (draft.email.trim() && !isEmail(draft.email)) errors.email = FIELD_MESSAGES.email;
+  if (draft.website.trim() && !isWebLink(draft.website)) errors.website = FIELD_MESSAGES.link;
   return errors;
 }
 
@@ -109,8 +112,8 @@ export function OrganizationRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
-  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
+  const validation = useFieldValidation(CHECKED, (field) => `organization-${field}`);
+  const touch = validation.leave;
 
   if (organization.error || !organization.data) {
     return (
@@ -136,14 +139,10 @@ export function OrganizationRecord({ id }: { id: string }) {
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
 
   const found = organizationDraftErrors(draft);
-  const fieldErrors = Object.fromEntries(Object.entries(found).filter(([key]) => touched.has(key)));
+  const fieldErrors = validation.shown(found);
 
   async function submit(): Promise<boolean> {
-    if (Object.keys(found).length > 0) {
-      setTouched(new Set([...touched, ...Object.keys(found)]));
-      setError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(found)) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -199,7 +198,7 @@ export function OrganizationRecord({ id }: { id: string }) {
         discard: () => {
           setEdit(null);
           setError(null);
-          setTouched(new Set());
+          validation.reset();
         },
         duplicate: canCreate ? duplicate : undefined,
         archived: loaded.archivedAt !== null,

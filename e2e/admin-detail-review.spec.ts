@@ -173,9 +173,9 @@ test("errors show on leaving a field, in the design system's error state; links 
   await page.screenshot({ path: join(SHOTS, "review-errors-1440.png") });
   await axe();
 
-  // Submit refuses while errors remain; fixing a field clears its error on leaving it.
+  // Submit refuses while errors remain and moves the focus to the first field to fix (OPS-70); fixing a field clears its error.
   await page.getByRole("button", { name: "Submit changes" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Some fields need attention." })).toBeVisible();
+  await expect(email).toBeFocused();
   await expect(page).toHaveURL(/\/admin\/people\/[0-9a-f-]{36}$/);
   await email.fill("rae@example.org");
   await email.press("Tab");

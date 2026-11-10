@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { GrantRef } from "../services/services.contracts.js";
 import { listQuerySchema } from "../common/listing/list-query.js";
 import { LIMIT_MESSAGES, RELATION_LIMITS } from "../common/relation-limits.js";
-import { INVALID_LINK, isWebLink } from "../common/web-link.js";
+import { FIELD_MESSAGES, isEmail, isWebLink } from "../common/field-rules.js";
 
 /** Request contracts (validated) and response shapes (stable JSON) for /api/admin/people. */
 
@@ -17,13 +17,13 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
-/** A link field: trimmed, "" clears it, otherwise a valid web address (web-link.ts). */
+/** A link field: trimmed, "" clears it, otherwise a valid web address (common/field-rules.ts). */
 const optionalLink = (max: number) =>
   z
     .string()
     .max(max)
     .transform((value) => value.trim() || null)
-    .refine((value) => value === null || isWebLink(value), INVALID_LINK)
+    .refine((value) => value === null || isWebLink(value), FIELD_MESSAGES.link)
     .nullable()
     .optional();
 
@@ -43,7 +43,7 @@ const personFields = {
     .string()
     .max(320)
     .transform((value) => value.trim() || null)
-    .pipe(z.email("Invalid email address.").nullable())
+    .refine((value) => value === null || isEmail(value), FIELD_MESSAGES.email)
     .nullable()
     .optional(),
   phone: optionalText(64),

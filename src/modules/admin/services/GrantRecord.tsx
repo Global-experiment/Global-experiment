@@ -11,6 +11,7 @@ import { useCan } from "../session";
 import { AdminButton, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, DateField, Pills, PropertyRow, ReadOnlyValue } from "../ui/RecordForm";
 import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
+import { useFieldValidation } from "../ui/fieldValidation";
 import { useToast } from "../ui/Toast";
 
 interface Draft {
@@ -62,9 +63,15 @@ function bodyFor(base: Draft | null, draft: Draft): Record<string, unknown> {
   return body;
 }
 
-/** Field errors before sending (the API checks the same rules). */
-export function grantDraftErrors(draft: Pick<Draft, "service" | "grantedOn" | "expiresOn" | "revokedOn">): Record<string, string> {
-  const errors: Record<string, string> = {};
+/** The fields with a rule, in the form's order; a picker or a date counts as left once a value is chosen. */
+const CHECKED = ["service", "revokedOn", "expiresOn"] as const;
+type CheckedField = (typeof CHECKED)[number];
+const TARGETS: Record<CheckedField, string> = { service: '[data-property="Service"] input', revokedOn: "grant-revoked", expiresOn: "grant-expires" };
+const isChecked = (key: string): key is CheckedField => (CHECKED as readonly string[]).includes(key);
+
+/** Field errors before sending (the API checks the same rules, services.contracts.ts). */
+export function grantDraftErrors(draft: Pick<Draft, "service" | "grantedOn" | "expiresOn" | "revokedOn">): Partial<Record<CheckedField, string>> {
+  const errors: Partial<Record<CheckedField, string>> = {};
   if (draft.service.length === 0) errors.service = "Choose a service.";
   if (draft.grantedOn && draft.revokedOn && draft.revokedOn < draft.grantedOn) errors.revokedOn = "Revoked can't be before granted.";
   if (draft.grantedOn && draft.expiresOn && draft.expiresOn < draft.grantedOn) errors.expiresOn = "Expired can't be before granted.";
@@ -198,23 +205,22 @@ function NewGrantRecord() {
   const [edited, setEdited] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tried, setTried] = useState(false);
+  const validation = useFieldValidation(CHECKED, (field) => TARGETS[field]);
 
   const draft: Draft = edited ?? {
     ...EMPTY,
     service: service.data ? [serviceOption(service.data)] : [],
     person: person.data ? [personOption(person.data)] : [],
   };
-  const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdited({ ...draft, [key]: value });
+  const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => {
+    setEdited({ ...draft, [key]: value });
+    if (isChecked(key)) validation.leave(key);
+  };
   const found = grantDraftErrors(draft);
   const backHref = serviceId ? `/admin/services/${serviceId}` : personId ? `/admin/people/${personId}` : "/admin/permissions";
 
   async function submit(): Promise<boolean> {
-    if (Object.keys(found).length > 0) {
-      setTried(true);
-      setError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(found)) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -234,10 +240,19 @@ function NewGrantRecord() {
       backHref={backHref}
       backLabel={serviceId ? "Service" : personId ? "Person" : "Permissions"}
       title="New permission"
-      actions={{ submit, discard: () => setEdited(null), savedMessage: "Permission created", dirty: draft.service.length > 0, busy }}
+      actions={{
+        submit,
+        discard: () => {
+          setEdited(null);
+          validation.reset();
+        },
+        savedMessage: "Permission created",
+        dirty: draft.service.length > 0,
+        busy,
+      }}
     >
       {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-      <GrantFields draft={draft} set={set} errors={tried ? found : {}} options={options.data} />
+      <GrantFields draft={draft} set={set} errors={validation.shown(found)} options={options.data} />
     </RecordPage>
   );
 }
@@ -251,6 +266,7 @@ function ExistingGrantRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const validation = useFieldValidation(CHECKED, (field) => TARGETS[field]);
 
   if (grant.error || !grant.data) {
     return (
@@ -273,15 +289,15 @@ function ExistingGrantRecord({ id }: { id: string }) {
   const draft = edit?.version === version ? edit.draft : base;
   const patch = bodyFor(base, draft);
   const dirty = Object.keys(patch).length > 0;
-  const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
+  const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => {
+    setEdit({ version, draft: { ...draft, [key]: value } });
+    if (isChecked(key)) validation.leave(key);
+  };
   const found = grantDraftErrors(draft);
   const number = `#${loaded.grantNumber}`;
 
   async function submit(): Promise<boolean> {
-    if (Object.keys(found).length > 0) {
-      setError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(found)) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -324,6 +340,7 @@ function ExistingGrantRecord({ id }: { id: string }) {
         discard: () => {
           setEdit(null);
           setError(null);
+          validation.reset();
         },
         archived: loaded.archivedAt !== null,
         setArchived,
@@ -333,7 +350,7 @@ function ExistingGrantRecord({ id }: { id: string }) {
       }}
     >
       {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
-      <GrantFields draft={draft} set={set} errors={found} options={options.data} />
+      <GrantFields draft={draft} set={set} errors={validation.shown(found)} options={options.data} />
       <RecordMeta
         numberLabel="ID"
         number={number}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { INVALID_LINK, isWebLink } from "@/shared/validation/webLink";
+import { FIELD_MESSAGES, isWebLink } from "@/shared/validation/fieldRules";
+import { useFieldValidation } from "../ui/fieldValidation";
 import { adminApi, AdminApiError } from "../api/client";
 import type { RecordHistory, Service, ServicesOptions } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
@@ -42,10 +43,15 @@ function patchFor(base: Draft, draft: Draft): Record<string, unknown> {
   return patch;
 }
 
-export function serviceDraftErrors(draft: Pick<Draft, "name" | "url">): Record<string, string> {
-  const errors: Record<string, string> = {};
+/** The fields with a rule, in the form's order (the first invalid one gets the focus on submit). */
+const CHECKED = ["name", "url"] as const;
+type CheckedField = (typeof CHECKED)[number];
+
+/** Field errors found before sending, with the API's own rules (fieldRules.ts); shown once a field is left. */
+export function serviceDraftErrors(draft: Pick<Draft, CheckedField>): Partial<Record<CheckedField, string>> {
+  const errors: Partial<Record<CheckedField, string>> = {};
   if (!draft.name.trim()) errors.name = "Name is required.";
-  if (draft.url.trim() && !isWebLink(draft.url)) errors.url = INVALID_LINK;
+  if (draft.url.trim() && !isWebLink(draft.url)) errors.url = FIELD_MESSAGES.link;
   return errors;
 }
 
@@ -69,8 +75,8 @@ export function ServiceRecord({ id }: { id: string }) {
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
-  const touch = (key: string) => setTouched((previous) => (previous.has(key) ? previous : new Set(previous).add(key)));
+  const validation = useFieldValidation(CHECKED, (field) => `service-${field}`);
+  const touch = validation.leave;
 
   if (service.error || !service.data) {
     return (
@@ -95,14 +101,10 @@ export function ServiceRecord({ id }: { id: string }) {
   const dirty = Object.keys(patch).length > 0;
   const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
   const found = serviceDraftErrors(draft);
-  const fieldErrors = Object.fromEntries(Object.entries(found).filter(([key]) => touched.has(key)));
+  const fieldErrors = validation.shown(found);
 
   async function submit(): Promise<boolean> {
-    if (Object.keys(found).length > 0) {
-      setTouched(new Set([...touched, ...Object.keys(found)]));
-      setError("Some fields need attention.");
-      return false;
-    }
+    if (!validation.checkAll(found)) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -147,7 +149,7 @@ export function ServiceRecord({ id }: { id: string }) {
         discard: () => {
           setEdit(null);
           setError(null);
-          setTouched(new Set());
+          validation.reset();
         },
         archived: loaded.archivedAt !== null,
         setArchived,

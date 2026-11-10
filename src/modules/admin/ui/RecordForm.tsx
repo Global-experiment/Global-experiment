@@ -332,15 +332,25 @@ export function PropertyRow({
       </div>
       <div className="flex min-h-8 min-w-0 flex-col justify-center text-body">
         {children}
-        {error ? (
-          // The design system's error state (Profile and account, "Invalid email address"): the warning glyph, then the message.
-          <p role="alert" id={htmlFor ? errorIdFor(htmlFor) : undefined} data-field-error className="mt-1 flex items-center gap-1 text-meta text-text-primary">
-            <AdminIcon name="warning" />
-            {error}
-          </p>
-        ) : null}
+        <FieldError fieldId={htmlFor} message={error} />
       </div>
     </div>
+  );
+}
+
+/**
+ * The design system's error state (Profile and account, "Invalid email address"): the warning glyph, then the
+ * message, under the field. role="alert" reads it out when it appears; the field points at it through
+ * invalidProps (aria-invalid, aria-describedby = errorIdFor(fieldId)). Used by PropertyRow and by forms without
+ * one (sign-up, password dialogs).
+ */
+export function FieldError({ fieldId, message }: { fieldId?: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" id={fieldId ? errorIdFor(fieldId) : undefined} data-field-error className="mt-1 flex items-center gap-1 text-meta text-text-primary">
+      <AdminIcon name="warning" />
+      {message}
+    </p>
   );
 }
 
