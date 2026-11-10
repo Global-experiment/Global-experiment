@@ -1,7 +1,7 @@
 import { RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants.js";
 import { ModulesContainer } from "@nestjs/core";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { auditEvents } from "../audit/audit.schema.js";
 import { ALLOW_ANONYMOUS } from "../auth/admin-area.js";
@@ -106,8 +106,6 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "GET /api/admin/services/options": "services.read",
   "GET /api/admin/treasury": "treasury.read",
   "GET /api/admin/treasury/:id": "treasury.read",
-  "GET /api/admin/treasury/:id/documents": "treasury.read",
-  "GET /api/admin/treasury/documents/:documentId": "treasury.read",
   "GET /api/admin/treasury/options": "treasury.read",
   "PATCH /api/admin/access-grants/:id": "access.update",
   "PATCH /api/admin/accounts/:id": "accounts.manage",
@@ -119,7 +117,7 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "PATCH /api/admin/people/:id": "directory.update",
   "PATCH /api/admin/profile": "signed in",
   "PATCH /api/admin/services/:id": "services.update",
-  "PATCH /api/admin/treasury/:id": "treasury.update | treasury.review",
+  "PATCH /api/admin/treasury/:id": "treasury.update | treasury.review | treasury.manage",
   "POST /api/admin/access-grants": "access.create",
   "POST /api/admin/access-grants/:id/archive": "access.update",
   "POST /api/admin/access-grants/:id/restore": "access.update",
@@ -157,7 +155,6 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "POST /api/admin/services/:id/archive": "services.update",
   "POST /api/admin/services/:id/restore": "services.update",
   "POST /api/admin/treasury/:id/archive": "treasury.update",
-  "POST /api/admin/treasury/:id/documents": "treasury.update",
   "POST /api/admin/treasury/:id/publish": "treasury.publish",
   "POST /api/admin/treasury/:id/restore": "treasury.update",
   "POST /api/admin/treasury/:id/review": "treasury.review",
@@ -168,8 +165,6 @@ const EXPECTED_ROUTES: Record<string, string> = {
   "PUT /api/admin/people/:id/organizations/:organizationId": "directory.update",
   "POST /api/admin/comments/:id/archive": "signed in",
   "POST /api/admin/comments/:id/restore": "signed in",
-  "POST /api/admin/treasury/documents/:documentId/archive": "treasury.update",
-  "POST /api/admin/treasury/documents/:documentId/restore": "treasury.update",
   "GET /api/admin/profile/pictures": "signed in",
   "GET /api/admin/profile/pictures/:id": "signed in",
   "POST /api/admin/profile/pictures/:id/restore": "signed in",
@@ -284,7 +279,9 @@ describe("access control", () => {
     const events = await t.db
       .select()
       .from(auditEvents)
-      .where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "permission_denied")));
+      .where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "permission_denied")))
+      // The latest refusal: without an order, PostgreSQL may return an earlier one last.
+      .orderBy(asc(auditEvents.occurredAt), asc(auditEvents.id));
     expect(events.at(-1)).toMatchObject({ entityType: "admin_user", meta: { permission: "treasury.read", route: "GET /api/admin/treasury" } });
   });
 });

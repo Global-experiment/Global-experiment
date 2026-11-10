@@ -2,11 +2,9 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, exists, gte, ilike, inArray, isNotNull, isNull, lte, not, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { containsPattern, groupFilters, type Page } from "../common/listing/list-query.js";
-import { adminUsers } from "../auth/auth.schema.js";
 import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
-import type { TreasuryDocumentDto, TreasuryEntryRowDto, TreasuryListQuery, VocabularyEntry } from "./treasury-admin.contracts.js";
-import { treasuryDocuments } from "./treasury-documents.schema.js";
+import type { TreasuryEntryRowDto, TreasuryListQuery, VocabularyEntry } from "./treasury-admin.contracts.js";
 import { treasuryEntries, treasuryEntryExpenseTypes, treasuryExpenseTypes, treasuryReviewStatuses } from "./treasury.schema.js";
 
 type Filter = TreasuryListQuery["filters"][number];
@@ -63,13 +61,6 @@ export class TreasuryAdminRepository {
     if (values("expense_type").length > 0) conditions.push(typeLink(values("expense_type")));
     for (const value of values("occurred_from")) conditions.push(gte(treasuryEntries.occurredOn, value));
     for (const value of values("occurred_to")) conditions.push(lte(treasuryEntries.occurredOn, value));
-    const documents = exists(
-      this.db
-        .select({ one: sql`1` })
-        .from(treasuryDocuments)
-        .where(eq(treasuryDocuments.entryId, treasuryEntries.id)),
-    );
-
     for (const filter of all) {
       const empty = filter.operator === "is_empty";
       switch (filter.field) {
@@ -87,9 +78,6 @@ export class TreasuryAdminRepository {
           conditions.push(empty ? none : not(none));
           break;
         }
-        case "documents":
-          conditions.push(empty ? not(documents) : documents);
-          break;
       }
     }
 
@@ -160,7 +148,6 @@ export class TreasuryAdminRepository {
       createdAt: treasuryEntries.createdAt,
       updatedAt: treasuryEntries.updatedAt,
       archivedAt: treasuryEntries.archivedAt,
-      documents: sql<number>`(select count(*)::int from ${treasuryDocuments} where ${treasuryDocuments.entryId} = ${treasuryEntries.id})`,
     };
   }
 
@@ -213,7 +200,6 @@ export class TreasuryAdminRepository {
       source: row.source as TreasuryEntryRowDto["source"],
       livemode: row.livemode,
       sample: row.sample,
-      documents: row.documents,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       archivedAt: iso(row.archivedAt),
@@ -254,7 +240,7 @@ export class TreasuryAdminRepository {
   async details(id: string) {
     const [entry] = await this.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, id));
     if (!entry) return null;
-    const [adjusts, adjustments, documents] = await Promise.all([
+    const [adjusts, adjustments] = await Promise.all([
       entry.adjustsEntryId
         ? this.db
             .select({ id: treasuryEntries.id, number: treasuryEntries.entryNumber })
@@ -266,26 +252,7 @@ export class TreasuryAdminRepository {
         .from(treasuryEntries)
         .where(eq(treasuryEntries.adjustsEntryId, id))
         .orderBy(asc(treasuryEntries.entryNumber)),
-      this.documents(id),
     ]);
-    return { entry, adjusts: adjusts[0] ?? null, adjustments, documents };
-  }
-
-  async documents(entryId: string): Promise<TreasuryDocumentDto[]> {
-    const rows = await this.db
-      .select({
-        id: treasuryDocuments.id,
-        fileName: treasuryDocuments.fileName,
-        contentType: treasuryDocuments.contentType,
-        sizeBytes: treasuryDocuments.sizeBytes,
-        uploadedAt: treasuryDocuments.uploadedAt,
-        uploadedBy: sql<string | null>`coalesce(${adminUsers.displayName}, ${adminUsers.email})`,
-        archivedAt: treasuryDocuments.archivedAt,
-      })
-      .from(treasuryDocuments)
-      .leftJoin(adminUsers, eq(adminUsers.id, treasuryDocuments.uploadedByAdminId))
-      .where(eq(treasuryDocuments.entryId, entryId))
-      .orderBy(desc(treasuryDocuments.uploadedAt));
-    return rows.map((row) => ({ ...row, uploadedAt: row.uploadedAt.toISOString(), archivedAt: row.archivedAt?.toISOString() ?? null }));
+    return { entry, adjusts: adjusts[0] ?? null, adjustments };
   }
 }

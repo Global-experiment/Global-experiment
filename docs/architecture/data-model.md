@@ -433,6 +433,12 @@ Monthly donors = active subscriptions of the public mode.
 
 ### 4.3 `treasury_documents` (supporting documents)
 
+**No longer used (OPS-155, 2026-11-10; ADR 021).** Accountants keep the
+supporting documents outside the platform: the admin and the API have no
+document feature any more. The table stays for the History and for the
+one-time deletion of ADR 021, which removes its rows and their stored files
+once. What follows describes it as it was built.
+
 | Column | Type | Rules |
 |---|---|---|
 | `id` | uuid PK | |
@@ -947,11 +953,13 @@ files; data steps and triggers are added to the generated file by hand.
 | **0012** | `accounts_and_roles` | Accounts and roles (built, Delivery 2) | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_tokens`; `admin_users` account number, status, picture, time zone, appearance, note, person; the keep-a-Rootadmin trigger (§10) |
 | **0013** | `services_and_access` | Services and Permissions (built, Delivery 2) | Lookups (statuses, categories, hosting models, access levels, access statuses), `services`, `access_grants` (§9) |
 | **0014** | `feedback_batch_1` | Candide's first feedback (built, Delivery 4, 2026-11-03) | `admin_invitations` (OPS-141, decision 018); `admin_users.role` nullable (no role yet), `admin_users.description` (OPS-144), `admin_user_expertise` (OPS-135); dropped `admin_users.note` and `person_id` (OPS-142, OPS-136; no values in production); `service_category_tags` from `services.category_key` (OPS-149); `services.responsible_admin_id` dropped after an Active Owner permission was added for each responsible account without one (OPS-130, client 2026-11-03), with one History event each; every permission named "Service / Account / Permission level" (OPS-138); `contact_channels` += Other (OPS-153); `audit_events.action` += `link_revoked` |
-| **0015** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
-| **0016** | `cms` | CMS | `document_statuses`, `documents`, `content_revisions`, `document_expertise` (+ limit trigger); `import_runs.kind` += cms |
-| **0017** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
-| **0018** | `waitlist` | Waitlist | `waitlist_entries` |
-| **0019** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| **0015** | `archive_only` | Platform (built, Delivery 6, ADR 017) | `admin_user_pictures` (current and past profile pictures); `archived_at` on comments and supporting documents (deleted comments become archived): archived and restored, never deleted |
+| **0016** | `native_cms` | Home and Documentation (built, Delivery 6, ADR 020) | `cms_documents`, `cms_revisions` (append-only), `cms_images` |
+| **0017** | `treasury_manage_permission` | Treasury (built, OPS-155, ADR 021) | `treasury.manage` (every business field of an expense), granted to the Rootadmin only; `treasury.update` no longer mentions documents. No table change |
+| **0018** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
+| **0019** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
+| **0020** | `waitlist` | Waitlist | `waitlist_entries` |
+| **0021** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
 
 Numbers follow the build order (roadmap §2); if a module moves, its
 migration takes the next free number at that time — numbers are never

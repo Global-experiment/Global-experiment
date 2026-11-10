@@ -363,8 +363,9 @@ test("organizations and Treasury entries have the same panel and history", async
   await expect(page).toHaveURL(/\/admin\/treasury\/[0-9a-f-]{36}$/);
   await expect(panel().getByRole("button", { name: /^(Publish|Unpublish)$/ })).toBeVisible();
   await expect(page.locator("[data-record-main]")).toContainText(/Entry ID\s*EXP-\d+/);
-  // Money: currency code, two decimals, a real minus for expenses.
-  await expect(page.locator("[data-record-main]")).toContainText(/Amount\s*\u2212[A-Z]{3}\u00a0\d[\d,]*\.\d{2}Fee/);
+  // Money: currency code, two decimals, a real minus for expenses (the net; the Rootadmin edits the amount itself, OPS-155).
+  await expect(page.locator("[data-property=Net]")).toContainText(/\u2212[A-Z]{3}\u00a0\d[\d,]*\.\d{2}/);
+  await expect(page.locator("#treasury-amount")).toHaveValue(/^\d+\.\d{2}$/);
   await page.screenshot({ path: join(SHOTS, "detail-treasury-1440.png") });
 });
 

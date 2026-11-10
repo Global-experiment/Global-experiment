@@ -63,6 +63,15 @@ the admin or through the API; removing it archives it.
 - Home and Documentation images (Delivery 6, ADR 020) follow the same
   rule: every revision keeps the images it used.
 
+## Exception — OPS-155 (2026-11-10): Treasury supporting documents
+
+The client asked for the Treasury's supporting documents to leave the
+platform (the accountants keep them) and for the ones already attached to be
+deleted permanently, once. That one-time deletion is the only exception to
+this decision; see [ADR 021](021-one-time-deletion-of-treasury-documents.md).
+Everything above still holds for every other record and file, and the guard
+test allows that one script and nothing else.
+
 ## Consequences
 
 - A record entered by mistake is archived, not removed; its number stays

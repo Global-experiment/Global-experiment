@@ -17,7 +17,8 @@
     "purge-demo-data": "node dist/scripts/purge-demo-data.js",
     "purge-test-donations": "node dist/scripts/purge-test-donations.js",
     "seed-sample-treasury": "node dist/scripts/seed-sample-treasury.js",
-    "purge-sample-treasury": "node dist/scripts/purge-sample-treasury.js"
+    "purge-sample-treasury": "node dist/scripts/purge-sample-treasury.js",
+    "purge-treasury-documents": "node dist/scripts/purge-treasury-documents.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",

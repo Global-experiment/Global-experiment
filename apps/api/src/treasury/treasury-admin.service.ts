@@ -1,54 +1,55 @@
-import { basename } from "node:path";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { PinoLogger } from "nestjs-pino";
 import { actorFor, AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditChange } from "../audit/audit.types.js";
-import { entryLabel } from "../audit/entity-labels.js";
+import { entryLabel, moneyLabel } from "../audit/entity-labels.js";
 import type { AdminPrincipal } from "../auth/auth.service.js";
 import { CLOCK, type Clock } from "../common/clock/clock.js";
 import { APP_CONFIG } from "../common/config/config.module.js";
 import type { AppConfig } from "../common/config/env.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationFailedError } from "../common/errors/api-error.js";
-import { FILE_STORAGE, sniffContentType, type FileStorage } from "../files/file-storage.js";
+import { organizations } from "../organizations/organizations.schema.js";
+import { people } from "../people/people.schema.js";
 import { PUBLIC_CACHE_TAGS, RevalidationService } from "../revalidation/revalidation.service.js";
 import { SettingsService } from "../settings/settings.service.js";
-import type {
-  ReviewTreasuryEntryRequest,
-  TreasuryDocumentDto,
-  TreasuryEntryDto,
-  TreasuryEntryRowDto,
-  TreasuryListQuery,
-  TreasuryOptionsDto,
-  UpdateTreasuryEntryRequest,
+import {
+  EXPENSE_FIELDS,
+  type ReviewTreasuryEntryRequest,
+  type TreasuryEntryDto,
+  type TreasuryEntryRowDto,
+  type TreasuryListQuery,
+  type TreasuryOptionsDto,
+  type UpdateTreasuryEntryRequest,
+  type VocabularyEntry,
 } from "./treasury-admin.contracts.js";
 import { TreasuryAdminRepository } from "./treasury-admin.repository.js";
 import { readPublicStripeModes } from "./treasury-ledger.repository.js";
-import { DOCUMENT_MAX_BYTES, treasuryDocuments } from "./treasury-documents.schema.js";
-import { TREASURY_CURRENCIES, treasuryEntries } from "./treasury.schema.js";
-
-/** An upload as multer hands it over (memory storage). */
-export interface UploadedFile {
-  originalname: string;
-  size: number;
-  buffer: Buffer;
-}
+import { TREASURY_CURRENCIES, treasuryEntries, treasuryEntryExpenseTypes } from "./treasury.schema.js";
 
 const REVIEWED = new Set(["qualified", "not_required"]);
+const CADENCE_LABEL: Record<string, string> = { one_off: "One-off", monthly: "Monthly", yearly: "Yearly" };
 
 type Entry = typeof treasuryEntries.$inferSelect;
+type Relation = { id: string; label: string };
 
 /** 409 with a stable reason code (the page and tests read it). */
 const refused = (reason: string, message: string) => new ConflictError(message, { reason });
 
+/** Minor units as the History shows them ("−USD 1,200.50"; the page formats its own fields). */
+const money = (minor: number | null, currency: string) => (minor === null ? null : moneyLabel(minor, currency));
+
 /**
  * The admin Treasury (roadmap 1b): list, record, review and publication
- * actions, supporting documents. Data ownership (overview §2.1):
+ * actions. Data ownership (overview §2.1):
  *
  * - Expenses copied from Notion before the Treasury became in-app only
  *   (decision of 2026-10-23, no import or export) are ordinary entries
  *   now: reviewed, published and annotated here like any other.
+ * - An expense's business fields — recipient, expense types, name, public
+ *   description, date, amount, fee, cadence — are edited by the Rootadmin
+ *   (treasury.manage; OPS-155, 2026-11-10).
  * - Native Stripe entries (donations, refunds, disputes): their amounts and
  *   dates come from Stripe and are read-only; the internal note and the
  *   publication can be changed.
@@ -56,8 +57,8 @@ const refused = (reason: string, message: string) => new ConflictError(message, 
  *   reviewed entry needs a public description; an unqualified one only
  *   while `treasury.publish_unqualified` is on.
  *
- * Only the owner role manages the Treasury in v0.1 (Q8: more roles later,
- * `treasury.*` permissions).
+ * Supporting documents left the platform (OPS-155, ADR 021): accountants keep
+ * them outside it. The table stays for the one-time deletion and the History.
  */
 @Injectable()
 export class TreasuryAdminService {
@@ -65,7 +66,6 @@ export class TreasuryAdminService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
-    @Inject(FILE_STORAGE) private readonly storage: FileStorage,
     private readonly repository: TreasuryAdminRepository,
     private readonly settings: SettingsService,
     private readonly revalidation: RevalidationService,
@@ -139,18 +139,12 @@ export class TreasuryAdminService {
               : null;
     const unpublishReason = entry.publicationStatus !== "published" ? "Not published." : null;
     const reviewReason = entry.entryType !== "expense" ? "Donations, refunds and disputes need no review." : null;
-    const hasRecipient = Boolean(entry.recipientPersonId || entry.recipientOrganizationId);
     return {
       editInternalNote: true,
+      editExpense: entry.entryType === "expense",
       publish: { allowed: publishReason === null, reason: publishReason },
       unpublish: { allowed: unpublishReason === null, reason: unpublishReason },
-      review: {
-        allowed: reviewReason === null,
-        reason: reviewReason,
-        // Qualified / Not required need exactly one recipient (a database rule).
-        options: reviewReason === null ? reviewStatuses.filter((status) => hasRecipient || !REVIEWED.has(status.key)) : [],
-      },
-      documents: true,
+      review: { allowed: reviewReason === null, reason: reviewReason, options: reviewReason === null ? reviewStatuses : [] },
     };
   }
 
@@ -169,7 +163,6 @@ export class TreasuryAdminService {
       importedAt: entry.importedAt?.toISOString() ?? null,
       adjusts: details.adjusts,
       adjustments: details.adjustments,
-      documentsList: details.documents,
       permissions: await this.permissions(entry),
     };
   }
@@ -190,34 +183,156 @@ export class TreasuryAdminService {
 
   async update(id: string, body: UpdateTreasuryEntryRequest, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
     const editor = this.assertTreasuryAdmin(admin);
-    // Field by field (overview §3.1): the internal note is treasury.update, the review status treasury.review.
+    // Field by field (overview §3.1): the internal note is treasury.update, the review status treasury.review,
+    // an expense's business fields treasury.manage (the Rootadmin).
     if (body.internalNote !== undefined && !editor.permissions.has("treasury.update"))
       throw new ForbiddenError("Your role doesn't allow editing the internal note.");
     if (body.reviewStatus !== undefined && !editor.permissions.has("treasury.review")) throw new ForbiddenError("Your role doesn't allow reviewing expenses.");
+    const expenseEdit = EXPENSE_FIELDS.some((field) => body[field] !== undefined);
+    if (expenseEdit && !editor.permissions.has("treasury.manage")) throw new ForbiddenError("Only a Rootadmin can edit an expense's details.");
     const entry = await this.load(id);
-    const review = body.reviewStatus === undefined ? null : await this.checkReview(entry, body.reviewStatus);
-    const now = this.clock();
+    if (expenseEdit && entry.entryType !== "expense") throw refused("not_an_expense", "Only an expense's details can be edited.");
+
     const changes: AuditChange[] = [];
+    const after = await this.expenseAfter(entry, body, changes);
+    const review = await this.checkReview(entry, body.reviewStatus, after);
     if (body.internalNote !== undefined && (entry.internalNote ?? null) !== (body.internalNote ?? null)) {
       changes.push({ field: "internalNote", label: "Internal note", kind: "text", before: entry.internalNote, after: body.internalNote ?? null });
     }
     if (review && entry.reviewStatusKey !== body.reviewStatus) {
       changes.push({ field: "reviewStatus", label: "Review status", kind: "select", before: review.before, after: review.after });
     }
+
+    const now = this.clock();
     await this.db.transaction(async (tx) => {
       await tx
         .update(treasuryEntries)
         .set({
+          ...after.columns,
           ...(body.internalNote !== undefined ? { internalNote: body.internalNote } : {}),
           // Choosing a status (even the same one) counts as a review.
           ...(body.reviewStatus !== undefined ? { reviewStatusKey: body.reviewStatus, reviewedAt: now, reviewedByAdminId: editor.id } : {}),
           updatedAt: now,
         })
         .where(eq(treasuryEntries.id, id));
+      if (after.expenseTypes) {
+        await tx.delete(treasuryEntryExpenseTypes).where(eq(treasuryEntryExpenseTypes.entryId, id));
+        if (after.expenseTypes.length > 0) await tx.insert(treasuryEntryExpenseTypes).values(after.expenseTypes.map((typeKey) => ({ entryId: id, typeKey })));
+      }
       if (changes.length > 0) await this.recordEntry(tx, entry, editor, "updated", changes);
     });
-    if (review && entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
+    if (changes.length > 0 && entry.publicationStatus === "published") await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
     return this.get(id);
+  }
+
+  /**
+   * An expense's business fields after this save (OPS-155): the columns to write, the expense types (when they
+   * change), and the History's before/after for each field that changes. Checks what the database would refuse,
+   * so the admin gets a field message instead of a constraint error.
+   */
+  private async expenseAfter(entry: Entry, body: UpdateTreasuryEntryRequest, changes: AuditChange[]) {
+    const columns: Partial<Entry> = {};
+    const text = (field: "name" | "publicDescription", label: string) => {
+      const value = body[field];
+      if (value === undefined || (entry[field] ?? null) === (value ?? null)) return;
+      columns[field] = value as never;
+      changes.push({ field, label, kind: "text", before: entry[field], after: value ?? null });
+    };
+
+    if (body.recipient !== undefined) {
+      const before = await this.recipientOf(entry.recipientPersonId, entry.recipientOrganizationId);
+      const next = body.recipient;
+      if ((before?.id ?? null) !== (next?.id ?? null)) {
+        const found = next ? await this.recipientOf(next.kind === "person" ? next.id : null, next.kind === "organization" ? next.id : null) : null;
+        if (next && !found) throw new ValidationFailedError([{ path: "recipient", message: "This recipient doesn't exist or is archived." }]);
+        columns.recipientPersonId = next?.kind === "person" ? next.id : null;
+        columns.recipientOrganizationId = next?.kind === "organization" ? next.id : null;
+        changes.push({ field: "recipient", label: "Recipient", kind: "relation", before: before ? [before] : [], after: found ? [found] : [] });
+      }
+    }
+
+    let expenseTypes: string[] | null = null;
+    if (body.expenseTypes !== undefined) {
+      const { expenseTypes: vocabulary } = await this.repository.vocabularies();
+      const known = new Map(vocabulary.map((type) => [type.key, type.label]));
+      const unknown = body.expenseTypes.find((key) => !known.has(key));
+      if (unknown) throw new ValidationFailedError([{ path: "expenseTypes", message: "Unknown expense type." }]);
+      const current = (await this.repository.row(entry.id))?.expenseTypes ?? [];
+      const sameSet = current.length === body.expenseTypes.length && current.every((type) => body.expenseTypes!.includes(type.key));
+      if (!sameSet) {
+        expenseTypes = body.expenseTypes;
+        const relation = (keys: string[]): Relation[] =>
+          vocabulary.filter((type) => keys.includes(type.key)).map((type) => ({ id: type.key, label: type.label }));
+        changes.push({
+          field: "expenseTypes",
+          label: "Expense types",
+          kind: "relation",
+          before: relation(current.map((type) => type.key)),
+          after: relation(body.expenseTypes),
+        });
+      }
+    }
+
+    text("name", "Name");
+    text("publicDescription", "Public description");
+    if (body.occurredOn !== undefined && body.occurredOn !== entry.occurredOn) {
+      // The day is what the admin chose; a time from an import no longer matches it.
+      columns.occurredOn = body.occurredOn;
+      columns.occurredAt = null;
+      changes.push({ field: "occurredOn", label: "Date", kind: "date", before: entry.occurredOn, after: body.occurredOn });
+    }
+    const gross = body.grossAmount ?? entry.grossAmount;
+    const fee = body.feeAmount === undefined ? entry.feeAmount : body.feeAmount;
+    if (gross !== entry.grossAmount) {
+      columns.grossAmount = gross;
+      changes.push({
+        field: "grossAmount",
+        label: "Amount",
+        kind: "text",
+        before: money(entry.grossAmount, entry.currency),
+        after: money(gross, entry.currency),
+      });
+    }
+    if (fee !== entry.feeAmount) {
+      columns.feeAmount = fee;
+      changes.push({ field: "feeAmount", label: "Fee", kind: "text", before: money(entry.feeAmount, entry.currency), after: money(fee, entry.currency) });
+    }
+    // The net is never typed: amount − fee, or none without a fee (database rules).
+    if (gross !== entry.grossAmount || fee !== entry.feeAmount) columns.netAmount = fee === null ? null : gross - fee;
+    if (body.cadence !== undefined && body.cadence !== entry.cadence) {
+      columns.cadence = body.cadence;
+      const option = (key: string) => ({ key, label: CADENCE_LABEL[key] ?? key });
+      changes.push({ field: "cadence", label: "Cadence", kind: "select", before: option(entry.cadence), after: option(body.cadence) });
+    }
+
+    return {
+      columns,
+      expenseTypes,
+      hasRecipient: Boolean(
+        (columns.recipientPersonId !== undefined ? columns.recipientPersonId : entry.recipientPersonId) ||
+        (columns.recipientOrganizationId !== undefined ? columns.recipientOrganizationId : entry.recipientOrganizationId),
+      ),
+      publicDescription: (columns.publicDescription !== undefined ? columns.publicDescription : entry.publicDescription) ?? null,
+    };
+  }
+
+  /** A live (not archived) person or organization, as a History relation. */
+  private async recipientOf(personId: string | null, organizationId: string | null): Promise<Relation | null> {
+    if (personId) {
+      const [person] = await this.db
+        .select({ id: people.id, label: people.name })
+        .from(people)
+        .where(and(eq(people.id, personId), isNull(people.archivedAt)));
+      return person ?? null;
+    }
+    if (organizationId) {
+      const [organization] = await this.db
+        .select({ id: organizations.id, label: organizations.name })
+        .from(organizations)
+        .where(and(eq(organizations.id, organizationId), isNull(organizations.archivedAt)));
+      return organization ?? null;
+    }
+    return null;
   }
 
   /** Archive (decision 12): out of the default admin views and off the public pages; restorable. */
@@ -275,132 +390,34 @@ export class TreasuryAdminService {
     return this.update(id, { reviewStatus: body.reviewStatus }, admin);
   }
 
-  /** The review rules (overview §2.1): refuses a status the entry can't take; returns the history's before/after. */
-  private async checkReview(entry: Entry, reviewStatus: string) {
-    const { review } = await this.permissions(entry);
-    if (!review.allowed) throw refused("cannot_review", review.reason!);
-    if (!review.options.some((option) => option.key === reviewStatus)) {
-      throw new ValidationFailedError([{ path: "reviewStatus", message: "Qualified and Not required need exactly one recipient." }]);
+  /**
+   * The review rules (overview §2.1), on the entry as it will be after this save (a new recipient or public
+   * description counts): refuses a state the entry can't take; returns the History's before/after when the
+   * status is set.
+   */
+  private async checkReview(entry: Entry, reviewStatus: string | undefined, after: { hasRecipient: boolean; publicDescription: string | null }) {
+    const status = reviewStatus ?? entry.reviewStatusKey;
+    if (reviewStatus !== undefined) {
+      const { review } = await this.permissions(entry);
+      if (!review.allowed) throw refused("cannot_review", review.reason!);
+      if (!review.options.some((option) => option.key === reviewStatus))
+        throw new ValidationFailedError([{ path: "reviewStatus", message: "Unknown review status." }]);
+    }
+    if (entry.entryType === "expense" && REVIEWED.has(status) && !after.hasRecipient) {
+      throw new ValidationFailedError([
+        { path: reviewStatus !== undefined ? "reviewStatus" : "recipient", message: "Qualified and Not required need exactly one recipient." },
+      ]);
     }
     const publishUnqualified = await this.settings.get("treasury.publish_unqualified");
-    if (entry.publicationStatus === "published" && !REVIEWED.has(reviewStatus) && !publishUnqualified) {
+    if (reviewStatus !== undefined && entry.publicationStatus === "published" && !REVIEWED.has(reviewStatus) && !publishUnqualified) {
       throw refused("cannot_review", "Unpublish it first: an unqualified entry can't stay public (treasury.publish_unqualified is off).");
     }
-    if (entry.publicationStatus === "published" && REVIEWED.has(reviewStatus) && !entry.publicDescription?.trim()) {
+    if (entry.publicationStatus === "published" && REVIEWED.has(status) && !after.publicDescription?.trim()) {
       throw refused("cannot_review", "A published, reviewed entry needs a public description.");
     }
+    if (reviewStatus === undefined) return null;
     const { reviewStatuses } = await this.repository.vocabularies();
-    const label = (key: string) => ({ key, label: reviewStatuses.find((status) => status.key === key)?.label ?? key });
+    const label = (key: string): VocabularyEntry => ({ key, label: reviewStatuses.find((option) => option.key === key)?.label ?? key });
     return { before: entry.reviewStatusKey ? label(entry.reviewStatusKey) : null, after: label(reviewStatus) };
   }
-
-  // ---- Supporting documents (private: admins only, never public) ----
-
-  documents(entryId: string, admin: AdminPrincipal | undefined): Promise<TreasuryDocumentDto[]> {
-    this.assertTreasuryAdmin(admin);
-    return this.repository.documents(entryId);
-  }
-
-  async upload(entryId: string, file: UploadedFile | undefined, admin: AdminPrincipal | undefined): Promise<TreasuryDocumentDto> {
-    const uploader = this.assertTreasuryAdmin(admin);
-    await this.load(entryId);
-    if (!file || file.size === 0) throw new ValidationFailedError([{ path: "file", message: "Choose a file to upload." }]);
-    if (file.size > DOCUMENT_MAX_BYTES) throw new ValidationFailedError([{ path: "file", message: "Files can be at most 20 MB." }]);
-    // The real type, from the bytes: the name and the browser's Content-Type are never trusted.
-    const contentType = sniffContentType(file.buffer);
-    if (!contentType) throw new ValidationFailedError([{ path: "file", message: "Only PDF, PNG or JPEG files can be uploaded." }]);
-    const fileName = cleanFileName(file.originalname, contentType);
-
-    // Content-addressed and never removed (ADR 017): a file stored for nothing (a refused duplicate) is harmless.
-    const stored = await this.storage.put(file.buffer);
-    const entry = await this.load(entryId);
-    const row = await this.db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select()
-        .from(treasuryDocuments)
-        .where(and(eq(treasuryDocuments.entryId, entryId), eq(treasuryDocuments.sha256, stored.sha256)));
-      if (existing && !existing.archivedAt) throw refused("duplicate_document", "This file is already attached to this entry.");
-      if (existing) {
-        // The same file again on an entry where it was archived: it comes back.
-        await tx.update(treasuryDocuments).set({ archivedAt: null, archivedByAdminId: null }).where(eq(treasuryDocuments.id, existing.id));
-        await this.recordDocument(tx, entry, uploader, "file_restored", existing);
-        return existing;
-      }
-      const [inserted] = await tx
-        .insert(treasuryDocuments)
-        .values({ entryId, fileName, contentType, sizeBytes: file.size, sha256: stored.sha256, storageKey: stored.key, uploadedByAdminId: uploader.id })
-        .returning({ id: treasuryDocuments.id });
-      await this.recordEntry(tx, entry, uploader, "updated", [
-        { field: "documents", label: "Documents", kind: "relation", before: [], after: [{ id: inserted!.id, label: fileName }] },
-      ]);
-      return inserted!;
-    });
-    this.logger.info({ entryId, documentId: row.id, contentType, sizeBytes: file.size }, "Treasury document uploaded");
-    return (await this.repository.documents(entryId)).find((document) => document.id === row.id)!;
-  }
-
-  async download(documentId: string, admin: AdminPrincipal | undefined): Promise<{ fileName: string; contentType: string; bytes: Buffer }> {
-    this.assertTreasuryAdmin(admin);
-    const [document] = await this.db.select().from(treasuryDocuments).where(eq(treasuryDocuments.id, documentId));
-    if (!document) throw new NotFoundError("Document not found.");
-    try {
-      return { fileName: document.fileName, contentType: document.contentType, bytes: await this.storage.get(document.storageKey) };
-    } catch {
-      this.logger.error({ documentId }, "A Treasury document's file is missing from the storage");
-      throw new NotFoundError("The document's file is missing from the storage.");
-    }
-  }
-
-  /**
-   * Archive-only (ADR 017): the document leaves the entry's list but keeps
-   * its row and its file, and can be restored; both are History events.
-   */
-  async setDocumentArchived(documentId: string, archived: boolean, admin: AdminPrincipal | undefined): Promise<TreasuryDocumentDto> {
-    const editor = this.assertTreasuryAdmin(admin);
-    const document = await this.db.transaction(async (tx) => {
-      const [row] = await tx.select().from(treasuryDocuments).where(eq(treasuryDocuments.id, documentId));
-      if (!row) throw new NotFoundError("Document not found.");
-      if ((row.archivedAt !== null) === archived) return row;
-      await tx
-        .update(treasuryDocuments)
-        .set(archived ? { archivedAt: this.clock(), archivedByAdminId: editor.id } : { archivedAt: null, archivedByAdminId: null })
-        .where(eq(treasuryDocuments.id, documentId));
-      const [entry] = await tx.select().from(treasuryEntries).where(eq(treasuryEntries.id, row.entryId));
-      if (entry) await this.recordDocument(tx, entry, editor, archived ? "file_archived" : "file_restored", row);
-      return row;
-    });
-    this.logger.info({ entryId: document.entryId, documentId }, archived ? "Treasury document archived" : "Treasury document restored");
-    return (await this.repository.documents(document.entryId)).find((item) => item.id === documentId)!;
-  }
-
-  /** "archived a document" / "restored a document" on the entry, naming the file. */
-  private async recordDocument(
-    tx: Executor,
-    entry: Entry,
-    admin: AdminPrincipal,
-    action: "file_archived" | "file_restored",
-    document: { id: string; fileName: string },
-  ) {
-    await this.audit.record(tx, {
-      entityType: "treasury_entry",
-      entityId: entry.id,
-      action,
-      actor: actorFor(admin),
-      source: "admin",
-      meta: { label: entryLabel(entry), file: { kind: "document", id: document.id, name: document.fileName } },
-    });
-  }
-}
-
-const EXTENSION: Record<string, string> = { "application/pdf": ".pdf", "image/png": ".png", "image/jpeg": ".jpg" };
-
-/** The uploaded name, made safe to show and to send back: no path, no control characters, ≤ 255, the right extension. */
-export function cleanFileName(original: string, contentType: string): string {
-  let name = basename(original.replace(/\\/g, "/"))
-    .replace(/[\u0000-\u001f\u007f"]/g, "")
-    .trim();
-  if (!name || name === "." || name === "..") name = "document";
-  const extension = EXTENSION[contentType]!;
-  if (!/\.(pdf|png|jpe?g)$/i.test(name)) name += extension;
-  return name.length > 255 ? name.slice(0, 255 - extension.length) + extension : name;
 }

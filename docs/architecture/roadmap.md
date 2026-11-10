@@ -296,7 +296,8 @@ for client*.
   admin access? If yes, is the team-based role list (overview §3.1) right? *Waiting for client.*
 - **Q11 — Retention.** How long are kept: the audit log, waitlist entries,
   feedback submissions (and their personal data), messages, Stripe event
-  ids, treasury documents (accounting law: often 10 years)? *Waiting for client.*
+  ids? *Waiting for client.* (Treasury documents: kept by the accountants
+  outside the platform since OPS-155, ADR 021.)
 - **Q15 — Environments and releases.** Add a staging environment? Deploy
   tagged releases from `main` (production follows `develop` today)? *Waiting for client.*
 

@@ -3,16 +3,17 @@ import { char, check, index, integer, pgTable, text, timestamp, uniqueIndex, uui
 import { adminUsers } from "../auth/auth.schema.js";
 import { treasuryEntries } from "./treasury.schema.js";
 
-/** 20 MB (docs/architecture/overview.md §3.4; retention is Q5). */
-export const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
-export const DOCUMENT_CONTENT_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
-export type DocumentContentType = (typeof DOCUMENT_CONTENT_TYPES)[number];
+/** 20 MB: the size rule of the existing rows (migration 0007). */
+const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
 
 /**
  * Supporting documents of a Treasury entry (invoices, receipts) —
- * data-model.md §4.3, migration 0007. Private entirely: the bytes live in the
- * file storage (storage_key, never a path), served only to authorized admins.
- * Never deleted (ADR 017, migration 0015): removing one archives it.
+ * data-model.md §4.3, migration 0007. No longer used by the platform
+ * (OPS-155, 2026-11-10): accountants keep these documents outside it, so the
+ * admin and the API have no document feature any more. The table stays for
+ * the History and for the one written exception to archive-only (ADR 017):
+ * the one-time deletion of ADR 021 (scripts/treasury-documents-purge.ts)
+ * removes its rows and their stored files, once.
  */
 export const treasuryDocuments = pgTable(
   "treasury_documents",
