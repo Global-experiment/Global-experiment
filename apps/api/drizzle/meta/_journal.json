@@ -120,6 +120,13 @@
       "when": 1793797036214,
       "tag": "0016_native_cms",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794321813274,
+      "tag": "0017_treasury_manage_permission",
+      "breakpoints": true
     }
   ]
 }

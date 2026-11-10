@@ -446,21 +446,9 @@ export interface TreasuryEntryRow {
   livemode: boolean;
   /** Sample data before go-live (marked Test publicly; purge-sample-treasury removes it). */
   sample: boolean;
-  documents: number;
   createdAt: string;
   updatedAt: string;
   /** Archived (decision 12): only in the "Archived" view. */
-  archivedAt: string | null;
-}
-
-export interface TreasuryDocument {
-  id: string;
-  fileName: string;
-  contentType: string;
-  sizeBytes: number;
-  uploadedAt: string;
-  uploadedBy: string | null;
-  /** Archived (ADR 017): listed under "Archived documents", restorable. */
   archivedAt: string | null;
 }
 
@@ -478,13 +466,14 @@ export interface TreasuryEntry extends TreasuryEntryRow {
   importedAt: string | null;
   adjusts: { id: string; number: number } | null;
   adjustments: { id: string; number: number; type: string; grossAmount: number }[];
-  documentsList: TreasuryDocument[];
   permissions: {
     editInternalNote: boolean;
+    /** An expense (its business fields can change); treasury.manage decides who changes them. */
+    editExpense: boolean;
     publish: TreasuryRule;
     unpublish: TreasuryRule;
+    /** Every status the entry can take; Qualified and Not required need a recipient (checked on save). */
     review: TreasuryRule & { options: VocabularyEntry[] };
-    documents: boolean;
   };
 }
 

@@ -1,35 +1,19 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  Res,
-  StreamableFile,
-  UploadedFile as UploadedFileParam,
-  UseInterceptors,
-} from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
-import type { Response } from "express";
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { z } from "zod";
 import type { AdminRequest } from "../auth/admin-area.js";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe.js";
 import { ReviewTreasuryEntryRequest, TreasuryListQuery, UpdateTreasuryEntryRequest } from "./treasury-admin.contracts.js";
-import { TreasuryAdminService, type UploadedFile } from "./treasury-admin.service.js";
-import { DOCUMENT_MAX_BYTES } from "./treasury-documents.schema.js";
+import { TreasuryAdminService } from "./treasury-admin.service.js";
 import { Requires, RequiresAny } from "../access-control/requires.js";
 
 const IdParam = new ZodValidationPipe(z.uuid("Invalid id."));
 
 /**
  * /api/admin/treasury — each route requires its `treasury.*` permission
- * (PermissionGuard; the service also checks treasury.update and
- * treasury.review per field). There is no create or delete of
- * entries: expenses come from Notion, donations from Stripe (data ownership).
+ * (PermissionGuard; the service also checks treasury.update,
+ * treasury.review and treasury.manage per field). There is no create or
+ * delete of entries, and no supporting documents any more (OPS-155, ADR 021:
+ * accountants keep them outside the platform).
  */
 @Controller("admin/treasury")
 export class TreasuryAdminController {
@@ -48,45 +32,15 @@ export class TreasuryAdminController {
     return this.treasury.options();
   }
 
-  @Get("documents/:documentId")
-  @Requires("treasury.read")
-  async download(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest, @Res({ passthrough: true }) response: Response) {
-    const file = await this.treasury.download(documentId, request.admin);
-    response.set({
-      "Content-Type": file.contentType,
-      "Content-Length": String(file.bytes.length),
-      // Always a download, never rendered by the browser in the admin's origin.
-      "Content-Disposition": contentDisposition(file.fileName),
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    });
-    return new StreamableFile(file.bytes);
-  }
-
-  /** Archive-only (ADR 017): a supporting document is archived and restored, never deleted. */
-  @Post("documents/:documentId/archive")
-  @Requires("treasury.update")
-  @HttpCode(200)
-  archiveDocument(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest) {
-    return this.treasury.setDocumentArchived(documentId, true, request.admin);
-  }
-
-  @Post("documents/:documentId/restore")
-  @Requires("treasury.update")
-  @HttpCode(200)
-  restoreDocument(@Param("documentId", IdParam) documentId: string, @Req() request: AdminRequest) {
-    return this.treasury.setDocumentArchived(documentId, false, request.admin);
-  }
-
   @Get(":id")
   @Requires("treasury.read")
   get(@Param("id", IdParam) id: string) {
     return this.treasury.get(id);
   }
 
-  /** The internal note (treasury.update) and the review status (treasury.review). */
+  /** The internal note (treasury.update), the review status (treasury.review) and an expense's business fields (treasury.manage). */
   @Patch(":id")
-  @RequiresAny("treasury.update", "treasury.review")
+  @RequiresAny("treasury.update", "treasury.review", "treasury.manage")
   update(
     @Param("id", IdParam) id: string,
     @Body(new ZodValidationPipe(UpdateTreasuryEntryRequest)) body: UpdateTreasuryEntryRequest,
@@ -133,24 +87,4 @@ export class TreasuryAdminController {
   restore(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
     return this.treasury.setArchived(id, false, request.admin);
   }
-
-  @Get(":id/documents")
-  @Requires("treasury.read")
-  documents(@Param("id", IdParam) id: string, @Req() request: AdminRequest) {
-    return this.treasury.documents(id, request.admin);
-  }
-
-  /** multipart/form-data, one `file` field; held in memory (multer's default, ≤ 20 MB) and type-checked from its bytes. */
-  @Post(":id/documents")
-  @Requires("treasury.update")
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: DOCUMENT_MAX_BYTES, files: 1, fields: 0, parts: 2 } }))
-  upload(@Param("id", IdParam) id: string, @UploadedFileParam() file: UploadedFile | undefined, @Req() request: AdminRequest) {
-    return this.treasury.upload(id, file, request.admin);
-  }
-}
-
-/** attachment; an ASCII fallback plus the exact UTF-8 name (RFC 6266 / 5987). */
-export function contentDisposition(fileName: string): string {
-  const fallback = fileName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }

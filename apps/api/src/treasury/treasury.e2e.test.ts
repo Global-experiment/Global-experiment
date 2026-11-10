@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
@@ -21,13 +21,12 @@ import { treasuryEntries, treasuryEntryExpenseTypes } from "./treasury.schema.js
 
 /**
  * The Treasury through the real HTTP stack (roadmap 1b): what the public
- * sees (published, public mode, settings), the admin's read-only rules and
- * actions, and supporting documents (storage and access). Fixtures live in
- * this file only.
+ * sees (published, public mode, settings), the admin's rules and actions,
+ * the expense detail page's editing (OPS-155) and the absence of supporting
+ * documents (ADR 021). Fixtures live in this file only.
  */
 
 const PDF = Buffer.from("%PDF-1.7\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n");
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 1)]);
 
 type EntryValues = typeof treasuryEntries.$inferInsert;
 
@@ -390,8 +389,8 @@ describe("Treasury API", () => {
         recipient: { kind: "person", name: "Ada Lovelace" },
         expenseTypes: [{ key: "hosting_and_infrastructure", label: "Hosting and infrastructure" }],
         review: { key: "qualified", label: "Qualified" },
-        documents: 0,
       });
+      expect(spent).not.toHaveProperty("documents");
 
       const filtered = async (query: string) =>
         (await admin.get(`/api/admin/treasury?${query}`).expect(200)).body.items.map((row: { type: string }) => row.type);
@@ -415,8 +414,9 @@ describe("Treasury API", () => {
         publish: { allowed: false, reason: "Already published." },
         unpublish: { allowed: true },
         review: { allowed: true },
-        documents: true,
+        editExpense: true,
       });
+      expect(record).not.toHaveProperty("documentsList");
       await admin.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "Checked the invoice" }).expect(200);
       // A published entry stays reviewed (the publication rules): unpublish first, then review.
       await admin.post(`/api/admin/treasury/${entry.id}/unpublish`).expect(200);
@@ -438,9 +438,11 @@ describe("Treasury API", () => {
       expect(record.internalNote).toBe("Thank-you sent");
       expect(record.permissions.review).toMatchObject({ allowed: false, reason: "Donations, refunds and disputes need no review." });
 
-      // Only the note: amounts, dates and descriptions are refused by the contract.
+      // Only the note: an amount above zero is refused by the contract, and the business fields are an expense's only.
+      expect(record.permissions.editExpense).toBe(false);
       expect((await admin.patch(`/api/admin/treasury/${gift.id}`, { grossAmount: 1 })).status).toBe(400);
-      expect((await admin.patch(`/api/admin/treasury/${gift.id}`, { publicDescription: "x" })).status).toBe(400);
+      expect((await admin.patch(`/api/admin/treasury/${gift.id}`, { publicDescription: "x" })).body.error.details).toEqual({ reason: "not_an_expense" });
+      expect((await admin.patch(`/api/admin/treasury/${gift.id}`, { name: "Renamed" })).status).toBe(409);
 
       expect((await admin.post(`/api/admin/treasury/${gift.id}/unpublish`).expect(200)).body).toMatchObject({ publication: "unpublished", publishedAt: null });
       expect(revalidate).toHaveBeenCalledWith(["treasury"]);
@@ -465,10 +467,17 @@ describe("Treasury API", () => {
 
       let record = (await admin.get(`/api/admin/treasury/${unqualified.id}`).expect(200)).body;
       expect(record.permissions.publish).toMatchObject({ allowed: false, reason: expect.stringContaining("publish_unqualified") });
-      // Without a recipient, Qualified and Not required aren't offered (the database requires one).
-      expect(record.permissions.review.options.map((option: { key: string }) => option.key)).toEqual(["unqualified", "pending_documents"]);
+      // Every status is offered (a recipient can be set in the same save); Qualified and Not required still need one.
+      expect(record.permissions.review.options.map((option: { key: string }) => option.key)).toEqual([
+        "unqualified",
+        "pending_documents",
+        "qualified",
+        "not_required",
+      ]);
       expect((await admin.post(`/api/admin/treasury/${unqualified.id}/publish`)).body.error.details).toEqual({ reason: "cannot_publish" });
-      expect((await admin.post(`/api/admin/treasury/${unqualified.id}/review`, { reviewStatus: "qualified" })).status).toBe(400);
+      const noRecipient = await admin.post(`/api/admin/treasury/${unqualified.id}/review`, { reviewStatus: "qualified" });
+      expect(noRecipient.status).toBe(400);
+      expect(noRecipient.body.error.details.issues[0].message).toBe("Qualified and Not required need exactly one recipient.");
 
       await setting("treasury.publish_unqualified", true);
       record = (await admin.post(`/api/admin/treasury/${unqualified.id}/publish`).expect(200)).body;
@@ -500,95 +509,183 @@ describe("Treasury API", () => {
       expect((await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, entry.id))).length).toBe(1);
     });
 
-    describe("supporting documents", () => {
-      const send = (id: string, bytes: Buffer, name: string) => admin.upload(`/api/admin/treasury/${id}/documents`, "file", bytes, name);
+    describe("the expense detail page (OPS-155)", () => {
+      const organization = async (name: string, archived = false) =>
+        (
+          await t.db
+            .insert(organizations)
+            .values({ name, ...(archived ? { archivedAt: new Date() } : {}) })
+            .returning()
+        )[0]!;
+      const unreviewed = (values: Partial<EntryValues> = {}) =>
+        insert(
+          expense({
+            managedBy: "native",
+            notionPageId: null,
+            source: "manual",
+            occurredOn: "2026-10-01",
+            grossAmount: -5000,
+            reviewStatusKey: "unqualified",
+            publicationStatus: "unpublished",
+            publishedAt: null,
+            ...values,
+          }),
+        );
 
-      it("uploads, lists, downloads, archives and restores a document on any entry (Notion-managed too); never deletes a file", async () => {
-        const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, recipientPersonId: (await recipient()).id }));
-        const uploaded = (await send(entry.id, PDF, '../../etc/Invoice "May".pdf').expect(201)).body;
-        expect(uploaded).toMatchObject({ fileName: "Invoice May.pdf", contentType: "application/pdf", sizeBytes: PDF.length, uploadedBy: expect.any(String) });
-
+      it("has no supporting documents any more: the routes are gone, the record and list don't mention them", async () => {
+        const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000 }));
+        // A row left from before (production has none): never exposed; the one-time deletion removes it (ADR 021).
+        const [legacy] = await t.db
+          .insert(treasuryDocuments)
+          .values({
+            entryId: entry.id,
+            fileName: "old.pdf",
+            contentType: "application/pdf",
+            sizeBytes: 10,
+            sha256: "a".repeat(64),
+            storageKey: `sha256/aa/${"a".repeat(64)}`,
+          })
+          .returning();
+        expect((await admin.get(`/api/admin/treasury/${entry.id}/documents`)).status).toBe(404);
+        expect((await admin.get(`/api/admin/treasury/documents/${legacy!.id}`)).status).toBe(404);
+        expect((await admin.upload(`/api/admin/treasury/${entry.id}/documents`, "file", PDF, "a.pdf")).status).toBe(404);
+        expect((await admin.post(`/api/admin/treasury/documents/${legacy!.id}/archive`)).status).toBe(404);
+        expect((await admin.post(`/api/admin/treasury/documents/${legacy!.id}/restore`)).status).toBe(404);
         const record = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
-        expect(record.documents).toBe(1);
-        expect(record.documentsList).toEqual([uploaded]);
-        expect(uploaded.archivedAt).toBeNull();
-        expect((await admin.get(`/api/admin/treasury/${entry.id}/documents`).expect(200)).body).toEqual([uploaded]);
-
-        const download = await admin
-          .get(`/api/admin/treasury/documents/${uploaded.id}`)
-          .buffer(true)
-          .parse((res, done) => {
-            const chunks: Buffer[] = [];
-            res.on("data", (chunk: Buffer) => chunks.push(chunk));
-            res.on("end", () => done(null, Buffer.concat(chunks)));
-          });
-        expect(download.status).toBe(200);
-        expect(download.headers["content-type"]).toBe("application/pdf");
-        expect(download.headers["content-disposition"]).toBe(`attachment; filename="Invoice May.pdf"; filename*=UTF-8''Invoice%20May.pdf`);
-        expect(download.headers["x-content-type-options"]).toBe("nosniff");
-        expect(download.headers["cache-control"]).toBe("private, no-store");
-        expect(Buffer.compare(download.body as Buffer, PDF)).toBe(0);
-
-        // The same file twice on one entry is refused; on another entry it's stored once and shared.
-        expect((await send(entry.id, PDF, "again.pdf")).body.error.details).toEqual({ reason: "duplicate_document" });
-        const other = await insert(expense({ occurredOn: "2026-10-02", grossAmount: -100, recipientPersonId: (await recipient("B")).id }));
-        const shared = (await send(other.id, PDF, "copy.pdf").expect(201)).body;
-        const files = async () => (await readdir(storageDir, { recursive: true })).filter((name) => /[0-9a-f]{64}$/.test(name));
-        expect(await files()).toHaveLength(1);
-
-        // Archive-only (ADR 017): no delete route; archiving keeps the row and the file, and restoring brings it back.
-        expect((await admin.delete(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(404);
-        const archived = (await admin.post(`/api/admin/treasury/documents/${uploaded.id}/archive`).expect(200)).body;
-        expect(archived.archivedAt).toEqual(expect.any(String));
-        await admin.post(`/api/admin/treasury/documents/${shared.id}/archive`).expect(200);
-        expect(await files()).toHaveLength(1);
-        await admin.get(`/api/admin/treasury/documents/${uploaded.id}`).expect(200);
-        const after = (await admin.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
-        expect(after.documentsList).toEqual([{ ...uploaded, archivedAt: archived.archivedAt }]);
-        let events = (await admin.get(`/api/admin/history/treasury_entry/${entry.id}`).expect(200)).body.items;
-        expect(events[0]).toMatchObject({ action: "file_archived", meta: { file: { kind: "document", id: uploaded.id, name: "Invoice May.pdf" } } });
-
-        // Uploading the archived file again restores it, as does Restore.
-        expect((await send(other.id, PDF, "copy again.pdf").expect(201)).body).toMatchObject({ id: shared.id, archivedAt: null });
-        expect((await admin.post(`/api/admin/treasury/documents/${uploaded.id}/restore`).expect(200)).body.archivedAt).toBeNull();
-        events = (await admin.get(`/api/admin/history/treasury_entry/${entry.id}`).expect(200)).body.items;
-        expect(events[0]).toMatchObject({ action: "file_restored", meta: { file: { id: uploaded.id } } });
-        expect(await files()).toHaveLength(1);
-        await admin.post(`/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000/archive`).expect(404);
+        expect(Object.keys(record)).not.toEqual(expect.arrayContaining(["documents"]));
+        expect(record).not.toHaveProperty("documentsList");
+        expect(record.permissions).not.toHaveProperty("documents");
+        expect((await admin.get("/api/admin/treasury?filter=documents:is_not_empty")).status).toBe(400);
       });
 
-      it("accepts only PDF, PNG and JPEG, judged from the bytes, up to 20 MB", async () => {
-        const entry = await insert(donation({ occurredOn: "2026-10-03", grossAmount: 500 }));
-        expect((await send(entry.id, PNG, "receipt").expect(201)).body).toMatchObject({ fileName: "receipt.png", contentType: "image/png" });
-        const disguised = await send(entry.id, Buffer.from("<script>alert(1)</script>"), "invoice.pdf");
-        expect(disguised.status).toBe(400);
-        expect(disguised.body.error.details.issues[0].message).toBe("Only PDF, PNG or JPEG files can be uploaded.");
-        const tooLarge = await send(entry.id, Buffer.concat([PDF, Buffer.alloc(20 * 1024 * 1024)]), "big.pdf");
-        expect(tooLarge.status).toBe(413);
-        expect(tooLarge.body.error.code).toBe("payload_too_large");
-        expect((await send("00000000-0000-4000-8000-000000000000", PDF, "a.pdf")).status).toBe(404);
+      it("lets the Rootadmin change every business field of an expense in one save: one History event, the net worked out", async () => {
+        const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000, recipientPersonId: (await recipient("Ada")).id }), [
+          "hosting_and_infrastructure",
+        ]);
+        const studio = await organization("Lumen Design Works");
+        const saved = (
+          await admin
+            .patch(`/api/admin/treasury/${entry.id}`, {
+              recipient: { kind: "organization", id: studio.id },
+              expenseTypes: ["design_and_product", "hosting_and_infrastructure"],
+              name: "  Website redesign  ",
+              publicDescription: "New design of the public site",
+              occurredOn: "2026-09-30",
+              grossAmount: -120050,
+              feeAmount: 450,
+              cadence: "monthly",
+              internalNote: "Invoice kept by the accountants",
+            })
+            .expect(200)
+        ).body;
+        expect(saved).toMatchObject({
+          recipient: { kind: "organization", id: studio.id, name: "Lumen Design Works" },
+          name: "Website redesign",
+          publicDescription: "New design of the public site",
+          occurredOn: "2026-09-30",
+          occurredAt: null,
+          grossAmount: -120050,
+          feeAmount: 450,
+          netAmount: -120500,
+          cadence: "monthly",
+          internalNote: "Invoice kept by the accountants",
+        });
+        expect(saved.expenseTypes.map((type: { key: string }) => type.key).sort()).toEqual(["design_and_product", "hosting_and_infrastructure"]);
+        // Published: the public Treasury refreshes.
+        expect(revalidate).toHaveBeenCalledWith(["treasury"]);
+
+        const [event, ...rest] = (await admin.get(`/api/admin/history/treasury_entry/${entry.id}`).expect(200)).body.items;
+        expect(rest.filter((item: { action: string }) => item.action === "updated")).toHaveLength(0);
+        expect(event.action).toBe("updated");
+        expect(event.changes.map((change: { field: string }) => change.field)).toEqual([
+          "recipient",
+          "expenseTypes",
+          "name",
+          "publicDescription",
+          "occurredOn",
+          "grossAmount",
+          "feeAmount",
+          "cadence",
+          "internalNote",
+        ]);
+        expect(event.changes.find((change: { field: string }) => change.field === "grossAmount")).toMatchObject({
+          // moneyLabel: a no-break space between the code and the amount.
+          before: "−USD 50.00",
+          after: "−USD 1,200.50",
+        });
+        expect(event.changes[0]).toMatchObject({ before: [{ label: "Ada" }], after: [{ id: studio.id, label: "Lumen Design Works" }] });
+
+        // Saving the same values again changes nothing and writes no event.
+        await admin
+          .patch(`/api/admin/treasury/${entry.id}`, {
+            name: "Website redesign",
+            expenseTypes: ["hosting_and_infrastructure", "design_and_product"],
+            cadence: "monthly",
+          })
+          .expect(200);
+        expect((await admin.get(`/api/admin/history/treasury_entry/${entry.id}`).expect(200)).body.items[0].id).toBe(event.id);
+        // No fee: no net either (a database rule).
+        expect((await admin.patch(`/api/admin/treasury/${entry.id}`, { feeAmount: null }).expect(200)).body).toMatchObject({
+          feeAmount: null,
+          netAmount: null,
+        });
       });
 
-      it("refuses anonymous visitors and roles without the Treasury permissions", async () => {
-        const entry = await insert(donation({ occurredOn: "2026-10-03", grossAmount: 500 }));
-        const uploaded = (await send(entry.id, PDF, "a.pdf").expect(201)).body;
-        expect((await anonymous().get(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(401);
-        expect((await anonymous().post(`/api/admin/treasury/${entry.id}/documents`).set("origin", TEST_ORIGIN).attach("file", PDF, "a.pdf")).status).toBe(401);
-        expect((await anonymous().post(`/api/admin/treasury/documents/${uploaded.id}/archive`).set("origin", TEST_ORIGIN)).status).toBe(401);
+      it("sets a recipient and qualifies the expense in the same save", async () => {
+        const entry = await unreviewed();
+        const person = await recipient("Grace Hopper");
+        const saved = (
+          await admin.patch(`/api/admin/treasury/${entry.id}`, { recipient: { kind: "person", id: person.id }, reviewStatus: "qualified" }).expect(200)
+        ).body;
+        expect(saved).toMatchObject({ recipient: { kind: "person", name: "Grace Hopper" }, review: { key: "qualified" } });
+      });
 
-        // A Moderator has no Treasury permission at all; Compliance reads and reviews but never edits or publishes.
-        const moderator = await signedInAs(t, "moderation");
-        expect((await moderator.get(`/api/admin/treasury/documents/${uploaded.id}`)).status).toBe(403);
-        expect((await moderator.post(`/api/admin/treasury/documents/${uploaded.id}/archive`)).status).toBe(403);
-        expect((await moderator.upload(`/api/admin/treasury/${entry.id}/documents`, "file", PDF, "a.pdf")).status).toBe(403);
-        expect((await moderator.post(`/api/admin/treasury/${entry.id}/unpublish`)).status).toBe(403);
-        expect((await moderator.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" })).status).toBe(403);
-        const compliance = await signedInAs(t, "compliance");
-        await compliance.get(`/api/admin/treasury/documents/${uploaded.id}`).expect(200);
-        expect((await compliance.post(`/api/admin/treasury/documents/${uploaded.id}/archive`)).status).toBe(403);
-        expect((await compliance.post(`/api/admin/treasury/${entry.id}/unpublish`)).status).toBe(403);
-        // The route allows review or update; the field decides: the internal note is treasury.update.
-        expect((await compliance.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "x" })).status).toBe(403);
+      it("refuses what the rules refuse, with a message on the field", async () => {
+        const entry = await insert(expense({ occurredOn: "2026-10-01", grossAmount: -5000 }));
+        const issue = async (body: object) => (await admin.patch(`/api/admin/treasury/${entry.id}`, body)).body.error;
+        expect((await issue({ grossAmount: 500 })).details.issues[0]).toMatchObject({
+          path: "grossAmount",
+          message: "An expense's amount is money out: below zero.",
+        });
+        expect((await issue({ grossAmount: -10.5 })).details.issues[0].message).toBe("Use whole cents.");
+        expect((await issue({ feeAmount: -1 })).details.issues[0].message).toBe("A fee is zero or more.");
+        expect((await issue({ name: "   " })).details.issues[0].message).toBe("Give the entry a name.");
+        expect((await issue({ expenseTypes: ["no_such_type"] })).details.issues[0]).toMatchObject({ path: "expenseTypes", message: "Unknown expense type." });
+        expect((await issue({ expenseTypes: ["design_and_product", "design_and_product"] })).details.issues[0].message).toBe("Each expense type once.");
+        expect((await issue({ recipient: { kind: "person", id: randomUUID() } })).details.issues[0]).toMatchObject({ path: "recipient" });
+        const archived = await organization("Gone Ltd", true);
+        expect((await issue({ recipient: { kind: "organization", id: archived.id } })).details.issues[0].message).toBe(
+          "This recipient doesn't exist or is archived.",
+        );
+        // A qualified expense keeps a recipient; a published, reviewed one keeps its public description.
+        expect((await issue({ recipient: null })).details.issues[0]).toMatchObject({
+          path: "recipient",
+          message: "Qualified and Not required need exactly one recipient.",
+        });
+        expect((await issue({ publicDescription: "  " })).details).toEqual({ reason: "cannot_review" });
+        expect(await issue({})).toMatchObject({ code: "validation_failed" });
+        const [unchanged] = await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, entry.id));
+        expect(unchanged).toMatchObject({ grossAmount: -5000, name: "Hosting", publicDescription: "Server hosting for the platform" });
+      });
+
+      it("only the Rootadmin edits an expense's details; Admin and Treasury admin keep the note and the review", async () => {
+        const entry = await unreviewed();
+        for (const role of ["admin", "treasury"] as const) {
+          const editor = await signedInAs(t, role, `${role}-ops155@example.org`);
+          const record = (await editor.get(`/api/admin/treasury/${entry.id}`).expect(200)).body;
+          expect(record.permissions.editExpense).toBe(true);
+          const refusedEdit = await editor.patch(`/api/admin/treasury/${entry.id}`, { name: "Renamed" });
+          expect(refusedEdit.status).toBe(403);
+          expect(refusedEdit.body.error.message).toBe("Only a Rootadmin can edit an expense's details.");
+          // A mixed save is refused whole: nothing changes.
+          expect((await editor.patch(`/api/admin/treasury/${entry.id}`, { internalNote: "mine", grossAmount: -1 })).status).toBe(403);
+          await editor.patch(`/api/admin/treasury/${entry.id}`, { internalNote: `Seen by ${role}` }).expect(200);
+        }
+        const compliance = await signedInAs(t, "compliance", "compliance-ops155@example.org");
+        expect((await compliance.patch(`/api/admin/treasury/${entry.id}`, { cadence: "yearly" })).status).toBe(403);
+        expect((await anonymous().patch(`/api/admin/treasury/${entry.id}`).set("origin", TEST_ORIGIN).send({ name: "x" })).status).toBe(401);
+        const [after] = await t.db.select().from(treasuryEntries).where(eq(treasuryEntries.id, entry.id));
+        expect(after).toMatchObject({ name: "Hosting", grossAmount: -5000, cadence: "one_off", internalNote: "Seen by treasury" });
       });
     });
   });

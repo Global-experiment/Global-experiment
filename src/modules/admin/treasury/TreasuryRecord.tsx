@@ -1,42 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { formatDateOnly } from "@/shared/format/dates";
 import { Timestamp } from "@/shared/format/Timestamp";
 import { adminApi, AdminApiError } from "../api/client";
-import { formatEntryNumber, type RecordHistory, type TreasuryDocument, type TreasuryEntry } from "../api/types";
+import { formatEntryNumber, type RecordHistory, type TreasuryEntry, type TreasuryOptions } from "../api/types";
 import { useAdminData } from "../api/useAdminData";
 import { RecordMeta } from "../record/RecordMeta";
 import { RecordPage } from "../record/RecordPage";
 import { AdminIcon } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
-import { AutoGrowTextarea, PanelButton, Pills, PropertyRow } from "../ui/RecordForm";
+import { AutoGrowTextarea, DateField, invalidProps, PanelButton, Pills, PropertyRow, recordInput } from "../ui/RecordForm";
+import { RelationPicker, type RelationOption } from "../ui/RelationPicker";
 import { useCan } from "../session";
 import { useToast } from "../ui/Toast";
-import {
-  CADENCE_LABEL,
-  DOCUMENT_ACCEPT,
-  DOCUMENT_MAX_BYTES,
-  DOCUMENT_TYPES,
-  formatBytes,
-  formatMoney,
-  modeLabel,
-  publicationLabel,
-  SOURCE_LABEL,
-  TYPE_LABEL,
-} from "./treasuryDisplay";
+import { parseAmount, recipientFromOption, recipientOption, searchRecipients, searchTypes, toAmountText, typeOption } from "./expenseFields";
+import { CADENCE_LABEL, formatMoney, modeLabel, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
 
 /** A value the admin can't change here: plain text, no field ring (only editable values look like fields). */
 function ReadOnly({ children }: { children: ReactNode }) {
   return <span className="flex min-h-8 items-center px-2 break-words text-text-primary">{children ?? <span className="text-text-muted">—</span>}</span>;
 }
 
-/** What "Submit changes" saves on an entry. */
+/** What "Submit changes" saves on an entry: the note and the review, and an expense's business fields (OPS-155). */
 interface Draft {
   internalNote: string;
   reviewStatus: string;
+  recipient: RelationOption[];
+  expenseTypes: RelationOption[];
+  name: string;
+  publicDescription: string;
+  occurredOn: string;
+  amount: string;
+  fee: string;
+  cadence: string;
 }
+
+const ERROR_FIELDS = ["name", "occurredOn", "amount", "fee", "recipient", "expenseTypes", "publicDescription", "reviewStatus"] as const;
+type ErrorField = (typeof ERROR_FIELDS)[number];
+type FieldErrors = Partial<Record<ErrorField, string>>;
+const isErrorField = (field: string): field is ErrorField => (ERROR_FIELDS as readonly string[]).includes(field);
+
+const REVIEWED = new Set(["qualified", "not_required"]);
+const CADENCES = ["one_off", "monthly", "yearly"].map((value) => ({ value, label: CADENCE_LABEL[value]! }));
+/** The API's field names → this page's. */
+const ISSUE_FIELD: Record<string, ErrorField> = { grossAmount: "amount", feeAmount: "fee" };
 
 const message = (caught: unknown, fallback: string) => (caught instanceof AdminApiError ? (caught.issues[0]?.message ?? caught.message) : fallback);
 
@@ -47,24 +56,32 @@ const message = (caught: unknown, fallback: string) => (caught instanceof AdminA
  * Data ownership (overview §2.1) decides what can change:
  * - the Treasury is edited here only (decision of 2026-10-23: no import, no
  *   export); expenses copied from Notion earlier are ordinary entries;
+ * - an expense (OPS-155): Recipient, Expense types, Name, Public description
+ *   and Review status first, then the rest; every business field is
+ *   editable by the Rootadmin (treasury.manage), the net worked out by the
+ *   API; other roles keep the internal note and the review;
  * - Stripe entries: amounts and dates come from Stripe; only the internal
  *   note, the review and the publication change here;
- * - the internal note and the review status are saved together by "Submit
- *   changes" (one event); publish and unpublish are explicit panel actions,
- *   offered only when the API's rules and settings allow them;
- * - supporting documents (PDF, PNG, JPEG, ≤ 20 MB) on any entry — private,
- *   downloaded by admins only, never public.
+ * - "Submit changes" saves everything together (one History event); publish
+ *   and unpublish are explicit panel actions, offered only when the API's
+ *   rules and settings allow them.
+ *
+ * No supporting documents (OPS-155, ADR 021): accountants keep them outside
+ * the platform.
  */
 export function TreasuryRecord({ id }: { id: string }) {
   const toast = useToast();
   const canUpdate = useCan("treasury.update");
   const canReview = useCan("treasury.review");
   const canPublish = useCan("treasury.publish");
+  const canManage = useCan("treasury.manage");
   const entry = useAdminData<TreasuryEntry>(`/treasury/${id}`);
+  const options = useAdminData<TreasuryOptions>("/treasury/options");
   const history = useAdminData<RecordHistory>(`/history/treasury_entry/${id}`);
   const [edit, setEdit] = useState<{ version: string; draft: Draft } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   if (entry.error || !entry.data) {
     return (
@@ -82,23 +99,71 @@ export function TreasuryRecord({ id }: { id: string }) {
   }
 
   const loaded = entry.data;
-  // What the entry allows (the API's rules), narrowed to what the role allows.
+  const isExpense = loaded.type === "expense";
+  const editsExpense = canManage && loaded.permissions.editExpense;
+  const version = `${loaded.id}@${loaded.updatedAt}@${loaded.archivedAt}`;
+  const base: Draft = {
+    internalNote: loaded.internalNote ?? "",
+    reviewStatus: loaded.review.key,
+    recipient: loaded.recipient ? [recipientOption(loaded.recipient)] : [],
+    expenseTypes: loaded.expenseTypes.map(typeOption),
+    name: loaded.name,
+    publicDescription: loaded.publicDescription ?? "",
+    occurredOn: loaded.occurredOn,
+    amount: toAmountText(loaded.grossAmount),
+    fee: toAmountText(loaded.feeAmount),
+    cadence: loaded.cadence,
+  };
+  const draft = edit?.version === version ? edit.draft : base;
+  const hasRecipient = (editsExpense ? draft.recipient.length : loaded.recipient ? 1 : 0) > 0;
+  // What the entry allows (the API's rules), narrowed to what the role allows; Qualified and Not required need a recipient.
   const permissions = {
     ...loaded.permissions,
     editInternalNote: loaded.permissions.editInternalNote && canUpdate,
-    review: canReview ? loaded.permissions.review : { ...loaded.permissions.review, allowed: false, reason: "Your role can't review expenses." },
+    review: canReview
+      ? { ...loaded.permissions.review, options: loaded.permissions.review.options.filter((option) => hasRecipient || !REVIEWED.has(option.key)) }
+      : { ...loaded.permissions.review, allowed: false, reason: "Your role can't review expenses." },
   };
-  const version = `${loaded.id}@${loaded.updatedAt}@${loaded.archivedAt}`;
-  const base: Draft = { internalNote: loaded.internalNote ?? "", reviewStatus: loaded.review.key };
-  const draft = edit?.version === version ? edit.draft : base;
-  const patch: { internalNote?: string; reviewStatus?: string } = {};
+
+  const amount = parseAmount(draft.amount, { allowEmpty: false });
+  const fee = parseAmount(draft.fee, { allowEmpty: true });
+  const patch: Record<string, unknown> = {};
   if (permissions.editInternalNote && draft.internalNote.trim() !== base.internalNote.trim()) patch.internalNote = draft.internalNote;
   if (permissions.review.allowed && draft.reviewStatus !== base.reviewStatus) patch.reviewStatus = draft.reviewStatus;
+  if (editsExpense) {
+    if ((draft.recipient[0]?.id ?? null) !== (base.recipient[0]?.id ?? null)) patch.recipient = recipientFromOption(draft.recipient[0]);
+    const keys = (selected: RelationOption[]) => selected.map((option) => option.id);
+    if ([...keys(draft.expenseTypes)].sort().join() !== [...keys(base.expenseTypes)].sort().join()) patch.expenseTypes = keys(draft.expenseTypes);
+    if (draft.name.trim() !== base.name.trim()) patch.name = draft.name;
+    if (draft.publicDescription.trim() !== base.publicDescription.trim()) patch.publicDescription = draft.publicDescription;
+    if (draft.occurredOn !== base.occurredOn) patch.occurredOn = draft.occurredOn;
+    if (draft.amount !== base.amount) patch.grossAmount = "minor" in amount && amount.minor !== null ? -amount.minor : draft.amount;
+    if (draft.fee !== base.fee) patch.feeAmount = "minor" in fee ? fee.minor : draft.fee;
+    if (draft.cadence !== base.cadence) patch.cadence = draft.cadence;
+  }
   const dirty = Object.keys(patch).length > 0;
-  const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setEdit({ version, draft: { ...draft, [key]: value } });
+  const set = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => {
+    setEdit({ version, draft: { ...draft, [key]: value } });
+    if (isErrorField(key)) setFieldErrors((errors) => ({ ...errors, [key]: undefined }));
+  };
   const number = formatEntryNumber(loaded.number);
 
+  /** What the page can tell before asking the API (the API checks everything again). */
+  function check(): FieldErrors {
+    const errors: FieldErrors = {};
+    if (!editsExpense) return errors;
+    if (!draft.name.trim()) errors.name = "Give the entry a name.";
+    if (!draft.occurredOn) errors.occurredOn = "Choose a date.";
+    if ("error" in amount) errors.amount = amount.error;
+    else if (amount.minor === 0) errors.amount = "An expense's amount is money out: above zero here.";
+    if ("error" in fee) errors.fee = fee.error;
+    return errors;
+  }
+
   async function submit(): Promise<boolean> {
+    const errors = check();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return false;
     setBusy("saving");
     setError(null);
     try {
@@ -106,7 +171,11 @@ export function TreasuryRecord({ id }: { id: string }) {
       toast("Treasury entry updated");
       return true;
     } catch (caught) {
-      setError(message(caught, "Couldn't save."));
+      // A field's message goes under the field; anything else above the form.
+      const issue = caught instanceof AdminApiError ? caught.issues[0] : undefined;
+      const field = issue ? (ISSUE_FIELD[issue.path] ?? issue.path) : "";
+      if (issue && isErrorField(field)) setFieldErrors({ [field]: issue.message });
+      else setError(message(caught, "Couldn't save."));
       return false;
     } finally {
       setBusy(null);
@@ -150,6 +219,332 @@ export function TreasuryRecord({ id }: { id: string }) {
     </>
   );
 
+  const money = (minor: number | null) => (
+    <ReadOnly>
+      <span className="tabular-nums">{formatMoney(minor, loaded.currency)}</span>
+    </ReadOnly>
+  );
+  // While the Rootadmin edits the amount or the fee, the net shows what it will be.
+  const previewNet =
+    editsExpense && "minor" in amount && amount.minor !== null && "minor" in fee ? (fee.minor === null ? null : -amount.minor - fee.minor) : loaded.netAmount;
+
+  const rows = {
+    recipient: isExpense ? (
+      <PropertyRow
+        key="recipient"
+        icon="arrow_outward"
+        label="Recipient"
+        hint={editsExpense ? "A person or an organization." : undefined}
+        error={fieldErrors.recipient}
+      >
+        {editsExpense ? (
+          <RelationPicker
+            label="Recipient"
+            selected={draft.recipient}
+            onChange={(next) => set("recipient", next.slice(-1))}
+            search={searchRecipients}
+            max={1}
+            limitMessage="An expense has one recipient."
+          />
+        ) : (
+          <ReadOnly>
+            {loaded.recipient ? (
+              <Link
+                href={`/admin/${loaded.recipient.kind === "person" ? "people" : "organizations"}/${loaded.recipient.id}`}
+                className={`underline underline-offset-2 ${focusRing}`}
+              >
+                {loaded.recipient.name}
+              </Link>
+            ) : null}
+          </ReadOnly>
+        )}
+      </PropertyRow>
+    ) : null,
+    expenseTypes: isExpense ? (
+      <PropertyRow key="expenseTypes" icon="select" label="Expense types" error={fieldErrors.expenseTypes}>
+        {editsExpense ? (
+          <RelationPicker
+            label="Expense types"
+            selected={draft.expenseTypes}
+            onChange={(next) => set("expenseTypes", next)}
+            search={searchTypes(options.data?.expenseTypes ?? [])}
+          />
+        ) : (
+          <ReadOnly>{loaded.expenseTypes.length > 0 ? loaded.expenseTypes.map((type) => type.label).join(", ") : null}</ReadOnly>
+        )}
+      </PropertyRow>
+    ) : null,
+    name: (
+      <PropertyRow key="name" icon="title" label="Name" htmlFor={editsExpense ? "treasury-name" : undefined} error={fieldErrors.name}>
+        {editsExpense ? (
+          <input
+            id="treasury-name"
+            className={recordInput}
+            value={draft.name}
+            maxLength={200}
+            onChange={(event) => set("name", event.target.value)}
+            {...invalidProps("treasury-name", fieldErrors.name)}
+          />
+        ) : (
+          <ReadOnly>{loaded.name}</ReadOnly>
+        )}
+      </PropertyRow>
+    ),
+    publicDescription: (
+      <PropertyRow
+        key="publicDescription"
+        icon="title"
+        label="Public description"
+        htmlFor={editsExpense ? "treasury-description" : undefined}
+        hint="Shown on the public Treasury page once the entry is qualified."
+        error={fieldErrors.publicDescription}
+      >
+        {editsExpense ? (
+          <AutoGrowTextarea
+            id="treasury-description"
+            value={draft.publicDescription}
+            onChange={(event) => set("publicDescription", event.target.value)}
+            maxLength={2000}
+            placeholder="What the money paid for, in plain words…"
+            {...invalidProps("treasury-description", fieldErrors.publicDescription)}
+          />
+        ) : (
+          <ReadOnly>{loaded.publicDescription}</ReadOnly>
+        )}
+      </PropertyRow>
+    ),
+    review: (
+      <PropertyRow
+        key="review"
+        icon="approval"
+        label="Review status"
+        hint={permissions.review.allowed ? "Qualified and Not required need a recipient." : (permissions.review.reason ?? undefined)}
+        error={fieldErrors.reviewStatus}
+      >
+        {permissions.review.allowed ? (
+          <Pills
+            label="Review status"
+            options={permissions.review.options.map((option) => ({ value: option.key, label: option.label }))}
+            value={draft.reviewStatus}
+            onChange={(value) => set("reviewStatus", value)}
+          />
+        ) : (
+          <ReadOnly>{loaded.review.label}</ReadOnly>
+        )}
+      </PropertyRow>
+    ),
+    type: (
+      <PropertyRow key="type" icon="select" label="Type">
+        <ReadOnly>{TYPE_LABEL[loaded.type]}</ReadOnly>
+      </PropertyRow>
+    ),
+    date: (
+      <PropertyRow key="date" icon="calendar" label="Date" htmlFor={editsExpense ? "treasury-date" : undefined} error={fieldErrors.occurredOn}>
+        {editsExpense ? (
+          <DateField id="treasury-date" label="Date" value={draft.occurredOn} onChange={(value) => set("occurredOn", value)} error={fieldErrors.occurredOn} />
+        ) : (
+          <ReadOnly>{loaded.occurredAt ? <Timestamp value={loaded.occurredAt} format="full" /> : formatDateOnly(loaded.occurredOn)}</ReadOnly>
+        )}
+      </PropertyRow>
+    ),
+    amount: (
+      <PropertyRow
+        key="amount"
+        icon="numbers"
+        label="Amount"
+        htmlFor={editsExpense ? "treasury-amount" : undefined}
+        hint={editsExpense ? `Money out, in ${loaded.currency}.` : undefined}
+        error={fieldErrors.amount}
+      >
+        {editsExpense ? (
+          <input
+            id="treasury-amount"
+            className={`${recordInput} tabular-nums`}
+            inputMode="decimal"
+            value={draft.amount}
+            onChange={(event) => set("amount", event.target.value)}
+            {...invalidProps("treasury-amount", fieldErrors.amount)}
+          />
+        ) : (
+          money(loaded.grossAmount)
+        )}
+      </PropertyRow>
+    ),
+    fee: (
+      <PropertyRow key="fee" icon="numbers" label="Fee" htmlFor={editsExpense ? "treasury-fee" : undefined} error={fieldErrors.fee}>
+        {editsExpense ? (
+          <input
+            id="treasury-fee"
+            className={`${recordInput} tabular-nums`}
+            inputMode="decimal"
+            value={draft.fee}
+            placeholder="No fee"
+            onChange={(event) => set("fee", event.target.value)}
+            {...invalidProps("treasury-fee", fieldErrors.fee)}
+          />
+        ) : (
+          money(loaded.feeAmount)
+        )}
+      </PropertyRow>
+    ),
+    net: (
+      <PropertyRow key="net" icon="numbers" label="Net" hint={editsExpense ? "Amount − fee, worked out on save." : undefined}>
+        {money(previewNet)}
+      </PropertyRow>
+    ),
+    settlement: loaded.settlement ? (
+      <PropertyRow key="settlement" icon="numbers" label="Settlement">
+        <ReadOnly>
+          <span className="tabular-nums">
+            {`${formatMoney(loaded.settlement.grossAmount, loaded.settlement.currency)} − fee ${formatMoney(loaded.settlement.feeAmount, loaded.settlement.currency)} = ${formatMoney(loaded.settlement.netAmount, loaded.settlement.currency)} (rate ${loaded.settlement.exchangeRate})`}
+          </span>
+        </ReadOnly>
+      </PropertyRow>
+    ) : null,
+    cadence: (
+      <PropertyRow key="cadence" icon="select" label="Cadence">
+        {editsExpense ? (
+          <Pills label="Cadence" options={CADENCES} value={draft.cadence} onChange={(value) => set("cadence", value)} />
+        ) : (
+          <ReadOnly>{CADENCE_LABEL[loaded.cadence] ?? loaded.cadence}</ReadOnly>
+        )}
+      </PropertyRow>
+    ),
+    adjusts: loaded.adjusts ? (
+      <PropertyRow key="adjusts" icon="arrow_outward" label="Adjusts">
+        <ReadOnly>
+          <Link href={`/admin/treasury/${loaded.adjusts.id}`} className={`underline underline-offset-2 ${focusRing}`}>
+            {`Donation ${formatEntryNumber(loaded.adjusts.number)}`}
+          </Link>
+        </ReadOnly>
+      </PropertyRow>
+    ) : null,
+    adjustments:
+      loaded.adjustments.length > 0 ? (
+        <PropertyRow key="adjustments" icon="arrow_outward" label="Adjustments">
+          <div className="flex flex-col px-2">
+            {loaded.adjustments.map((adjustment) => (
+              <Link
+                key={adjustment.id}
+                href={`/admin/treasury/${adjustment.id}`}
+                className={`flex min-h-8 items-center underline underline-offset-2 ${focusRing}`}
+              >
+                {`${TYPE_LABEL[adjustment.type as keyof typeof TYPE_LABEL] ?? adjustment.type} ${formatEntryNumber(adjustment.number)} · ${formatMoney(adjustment.grossAmount, loaded.currency)}`}
+              </Link>
+            ))}
+          </div>
+        </PropertyRow>
+      ) : null,
+    lastReviewed: loaded.reviewedAt ? (
+      <PropertyRow key="lastReviewed" icon="schedule" label="Last reviewed">
+        <ReadOnly>
+          <Timestamp value={loaded.reviewedAt} format="full" />
+        </ReadOnly>
+      </PropertyRow>
+    ) : null,
+    publication: (
+      <PropertyRow key="publication" icon="visibility" label="Publication">
+        <ReadOnly>
+          {publicationLabel(loaded)}
+          {loaded.publishedAt ? (
+            <>
+              {" · "}
+              <Timestamp value={loaded.publishedAt} format="full" />
+            </>
+          ) : null}
+        </ReadOnly>
+      </PropertyRow>
+    ),
+    source: (
+      <PropertyRow key="source" icon="select" label="Source">
+        <ReadOnly>{`${SOURCE_LABEL[loaded.source]} · ${modeLabel(loaded)}`}</ReadOnly>
+      </PropertyRow>
+    ),
+    transaction: (
+      <PropertyRow key="transaction" icon="numbers" label={loaded.source === "stripe" ? "Stripe ID" : "Transaction ID"}>
+        <ReadOnly>{loaded.externalTransactionId ? <span className="font-mono text-meta">{loaded.externalTransactionId}</span> : null}</ReadOnly>
+      </PropertyRow>
+    ),
+    sourceAccount: loaded.sourceAccountId ? (
+      <PropertyRow key="sourceAccount" icon="numbers" label="Source account">
+        <ReadOnly>{loaded.sourceAccountId}</ReadOnly>
+      </PropertyRow>
+    ) : null,
+    internalNote: (
+      <PropertyRow
+        key="internalNote"
+        icon="title"
+        label="Internal note"
+        htmlFor={permissions.editInternalNote ? "treasury-note" : undefined}
+        hint="Admins only: never public."
+      >
+        {permissions.editInternalNote ? (
+          <AutoGrowTextarea
+            id="treasury-note"
+            value={draft.internalNote}
+            onChange={(event) => set("internalNote", event.target.value)}
+            maxLength={5000}
+            placeholder="Notes for the admin team…"
+          />
+        ) : (
+          <ReadOnly>{loaded.internalNote}</ReadOnly>
+        )}
+      </PropertyRow>
+    ),
+    imported: loaded.importedAt ? (
+      <PropertyRow key="imported" icon="sync" label="Imported">
+        <ReadOnly>
+          <Timestamp value={loaded.importedAt} format="full" />
+        </ReadOnly>
+      </PropertyRow>
+    ) : null,
+  } satisfies Record<string, ReactNode>;
+
+  // OPS-155: an expense starts with what the client checks first; other entries keep their order.
+  const order: (keyof typeof rows)[] = isExpense
+    ? [
+        "recipient",
+        "expenseTypes",
+        "name",
+        "publicDescription",
+        "review",
+        "type",
+        "date",
+        "amount",
+        "fee",
+        "net",
+        "settlement",
+        "cadence",
+        "lastReviewed",
+        "publication",
+        "source",
+        "transaction",
+        "sourceAccount",
+        "internalNote",
+        "imported",
+      ]
+    : [
+        "name",
+        "type",
+        "date",
+        "amount",
+        "fee",
+        "net",
+        "settlement",
+        "cadence",
+        "adjusts",
+        "adjustments",
+        "review",
+        "lastReviewed",
+        "publication",
+        "publicDescription",
+        "source",
+        "transaction",
+        "sourceAccount",
+        "internalNote",
+        "imported",
+      ];
+
   return (
     <RecordPage
       backHref="/admin/treasury/manage"
@@ -159,14 +554,14 @@ export function TreasuryRecord({ id }: { id: string }) {
       entityNoun="entry"
       recordLink={(other) => `/admin/treasury/${other}`}
       panelExtra={canPublish ? publishAction : null}
-      // A document archived, restored or uploaded is an event on the entry too: the history reloads.
-      revision={`${loaded.updatedAt}|${loaded.documentsList.map((document) => `${document.id}:${document.archivedAt ?? ""}`).join(",")}`}
-      readOnly={!canUpdate && !canReview && !canPublish}
+      revision={loaded.updatedAt}
+      readOnly={!canUpdate && !canReview && !canPublish && !editsExpense}
       actions={{
         submit,
         discard: () => {
           setEdit(null);
           setError(null);
+          setFieldErrors({});
         },
         archived: loaded.archivedAt !== null,
         setArchived: !canUpdate
@@ -177,7 +572,6 @@ export function TreasuryRecord({ id }: { id: string }) {
                 () => adminApi(`/treasury/${id}/${archived ? "archive" : "restore"}`, { method: "POST" }),
                 archived ? "Entry archived" : "Entry restored",
               ),
-        // Only manual entries can go: Stripe entries belong to the ledger.
         savedMessage: "Treasury entry updated",
         dirty,
         busy,
@@ -208,165 +602,7 @@ export function TreasuryRecord({ id }: { id: string }) {
       ) : null}
       {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
 
-      <PropertyRow icon="title" label="Name">
-        <ReadOnly>{loaded.name}</ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="select" label="Type">
-        <ReadOnly>{TYPE_LABEL[loaded.type]}</ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="calendar" label="Date">
-        <ReadOnly>{loaded.occurredAt ? <Timestamp value={loaded.occurredAt} format="full" /> : formatDateOnly(loaded.occurredOn)}</ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="numbers" label="Amount">
-        <ReadOnly>
-          <span className="tabular-nums">{formatMoney(loaded.grossAmount, loaded.currency)}</span>
-        </ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="numbers" label="Fee">
-        <ReadOnly>
-          <span className="tabular-nums">{formatMoney(loaded.feeAmount, loaded.currency)}</span>
-        </ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="numbers" label="Net">
-        <ReadOnly>
-          <span className="tabular-nums">{formatMoney(loaded.netAmount, loaded.currency)}</span>
-        </ReadOnly>
-      </PropertyRow>
-      {loaded.settlement ? (
-        <PropertyRow icon="numbers" label="Settlement">
-          <ReadOnly>
-            <span className="tabular-nums">
-              {`${formatMoney(loaded.settlement.grossAmount, loaded.settlement.currency)} − fee ${formatMoney(loaded.settlement.feeAmount, loaded.settlement.currency)} = ${formatMoney(loaded.settlement.netAmount, loaded.settlement.currency)} (rate ${loaded.settlement.exchangeRate})`}
-            </span>
-          </ReadOnly>
-        </PropertyRow>
-      ) : null}
-      <PropertyRow icon="select" label="Cadence">
-        <ReadOnly>{CADENCE_LABEL[loaded.cadence] ?? loaded.cadence}</ReadOnly>
-      </PropertyRow>
-      {loaded.type === "expense" ? (
-        <>
-          <PropertyRow icon="arrow_outward" label="Recipient">
-            <ReadOnly>
-              {loaded.recipient ? (
-                <Link
-                  href={`/admin/${loaded.recipient.kind === "person" ? "people" : "organizations"}/${loaded.recipient.id}`}
-                  className={`underline underline-offset-2 ${focusRing}`}
-                >
-                  {loaded.recipient.name}
-                </Link>
-              ) : null}
-            </ReadOnly>
-          </PropertyRow>
-          <PropertyRow icon="select" label="Expense types">
-            <ReadOnly>{loaded.expenseTypes.length > 0 ? loaded.expenseTypes.map((type) => type.label).join(", ") : null}</ReadOnly>
-          </PropertyRow>
-        </>
-      ) : null}
-      {loaded.adjusts ? (
-        <PropertyRow icon="arrow_outward" label="Adjusts">
-          <ReadOnly>
-            <Link href={`/admin/treasury/${loaded.adjusts.id}`} className={`underline underline-offset-2 ${focusRing}`}>
-              {`Donation ${formatEntryNumber(loaded.adjusts.number)}`}
-            </Link>
-          </ReadOnly>
-        </PropertyRow>
-      ) : null}
-      {loaded.adjustments.length > 0 ? (
-        <PropertyRow icon="arrow_outward" label="Adjustments">
-          <div className="flex flex-col px-2">
-            {loaded.adjustments.map((adjustment) => (
-              <Link
-                key={adjustment.id}
-                href={`/admin/treasury/${adjustment.id}`}
-                className={`flex min-h-8 items-center underline underline-offset-2 ${focusRing}`}
-              >
-                {`${TYPE_LABEL[adjustment.type as keyof typeof TYPE_LABEL] ?? adjustment.type} ${formatEntryNumber(adjustment.number)} · ${formatMoney(adjustment.grossAmount, loaded.currency)}`}
-              </Link>
-            ))}
-          </div>
-        </PropertyRow>
-      ) : null}
-
-      <PropertyRow
-        icon="approval"
-        label="Review status"
-        hint={permissions.review.allowed ? "Qualified and Not required need a recipient." : (permissions.review.reason ?? undefined)}
-      >
-        {permissions.review.allowed ? (
-          <Pills
-            label="Review status"
-            options={permissions.review.options.map((option) => ({ value: option.key, label: option.label }))}
-            value={draft.reviewStatus}
-            onChange={(value) => set("reviewStatus", value)}
-          />
-        ) : (
-          <ReadOnly>{loaded.review.label}</ReadOnly>
-        )}
-      </PropertyRow>
-      {loaded.reviewedAt ? (
-        <PropertyRow icon="schedule" label="Last reviewed">
-          <ReadOnly>
-            <Timestamp value={loaded.reviewedAt} format="full" />
-          </ReadOnly>
-        </PropertyRow>
-      ) : null}
-      <PropertyRow icon="visibility" label="Publication">
-        <ReadOnly>
-          {publicationLabel(loaded)}
-          {loaded.publishedAt ? (
-            <>
-              {" · "}
-              <Timestamp value={loaded.publishedAt} format="full" />
-            </>
-          ) : null}
-        </ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="title" label="Public description" hint="Shown on the public Treasury page once the entry is qualified.">
-        <ReadOnly>{loaded.publicDescription}</ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="select" label="Source">
-        <ReadOnly>{`${SOURCE_LABEL[loaded.source]} · ${modeLabel(loaded)}`}</ReadOnly>
-      </PropertyRow>
-      <PropertyRow icon="numbers" label={loaded.source === "stripe" ? "Stripe ID" : "Transaction ID"}>
-        <ReadOnly>{loaded.externalTransactionId ? <span className="font-mono text-meta">{loaded.externalTransactionId}</span> : null}</ReadOnly>
-      </PropertyRow>
-      {loaded.sourceAccountId ? (
-        <PropertyRow icon="numbers" label="Source account">
-          <ReadOnly>{loaded.sourceAccountId}</ReadOnly>
-        </PropertyRow>
-      ) : null}
-      <PropertyRow icon="title" label="Internal note" htmlFor={permissions.editInternalNote ? "treasury-note" : undefined} hint="Admins only: never public.">
-        {permissions.editInternalNote ? (
-          <AutoGrowTextarea
-            id="treasury-note"
-            value={draft.internalNote}
-            onChange={(event) => set("internalNote", event.target.value)}
-            maxLength={5000}
-            placeholder="Notes for the admin team…"
-          />
-        ) : (
-          <ReadOnly>{loaded.internalNote}</ReadOnly>
-        )}
-      </PropertyRow>
-      <PropertyRow icon="insert_drive_file" label="Documents" hint="Invoices and receipts: PDF, PNG or JPEG up to 20 MB. Private: admins only.">
-        <Documents
-          editable={canUpdate}
-          entryId={id}
-          documents={loaded.documentsList}
-          onChange={() => {
-            entry.reload();
-            history.reload();
-          }}
-        />
-      </PropertyRow>
-      {loaded.importedAt ? (
-        <PropertyRow icon="sync" label="Imported">
-          <ReadOnly>
-            <Timestamp value={loaded.importedAt} format="full" />
-          </ReadOnly>
-        </PropertyRow>
-      ) : null}
+      {order.map((key) => rows[key])}
       <RecordMeta
         numberLabel="Entry ID"
         number={number}
@@ -376,131 +612,5 @@ export function TreasuryRecord({ id }: { id: string }) {
         createdBy={history.data?.createdBy?.label ?? (loaded.source === "stripe" ? "Automation" : null)}
       />
     </RecordPage>
-  );
-}
-
-function Documents({ entryId, documents, onChange, editable }: { entryId: string; documents: TreasuryDocument[]; onChange: () => void; editable: boolean }) {
-  const toast = useToast();
-  const input = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const current = documents.filter((document) => !document.archivedAt);
-  const archived = documents.filter((document) => document.archivedAt);
-
-  async function upload(file: File) {
-    setError(null);
-    if (!(DOCUMENT_TYPES as readonly string[]).includes(file.type)) return setError("Only PDF, PNG or JPEG files can be uploaded.");
-    if (file.size > DOCUMENT_MAX_BYTES) return setError("Files can be at most 20 MB.");
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      await adminApi(`/treasury/${entryId}/documents`, { method: "POST", body: form });
-      toast("Document uploaded");
-      onChange();
-    } catch (caught) {
-      setError(message(caught, "Couldn't upload the document."));
-    } finally {
-      setUploading(false);
-      if (input.current) input.current.value = "";
-    }
-  }
-
-  /** Archive-only (ADR 017): a document is archived (kept, file included) and restored, never deleted. */
-  async function setArchived(documentId: string, archive: boolean) {
-    setError(null);
-    setBusy(documentId);
-    try {
-      await adminApi(`/treasury/documents/${documentId}/${archive ? "archive" : "restore"}`, { method: "POST" });
-      toast(archive ? "Document archived" : "Document restored");
-      onChange();
-    } catch (caught) {
-      setError(message(caught, archive ? "Couldn't archive the document." : "Couldn't restore the document."));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const row = (document: TreasuryDocument, isArchived: boolean) => (
-    <li key={document.id} className="flex min-h-8 items-center gap-2 border-b border-line px-2">
-      <AdminIcon name="insert_drive_file" />
-      <a
-        href={`/api/admin/treasury/documents/${document.id}`}
-        download={document.fileName}
-        className={`min-w-0 truncate underline underline-offset-2 ${isArchived ? "text-text-muted" : ""} ${focusRing}`}
-      >
-        {document.fileName}
-      </a>
-      <span className="shrink-0 text-meta text-text-muted">
-        {formatBytes(document.sizeBytes)} · <Timestamp value={document.uploadedAt} format="short" />
-        {document.uploadedBy ? ` · ${document.uploadedBy}` : ""}
-      </span>
-      <span className="ml-auto flex shrink-0 items-center gap-2">
-        {editable ? (
-          <AdminButton
-            icon={isArchived ? "restart_alt" : "approval"}
-            onClick={() => void setArchived(document.id, !isArchived)}
-            disabled={busy !== null}
-            aria-label={`${isArchived ? "Restore" : "Archive"} ${document.fileName}`}
-          >
-            {busy === document.id ? (isArchived ? "Restoring…" : "Archiving…") : isArchived ? "Restore" : "Archive"}
-          </AdminButton>
-        ) : null}
-      </span>
-    </li>
-  );
-
-  return (
-    <div className="flex max-w-[720px] flex-col gap-1">
-      {current.length > 0 ? (
-        <ul aria-label="Supporting documents" className="flex flex-col">
-          {current.map((document) => row(document, false))}
-        </ul>
-      ) : (
-        <p className="flex min-h-8 items-center px-2 text-text-muted">No documents yet.</p>
-      )}
-      {archived.length > 0 ? (
-        <>
-          <button
-            type="button"
-            aria-expanded={showArchived}
-            onClick={() => setShowArchived((open) => !open)}
-            className={`flex min-h-8 items-center gap-1 self-start rounded-control px-2 text-meta text-text-muted hover:text-text-primary ${focusRing}`}
-          >
-            <AdminIcon name={showArchived ? "expand_less" : "expand_more"} />
-            Archived documents {archived.length}
-          </button>
-          {showArchived ? (
-            <ul aria-label="Archived documents" className="flex flex-col">
-              {archived.map((document) => row(document, true))}
-            </ul>
-          ) : null}
-        </>
-      ) : null}
-      <input
-        ref={input}
-        type="file"
-        accept={DOCUMENT_ACCEPT}
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void upload(file);
-        }}
-      />
-      {editable ? (
-        <AdminButton icon="add" onClick={() => input.current?.click()} disabled={uploading} className="mt-1 self-start">
-          {uploading ? "Uploading…" : "Upload document"}
-        </AdminButton>
-      ) : null}
-      {error ? (
-        <p role="alert" className="px-2 text-meta text-text-primary">
-          {error}
-        </p>
-      ) : null}
-    </div>
   );
 }

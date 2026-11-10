@@ -18,7 +18,6 @@ let page: Page;
 const rows = () => page.locator("tbody tr");
 /** Sessions the other admin suites saved (same owner, same API), freshest first: admin-figma runs just before this project. */
 const SAVED_SESSIONS = ["admin-figma", "admin-table", "admin-directory-v2", "admin"].map((name) => `test-results/.auth/${name}.json`);
-const PDF = Buffer.from("%PDF-1.7\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n");
 
 async function axe() {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -114,51 +113,72 @@ test("an expense copied from Notion earlier is an ordinary entry now: no Notion 
   await axe();
 });
 
-test("supporting documents: upload, list, download, archive and restore (private, admins only; never deleted)", async () => {
+test("the expense detail page (OPS-155): Recipient, Expense types, Name, Description and Review status first; every field editable by the Rootadmin; no documents", async () => {
   await openRecord("Platform development");
-  await expect(page.getByText("No documents yet.")).toBeVisible();
-  await page.locator("input[type=file]").setInputFiles({ name: "invoice-april.pdf", mimeType: "application/pdf", buffer: PDF });
-  const documents = page.getByRole("list", { name: "Supporting documents" });
-  await expect(documents.getByRole("link", { name: "invoice-april.pdf" })).toBeVisible();
+  const properties = await page.locator("[data-property]").evaluateAll((elements) => elements.map((element) => element.getAttribute("data-property")));
+  expect(properties.slice(0, 5)).toEqual(["Recipient", "Expense types", "Name", "Public description", "Review status"]);
+  expect(properties).toEqual(expect.arrayContaining(["Type", "Date", "Amount", "Fee", "Net", "Cadence", "Publication", "Source", "Internal note"]));
+  // Accounting documents are handled outside the platform now (ADR 021).
+  expect(properties).not.toContain("Documents");
+  await expect(page.locator("input[type=file]")).toHaveCount(0);
 
-  const download = page.waitForEvent("download");
-  await documents.getByRole("link", { name: "invoice-april.pdf" }).click();
-  expect((await download).suggestedFilename()).toBe("invoice-april.pdf");
+  // The Rootadmin edits every business field; the net is worked out.
+  // One recipient, as a removable chip in the picker.
+  await expect(page.locator("[data-property=Recipient]").getByRole("button", { name: /^Remove / })).toHaveCount(1);
+  await expect(page.locator("#treasury-name")).toHaveValue("Platform development");
+  await expect(page.locator("#treasury-amount")).toHaveValue("5675.00");
+  await expect(page.locator("#treasury-fee")).toHaveValue("0.00");
+  await expect(page.getByRole("group", { name: "Cadence" })).toBeVisible();
+  await axe();
 
-  // A file that isn't a PDF, PNG or JPEG is refused before upload.
-  await page.locator("input[type=file]").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
-  await expect(page.getByRole("alert").filter({ hasText: "Only PDF, PNG or JPEG" })).toBeVisible();
+  await page.locator("#treasury-name").fill("Platform development, phase 2");
+  await page.locator("#treasury-amount").fill("5,700.50");
+  await page.locator("#treasury-fee").fill("12.25");
+  await expect(page.locator("[data-property=Net]")).toContainText("5,712.75");
+  await page.getByRole("group", { name: "Cadence" }).getByRole("button", { name: "Monthly" }).click();
+  await axe();
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page.getByText("Treasury entry updated")).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/treasury\/manage\?q=/);
+  await page.goto("/admin/treasury/manage?q=phase%202");
+  await expect(rows()).toHaveCount(1);
+  await rows().first().click();
+  await expect(page.locator("#treasury-amount")).toHaveValue("5700.50");
+  await expect(page.locator("#treasury-fee")).toHaveValue("12.25");
+  await expect(page.locator("[data-property=Net]")).toContainText("5,712.75");
+  await expect(page.getByRole("group", { name: "Cadence" }).getByRole("button", { name: "Monthly" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-history-item=updated]").first()).toContainText("Amount");
 
-  // Archive-only (ADR 017): archived into "Archived documents", still downloadable, restored from there.
-  await expect(documents.getByRole("button", { name: /^Delete/ })).toHaveCount(0);
-  await documents.getByRole("button", { name: "Archive invoice-april.pdf" }).click();
-  await expect(page.getByText("No documents yet.")).toBeVisible();
-  await expect(page.locator("[data-history-item=file_archived]").first()).toContainText("archived a document");
-  await page.getByRole("button", { name: "Archived documents 1" }).click();
-  const archived = page.getByRole("list", { name: "Archived documents" });
-  await expect(archived.getByRole("link", { name: "invoice-april.pdf" })).toBeVisible();
-  await archived.getByRole("button", { name: "Restore invoice-april.pdf" }).click();
-  await expect(documents.getByRole("link", { name: "invoice-april.pdf" })).toBeVisible();
-  await expect(page.locator("[data-history-item=file_restored]").first()).toContainText("restored a document");
-  await documents.getByRole("button", { name: "Archive invoice-april.pdf" }).click();
-  await expect(page.getByText("No documents yet.")).toBeVisible();
+  // Errors appear under their field: a name is required (checked here), a qualified expense keeps its recipient (the API).
+  await page.locator("#treasury-name").fill("");
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page.locator("[data-property=Name] [data-field-error]")).toHaveText("Give the entry a name.");
+  await expect(page.locator("#treasury-name")).toHaveAttribute("aria-invalid", "true");
+  await axe();
+  await page.locator("#treasury-name").fill("Platform development, phase 2");
+  await page
+    .locator("[data-property=Recipient]")
+    .getByRole("button", { name: /^Remove / })
+    .click();
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page.locator("[data-property=Recipient] [data-field-error]")).toHaveText("Qualified and Not required need exactly one recipient.");
+  await page.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("button", { name: "Discard changes" }).click();
 
-  // The download route itself needs a session.
-  const anonymous = await page.context().browser()!.newContext();
-  expect(
-    (await anonymous.request.get("/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000", { headers: { origin: "http://localhost" } })).status(),
-  ).toBe(401);
-  await anonymous.close();
-});
-
-test("a document over 10 MB reaches the API whole through the website's proxy (up to 20 MB)", async () => {
+  // Back to the fixture's values (the suite leaves the data as it found it).
+  await page.goto("/admin/treasury/manage?q=phase%202");
+  await rows().first().click();
+  await page.locator("#treasury-name").fill("Platform development");
+  await page.locator("#treasury-amount").fill("5675.00");
+  await page.locator("#treasury-fee").fill("0.00");
+  await page.getByRole("group", { name: "Cadence" }).getByRole("button", { name: "One-off" }).click();
+  await page.getByRole("button", { name: "Submit changes" }).click();
+  await expect(page.getByText("Treasury entry updated")).toBeVisible();
   await openRecord("Platform development");
-  const big = Buffer.concat([PDF, Buffer.alloc(15 * 1024 * 1024, 0x20)]);
-  await page.locator("input[type=file]").setInputFiles({ name: "scan-15mb.pdf", mimeType: "application/pdf", buffer: big });
-  const documents = page.getByRole("list", { name: "Supporting documents" });
-  await expect(documents.getByRole("link", { name: "scan-15mb.pdf" })).toBeVisible({ timeout: 30_000 });
-  await documents.getByRole("button", { name: "Archive scan-15mb.pdf" }).click();
-  await expect(page.getByText("No documents yet.")).toBeVisible();
+  await expect(page.locator("#treasury-amount")).toHaveValue("5675.00");
+
+  // The old document routes are gone.
+  expect((await page.request.get("/api/admin/treasury/documents/00000000-0000-4000-8000-000000000000")).status()).toBe(404);
 });
 
 test("a Stripe donation: only the internal note and the publication change", async () => {

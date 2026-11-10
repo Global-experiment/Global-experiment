@@ -74,7 +74,6 @@ const COLUMNS: TableColumn<TreasuryEntryRow>[] = [
   },
   { id: "source", label: "Source", icon: "select", width: 100, render: (row) => SOURCE_LABEL[row.source] },
   { id: "mode", label: "Mode", icon: "select", width: 80, render: (row) => (row.livemode && !row.sample ? modeLabel(row) : muted(modeLabel(row))) },
-  { id: "documents", label: "Documents", icon: "insert_drive_file", width: 110, render: (row) => (row.documents > 0 ? String(row.documents) : muted("0")) },
   { id: "created", label: "Created", icon: "schedule", width: 120, defaultHidden: true, render: (row) => formatDate(row.createdAt) },
   { id: "updated", label: "Updated", icon: "schedule", width: 120, defaultHidden: true, render: (row) => formatDate(row.updatedAt) },
 ];
@@ -168,7 +167,6 @@ export function TreasuryList() {
           { value: "test", label: "Test" },
         ],
       },
-      { id: "documents", label: "Documents", icon: "insert_drive_file", operators: ["is_empty", "is_not_empty"] },
       { id: "created", label: "Created", icon: "schedule", operators: [], sort: "dates" },
       { id: "updated", label: "Updated", icon: "schedule", operators: [], sort: "dates" },
     ];

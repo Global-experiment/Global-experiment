@@ -43,19 +43,3 @@ const dateTime = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeri
 export function formatOccurred(row: Pick<TreasuryEntryRow, "occurredOn" | "occurredAt">): string {
   return row.occurredAt ? dateTime.format(new Date(row.occurredAt)) : day.format(new Date(`${row.occurredOn}T00:00:00Z`));
 }
-
-const units = ["B", "KB", "MB"];
-export function formatBytes(bytes: number): string {
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`;
-}
-
-/** Same limits as the API (treasury-documents.schema.ts): checked here only to answer at once. */
-export const DOCUMENT_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
-export const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
-export const DOCUMENT_ACCEPT = ".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
