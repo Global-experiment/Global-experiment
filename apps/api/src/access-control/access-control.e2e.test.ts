@@ -1,7 +1,7 @@
 import { RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants.js";
 import { ModulesContainer } from "@nestjs/core";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { auditEvents } from "../audit/audit.schema.js";
 import { ALLOW_ANONYMOUS } from "../auth/admin-area.js";
@@ -279,7 +279,9 @@ describe("access control", () => {
     const events = await t.db
       .select()
       .from(auditEvents)
-      .where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "permission_denied")));
+      .where(and(eq(auditEvents.entityId, account!.id), eq(auditEvents.action, "permission_denied")))
+      // The latest refusal: without an order, PostgreSQL may return an earlier one last.
+      .orderBy(asc(auditEvents.occurredAt), asc(auditEvents.id));
     expect(events.at(-1)).toMatchObject({ entityType: "admin_user", meta: { permission: "treasury.read", route: "GET /api/admin/treasury" } });
   });
 });

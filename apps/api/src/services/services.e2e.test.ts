@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { auditEvents } from "../audit/audit.schema.js";
 import { adminUsers } from "../auth/auth.schema.js";
@@ -122,7 +122,8 @@ describe("services and access grants", () => {
         .post("/api/admin/access-grants", { personId: person.id, adminUserId: ownerId, serviceId: service.id, levelKey: "owner", statusKey: "active" })
         .expect(201)
     ).body;
-    const written = (await t.db.select().from(auditEvents)).slice(before);
+    // In the order they were written (the id), so the slice is exactly the new ones.
+    const written = (await t.db.select().from(auditEvents).orderBy(asc(auditEvents.id))).slice(before);
     expect(written).toHaveLength(1);
     expect(written[0]).toMatchObject({
       entityType: "access_grant",
