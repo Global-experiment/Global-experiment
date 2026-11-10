@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { focusRing } from "./controls";
+import styles from "./AdminShell.module.css";
 
 /** A link the toast offers (e.g. "See the report" after an import). */
 export interface ToastAction {
@@ -23,9 +24,9 @@ const WITH_ACTION_MS = 8000;
  * Figma's confirmation toast (p40–p43: "Notion imported 34 new entries",
  * "Filters applied", "People updated"): a 34px #1f1f1f pill, bold 14px
  * white text, 12px side padding, 24px above the bottom edge, centered on
- * the content area (right of the sidebar, 240px or the 56px rail). Announced politely.
+ * the content area (right of the sidebar, 240px or the 40px rail). Announced politely.
  */
-export function ToastProvider({ sidebarWidth = 240, children }: { sidebarWidth?: number; children: ReactNode }) {
+export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -40,13 +41,7 @@ export function ToastProvider({ sidebarWidth = 240, children }: { sidebarWidth?:
   return (
     <ToastContext.Provider value={show}>
       {children}
-      <div
-        role="status"
-        aria-live="polite"
-        data-admin-toast
-        style={{ left: `calc(${sidebarWidth / 2}px + 50vw)` }}
-        className="pointer-events-none fixed bottom-6 z-50 -translate-x-1/2"
-      >
+      <div role="status" aria-live="polite" data-admin-toast className={`${styles.toast} pointer-events-none fixed bottom-6 z-50 -translate-x-1/2`}>
         {toast ? (
           <p
             key={toast.id}

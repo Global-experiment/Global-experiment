@@ -85,8 +85,10 @@ test("only the table scrolls sideways; the page never does and the nav stays ful
   expect(await box.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
   expect(await pageOverflow()).toEqual({ x: 0, scrollX: 0 });
 
-  const nav = await page.getByRole("navigation", { name: "Admin" }).boundingBox();
-  expect(nav).toMatchObject({ x: 0, width: 240 });
+  const sidebar = page.locator("#admin-sidebar");
+  expect(await sidebar.boundingBox()).toMatchObject({ x: 0, width: 240 });
+  const nav = sidebar.getByRole("navigation", { name: "Admin" });
+  expect(await nav.boundingBox()).toMatchObject({ x: 8, width: 224 });
   // The user card (last element of the sidebar) is always on screen.
   await expect(page.locator('a[href="/admin/profile"]')).toBeInViewport();
 });

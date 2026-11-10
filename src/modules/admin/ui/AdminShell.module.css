@@ -1,0 +1,69 @@
+.shell {
+  --admin-sidebar-width: 240px;
+
+  grid-template-columns: var(--admin-sidebar-width) minmax(0, 1fr);
+}
+
+.shell[data-sidebar="collapsed"] {
+  --admin-sidebar-width: 40px;
+}
+
+.toast {
+  left: calc(50vw + var(--admin-sidebar-width) / 2);
+}
+
+.icon[data-sidebar-icon="business"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/business.svg");
+}
+
+.icon[data-sidebar-icon="collapse"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/collapse.svg");
+}
+
+.icon[data-sidebar-icon="expand"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/expand.svg");
+}
+
+.icon[data-sidebar-icon="groups-2"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/groups-2.svg");
+}
+
+.icon[data-sidebar-icon="history"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/history.svg");
+}
+
+.icon[data-sidebar-icon="home"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/home.svg");
+}
+
+.icon[data-sidebar-icon="insert-drive-file"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/insert-drive-file.svg");
+}
+
+.icon[data-sidebar-icon="lock-open"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/lock-open.svg");
+}
+
+.icon[data-sidebar-icon="manage-accounts"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/manage-accounts.svg");
+}
+
+.icon[data-sidebar-icon="search"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/search.svg");
+}
+
+.icon[data-sidebar-icon="sign-out"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/sign-out.svg");
+}
+
+.icon[data-sidebar-icon="toll"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/toll.svg");
+}
+
+.icon[data-sidebar-icon="touch-app"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/touch-app.svg");
+}
+
+.icon[data-sidebar-icon="view-week"] {
+  mask-image: url("/assets/icons/figma/admin/sidebar/view-week.svg");
+}

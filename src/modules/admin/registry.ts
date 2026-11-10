@@ -1,117 +1,41 @@
-import type { AdminIconName } from "./ui/adminIcons";
-
-/**
- * Admin module registry: every module the admin knows about, in the
- * sidebar's sections and order (admin-desktop.pdf p2, 19 Oct; decision 16
- * of 2026-10-19). A module is `live` once its pages exist; until then the
- * sidebar lists it disabled with "Coming soon" and no route answers for
- * it. Turning a module on is one line here plus its pages. Each module
- * names the permission that shows it (Delivery 2): the menu only lists
- * what the signed-in role can read.
- */
-export type AdminModuleStatus = "live" | "coming_soon";
-
+/** Destinations in the Design System's Desktop menu, in display order. */
 export interface AdminModule {
-  /** Stable id (one per sidebar row: a page listed twice gets two ids). */
   key: string;
   label: string;
-  icon: AdminIconName;
-  /** The permission that shows it (`module.read`); a role without it doesn't see the row. */
+  icon: string;
+  href: string;
   permission?: string;
-  status: AdminModuleStatus;
-  /** The module's page (live modules). */
-  href?: string;
-  /** Other paths that belong to this module (e.g. the Notion import page under People). */
+  /** Other paths that highlight this destination. */
   alsoActiveOn?: string[];
+  /** The first three rows are spaced more closely in both menu states. */
+  publicPage?: boolean;
 }
 
-export interface AdminSection {
-  section: string;
-  modules: AdminModule[];
-}
-
-export const ADMIN_MODULES: AdminSection[] = [
-  {
-    section: "Communication",
-    modules: [
-      { key: "home", label: "Home", icon: "home", permission: "cms.read", status: "live", href: "/admin/home" },
-      { key: "documentation", label: "Documentation", icon: "insert_drive_file", permission: "cms.read", status: "live", href: "/admin/documentation" },
-      { key: "treasury", label: "Treasury", icon: "toll", permission: "treasury.read", status: "live", href: "/admin/treasury" },
-    ],
-  },
-  {
-    section: "Admin",
-    modules: [
-      { key: "feedback", label: "Feedbacks and issues", icon: "lightbulb", permission: "feedback.read", status: "coming_soon" },
-      { key: "people", label: "People", icon: "group", permission: "directory.read", status: "live", href: "/admin/people", alsoActiveOn: ["/admin/imports"] },
-      { key: "organizations", label: "Organizations", icon: "corporate_fare", permission: "directory.read", status: "live", href: "/admin/organizations" },
-      // Owner's addendum of 2026-10-19 (Step 8); not drawn in the Figma: the document glyph until a Figma icon exists.
-      { key: "contracting", label: "Contracting", icon: "insert_drive_file", status: "coming_soon" },
-      { key: "messages", label: "Messages", icon: "forum", permission: "messages.read", status: "coming_soon" },
-      { key: "cloud", label: "Cloud", icon: "cloud", status: "coming_soon" },
-    ],
-  },
-  {
-    section: "Monitoring",
-    modules: [
-      { key: "services", label: "Services", icon: "services", permission: "services.read", status: "live", href: "/admin/services" },
-      { key: "permissions", label: "Permissions", icon: "lock", permission: "access.read", status: "live", href: "/admin/permissions" },
-      { key: "accounts", label: "Accounts", icon: "manage_accounts", permission: "accounts.read", status: "live", href: "/admin/accounts" },
-      // Figma draws History with the lightbulb glyph.
-      { key: "history", label: "History", icon: "lightbulb", status: "live", href: "/admin/history" },
-      { key: "analytics", label: "Analytics", icon: "analytics", status: "coming_soon" },
-      { key: "technical_dashboard", label: "Technical dashboard", icon: "technical_dashboard", status: "coming_soon" },
-      { key: "emails", label: "Emails", icon: "alternate_email", permission: "messages.read", status: "coming_soon" },
-    ],
-  },
-  {
-    section: "Other",
-    modules: [
-      { key: "expertise", label: "Expertise", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/expertise" },
-      { key: "fields", label: "Fields", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/fields" },
-      { key: "domains", label: "Domains", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/domains" },
-      // The same page as Admin › Organizations (decision 16): highlighted there, not twice.
-      {
-        key: "organizations_other",
-        label: "Organizations",
-        icon: "corporate_fare",
-        permission: "directory.read",
-        status: "live",
-        href: "/admin/organizations",
-      },
-      { key: "waitlist", label: "Waitlist", icon: "approval", permission: "waitlist.read", status: "coming_soon" },
-    ],
-  },
+export const ADMIN_MODULES: AdminModule[] = [
+  { key: "home", label: "Home", icon: "home", href: "/admin/home", permission: "cms.read", publicPage: true },
+  { key: "documentation", label: "Documentation", icon: "insert-drive-file", href: "/admin/documentation", permission: "cms.read", publicPage: true },
+  { key: "treasury", label: "Treasury", icon: "toll", href: "/admin/treasury", permission: "treasury.read", publicPage: true },
+  { key: "people", label: "People", icon: "groups-2", href: "/admin/people", permission: "directory.read", alsoActiveOn: ["/admin/imports"] },
+  { key: "organizations", label: "Organizations", icon: "business", href: "/admin/organizations", permission: "directory.read" },
+  { key: "services", label: "Services", icon: "touch-app", href: "/admin/services", permission: "services.read" },
+  { key: "permissions", label: "Permissions", icon: "lock-open", href: "/admin/permissions", permission: "access.read" },
+  { key: "accounts", label: "Accounts", icon: "manage-accounts", href: "/admin/accounts", permission: "accounts.read" },
+  { key: "expertise", label: "Expertise", icon: "view-week", href: "/admin/expertise", permission: "taxonomy.read" },
+  { key: "fields", label: "Fields", icon: "view-week", href: "/admin/fields", permission: "taxonomy.read" },
+  { key: "domains", label: "Domains", icon: "view-week", href: "/admin/domains", permission: "taxonomy.read" },
+  { key: "history", label: "History", icon: "history", href: "/admin/history" },
 ];
 
-/** The menu as this role sees it: modules it can't read drop out, and so do sections left empty. */
-export function modulesFor(sections: readonly AdminSection[], permissions: ReadonlySet<string>): AdminSection[] {
-  return (
-    sections
-      // A live module without a permission of its own (History) still needs a role: an account with none (OPS-141) has only its profile.
-      .map((group) => ({
-        ...group,
-        modules: group.modules.filter((entry) => (entry.permission ? permissions.has(entry.permission) : entry.status !== "live" || permissions.size > 0)),
-      }))
-      .filter((group) => group.modules.length > 0)
-  );
+export function modulesFor(modules: readonly AdminModule[], permissions: ReadonlySet<string>): AdminModule[] {
+  // History has no permission of its own but still requires a role.
+  return modules.filter((entry) => (entry.permission ? permissions.has(entry.permission) : permissions.size > 0));
 }
 
-/** The menu filtered by the sidebar search (case-insensitive, on the label); empty sections drop out. */
-export function filterModules(sections: readonly AdminSection[], query: string): AdminSection[] {
+export function filterModules(modules: readonly AdminModule[], query: string): AdminModule[] {
   const needle = query.trim().toLowerCase();
-  if (!needle) return [...sections];
-  return sections
-    .map((group) => ({ ...group, modules: group.modules.filter((entry) => entry.label.toLowerCase().includes(needle)) }))
-    .filter((group) => group.modules.length > 0);
+  return modules.filter((entry) => entry.label.toLowerCase().includes(needle));
 }
 
-const matches = (entry: AdminModule, pathname: string) =>
-  entry.status === "live" &&
-  [entry.href, ...(entry.alsoActiveOn ?? [])].some((path) => path !== undefined && (pathname === path || pathname.startsWith(`${path}/`)));
-
-/** The one sidebar row for this path: the first match, so a page listed twice is highlighted once. */
-export function activeModuleKey(sections: readonly AdminSection[], pathname: string): string | undefined {
-  for (const group of sections) for (const entry of group.modules) if (matches(entry, pathname)) return entry.key;
-  return undefined;
+export function activeModuleKey(modules: readonly AdminModule[], pathname: string): string | undefined {
+  return modules.find((entry) => [entry.href, ...(entry.alsoActiveOn ?? [])].some((path) => pathname === path || pathname.startsWith(`${path}/`)))?.key;
 }
