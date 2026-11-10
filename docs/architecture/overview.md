@@ -370,8 +370,11 @@ Technical dashboard, and never holds secrets in its payload.
 
 ### 3.4 File storage
 
-Treasury supporting documents (invoices, receipts) are the only uploads in
-v0.1. Behind a `FileStorage` interface (`put`, `get`, `delete`, `exists`):
+The uploads are profile pictures and the images of Home and Documentation.
+Treasury supporting documents (invoices, receipts) were uploaded too until
+OPS-155 (2026-11-10, ADR 021): the accountants keep them outside the
+platform now. Behind a `FileStorage` interface (`put`, `get`, `exists`; no
+delete, ADR 017):
 
 - **v0.1 adapter: local disk** (built in 1b, `FILE_STORAGE_DIR`) on the
   production server (a private folder outside every web root, readable only
@@ -380,8 +383,8 @@ v0.1. Behind a `FileStorage` interface (`put`, `get`, `delete`, `exists`):
   attachment`. Included in the backup.
 - Later: an S3-compatible adapter (e.g. Hetzner Object Storage) with no
   schema change — the table stores a `storage_key`, not a path.
-- Limits: 20 MB, PDF / PNG / JPEG only, checked by content sniffing, not
-  just the extension. Retention (accounting law usually 10 years) is **Q5**.
+- Limits are set per kind of upload (size and file types) and checked from
+  the file's bytes, not its name or extension.
 
 ### 3.5 AI layer
 
