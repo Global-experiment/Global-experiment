@@ -163,10 +163,7 @@ test("whoever opens the invitation link makes an account (email + password), lan
   await expect(newcomer.getByLabel("Display name")).toHaveValue("");
   await expect(newcomer.getByLabel("Description")).toHaveValue("");
   await expect(newcomer.locator("[data-record-main]")).toContainText("No role");
-  // Only the "Coming soon" placeholders, which need no permission; no module with data.
-  for (const hidden of ["people", "organizations", "treasury", "services", "permissions", "accounts", "history", "expertise"]) {
-    await expect(newcomer.locator(`#admin-sidebar nav li[data-module=${hidden}]`), hidden).toHaveCount(0);
-  }
+  await expect(newcomer.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveCount(0);
   await newcomer.screenshot({ path: join(SHOTS, "ops141-empty-profile-1440-dark.png") });
 
   // OPS-144 and OPS-135: the holder sets their description and expertise.
@@ -402,6 +399,11 @@ test("Profile settings (p18): display name, description, expertise, appearance (
   await expect(page.getByRole("status").filter({ hasText: "Profile picture updated" })).toBeVisible();
   await expect(page.locator("#admin-sidebar img")).toHaveAttribute("src", /\/api\/admin\/accounts\/[0-9a-f-]{36}\/picture/);
   await page.screenshot({ path: join(SHOTS, "profile-p18-saved-light.png") });
+  await page.getByRole("button", { name: "Collapse menu" }).click();
+  const collapsedPicture = page.locator('[data-sidebar="collapsed"] #admin-sidebar img');
+  await expect(collapsedPicture).toBeVisible();
+  await expect(collapsedPicture).toHaveAttribute("width", "24");
+  await page.getByRole("button", { name: "Expand menu" }).click();
 
   // Back to the defaults (the display name renames the owner's permissions back too).
   await page.getByLabel("Display name").fill("");

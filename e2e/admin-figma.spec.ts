@@ -116,55 +116,39 @@ test.describe("login (p1)", () => {
 test.describe("signed in", () => {
   test.use({ storageState: STATE, viewport: FRAME });
 
-  test("shell (p2): sidebar groups, sizes, active row, user card", async ({ page }) => {
+  test("shell: Desktop menu order, sizes, active row, and profile card", async ({ page }) => {
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
 
-    const sections = await nav(page).locator(":scope > div > p").allTextContents();
-    expect(sections).toEqual(["Communication", "Admin", "Monitoring", "Other"]);
-    // Group titles in the Figma font (client, 2026-10-19): plain 12px muted text, no rules between groups.
-    const groupTitle = nav(page).locator(":scope > div > p").first();
-    await expect(groupTitle).toHaveCSS("text-transform", "none");
-    await expect(groupTitle).toHaveCSS("font-size", "12px");
-    expect(Number(await groupTitle.evaluate((el) => getComputedStyle(el).fontWeight))).toBeLessThan(700);
-    await expect(nav(page).locator("hr")).toHaveCount(0);
-    const labels = (await nav(page).locator("li").allInnerTexts()).map((text) => text.replace(/\s*\(coming soon\)$/, "").trim());
-    expect(labels).toEqual([
+    await expect(nav(page).getByRole("link")).toHaveText([
       "Home",
       "Documentation",
       "Treasury",
-      "Feedbacks and issues",
       "People",
       "Organizations",
-      "Contracting",
-      "Messages",
-      "Cloud",
       "Services",
       "Permissions",
       "Accounts",
-      "History",
-      "Analytics",
-      "Technical dashboard",
-      "Emails",
       "Expertise",
       "Fields",
       "Domains",
-      "Organizations",
-      "Waitlist",
+      "History",
     ]);
 
-    // Geometry (p2): search at 8,8, 32 tall, with "Collapse menu" beside it (client, 2026-10-19; Figma's field is 224
-    // wide alone); rows 224×32 at x=8, 4px apart; 64px user card 8px above the bottom.
     const search = await box(page.getByRole("searchbox", { name: "Search the menu" }).locator(".."));
-    expect([search.x, search.y, search.width, search.height]).toEqual([8, 8, 184, 32]);
+    expect([search.x, search.y, search.width, search.height]).toEqual([8, 8, 224, 32]);
     const collapse = await box(page.getByRole("button", { name: "Collapse menu" }));
-    expect([collapse.x, collapse.y, collapse.width, collapse.height]).toEqual([200, 8, 32, 32]);
-    const home = await box(nav(page).locator("li").filter({ hasText: "Home" }).locator("> *"));
-    expect([home.x, home.y, home.width, home.height]).toEqual([8, 80, 224, 32]);
-    const documentation = await box(nav(page).locator("li").filter({ hasText: "Documentation" }).locator("> *"));
-    expect(documentation.y).toBe(116);
+    expect([collapse.x, collapse.y, collapse.width, collapse.height]).toEqual([8, 48, 224, 24]);
+    await expect(page.getByText("Collapse menu", { exact: true })).toBeVisible();
+    const home = await box(nav(page).getByRole("link", { name: "Home" }));
+    expect([home.x, home.y, home.width, home.height]).toEqual([8, 88, 224, 32]);
+    const documentation = await box(nav(page).getByRole("link", { name: "Documentation" }));
+    expect(documentation.y).toBe(124);
+    const firstAdminRow = await box(nav(page).getByRole("link", { name: "People" }));
+    expect(firstAdminRow.y).toBe(200);
     const people = nav(page).getByRole("link", { name: "People" });
     await expect(people).toHaveAttribute("aria-current", "page");
+    await expect(people.locator("[data-sidebar-icon]")).toHaveCSS("mask-image", /\/assets\/icons\/figma\/admin\/sidebar\/groups-2\.svg/);
     expect(await people.evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color])).toEqual([
       "rgb(31, 31, 31)",
       "rgb(255, 255, 255)",
@@ -182,31 +166,60 @@ test.describe("signed in", () => {
     await capture(page, "p04-people");
   });
 
-  test("the sidebar collapses to an icon rail, remembers it, and expands again (client, 2026-10-14)", async ({ page }) => {
+  test("the sidebar collapses without shifting the rows, remembers it, and expands again", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
     const sidebar = page.locator("#admin-sidebar");
     expect((await box(sidebar)).width).toBe(240);
 
-    await page.getByRole("button", { name: "Collapse menu" }).click();
+    const frames = await page.getByRole("button", { name: "Collapse menu" }).evaluate(async (button: HTMLButtonElement) => {
+      const icons = [...button.closest("#admin-sidebar")!.querySelectorAll("nav a > [aria-hidden=true]")];
+      const measure = () =>
+        icons.map((icon) => {
+          const { x } = icon.getBoundingClientRect();
+          const { y, height } = icon.parentElement!.getBoundingClientRect();
+          return { x, y, height };
+        });
+      const samples = [measure()];
+      button.click();
+      const start = performance.now();
+      do {
+        await new Promise(requestAnimationFrame);
+        samples.push(measure());
+      } while (performance.now() - start < 200);
+      return samples;
+    });
+    for (const frame of frames) {
+      frame.forEach(({ x, y, height }, index) => {
+        near(x, frames[0][index].x);
+        expect([y, height]).toEqual([frames[0][index].y, frames[0][index].height]);
+      });
+    }
     await expect(page.getByRole("button", { name: "Expand menu" })).toHaveAttribute("aria-expanded", "false");
-    await expect.poll(async () => (await box(sidebar)).width).toBe(56);
-    // Names stay available: as tooltips and for screen readers; group titles too.
+    await expect.poll(async () => (await box(sidebar)).width).toBe(40);
+    // Destination names stay available through tooltips and screen readers.
     const people = nav(page).getByRole("link", { name: "People" });
     await expect(people).toHaveAttribute("title", "People");
     await expect(people).toHaveAttribute("aria-current", "page");
-    await expect(nav(page).locator(":scope > div > p").first()).toHaveClass(/sr-only/);
+    const home = await box(nav(page).getByRole("link", { name: "Home" }));
+    const documentation = await box(nav(page).getByRole("link", { name: "Documentation" }));
+    expect([home.x, home.y, home.width, home.height, documentation.y]).toEqual([4, 88, 32, 32, 124]);
+    const profile = sidebar.getByRole("link", { name: "e2e-owner" });
+    await expect(profile.locator('[aria-hidden="true"]')).toHaveText("e");
+    const card = await box(profile);
+    expect([card.x, card.width, card.height, card.y + card.height]).toEqual([4, 32, 64, FRAME.height - 8]);
     // The content column takes the freed width; nothing scrolls sideways.
-    expect((await box(page.getByRole("heading", { name: "People", level: 1 }))).x).toBe(64);
+    expect((await box(page.getByRole("heading", { name: "People", level: 1 }))).x).toBe(48);
     await noHorizontalScroll(page);
     await capture(page, "sidebar-collapsed");
 
     // Remembered across pages and reloads, from the first paint (server-rendered).
     await page.reload();
-    expect((await box(sidebar)).width).toBe(56);
+    expect((await box(sidebar)).width).toBe(40);
     await page.getByRole("link", { name: "Organizations" }).first().click();
     await expect(page).toHaveURL(/\/admin\/organizations$/);
-    expect((await box(sidebar)).width).toBe(56);
+    expect((await box(sidebar)).width).toBe(40);
 
     // The search glyph re-opens the menu with the search field focused.
     await page.getByRole("button", { name: "Search the menu" }).click();
@@ -239,60 +252,25 @@ test.describe("signed in", () => {
     await expect(rows(page).nth(2).locator("td").first()).toHaveCSS("background-color", "rgb(0, 0, 0)");
   });
 
-  test("sidebar search filters the menu; modules that don't exist are disabled, never pages", async ({ page }) => {
+  test("sidebar search filters the available destinations", async ({ page }) => {
     await page.goto("/admin/people");
     const search = page.getByRole("searchbox", { name: "Search the menu" });
     await search.fill("perm");
-    await expect(nav(page).locator("li")).toHaveText([/Permissions/]);
-    await expect(nav(page).locator(":scope > div > p")).toHaveText(["Monitoring"]);
-    // Organizations is listed in Admin and in Other (decision 16).
+    await expect(nav(page).getByRole("link")).toHaveText(["Permissions"]);
     await search.fill("organ");
-    await expect(nav(page).locator(":scope > div > p")).toHaveText(["Admin", "Other"]);
+    await expect(nav(page).getByRole("link")).toHaveText(["Organizations"]);
     await search.fill("zzz");
     await expect(nav(page).getByRole("status")).toHaveText("No menu items match.");
     await search.press("Escape");
-    await expect(nav(page).locator("li")).toHaveCount(21);
-
-    const messages = nav(page).locator("[data-coming-soon]").filter({ hasText: "Messages" });
-    await expect(messages).toHaveAttribute("title", "Coming soon");
-    await expect(messages).toHaveAttribute("aria-disabled", "true");
-    // Dimmed as in the Figma (#484848), darker than the live rows.
-    await expect(messages).toHaveCSS("color", "rgb(72, 72, 72)");
-    await expect(nav(page).getByRole("link", { name: /Messages/ })).toHaveCount(0);
-    await messages.click();
-    await expect(page).toHaveURL(/\/admin\/people$/);
-    // Only the existing modules link anywhere.
-    const links = await nav(page)
-      .getByRole("link")
-      .evaluateAll((elements) => elements.map((el) => el.getAttribute("href")));
-    expect(links).toEqual([
-      "/admin/home",
-      "/admin/documentation",
-      "/admin/treasury",
-      "/admin/people",
-      "/admin/organizations",
-      "/admin/services",
-      "/admin/permissions",
-      "/admin/accounts",
-      "/admin/history",
-      "/admin/expertise",
-      "/admin/fields",
-      "/admin/domains",
-      "/admin/organizations",
-    ]);
-    // Decision 16: these stay "Coming soon" until built.
-    for (const label of ["Waitlist", "Messages", "Cloud", "Analytics", "Technical dashboard", "Emails", "Contracting"]) {
-      await expect(nav(page).locator("[data-coming-soon]").filter({ hasText: label }), label).toHaveCount(1);
-    }
-    // One page listed twice is highlighted once.
-    await nav(page).getByRole("link", { name: "Organizations" }).last().click();
+    await expect(nav(page).getByRole("link")).toHaveCount(12);
+    await nav(page).getByRole("link", { name: "Organizations" }).click();
     await expect(page).toHaveURL(/\/admin\/organizations$/);
-    await expect(nav(page).locator("[aria-current=page]")).toHaveCount(1);
-    await expect(page.locator("li[data-module=organizations] a")).toHaveAttribute("aria-current", "page");
+    const active = nav(page).locator("[aria-current=page]");
+    await expect(active).toHaveText("Organizations");
   });
 
   test("the menu keeps its search and collapse button at the top while it scrolls; the light appearance (Profile settings, p18)", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 600 });
+    await page.setViewportSize({ width: 1440, height: 480 });
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
     await nav(page).evaluate((element) => element.scrollTo(0, element.scrollHeight));
@@ -598,17 +576,21 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: "Save changes" }).click();
   });
 
-  test("display name: set in Profile settings, shown on the user card, cleared back to the email", async ({ page }) => {
+  test("display name: the collapsed profile initial preserves case", async ({ page }) => {
     await page.goto("/admin/profile");
     await page.getByLabel("Display name").fill("Candide Test");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Profile updated" })).toBeVisible();
     await expect(page.locator("[data-user-name]")).toHaveText("Candide Test");
+    await page.getByRole("button", { name: "Collapse menu" }).click();
+    const initial = page.locator('#admin-sidebar a[href="/admin/profile"] [aria-hidden="true"]');
+    await expect(initial).toHaveText("C");
     await page.getByLabel("Display name").fill("x".repeat(81));
     await expect(page.getByLabel("Display name")).toHaveValue("x".repeat(80)); // maxLength
     await page.getByLabel("Display name").fill("");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.locator("[data-user-name]")).toHaveText("e2e-owner");
+    await expect(initial).toHaveText("e");
   });
 
   test("other list screens fit 1024px without horizontal page scroll", async ({ page }) => {

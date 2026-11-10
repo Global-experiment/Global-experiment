@@ -3,44 +3,40 @@ import { PERMISSIONS, ROLE_PERMISSIONS } from "../../../apps/api/src/access-cont
 import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor } from "./registry";
 
 describe("admin module registry", () => {
-  it("lists the sidebar exactly as the Figma (decision 16, plus Contracting)", () => {
-    expect(ADMIN_MODULES.map(({ section, modules }) => [section, modules.map((entry) => entry.label)])).toEqual([
-      ["Communication", ["Home", "Documentation", "Treasury"]],
-      ["Admin", ["Feedbacks and issues", "People", "Organizations", "Contracting", "Messages", "Cloud"]],
-      ["Monitoring", ["Services", "Permissions", "Accounts", "History", "Analytics", "Technical dashboard", "Emails"]],
-      ["Other", ["Expertise", "Fields", "Domains", "Organizations", "Waitlist"]],
+  it("lists the Design System Desktop menu destinations once and in order", () => {
+    expect(ADMIN_MODULES.map((entry) => entry.label)).toEqual([
+      "Home",
+      "Documentation",
+      "Treasury",
+      "People",
+      "Organizations",
+      "Services",
+      "Permissions",
+      "Accounts",
+      "Expertise",
+      "Fields",
+      "Domains",
+      "History",
     ]);
+    expect(new Set(ADMIN_MODULES.map((entry) => entry.href)).size).toBe(ADMIN_MODULES.length);
   });
 
-  it("keeps the decided modules 'Coming soon' and gives every live module a page (History since 2026-10-21; Services, Permissions, Accounts since Delivery 2)", () => {
-    const all = ADMIN_MODULES.flatMap((group) => group.modules);
-    expect(new Set(all.map((entry) => entry.key)).size).toBe(all.length);
-    for (const key of ["waitlist", "messages", "cloud", "analytics", "technical_dashboard", "emails", "contracting"]) {
-      expect(all.find((entry) => entry.key === key)?.status, key).toBe("coming_soon");
-    }
-    for (const entry of all.filter((candidate) => candidate.status === "live")) expect(entry.href, entry.key).toMatch(/^\/admin\//);
-    for (const entry of all.filter((candidate) => candidate.status === "coming_soon")) expect(entry.href, entry.key).toBeUndefined();
-    for (const key of ["services", "permissions", "accounts"]) expect(all.find((entry) => entry.key === key)?.status, key).toBe("live");
-  });
-
-  it("names, for each module, a permission the API defines", () => {
-    for (const entry of ADMIN_MODULES.flatMap((group) => group.modules)) {
+  it("uses permissions defined by the API", () => {
+    for (const entry of ADMIN_MODULES) {
       if (entry.permission) expect(Object.keys(PERMISSIONS), entry.key).toContain(entry.permission);
     }
   });
 
-  it("shows each role only the modules it can read (overview §3.1)", () => {
-    const menu = (role: keyof typeof ROLE_PERMISSIONS) =>
-      modulesFor(ADMIN_MODULES, new Set(ROLE_PERMISSIONS[role])).flatMap((group) => group.modules.map((entry) => entry.key));
-    expect(menu("owner")).toEqual(ADMIN_MODULES.flatMap((group) => group.modules.map((entry) => entry.key)));
+  it("shows each role only the modules it can read", () => {
+    const menu = (role: keyof typeof ROLE_PERMISSIONS) => modulesFor(ADMIN_MODULES, new Set(ROLE_PERMISSIONS[role])).map((entry) => entry.key);
+    expect(menu("owner")).toEqual(ADMIN_MODULES.map((entry) => entry.key));
     const moderator = menu("moderation");
-    for (const hidden of ["treasury", "services", "permissions", "accounts", "waitlist"]) expect(moderator, hidden).not.toContain(hidden);
-    for (const shown of ["home", "people", "feedback", "messages", "history", "expertise"]) expect(moderator, shown).toContain(shown);
+    for (const hidden of ["treasury", "services", "permissions", "accounts"]) expect(moderator, hidden).not.toContain(hidden);
+    for (const shown of ["home", "people", "history", "expertise"]) expect(moderator, shown).toContain(shown);
     expect(menu("treasury")).toEqual(expect.arrayContaining(["treasury", "services", "permissions"]));
     expect(menu("treasury")).not.toContain("accounts");
     expect(menu("compliance")).toContain("accounts");
-    // A section with nothing left drops out.
-    expect(modulesFor(ADMIN_MODULES, new Set()).map((group) => group.section)).toEqual(["Admin", "Monitoring"]);
+    expect(modulesFor(ADMIN_MODULES, new Set())).toEqual([]);
   });
 
   it("highlights one row per page, including sub-pages and pages that belong to a module", () => {
@@ -52,12 +48,9 @@ describe("admin module registry", () => {
     expect(activeModuleKey(ADMIN_MODULES, "/admin/profile")).toBeUndefined();
   });
 
-  it("filters by label and drops empty sections", () => {
-    expect(filterModules(ADMIN_MODULES, " ORGAN ").map((group) => [group.section, group.modules.map((entry) => entry.key)])).toEqual([
-      ["Admin", ["organizations"]],
-      ["Other", ["organizations_other"]],
-    ]);
+  it("filters by label while preserving the destination order", () => {
+    expect(filterModules(ADMIN_MODULES, " ORGAN ").map((entry) => entry.key)).toEqual(["organizations"]);
     expect(filterModules(ADMIN_MODULES, "zzz")).toEqual([]);
-    expect(filterModules(ADMIN_MODULES, "")).toHaveLength(4);
+    expect(filterModules(ADMIN_MODULES, "")).toEqual(ADMIN_MODULES);
   });
 });
