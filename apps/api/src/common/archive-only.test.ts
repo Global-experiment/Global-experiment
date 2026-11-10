@@ -8,7 +8,10 @@ import { describe, expect, it } from "vitest";
  * archived and restored, never deleted. No runtime code may delete their
  * rows (Drizzle or SQL), and the file storage has no way to delete a file.
  * The demo and test-data purge scripts are the only exception (scripts/,
- * run by hand with a backup; they never touch these tables' real rows).
+ * run by hand with a backup; they never touch these tables' real rows),
+ * plus ONE written, one-time exception: the deletion of Treasury supporting
+ * documents asked by the client (OPS-155, ADR 021) — that script alone may
+ * delete their rows and stored files.
  */
 const SRC = resolve(import.meta.dirname, "..");
 const runtimeFiles = (dir: string): string[] =>
@@ -39,6 +42,17 @@ describe("archive only: nothing archivable is ever hard-deleted", () => {
     const pattern = new RegExp(`\\.delete\\(\\s*${name}\\b|delete\\s+from\\s+"?${table}\\b`, "i");
     const offenders = files.filter((file) => pattern.test(readFileSync(file, "utf8"))).map((file) => relative(SRC, file));
     expect(offenders).toEqual([]);
+  });
+
+  it("only the one-time deletion of ADR 021 deletes Treasury documents or stored files, and nothing at runtime uses it", () => {
+    const scripts = readdirSync(join(SRC, "scripts"))
+      .filter((name) => /\.ts$/.test(name) && !/\.test\.ts$/.test(name))
+      .map((name) => join(SRC, "scripts", name));
+    const deletes = /\.delete\(\s*treasuryDocuments\b|delete\s+from\s+"?treasury_documents\b|\b(unlink|unlinkSync|rm|rmSync|rmdir)\s*\(/i;
+    const offenders = scripts.filter((file) => deletes.test(readFileSync(file, "utf8"))).map((file) => relative(SRC, file));
+    expect(offenders).toEqual([join("scripts", "treasury-documents-purge.ts")]);
+    const users = files.filter((file) => /from\s+["'][^"']*treasury-documents-purge/.test(readFileSync(file, "utf8"))).map((file) => relative(SRC, file));
+    expect(users).toEqual([]);
   });
 
   it("the file storage can store and read, never delete", () => {

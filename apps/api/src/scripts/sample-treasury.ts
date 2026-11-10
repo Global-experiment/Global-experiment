@@ -324,7 +324,10 @@ export async function purgeSampleTreasury(db: Database): Promise<SamplePlan> {
     const ids = samples.map((row) => row.id);
     if (ids.length > 0) {
       const [documents] = await tx.select({ n: count() }).from(treasuryDocuments).where(inArray(treasuryDocuments.entryId, ids));
-      if ((documents?.n ?? 0) > 0) throw new Error(`${documents!.n} documents are attached to sample entries: delete them in the admin first.`);
+      if ((documents?.n ?? 0) > 0)
+        throw new Error(
+          `${documents!.n} documents are attached to sample entries: run the one-time document deletion first (npm run api:purge-treasury-documents, ADR 021).`,
+        );
       await tx.delete(treasuryEntries).where(inArray(treasuryEntries.id, ids));
     }
     // The sample recipient goes too, unless a real entry was linked to it since.
