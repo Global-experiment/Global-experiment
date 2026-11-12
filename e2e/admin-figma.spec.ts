@@ -156,6 +156,15 @@ test.describe("signed in", () => {
     const card = await box(page.locator('a[href="/admin/profile"]').locator(".."));
     expect([card.x, card.width, card.height, card.y + card.height]).toEqual([8, 224, 64, FRAME.height - 8]);
     await expect(page.locator("[data-user-name]")).toHaveText("e2e-owner"); // no display name: the email's local part
+    await expect(page.locator('#admin-sidebar a[href="/admin/profile"] [aria-hidden="true"]')).toHaveCount(0);
+    await expect(nav(page).getByRole("link", { name: "Accounts", exact: true }).locator("[data-sidebar-icon]")).toHaveCSS(
+      "mask-image",
+      /\/assets\/icons\/figma\/admin\/manage-accounts\.svg/,
+    );
+    await expect(page.getByRole("button", { name: "Sign out", exact: true }).locator("[data-sidebar-icon]")).toHaveCSS(
+      "mask-image",
+      /\/assets\/icons\/figma\/admin\/logout\.svg/,
+    );
 
     // The list page title and toolbar (p2).
     const title = await box(page.getByRole("heading", { name: "People", level: 1 }));
@@ -174,25 +183,29 @@ test.describe("signed in", () => {
     expect((await box(sidebar)).width).toBe(240);
 
     const frames = await page.getByRole("button", { name: "Collapse menu" }).evaluate(async (button: HTMLButtonElement) => {
-      const icons = [...button.closest("#admin-sidebar")!.querySelectorAll("nav a > [aria-hidden=true]")];
+      const icons = [...button.closest("#admin-sidebar")!.querySelectorAll('[data-sidebar-icon="search"], nav a > [aria-hidden=true]')];
       const measure = () =>
         icons.map((icon) => {
           const { x } = icon.getBoundingClientRect();
-          const { y, height } = icon.parentElement!.getBoundingClientRect();
-          return { x, y, height };
+          const { y, height, right } = icon.parentElement!.getBoundingClientRect();
+          return { x, y, height, right };
         });
       const samples = [measure()];
-      button.click();
-      const start = performance.now();
-      do {
-        await new Promise(requestAnimationFrame);
-        samples.push(measure());
-      } while (performance.now() - start < 200);
+      for (let toggle = 0; toggle < 3; toggle++) {
+        button.click();
+        const start = performance.now();
+        do {
+          await new Promise(requestAnimationFrame);
+          samples.push(measure());
+        } while (performance.now() - start < 200);
+      }
       return samples;
     });
     for (const frame of frames) {
-      frame.forEach(({ x, y, height }, index) => {
+      frame.forEach(({ x, y, height, right }, index) => {
         near(x, frames[0][index].x);
+        near(x, frames[0][0].x);
+        near(right, frame[0].right);
         expect([y, height]).toEqual([frames[0][index].y, frames[0][index].height]);
       });
     }
@@ -207,6 +220,7 @@ test.describe("signed in", () => {
     expect([home.x, home.y, home.width, home.height, documentation.y]).toEqual([4, 88, 32, 32, 124]);
     const profile = sidebar.getByRole("link", { name: "e2e-owner" });
     await expect(profile.locator('[aria-hidden="true"]')).toHaveText("e");
+    await expect(sidebar.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
     const card = await box(profile);
     expect([card.x, card.width, card.height, card.y + card.height]).toEqual([4, 32, 64, FRAME.height - 8]);
     // The content column takes the freed width; nothing scrolls sideways.

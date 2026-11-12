@@ -7,7 +7,7 @@ import { adminApi, endSession } from "../api/client";
 import { adminDisplayName, type AdminPrincipal } from "../api/types";
 import { setPreferredTimeZone } from "@/shared/format/Timestamp";
 import { applyAppearance } from "@/shared/ui/appearance";
-import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor } from "../registry";
+import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor, type SidebarIconName } from "../registry";
 import { AdminSessionProvider } from "../session";
 import { AccountAvatar } from "./AccountAvatar";
 import { focusRing } from "./controls";
@@ -52,38 +52,40 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
             className={`relative z-10 flex h-dvh min-h-0 flex-col gap-4 py-2 font-medium shadow-[inset_-1px_0_0_var(--color-line)] ${collapsed ? "px-1" : "px-2"} ${paddingTransition}`}
           >
             <div className="flex shrink-0 flex-col gap-2">
-              {collapsed ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenu(false);
-                    requestAnimationFrame(() => searchRef.current?.focus());
-                  }}
-                  aria-label="Search the menu"
-                  title="Search the menu"
-                  className={`flex h-8 cursor-pointer items-center rounded-control pl-2 text-text-muted hover:bg-surface-hover hover:text-text-primary ${focusRing}`}
-                >
-                  <SidebarIcon name="search" />
-                </button>
-              ) : (
-                <label className="flex h-8 items-center gap-1 rounded-control pr-1 pl-2 inset-ring-1 inset-ring-line focus-within:inset-ring-text-primary">
-                  <SidebarIcon name="search" />
-                  <span className="sr-only">Search the menu</span>
-                  <input
-                    ref={searchRef}
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") setQuery("");
+              <div
+                className={`relative flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 text-text-muted inset-ring-1 transition-[padding,box-shadow] duration-150 motion-reduce:transition-none ${collapsed ? "pl-2 inset-ring-transparent hover:bg-surface-hover" : "pl-1 inset-ring-line focus-within:inset-ring-text-primary"}`}
+              >
+                <SidebarIcon name="search" />
+                {collapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(false);
+                      requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
                     }}
-                    placeholder="Search"
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="h-full min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-muted [&::-webkit-search-cancel-button]:hidden"
+                    aria-label="Search the menu"
+                    title="Search the menu"
+                    className={`absolute inset-0 cursor-pointer rounded-control ${focusRing}`}
                   />
-                </label>
-              )}
+                ) : null}
+                <input
+                  ref={searchRef}
+                  type="search"
+                  aria-label="Search the menu"
+                  aria-hidden={collapsed}
+                  inert={collapsed}
+                  tabIndex={collapsed ? -1 : 0}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setQuery("");
+                  }}
+                  placeholder="Search"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className={`h-full min-w-0 flex-1 bg-transparent text-body text-text-primary outline-none transition-opacity duration-150 placeholder:text-text-muted motion-reduce:transition-none [&::-webkit-search-cancel-button]:hidden ${collapsed ? "opacity-0" : "opacity-100"}`}
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setMenu(!collapsed)}
@@ -142,7 +144,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
   );
 }
 
-function SidebarIcon({ name }: { name: string }) {
+function SidebarIcon({ name }: { name: SidebarIconName }) {
   return <span aria-hidden="true" data-sidebar-icon={name} className={`${styles.icon} size-4 shrink-0 bg-current mask-no-repeat`} />;
 }
 

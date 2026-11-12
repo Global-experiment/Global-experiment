@@ -1,8 +1,8 @@
-<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="keyboard_double_arrow_left">
-<g id="Vector">
-<path d="M11.7267 12L12.6667 11.06L9.61333 8L12.6667 4.94L11.7267 4L7.72667 8L11.7267 12Z" fill="#B2B2B2"/>
-<path d="M7.33333 12L8.27333 11.06L5.22 8L8.27333 4.94L7.33333 4L3.33333 8L7.33333 12Z" fill="#B2B2B2"/>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g>
+<g>
+<path d="M11.7267 12L12.6667 11.06L9.61333 8L12.6667 4.94L11.7267 4L7.72667 8L11.7267 12Z" fill="currentColor"/>
+<path d="M7.33333 12L8.27333 11.06L5.22 8L8.27333 4.94L7.33333 4L3.33333 8L7.33333 12Z" fill="currentColor"/>
 </g>
 </g>
 </svg>
