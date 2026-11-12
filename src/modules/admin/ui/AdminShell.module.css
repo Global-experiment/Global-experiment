@@ -45,7 +45,7 @@
 }
 
 .icon[data-sidebar-icon="manage-accounts"] {
-  mask-image: url("/assets/icons/figma/admin/sidebar/manage-accounts.svg");
+  mask-image: url("/assets/icons/figma/admin/manage-accounts.svg");
 }
 
 .icon[data-sidebar-icon="search"] {
@@ -53,7 +53,7 @@
 }
 
 .icon[data-sidebar-icon="sign-out"] {
-  mask-image: url("/assets/icons/figma/admin/sidebar/sign-out.svg");
+  mask-image: url("/assets/icons/figma/admin/logout.svg");
 }
 
 .icon[data-sidebar-icon="toll"] {

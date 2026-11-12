@@ -1,8 +1,24 @@
+export type SidebarIconName =
+  | "home"
+  | "insert-drive-file"
+  | "toll"
+  | "groups-2"
+  | "business"
+  | "touch-app"
+  | "lock-open"
+  | "manage-accounts"
+  | "view-week"
+  | "history"
+  | "search"
+  | "collapse"
+  | "expand"
+  | "sign-out";
+
 /** Destinations in the Design System's Desktop menu, in display order. */
 export interface AdminModule {
   key: string;
   label: string;
-  icon: string;
+  icon: SidebarIconName;
   href: string;
   permission?: string;
   /** Other paths that highlight this destination. */
