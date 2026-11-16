@@ -10,6 +10,7 @@
     "setup": "node scripts/setup.mjs",
     "dev": "next dev",
     "dev:local": "node scripts/dev.mjs",
+    "icons:add": "node scripts/icons-add.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

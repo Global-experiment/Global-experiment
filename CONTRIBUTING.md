@@ -100,11 +100,25 @@ what you know: read the guide for what you touch in
 
 ## Design
 
-The screens follow the client's Figma files: layout, spacing, sizes, colors
+The screens follow the project's Figma files: layout, spacing, sizes, colors
 and icons come from there (ask the maintainer for access). Colors and sizes
 are theme tokens (`src/app/globals.css`); don't hard-code new ones. Icons are
-the Figma assets in `public/assets/icons/figma/`, nothing else; if one is
-missing, ask the maintainer. Every screen works in light
+the project's Figma assets in `public/assets/icons/figma/`, or a symbol from
+the official Material Symbols set added with `npm run icons:add` — nothing
+else (no icon drawn by hand, copied from another site or from another
+library):
+
+```bash
+npm run icons:add -- manage_accounts                  # → public/assets/icons/figma/manage-accounts.svg
+npm run icons:add -- home --style rounded --filled --folder admin
+```
+
+The name is the symbol's official name as on
+[fonts.google.com/icons](https://fonts.google.com/icons). The script
+downloads it from Google's official source, cleans it (its colour comes from
+the text, its size from the CSS) and never replaces an existing file
+without `--force`. If an icon is neither in the Figma assets nor a Material
+Symbol, ask the maintainer. Every screen works in light
 and dark, on mobile and desktop. Design exports stay on your machine: never
 commit them (`docs/design/` is ignored).
 
@@ -122,8 +136,10 @@ commit them (`docs/design/` is ignored).
   ```
 
   Type (`feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`,
-  `ci`, `build`), an optional scope in brackets, then what changed. Mention
-  the OPS card when there is one (`… (OPS-153)`).
+  `ci`, `build`), an optional scope in brackets, then what changed.
+- **OPS cards:** work on a roadmap card names it, in the commit or the pull
+  request (`… (OPS-153)`). For a small fix (a typo, a spacing, a broken
+  link) it's optional.
 - Git hooks (installed by `npm ci`) check this for you:
   - **before each commit**: ESLint and Prettier fix and format the code and
     CSS files you staged (only those, so it's quick);
@@ -136,6 +152,10 @@ commit them (`docs/design/` is ignored).
 
 - Open pull requests **into `develop` only** (never `main`). Fill in the
   template: what, why, the OPS card, screenshots of visible changes, tests.
+- **Open it early, as a Draft** (GitHub: **Create draft pull request**), as
+  soon as there is something to look at: CI runs on it and the maintainer
+  can follow along. When the work is finished and the checks pass, mark it
+  **Ready for review**; a Draft is not reviewed or merged.
 - **CI must pass** (lint, types, tests, builds, commit messages, formatting).
 - **A review is required**: the maintainer reviews every pull request.
 - Keep a pull request to one change; rebase on `develop` if it falls behind.
@@ -179,6 +199,53 @@ npm run test:e2e      # browser tests (Playwright)
 
 Run the browser tests for every UI change. If you can't (no local
 PostgreSQL), say so in the pull request and the maintainer runs them.
+
+### Run the browser tests locally
+
+**The test database (once).** Install PostgreSQL 17, create an empty
+database whose name ends in `_test` (the tests wipe it every run; never point
+them at a database you care about), and put its address in `.env.local`:
+
+```bash
+createdb global_experiment_test
+# .env.local
+TEST_DATABASE_URL=postgres://postgres:<your local password>@localhost:5432/global_experiment_test
+```
+
+Without `TEST_DATABASE_URL`, the admin tests are skipped and only the public
+pages are tested.
+
+**Run them.** Stop `npm run dev:local` first: the tests start their own API
+(port 4100, on the test database) and reuse a site already running on port
+3000, which would point at the wrong API. Then:
+
+```bash
+npx playwright install chromium webkit   # once: the browsers the tests use
+npm run test:e2e
+```
+
+The first run compiles every page once, so it is slower; a full run takes
+about 8 to 10 minutes. The report: `npx playwright show-report`.
+
+**Timeouts.** A test that times out on the first run is usually a page
+compiling for the first time on a busy machine (each test has 60 seconds,
+each check 10). Run it again before looking further; close other heavy
+programs. If it still times out, the screenshot and trace in
+`test-results/` show where it stopped.
+
+**One test at a time.** The admin suites share the test database and run in
+a fixed order (projects in `playwright.config.ts`), so a test can rely on the
+ones before it in its file:
+
+```bash
+npx playwright test admin-treasury                               # one file (its name, without the folder)
+npx playwright test admin-treasury -g "expense detail page"      # one test in it, by its title
+npx playwright test --project=chromium-accounts --no-deps        # one project, without the projects before it
+npx playwright test --last-failed                                # only what failed last time
+```
+
+`--no-deps` skips the earlier projects, so run their whole file rather than a
+single test when a test needs what an earlier one in the file created.
 
 Add or update tests with every change: unit tests next to the code
 (`*.test.ts`), API tests in `apps/api/src/<module>/*.e2e.test.ts`, browser

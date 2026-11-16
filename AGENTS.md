@@ -45,7 +45,7 @@ Ask the maintainer **before** changing any of these:
 
 - Follow the project's Figma files and the existing design system: layout, spacing, sizes, colours and icons come from there.
 - Reuse an existing component (`src/shared/ui/`, `src/modules/*/`) before creating one. Extend it rather than copying it.
-- Icons: only the exact Figma assets in `public/assets/icons/figma/`. If the icon you need isn't there, stop and ask; don't draw, download or substitute one.
+- Icons: only the project's Figma assets in `public/assets/icons/figma/`, or a symbol from the official Material Symbols set added with `npm run icons:add -- <name>` (it downloads it from Google's official source and cleans it). Nothing else: don't draw an icon, copy one from another site or library, or edit a downloaded one by hand. If the icon you need is in neither, stop and ask.
 - No inline styles and no hard-coded colours or sizes where a theme token exists (`src/app/globals.css`).
 - Every screen works in light and dark, on mobile and desktop.
 - Accessibility: every control has a label, everything works with the keyboard (visible focus, logical order), text meets contrast, and the axe checks in the browser tests pass.
