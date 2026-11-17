@@ -136,8 +136,22 @@ export class AccountsService {
 
   // ---- Managing accounts (accounts.manage) ----
 
+  /**
+   * Not on one's own account, for every role (the Rootadmin too): Profile settings does these with the current
+   * password, so a session alone can't change the account's password, role or status.
+   */
+  private async refuseOwnAccount(id: string, principal: AdminPrincipal, route: string, message: string) {
+    if (id === principal.id) throw await this.audit.refuse(principal, "another account", route, message);
+  }
+
   /** A fresh link for an account: an invitation while invited, a password reset when active. */
   async createLink(id: string, principal: AdminPrincipal): Promise<OneTimeLinkDto> {
+    await this.refuseOwnAccount(
+      id,
+      principal,
+      "POST /api/admin/accounts/:id/link",
+      "You can't make a link for your own account. Change your password in Profile settings.",
+    );
     const account = await this.get(id);
     if (account.status === "deactivated") throw new ConflictError("Reactivate the account first.");
     const purpose = account.status === "invited" ? "invite" : "reset";
@@ -157,6 +171,14 @@ export class AccountsService {
 
   /** A Rootadmin on any account: its role (a new account has none, OPS-141), and its profile's name, description and expertise. */
   async update(id: string, input: UpdateAccountRequest, principal: AdminPrincipal): Promise<AccountDto> {
+    if (input.role !== undefined) {
+      await this.refuseOwnAccount(
+        id,
+        principal,
+        "PATCH /api/admin/accounts/:id",
+        "You can't change your own role. Your other details are in Profile settings.",
+      );
+    }
     const before = await this.get(id);
     if (
       input.role !== undefined &&
@@ -200,6 +222,7 @@ export class AccountsService {
   }
 
   async deactivate(id: string, principal: AdminPrincipal): Promise<AccountDto> {
+    await this.refuseOwnAccount(id, principal, "POST /api/admin/accounts/:id/deactivate", "You can't deactivate your own account here. Use Profile settings.");
     const account = await this.get(id);
     if (account.status === "deactivated") return account;
     await this.keepARootadmin(account);

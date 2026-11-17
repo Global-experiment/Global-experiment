@@ -181,14 +181,14 @@ describe("admin accounts", () => {
     }
   });
 
-  it("never deactivates or demotes the last active Rootadmin", async () => {
+  it("never deactivates or demotes the last active Rootadmin: from Accounts, not even its own account (OPS-158)", async () => {
     const [second] = await t.db.insert(adminUsers).values({ email: "root2@example.org", role: "owner", status: "active", passwordHash: "x" }).returning();
     await owner.post(`/api/admin/accounts/${second!.id}/deactivate`).expect(200);
     const self = (await owner.get("/api/admin/accounts?filter=role:is:owner").expect(200)).body.items.find(
       (account: { email: string }) => account.email === "owner@example.org",
     );
-    expect((await owner.post(`/api/admin/accounts/${self.id}/deactivate`).expect(409)).body.error.message).toMatch(/last active Rootadmin/);
-    await owner.patch(`/api/admin/accounts/${self.id}`, { role: "admin" }).expect(409);
+    expect((await owner.post(`/api/admin/accounts/${self.id}/deactivate`).expect(403)).body.error.message).toMatch(/Profile settings/);
+    await owner.patch(`/api/admin/accounts/${self.id}`, { role: "admin" }).expect(403);
     await owner.post(`/api/admin/accounts/${second!.id}/reactivate`).expect(200);
   });
 

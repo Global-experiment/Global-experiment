@@ -1,8 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { AuditService, type Executor } from "../audit/audit.service.js";
+import { actorFor, AuditService, type Executor } from "../audit/audit.service.js";
 import type { AuditActor, AuditChange } from "../audit/audit.types.js";
 import { entryLabel } from "../audit/entity-labels.js";
 import { diffRecord } from "../audit/record-fields.js";
+import type { AdminPrincipal } from "../auth/auth.service.js";
 import { DATABASE, type Database } from "../common/database/database.module.js";
 import { NotFoundError, ValidationFailedError, type ValidationIssue } from "../common/errors/api-error.js";
 import type { Page } from "../common/listing/list-query.js";
@@ -10,6 +11,7 @@ import { countExistingExpertise } from "../expertise/expertise-refs.js";
 import { countExistingOrganizations } from "../organizations/organization-refs.js";
 import { labelOfOrganization, ORGANIZATION_FIELDS } from "../organizations/organizations.audit.js";
 import { OrganizationsRepository } from "../organizations/organizations.repository.js";
+import { PUBLIC_CACHE_TAGS, RevalidationService } from "../revalidation/revalidation.service.js";
 import { SettingsService } from "../settings/settings.service.js";
 import { labelOfPerson, PERSON_FIELDS } from "./people.audit.js";
 import type { CreatePersonRequest, PeopleListQuery, PeopleOptionsDto, PersonDto, UpdatePersonRequest } from "./people.contracts.js";
@@ -30,6 +32,7 @@ export class PeopleService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly organizations: OrganizationsRepository,
+    private readonly revalidation: RevalidationService,
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
@@ -48,9 +51,11 @@ export class PeopleService {
     return person;
   }
 
-  async create(input: CreatePersonRequest, actor: AuditActor): Promise<PersonDto> {
+  async create(input: CreatePersonRequest, admin: AdminPrincipal): Promise<PersonDto> {
+    await this.assertExpenseRight(input, admin, "POST /api/admin/people");
     await this.assertInput(input);
-    return this.db.transaction(async (tx) => {
+    const actor = actorFor(admin);
+    const created = await this.db.transaction(async (tx) => {
       const id = await this.repository.create(tx, input);
       const person = (await this.repository.findById(id, tx))!;
       await this.audit.record(tx, {
@@ -64,11 +69,15 @@ export class PeopleService {
       await this.recordExpenseLinks(tx, person, [], person.expenses, actor);
       return person;
     });
+    await this.revalidateExpenses([], created.expenses);
+    return created;
   }
 
-  async update(id: string, input: UpdatePersonRequest, actor: AuditActor): Promise<PersonDto> {
+  async update(id: string, input: UpdatePersonRequest, admin: AdminPrincipal): Promise<PersonDto> {
+    await this.assertExpenseRight(input, admin, "PATCH /api/admin/people/:id");
     await this.assertInput(input, id);
-    return this.db.transaction(async (tx) => {
+    const actor = actorFor(admin);
+    const { before, after } = await this.db.transaction(async (tx) => {
       const before = await this.repository.findById(id, tx);
       if (!before) throw new NotFoundError("Person not found.");
       // Organizations linked or unlinked by this Submit record their own event too (both records show the link).
@@ -80,8 +89,29 @@ export class PeopleService {
       const after = (await this.repository.findById(id, tx))!;
       await this.recordUpdate(tx, before, after, actor);
       for (const organizationBefore of organizationsBefore) if (organizationBefore) await this.recordOrganization(tx, organizationBefore, actor);
-      return after;
+      return { before, after };
     });
+    await this.revalidateExpenses(before.expenses, after.expenses);
+    return after;
+  }
+
+  /**
+   * Linking an expense sets its recipient, a Treasury field only treasury.manage changes (OPS-155): without it,
+   * a save that lists expenses is refused before anything is written, and the refusal is recorded.
+   */
+  private async assertExpenseRight(input: UpdatePersonRequest, admin: AdminPrincipal, route: string) {
+    if (input.expenseIds === undefined || admin.permissions.has("treasury.manage")) return;
+    throw await this.audit.refuse(admin, "treasury.manage", route, "Only a Rootadmin can change an expense's recipient.");
+  }
+
+  /** A published expense whose recipient changed: the public Treasury shows it, so its pages are refreshed. */
+  private async revalidateExpenses(before: PersonDto["expenses"], after: PersonDto["expenses"]) {
+    const was = new Set(before.map((expense) => expense.id));
+    const now = new Set(after.map((expense) => expense.id));
+    const changed = [...[...now].filter((id) => !was.has(id)), ...[...was].filter((id) => !now.has(id))];
+    if (changed.length === 0) return;
+    const published = (await this.repository.expensesById(changed)).some((expense) => expense.publicationStatus === "published");
+    if (published) await this.revalidation.revalidate([PUBLIC_CACHE_TAGS.treasury]);
   }
 
   async duplicate(id: string, actor: AuditActor): Promise<PersonDto> {
