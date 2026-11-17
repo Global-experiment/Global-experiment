@@ -34,6 +34,12 @@ export async function recordAuditEvent(tx: Pick<Database, "insert">, input: Audi
   });
 }
 
+/** The record types whose events `viewer` may read: every type with history.read, else those of the modules the role reads (overview §3.1). */
+function readableTypes(viewer: AdminPrincipal): "all" | string[] {
+  if (viewer.permissions.has("history.read")) return "all";
+  return AUDITED_ENTITIES.filter((type) => canReadEntity(viewer.permissions, type));
+}
+
 /** The actor for a signed-in admin: their display name, or the part of their email before "@". */
 export function actorFor(admin: AdminPrincipal): AuditActor {
   return { type: "admin", id: admin.id, label: admin.displayName ?? admin.email.split("@")[0]!, role: admin.role };
@@ -125,6 +131,15 @@ export class AuditService {
   }
 
   /**
+   * A refusal decided inside a service, where the route's permission isn't enough (a field or a state needs
+   * more): recorded like the guard's refusals, then returned for the caller to throw.
+   */
+  async refuse(admin: AdminPrincipal, permission: string, route: string, message: string): Promise<ForbiddenError> {
+    await this.recordDenied(admin, permission, route);
+    return new ForbiddenError(message);
+  }
+
+  /**
    * One opening of a record (decision 11): every opening counts; the
    * history shows it only when this account has no shown view within the
    * window (history.view_event_window_hours).
@@ -159,8 +174,12 @@ export class AuditService {
   /** A record's history, newest first, as `viewer` may see it (masked contact values, no private notes). */
   async feed(entityType: string, entityId: string, viewer: AdminPrincipal): Promise<RecordHistoryDto> {
     const forEntity = and(eq(auditEvents.entityType, entityType), eq(auditEvents.entityId, entityId));
-    // Also the events of other records that name this one (a permission's single event on its account, service and person, OPS-151).
-    const shownHere = or(forEntity, sql`${auditEvents.meta} -> 'related' @> ${JSON.stringify([{ type: entityType, id: entityId }])}::jsonb`);
+    // Also the events of other records that name this one (a permission's single event on its account, service and person, OPS-151),
+    // only when the viewer may read that other record's type (the same rule as list()).
+    const namesThis = sql`${auditEvents.meta} -> 'related' @> ${JSON.stringify([{ type: entityType, id: entityId }])}::jsonb`;
+    const readable = readableTypes(viewer);
+    const related = readable === "all" ? namesThis : readable.length > 0 ? and(namesThis, inArray(auditEvents.entityType, readable)) : undefined;
+    const shownHere = related ? or(forEntity, related) : forEntity;
     const viewsOf = and(eq(recordViews.entityType, entityType), eq(recordViews.entityId, entityId));
     const [events, shownViews, [viewCount], [editCount], [eventCount], [shownViewCount], [created], [edited]] = await Promise.all([
       this.db.select().from(auditEvents).where(shownHere).orderBy(desc(auditEvents.id)).limit(FEED_LIMIT),
@@ -226,10 +245,8 @@ export class AuditService {
     const conditions: (SQL | undefined)[] = [];
     if (query.entityType) conditions.push(eq(auditEvents.entityType, query.entityType));
     // Without history.read, only the record types of the modules the role can read (overview §3.1).
-    if (!viewer.permissions.has("history.read")) {
-      const readable = AUDITED_ENTITIES.filter((type) => canReadEntity(viewer.permissions, type));
-      conditions.push(readable.length > 0 ? inArray(auditEvents.entityType, [...readable]) : sql`false`);
-    }
+    const readable = readableTypes(viewer);
+    if (readable !== "all") conditions.push(readable.length > 0 ? inArray(auditEvents.entityType, readable) : sql`false`);
     if (query.actor === "automation") conditions.push(eq(auditEvents.actorType, "automation"));
     else if (query.actor) conditions.push(eq(auditEvents.actorId, query.actor));
     if (query.source) conditions.push(eq(auditEvents.source, query.source));

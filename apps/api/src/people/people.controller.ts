@@ -11,17 +11,21 @@ import { Requires } from "../access-control/requires.js";
 
 const IdParam = new ZodValidationPipe(z.uuid("Invalid id."));
 
-const actor = (request: AdminRequest) => {
+const signedIn = (request: AdminRequest) => {
   if (!request.admin) throw new UnauthenticatedError();
-  return actorFor(request.admin);
+  return request.admin;
 };
+
+const actor = (request: AdminRequest) => actorFor(signedIn(request));
 
 /**
  * /api/admin/people — each route requires its `directory.*` permission
  * (PermissionGuard). Every write is audited with the signed-in admin as
  * its actor. Archive instead of delete; permanent delete needs
  * directory.delete and the typed name (decision 12 of 2026-10-19). A
- * person's access grants show only to roles with access.read.
+ * person's access grants show only to roles with access.read. Listing a
+ * person's expenses sets their recipient, which also needs treasury.manage
+ * (checked in the service).
  */
 @Controller("admin/people")
 @UseInterceptors(HideAccessInterceptor)
@@ -44,7 +48,7 @@ export class PeopleController {
   @Post()
   @Requires("directory.create")
   create(@Body(new ZodValidationPipe(CreatePersonRequest)) body: CreatePersonRequest, @Req() request: AdminRequest) {
-    return this.people.create(body, actor(request));
+    return this.people.create(body, signedIn(request));
   }
 
   @Get(":id")
@@ -63,7 +67,7 @@ export class PeopleController {
   @Patch(":id")
   @Requires("directory.update")
   update(@Param("id", IdParam) id: string, @Body(new ZodValidationPipe(UpdatePersonRequest)) body: UpdatePersonRequest, @Req() request: AdminRequest) {
-    return this.people.update(id, body, actor(request));
+    return this.people.update(id, body, signedIn(request));
   }
 
   @Post(":id/archive")

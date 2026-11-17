@@ -335,11 +335,24 @@ export class TreasuryAdminService {
     return null;
   }
 
-  /** Archive (decision 12): out of the default admin views and off the public pages; restorable. */
+  /**
+   * Archive (decision 12): out of the default admin views and off the public pages; restorable. A published
+   * entry leaves or returns to the public Treasury, so it also needs treasury.publish.
+   */
   async setArchived(id: string, archived: boolean, admin: AdminPrincipal | undefined): Promise<TreasuryEntryDto> {
     const editor = this.assertTreasuryAdmin(admin);
     const entry = await this.load(id);
     if ((entry.archivedAt !== null) === archived) return this.get(id);
+    if (entry.publicationStatus === "published" && !editor.permissions.has("treasury.publish")) {
+      throw await this.audit.refuse(
+        editor,
+        "treasury.publish",
+        `POST /api/admin/treasury/:id/${archived ? "archive" : "restore"}`,
+        archived
+          ? "This entry is published: only a role that publishes can archive it."
+          : "This entry is published: only a role that publishes can restore it.",
+      );
+    }
     const now = this.clock();
     await this.db.transaction(async (tx) => {
       await tx

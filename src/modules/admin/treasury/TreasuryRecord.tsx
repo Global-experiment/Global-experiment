@@ -17,6 +17,7 @@ import { useCan } from "../session";
 import { useFieldValidation } from "../ui/fieldValidation";
 import { useToast } from "../ui/Toast";
 import { parseAmount, recipientFromOption, recipientOption, searchRecipients, searchTypes, toAmountText, typeOption } from "./expenseFields";
+import { canArchiveEntry } from "./treasuryAccess";
 import { CADENCE_LABEL, formatMoney, modeLabel, publicationLabel, SOURCE_LABEL, TYPE_LABEL } from "./treasuryDisplay";
 
 /** A value the admin can't change here: plain text, no field ring (only editable values look like fields). */
@@ -577,7 +578,7 @@ export function TreasuryRecord({ id }: { id: string }) {
           validation.reset();
         },
         archived: loaded.archivedAt !== null,
-        setArchived: !canUpdate
+        setArchived: !canArchiveEntry({ canUpdate, canPublish, published: loaded.publication === "published" })
           ? undefined
           : (archived) =>
               run(

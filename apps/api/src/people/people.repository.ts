@@ -216,7 +216,7 @@ export class PeopleRepository {
     return rows.length;
   }
 
-  /** The expenses among `ids` and their current recipients (for validating a link). */
+  /** The expenses among `ids` and their current recipients (for validating a link), and whether the public sees them. */
   async expensesById(ids: readonly string[]) {
     if (ids.length === 0) return [];
     return this.db
@@ -227,6 +227,7 @@ export class PeopleRepository {
         recipientOrganizationId: treasuryEntries.recipientOrganizationId,
         reviewStatusKey: treasuryEntries.reviewStatusKey,
         archivedAt: treasuryEntries.archivedAt,
+        publicationStatus: treasuryEntries.publicationStatus,
       })
       .from(treasuryEntries)
       .where(inArray(treasuryEntries.id, [...ids]));
