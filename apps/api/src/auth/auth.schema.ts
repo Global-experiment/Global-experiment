@@ -77,7 +77,7 @@ export const adminUsers = pgTable(
       sql`${table.displayName} is null or (char_length(${table.displayName}) between 1 and 80 and ${table.displayName} = btrim(${table.displayName}))`,
     ),
     check("admin_users_status_known", sql`${table.status} in ('active', 'invited', 'deactivated')`),
-    check("admin_users_password_when_active", sql`${table.status} = 'invited' or ${table.passwordHash} is not null`),
+    check("admin_users_password_when_active", sql`${table.status} <> 'active' or ${table.passwordHash} is not null`),
     check("admin_users_appearance_known", sql`${table.appearance} in ('system', 'light', 'dark')`),
     check("admin_users_time_zone_shape", sql`${table.timeZone} is null or char_length(${table.timeZone}) between 1 and 64`),
     check("admin_users_description_length", sql`${table.description} is null or char_length(${table.description}) <= 5000`),

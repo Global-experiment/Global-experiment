@@ -204,6 +204,48 @@ describe("admin accounts", () => {
     expect(await historyOf(account!.id)).toEqual(expect.arrayContaining(["deactivated", "reactivated"]));
   });
 
+  it("deactivates an invited account that has no password yet: its unused link stops working; reactivated, it is invited again (OPS-158)", async () => {
+    const [invited] = await t.db
+      .insert(adminUsers)
+      .values({ email: "not-yet@example.org", role: "treasury", status: "invited", passwordHash: null })
+      .returning();
+    const link = (await owner.post(`/api/admin/accounts/${invited!.id}/link`).expect(201)).body;
+
+    expect((await owner.post(`/api/admin/accounts/${invited!.id}/deactivate`).expect(200)).body.status).toBe("deactivated");
+    const [deactivated] = await t.db.select().from(adminUsers).where(eq(adminUsers.id, invited!.id));
+    expect(deactivated).toMatchObject({ status: "deactivated", passwordHash: null });
+    expect((await accept(tokenOf(link.link), "Gentle rain falls on 9 hills")).status).toBe(404);
+    expect(await historyOf(invited!.id)).toContain("deactivated");
+
+    // No password: back to invited, and it needs a new link.
+    expect((await owner.post(`/api/admin/accounts/${invited!.id}/reactivate`).expect(200)).body.status).toBe("invited");
+    expect(await historyOf(invited!.id)).toEqual(expect.arrayContaining(["deactivated", "reactivated"]));
+    const fresh = (await owner.post(`/api/admin/accounts/${invited!.id}/link`).expect(201)).body;
+    await accept(tokenOf(fresh.link), "Gentle rain falls on 9 hills").expect(200);
+    await login("not-yet@example.org", "Gentle rain falls on 9 hills").expect(204);
+  });
+
+  it("never lets an account be active without a password (database rule)", async () => {
+    // The database names the rule in its message (PGlite and PostgreSQL report it in different fields).
+    const refusedBy = async (query: PromiseLike<unknown>) => {
+      const error = await Promise.resolve(query).then(
+        () => null,
+        (caught: { cause?: { message?: string } }) => caught,
+      );
+      expect(error?.cause?.message).toContain("admin_users_password_when_active");
+    };
+    await refusedBy(t.db.insert(adminUsers).values({ email: "no-password@example.org", role: "treasury", status: "active", passwordHash: null }));
+    const [invited] = await t.db
+      .insert(adminUsers)
+      .values({ email: "still-invited@example.org", role: "treasury", status: "invited", passwordHash: null })
+      .returning();
+    await refusedBy(t.db.update(adminUsers).set({ status: "active" }).where(eq(adminUsers.id, invited!.id)));
+    const [after] = await t.db.select({ status: adminUsers.status }).from(adminUsers).where(eq(adminUsers.id, invited!.id));
+    expect(after!.status).toBe("invited");
+    // With a password it can be active (and the account list keeps only active accounts for the next test).
+    await t.db.update(adminUsers).set({ status: "active", passwordHash: "x" }).where(eq(adminUsers.id, invited!.id));
+  });
+
   describe("description and expertise (OPS-144, OPS-135); no note, no People link (OPS-142, OPS-136)", () => {
     it("the account holder sets their own description and expertise from Profile settings", async () => {
       const profile = (
