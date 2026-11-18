@@ -1,0 +1,2 @@
+ALTER TABLE "admin_users" DROP CONSTRAINT "admin_users_password_when_active";--> statement-breakpoint
+ALTER TABLE "admin_users" ADD CONSTRAINT "admin_users_password_when_active" CHECK ("admin_users"."status" <> 'active' or "admin_users"."password_hash" is not null);
