@@ -1,23 +1,25 @@
 # Global Experiment — Architecture overview (v0.1, v1.0-ready)
 
-Status: **proposed** (2026-10-15). This replaces the M1 overview, which
-predated the NestJS API and the admin. Decisions with real trade-offs stay in
+Status: **current** (updated 2026-11-19, OPS-104). First written on
+2026-10-15; it replaced the M1 overview, which predated the NestJS API and
+the admin. Decisions with real trade-offs stay in
 [`decisions/`](./decisions/) (ADRs); the database is specified in
-[data-model.md](./data-model.md) and the build order in
+[data-model.md](./data-model.md) and the order of work in
 [roadmap.md](./roadmap.md). Anything only the client can decide is listed in
 [roadmap.md §5](./roadmap.md#5-open-questions-for-the-client) — this
 document never assumes an answer to those.
 
-**Sources of truth** used for this design (read 2026-10-15):
+**Sources of truth:**
 
-- Notion **"0.1 native"**: Treasury, Feedbacks and issues, Services, Access
-  grants, Documentation, People, Organizations, Domains, Fields, Expertise
-  and the Home page (schema, options and relations — the full mapping is in
-  data-model.md). The legacy "Community" database is ignored.
-- The Figma PDFs in `docs/design/figma/` (admin desktop, common pages,
-  master, profile and account, signup and sign-in).
-- The code: migrations 0000–0005, the NestJS modules, the importers, the
-  admin shell.
+- **The code:** migrations 0000–0018, the NestJS modules and the admin. The
+  code wins over this document; a difference is a documentation bug.
+- **Notion "0.1 native"** (read 2026-10-15): Treasury, Feedbacks and
+  issues, Services, Access grants, Documentation, People, Organizations,
+  Domains, Fields, Expertise and the Home page. The full mapping is in
+  data-model.md. Nothing reads Notion at runtime any more (§4).
+- **The Figma PDFs** in `docs/design/figma/` (admin desktop, common pages,
+  master, profile and account, signup and sign-in). These are local only
+  and not committed.
 
 **Client principle:** built the right way and ready to grow into v1.0, with
 **no speculative features**. Every module below is something the v0.1 admin
@@ -37,10 +39,13 @@ flowchart LR
   api --> pg[(PostgreSQL 17)]
   api --> files[(File storage)]
   api -- jobs --> worker["Job runner (pg-boss, same process)"]
-  worker --> ai[AI provider]
-  worker --> mail[Stalwart mail]
+  worker -.-> ai["AI provider (planned)"]
+  worker -.-> mail["Mail server (planned)"]
   api --> stripeapi[Stripe API]
 ```
+
+Dotted lines are planned integrations; everything else is running in
+production.
 
 - **One repository, two processes** (ADR [013](./decisions/013-nestjs-native-api.md)):
   the Next.js app renders every page and never touches the database; the
@@ -63,32 +68,43 @@ service, controllers, contracts, tests) and, for its admin screens, in
 `src/modules/admin/<module>/`. "Owns" means only this module writes those
 tables.
 
+**Built** (in production):
+
 | Module | Purpose | Owns (tables) | API boundary | Admin pages (sidebar) | Public pages | Depends on |
 |---|---|---|---|---|---|---|
-| **Directory — People** | Contacts the experiment works with: state, source, follow-ups, contact details | `people`, `person_states`, `person_sources`, `people_organizations`, `people_expertise` | `/api/admin/people` | Admin → People (list, record) | none (never public) | Taxonomy, Organizations, Audit |
+| **Directory — People** | Contacts the experiment works with: state, source, follow-ups, contact details, expenses paid to them | `people`, `person_states`, `person_sources`, `people_organizations`, `people_expertise`, `contact_channels`, `person_contact_channels` | `/api/admin/people` | Admin → People (list, record) | none (never public) | Taxonomy, Organizations, Treasury (expense links), Audit |
 | **Directory — Organizations** | Organizations people belong to; expense recipients | `organizations`, `organization_expertise` | `/api/admin/organizations` | Other → Organizations | none | Taxonomy, People, Audit |
-| **Taxonomy** | Domain → Field → Expertise vocabulary, teams | `expertise_domains`, `expertise_fields`, `expertise_items`, `teams`, `expertise_teams`, `taxonomy_statuses` | `/api/admin/expertise/*` (read-only in v0.1) | Other → Expertise, Fields, Domains | Expertise tags on documents and expenses | Imports |
-| **Treasury** | Donations and expenses, review and publication, Stripe donations; Wise later | `treasury_entries`, `treasury_review_statuses`, `treasury_expense_types`, `treasury_entry_expense_types`, `treasury_documents`, `stripe_events` | `/api/admin/treasury/*`, public `/api/treasury/*`, `/api/donations/checkout`, `/api/stripe/webhook` | Admin → Treasury | `/treasury`, expense and donation detail, `/donate`, `/donate/thank-you` | People, Organizations, Files, Jobs, Audit |
+| **Taxonomy** | Domain → Field → Expertise vocabulary, and the teams each expertise belongs to | `expertise_domains`, `expertise_fields`, `expertise_items`, `teams`, `expertise_teams`, `taxonomy_statuses` | `/api/admin/expertise/*` | Other → Expertise, Fields, Domains | none yet | Audit |
+| **Treasury** | Donations and expenses, review and publication, Stripe donations; Wise later | `treasury_entries`, `treasury_review_statuses`, `treasury_expense_types`, `treasury_entry_expense_types`, `stripe_events`, `stripe_subscriptions` (`treasury_documents` is kept for History only, ADR 021) | `/api/admin/treasury/*`, public `/api/treasury/*`, `/api/donations/*`, `/api/stripe/webhook` | Admin → Treasury | `/treasury`, expense and donation detail, `/donate`, `/donate/thank-you` | People, Organizations, Jobs, Audit |
 | **CMS** | Home and Documentation content, editor, revisions, versions, images | `cms_documents` (Home is the one of kind `home`), `cms_revisions`, `cms_images` (data-model §5) | `/api/admin/cms/*`, public `/api/cms/*` | Communication → Home, Documentation | `/`, `/documentation`, article and its history | Audit, Files |
-| **Feedback and issues** | Public submissions, AI-assisted triage, decisions | `submissions`, `submission_types`, `submission_type_links`, `submission_statuses`, `submission_expertise` | public `POST /api/submissions`, `/api/admin/submissions` | Admin → Feedbacks and issues | Send feedback, Report issue composers | Taxonomy, AI, Jobs, Audit |
-| **Waitlist** | Email sign-ups for the launch | `waitlist_entries` | public `POST /api/waitlist`, `/api/admin/waitlist` | Other → Waitlist | `/waitlist` | Email, People (link), Audit |
-| **Messages (Contribute)** | Inbound mail to contribute@ / waitlist@ / donations@, linked to people | `mailboxes`, `mail_threads`, `mail_messages` | `/api/admin/messages` | Admin → Messages | `/contribute` (address only) | Email, People, Audit |
-| **Emails** | Outbound email log and templates | `email_outbox` | internal service; `/api/admin/emails` (read) | Monitoring → Emails | none | Email integration, Jobs |
-| **Services and access grants** | Which person holds which access to which tool | `services`, `access_grants`, `access_grant_statuses` | `/api/admin/services`, `/api/admin/access-grants` | Monitoring → Services, Access grants; People "Access grant" column | none | People, Audit, Imports |
-| **Accounts and roles** | Admin identities, sessions, roles, permissions | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_tokens`, `admin_user_expertise` | `/api/admin/auth/*`, `/api/admin/accounts`, `/api/admin/invitations` | Monitoring → Accounts; user card; Profile | `/admin/login`, `/admin/join` | Expertise, Email, Audit (no People link, decision 018) |
-| **Audit / History** | Who changed what, when; before/after | `audit_events` | written by every module's service; `/api/admin/history` (read) | Monitoring → History; History panel on record pages | none | — (used by all) |
-| **Settings and module registry** | Module modes (notion / native), feature flags, import schedules; which modules are enabled | `settings` | `/api/admin/modules`, `/api/admin/settings` (owner), public `/api/config` (public flags only) | Settings (owner, from the user card); drives the sidebar | Donate page reads public flags | Audit |
-| **Analytics** | Visitor statistics | none in PostgreSQL (lives in the analytics tool) | `/api/admin/analytics` (proxy of the tool's stats API) | Monitoring → Analytics | none (v1.0: Statistics page) | Analytics integration |
-| **Technical dashboard** | Health of the stack, jobs, backups, integrations | none (reads health, `job` tables, `import_runs`) | `/api/admin/system` | Monitoring → Technical dashboard | none | all integrations, Jobs |
-| **Imports** | People and Organizations only, from CSV (ADR 016; no Notion import since OPS-154): column and value matching, check, import, report | `import_runs` | `/api/admin/imports/runs`, `/api/admin/imports/csv/*` | People / Organizations → More options → Import CSV; Imports page (history); report pages | none | Directory |
+| **Services and access grants** | Which person and account hold which access to which outside tool | `services`, `access_grants` and their lookups | `/api/admin/services`, `/api/admin/access-grants` | Monitoring → Services, Permissions; People "Permissions" row | none | People, Accounts, Audit |
+| **Accounts and roles** | Admin identities, sessions, roles, permissions, invitation links, profiles | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_tokens`, `admin_user_expertise`, `admin_user_pictures` | `/api/admin/auth/*`, `/api/admin/accounts`, `/api/admin/invitations`, `/api/admin/profile` | Monitoring → Accounts; user card; Profile settings | `/admin/login`, `/admin/join`, `/admin/welcome`, `/admin/reset-password` | Expertise, Files, Audit (no People link, decision 018) |
+| **Audit / History** | Who changed what, when; before/after; comments and views | `audit_events`, `record_comments`, `record_views` | written by every module's service; `/api/admin/history/*` | Monitoring → History; History panel on record pages | none | — (used by all) |
+| **Imports** | People and Organizations only, from CSV (ADR 016): column and value matching, check, import, report | `import_runs` | `/api/admin/imports/*` | People / Organizations → More options → Import CSV; Imports page; report pages | none | Directory |
+| **Settings** | Typed settings and feature flags with environment defaults | `settings` | read by the modules; public donation config | none yet (changed by the owner outside the admin) | Donate page reads public flags | — |
+
+**Planned** (the sidebar shows them as "Coming soon"; order in the
+roadmap):
+
+| Module | Purpose | Tables (data-model) | Admin pages | Public pages |
+|---|---|---|---|---|
+| **Feedbacks and issues** | Public submissions, automatic qualification, decisions | `submissions`, `submission_types`, `submission_type_links`, `submission_statuses`, `submission_expertise` (§6) | Admin → Feedbacks and issues | Send feedback, Report issue composers (shells today) |
+| **Information notes** | News posts on the public site | CMS documents of a new kind (§5), not a new module | Communication | Information notes section |
+| **Waitlist** | Email sign-ups for the launch | `waitlist_entries` (§7) | Other → Waitlist | `/waitlist` (shell today) |
+| **Messages and Emails** | Inbound mail linked to people; outbound delivery log | `mailboxes`, `mail_threads`, `mail_messages`, `email_outbox` (§8) | Admin → Messages; Monitoring → Emails | `/contribute` (address only) |
+| **Analytics** | Visitor statistics, read from the analytics tool | none | Monitoring → Analytics | none |
+| **Technical dashboard** | Health of the stack, jobs, backups, integrations | none | Monitoring → Technical dashboard | none |
+| **Teams and governance** | Teams, memberships, moderation tools, reviews, task assignment | roadmap §4 | — | — |
 
 Module notes:
 
-- **Directory and Taxonomy** are built (migrations 0001–0005). The People
-  "Access grant" and "Expenses" columns, and Figma's record "Access grant"
-  / "Expenses" rows, come from Services and Treasury once those exist —
-  read through those modules' services, not stored on `people`.
-- **Treasury** is first in the build order (roadmap, due 24 October).
+- **Directory and Taxonomy:** People and Organizations are on hold until
+  the client decides (roadmap §1). Expense links on a person are
+  Treasury recipients, so they also need the Treasury's own permission
+  (§3.1).
+- **Treasury** is built (modules 1 and 1b, OPS-155). Every business field
+  of an expense is edited by a Rootadmin (`treasury.manage`); supporting
+  documents left the platform (ADR 021).
 - **CMS** is built (Delivery 6, migration 0016, ADR 020): Home and
   Documentation are edited in the admin (ADR 019, Tiptap), every save is a
   revision (draft → published), with versions to view, compare and
@@ -96,11 +112,11 @@ Module notes:
   is revalidated on publish. The Home page and the 10 articles were copied
   from Notion once, on 2026-11-05 (version 1 by "Notion import"); the
   import was then removed.
-- **Messages and Emails** are one integration (Stalwart) with two admin
-  views: inbound conversations, and the outbound delivery log.
-- **Analytics and the Technical dashboard** have no tables of their own:
-  they show data that lives elsewhere. Building storage for them would be
-  speculative.
+- **Messages and Emails** (planned) are one integration (Stalwart) with
+  two admin views: inbound conversations, and the outbound delivery log.
+- **Analytics and the Technical dashboard** (planned) have no tables of
+  their own: they show data that lives elsewhere. Building storage for them
+  would be speculative.
 - **Platform** (settings, module registry, audit) is not a sidebar module:
   it owns `settings` and `audit_events` and serves every other module
   (§2.1, §2.2, §3.2).
@@ -171,6 +187,18 @@ Module specifics:
 
 ### 2.2 Flexible admin framework
 
+**Built so far:**
+
+- the site's module registry (`src/modules/admin/registry.ts`): sidebar,
+  routes, required permission, "Coming soon";
+- the shared list engine and record page (`src/modules/admin/table/`,
+  `record/`, `ui/`) used by every built module;
+- typed settings with environment defaults.
+
+**Not built:** `/api/admin/modules`, an admin Settings page, module modes
+and the cut-over action. Notion is no longer a source (§2.1), so the last
+two are no longer needed. The plan below is kept for the record.
+
 So that a module or a field is added by configuration, not by a new screen:
 
 - **Module registry.** Each module declares, in one registry entry: its
@@ -227,7 +255,7 @@ later needs no code change. Built in the step named (plan:
 | 6 | Services and Permissions start empty, fully editable; a Notion importer for Services and Access grants with the usual dry run (demo rows skipped). | importer | 8 |
 | 7 | Relevance scores: integers 0–10, nullable, editable; `ai_relevance_score` becomes read-only when `ai.enabled` is true (later). | schema + setting `ai.enabled` | 5 |
 | 8 | Contact channels: an admin-editable lookup seeded with Email, Phone, WhatsApp, Signal, Telegram, LinkedIn, X, Matrix, Workana. | lookup `contact_channels` | 5 |
-| 9 | People keep the phone column, hidden in the record (Figma moved it into "Other contact details"); field visibility is config. Sources stay Candide, Contribution email, Other, AI. | record config | 5 |
+| 9 | People keep the phone column, hidden in the record (Figma moved it into "Other contact details"); field visibility is config. Sources stay as in Notion. | record config | 5 |
 | 10 | Any admin with access to a record can comment; authors edit or delete their own comments; edits and deletions are kept in the history. | schema | 5 |
 | 11 | Every opening counts as a view; the feed shows "viewed this page" at most once per account per `history.view_event_window_hours` (24). | setting | 5 |
 | 12 | Archive instead of delete: archived records leave the default views and appear in an "Archived" view; restore is available; permanent delete is owner-only, behind a typed confirmation, and logged. **Changed 2026-11-03 (decision 017, OPS-147):** no permanent delete at all; past "deleted" events stay readable. | schema | 5 |
@@ -250,16 +278,20 @@ the API (Step 5); and a minimal Contracting module (contracts CON-n, Step 8).
 
 ### 3.1 Roles and permissions
 
-Built in Delivery 2 (migration 0012). Roles follow the experiment's
-**teams**, plus the Rootadmin and a general admin. "Superadmin" (a senior
-level within a team, which validates applications and treasury transfers
-in the v1.0 designs) is a v1.0 team-membership level, not a v0.1 role.
-There can be **several Rootadmins** (admin p15 shows two), never none.
+Built in Delivery 2 (migration 0012) and changed since by migrations 0014,
+0017 and 0018. Today each account has **one role**, or none. Roles follow
+the experiment's **teams**, plus the Rootadmin and a general Admin.
+There can be **several Rootadmins**, never none.
+
+Teams with memberships (Admin, Superadmin, Auditor), per-team permissions
+and individual permissions replace the fixed roles in the teams and
+governance work (roadmap §4). Participants and admins share one identity
+(ADR [022](./decisions/022-one-identity-for-participants-and-admins.md)).
 
 | Role | Label | Notes |
 |---|---|---|
-| `owner` | Rootadmin | Everything, including accounts, roles and settings. Several allowed; the last active one can't be deactivated, demoted or deleted (service check plus a deferred constraint trigger). |
-| `admin` | Admin | Everything except accounts, settings and permanent deletes. |
+| `owner` | Rootadmin | Everything, including accounts, roles and settings, and the business fields of an expense (`treasury.manage`, OPS-155). Several allowed; the last active one can't be deactivated or demoted (service check plus a deferred constraint trigger). |
+| `admin` | Admin | Most modules; not accounts management, settings, Treasury publication or expense business fields. |
 | `treasury` | Treasury admin | Treasury (including publish and review), read elsewhere. |
 | `communication` | Communication admin | Home and Documentation, Waitlist, Messages. |
 | `moderation` | Moderator | Feedbacks and issues, Messages. |
@@ -270,79 +302,130 @@ There can be **several Rootadmins** (admin p15 shows two), never none.
 Permissions are `module.action` keys stored as rows (`admin_permissions`),
 granted to roles in `admin_role_permissions`, so a team's rights can change
 without a release, and v1.0 can attach the same keys to team memberships.
-The source is `apps/api/src/access-control/permissions.ts`; migration 0012
-seeds it and a test keeps the two equal. The table below is generated from
-that file:
+The source is `apps/api/src/access-control/permissions.ts`; migrations
+0012 and 0017 seed it and a test keeps the two equal. The table below is
+generated from that file (the unused `*.import` and `*.delete` keys left
+out):
 
 | Module \ role | Rootadmin | Admin | Treasury admin | Communication admin | Moderator | Operation admin | Tech admin | Compliance |
 |---|---|---|---|---|---|---|---|---|
-| People and Organizations | all | read, create, update, import | read | read | read | read, create, update | read | read |
-| Expertise, Fields and Domains | all | read, import | read | read | read | read | read, import | read |
-| Treasury | all | read, create, update, review | read, create, update, review, publish, import | read | — | read | read | read, review |
-| Home and Documentation | all | all | — | read, create, update, publish | read | — | read | read |
+| People and Organizations | all | all | read | read | read | all | read | read |
+| Expertise, Fields and Domains | all | read | read | read | read | read | read | read |
+| Treasury | all | read, create, update, review | read, create, update, review, publish | read | — | read | read | read, review |
+| Home and Documentation | all | all | — | all | read | — | read | read |
 | Feedbacks and issues | all | read, update | — | read | all | — | read | read |
 | Waitlist | all | all | — | all | — | read | — | read |
 | Messages and Emails | all | all | — | all | all | read | read | read |
-| Services | all | read, create, update | read | — | — | read, create, update | read, create, update | read |
-| Permissions | all | read, create, update | read | — | — | read, create, update | read, create, update | read |
+| Services | all | all | read | — | — | all | all | read |
+| Permissions | all | all | read | — | — | all | all | read |
 | Accounts and roles | all | read | — | — | — | — | — | read |
 | History | read | read | — | — | — | — | read | read |
 | Imports | read | read | read | — | — | — | read | read |
 | Settings | manage | — | — | — | — | — | — | — |
 
-"All" is every action the module has. Without `history.read`, Monitoring →
-History and each record's history show the events of the modules the role
-can read. Only People and Organizations have an import, from CSV (ADR 016):
-it needs `directory.create` (the table's write access). The `*.import` and
-`*.delete` keys remain but no route uses them (no Notion import since
-OPS-154, no permanent delete since decision 017). An account with no role
-(made from an invitation link, decision 018) has no permission: it sees its
-own profile only.
+"All" is every action the module has; the Treasury's "all" includes
+`treasury.manage`, held by the Rootadmin only.
 
-**Enforcement.** One global guard (`PermissionGuard`, after the session
-guard) reads each route's declaration — `@Requires(...)`,
-`@RequiresAny(...)`, `@RequiresForParam(...)` for routes whose module is a
-URL parameter (history, imports), or `@SignedIn()` (own profile, sign-out).
-A route that declares nothing is refused (fail closed); a test walks every
-route and checks it against a reviewed table and against every role. A
-denied attempt answers 403 "Your role doesn't allow this." and is recorded
-as a `permission_denied` event on the account. The admin hides what the
-role can't do: menu entries, New / Import / Archive / Delete / Publish /
-Review actions, and records open view-only. The UI never calls an endpoint
-the role can't use, so denials in the log are real attempts.
+- **History:** without `history.read`, Monitoring → History and each
+  record's History show the events of the modules the role can read.
+- **Imports:** only People and Organizations have an import, from CSV
+  (ADR 016). It needs `directory.create`.
+- **Unused keys:** the `*.import` and `*.delete` keys remain, but no route
+  uses them (no Notion import since OPS-154, no permanent delete since
+  ADR 017).
+- **No role:** an account with no role (made from an invitation link,
+  decision 018) has no permission and sees its own profile only.
 
-**Accounts.** "New account" creates an invited account and a one-time
-link (72 h, single use, a newer one cancels it) that the Rootadmin copies
-and sends privately (no email yet, decision 13); the invitee sets their
-own password on `/admin/welcome`. Password reset links work the same way
-(`/admin/reset-password`), made from the account. The token travels in the
-URL fragment (never in a request line, so never in a log) and only its
-SHA-256 is stored. Passwords: 12–128 characters; under 20, three of
-lowercase, uppercase, digits, symbols; not the email or the name; not one
-repeated character; not a common password. Changing the email, the
-password or deactivating one's own account asks for the current password.
+**Enforcement** has three layers:
+
+1. **Every route declares what it needs.** One global guard
+   (`PermissionGuard`, after the session guard) reads the route's
+   declaration:
+   - `@Requires(...)` or `@RequiresAny(...)`;
+   - `@RequiresForParam(...)`, for routes whose module is a URL parameter
+     (history, imports);
+   - `@SignedIn()`, for one's own profile and sign-out.
+
+   A route that declares nothing is refused (fail closed). A test walks
+   every route and checks it against a reviewed table and against every
+   role.
+
+2. **Services check what depends on the record or on another module.**
+   - **Field by field:** the Treasury checks each field of an edit against
+     its own permission (internal note, review status, expense business
+     fields).
+   - **Another module's right:** a change that reaches into another module
+     also needs that module's right. Listing a person's expenses sets a
+     Treasury recipient, so it also needs `treasury.manage`.
+   - **Publication:** archiving or restoring a published Treasury entry
+     changes the public site, so it also needs `treasury.publish`.
+   - **One's own account:** Accounts doesn't act on it (no link, no
+     deactivation, no role change); Profile settings handles it with the
+     current password.
+   - **History feeds:** a record's History shows another record's events
+     only when the viewer can read that record's type.
+3. **Lists and records hide what the role can't read.** For example, a
+   person's access grants are hidden without `access.read`.
+
+A refusal from the guard or from a service answers 403 and is recorded as
+a `permission_denied` History event on the account (OPS-158). The admin
+hides what the role can't do: menu entries, actions, and records open
+view-only. The UI never calls an endpoint the role can't use, so refusals
+in History are real attempts.
+
+**Accounts.**
+
+- **Invitation links:** "New invitation link" (decision 018) makes a link,
+  used once within 7 days by whoever opens it. That person creates their
+  own account, which has no role until a Rootadmin gives one.
+- **Reset links:** made from an account. They last 72 hours, are single
+  use, and a newer one cancels the older.
+- **Tokens:** the token travels in the URL fragment (never in a request
+  line, so never in a log), and only its SHA-256 is stored.
+- **Statuses:** active, invited, deactivated. A password is required only
+  while active (migration 0018), so an invited account can be deactivated,
+  and reactivating it without a password makes it invited again.
+- **Passwords:** 12–128 characters; under 20, three of lowercase,
+  uppercase, digits, symbols; not the email or the name; not one repeated
+  character; not a common password.
+- **Own-account changes:** changing the email or the password, or
+  deactivating one's own account, asks for the current password.
 
 ### 3.2 Audit log (History)
 
-Figma's History panel (admin p6, p9, p12) shows, per record, entries like
-"Candide · Rootadmin · updated · Aug 12 09:14" with the changed fields
-before/after (struck-through old values, added/removed chips). One
+Built in migrations 0009–0010 and extended since (data-model §11). The
+History panel on every record page shows entries like "Name · Rootadmin ·
+updated · Aug 12 09:14", with the changed fields before and after. One
 append-only table serves it and the Monitoring → History page:
 
-- `audit_events`: when, actor (admin user, or `system` / `import` /
-  `stripe_webhook` / `job`), action (`create`, `update`, `delete`,
-  `publish`, `unpublish`, `link`, `unlink`, `import`, `login`, `logout`,
-  `permission_denied`), entity type + id, a **field-level diff**
-  `{ field: { before, after } }`, and the request id.
-- Written by each module's service **inside the same transaction** as the
-  change (no change without its audit row, no audit row for a rolled-back
-  change). Imports write one event per changed record, tagged with the
-  import run.
-- Never updated or deleted by the application (a database role without
-  UPDATE/DELETE on the table in production); retention is **Q11**.
-- Secrets and password hashes are never in a diff; private fields (personal
-  notes, emails) are in the diff (the History page is admin-only) but never
-  in logs.
+- **`audit_events`:**
+  - when, and the actor (an admin account, or automation for imports,
+    Stripe and scripts);
+  - the action: created, imported, duplicated, updated, archived,
+    restored, published, unpublished, comment and file actions, access
+    granted, changed and revoked, account actions (invited, activated,
+    link created and revoked, password and email changed, deactivated,
+    reactivated) and `permission_denied`;
+  - the entity type and id;
+  - a **field-level diff** (`[{ field, label, kind, before, after }]`);
+  - context in `meta` (the record's label, related records).
+- **One "Submit changes" is one event,** written by the module's service
+  **inside the same transaction** as the change: no change without its
+  event, no event for a rolled-back change.
+- **Related records:** an event can name them. A permission's single event
+  shows on its account, its service and its person. A record's History
+  shows such events only to viewers who can read the event's own record
+  type.
+- **Never rewritten:** a database trigger refuses UPDATE, DELETE and
+  TRUNCATE on the table. Retention is **Q11**.
+- **Comments and views:** comments (archived, never deleted) and record
+  views ("viewed this page" at most once per account per window) belong to
+  the same panel.
+- **Privacy:**
+  - secrets and password hashes are never in a diff;
+  - contact fields are masked in History by configuration;
+  - private notes are never returned;
+  - nothing personal goes to the logs.
 
 ### 3.3 Background jobs
 
@@ -388,8 +471,9 @@ delete, ADR 017):
 
 ### 3.5 AI layer
 
-Used only for **feedback and issue triage** (Notion's "AI note", "AI
-significance score", "Bot score", "Translation"). Behind an `AiProvider`
+Planned, first for the **automatic qualification of feedback and issues**
+(the next module, roadmap §2): Notion's "AI note", "AI significance score",
+"Bot score" and "Translation". Behind an `AiProvider`
 interface (`translate`, `assess`), one adapter per provider; the provider
 is **Q12**. Rules: AI output is stored as a suggestion next to the human
 value (e.g. `ai_significance_score` vs `significance_score`) and never
@@ -442,6 +526,41 @@ boundaries for the public site. Added: job failures and integration errors
 are logged with the job/run id and surfaced on the Technical dashboard;
 optional error tracking (self-hosted GlitchTip) is **Q14**.
 
+### 3.10 Archive only
+
+Nothing is deleted (ADR [017](./decisions/017-archive-only.md)):
+
+- **What is archived:** records, comments, profile pictures and Home and
+  Documentation images are archived and restored, never deleted, for every
+  role, the Rootadmin included.
+- **Where archived records go:** they leave the default views and appear in
+  an "Archived" view. Archived Treasury entries leave the public pages.
+  Archiving or restoring a published entry needs `treasury.publish` (§3.1).
+- **Links:** removing a link between two records is not a deletion. Both
+  records stay, and History shows the removal.
+- **Files:** they are never removed from the storage (the interface has no
+  delete).
+- **The one exception** is the one-time deletion of the Treasury
+  supporting documents (ADR [021](./decisions/021-one-time-deletion-of-treasury-documents.md)),
+  behind a verified backup.
+
+### 3.11 Field validation shared by site and API
+
+Every edit form checks its fields the same way (OPS-70):
+
+- **When:** a field is checked when it is left. Once it shows an error, it
+  is re-checked as it changes. Submit checks every field and moves the
+  focus to the first one to fix.
+- **Accessibility:** errors are linked to their fields and read out.
+- **Shared rules** (email, web link, slug and their messages): one file in
+  two places, `apps/api/src/common/field-rules.ts` for the API and
+  `src/shared/validation/fieldRules.ts` for the site. A test fails if the
+  two copies differ.
+- **The API decides:** it refuses every invalid value with a 400 naming the
+  field, whatever the page sent.
+- **Later:** merging the two copies into one shared package is planned in
+  the hardening work (roadmap §4).
+
 ## 4. Integrations
 
 All provider code sits behind an interface in `apps/api/src/integrations/`
@@ -468,9 +587,11 @@ only, validated at startup).
   (Next.js) and the API (NestJS), with PostgreSQL 17 and, when the email
   module ships, a mail server. Configuration only from the server's
   environment files, outside the repository.
-- **Migrations:** Drizzle SQL files, reviewed in the pull request, applied
-  explicitly on release (`db:migrate` with the production env), each in one
-  transaction, after a verified backup — see
+- **Migrations:** Drizzle SQL files, generated from the schema files and
+  reviewed in the pull request. Production is at **0018**; the list is in
+  data-model §14. They are applied explicitly on release (`db:migrate` with
+  the production environment), with both services stopped, after a
+  verified backup, and rehearsed on a copy of production first. See
   [docs/operations](../operations/README.md).
 - **Backups:** today manual per release. Proposal: nightly `pg_dump` (custom
   format) + the file store, kept 30 days on the server and copied
@@ -479,11 +600,18 @@ only, validated at startup).
 - **Monitoring:** external uptime check of `/`, `/api/health` and the admin
   login; journald logs; disk and backup-age alerts; Stripe webhook failures
   and dead jobs on the Technical dashboard.
-- **Release process:** feature branch → merge commit into `develop` → full
-  suite → push to the client repo → deploy with the runbook (backup,
-  build, `chown .next`, migrate, restart, health checks, verification,
-  record of the run). Production currently deploys `develop`; deploying
-  tagged releases from `main` is **Q15**.
+- **Release process:**
+  1. A branch from `develop`, then a pull request into `develop`, with
+     the template filled in.
+  2. The required checks pass (commit conventions, build and unit tests,
+     API tests on PostgreSQL), plus a code owner's review.
+  3. Squash merge.
+  4. Deploy with the runbook: backup, build beside the live release,
+     swap, migrate, start, health checks, verification, record of the
+     run. The previous release is kept as a rollback folder.
+
+  Production deploys `develop`; deploying tagged releases from `main` is
+  **Q15**. How to contribute: [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## 6. Security summary
 
@@ -504,9 +632,9 @@ Today's design leaves these seams, so nothing is reworked:
 
 | v1.0 capability | Seam in v0.1 | How it extends |
 |---|---|---|
-| **Participant accounts** (signup, email validation, password reset) | `admin_users` stays the staff identity | New `accounts` table for participants; an admin who is also a participant links `admin_users.account_id`. Email templates already go through `email_outbox`. |
-| **Profiles** (bio, demographics, expertise, alignment / participation / diversity) | Taxonomy links are already "entity ↔ expertise item" tables | `profiles` (1:1 with `accounts`), `profile_expertise` on the same `expertise_items`; coefficients in their own versioned tables. |
-| **Teams and admin applications** ("Join admin") | `teams` lookup, role keys = team keys, permissions as rows | `team_memberships(account, team, role)` reuse the permission keys; applications are a new table with the audit log. |
+| **Participant accounts** (signup, email validation, password reset) | The accounts table, invitation sign-up, `admin_user_expertise` | One identity for participants and admins (ADR [022](./decisions/022-one-identity-for-participants-and-admins.md)): a participant is an account with no team membership. Sign-up adds email verification and abuse controls; email goes through `email_outbox`. |
+| **Profiles** (bio, demographics, expertise, alignment / participation / diversity) | Taxonomy links are already "entity ↔ expertise item" tables; accounts already have expertise (up to 10) | Profile columns on the account; scores and coefficients in their own versioned tables. |
+| **Teams and governance** (memberships, moderation, reviews, task assignment) | `teams` lookup with `expertise_teams`, permissions as rows, fail-closed guard, service-level checks, History | `team_memberships(account, team, role)` with per-team permission sets and individual permissions; cases, ratings and assignments as new tables with History (roadmap §4). |
 | **Donor identity** (named donations, "recurring donation since …") | Donations have no donor columns | A nullable `donor_account_id` on `treasury_entries` once accounts exist and the donor opts in; anonymous stays the default. |
 | **Wise sync and payouts** | `treasury_entries.source = wise`, unique `(source, external_transaction_id)` | A Wise adapter writes entries idempotently; payouts get their own table linked to expense entries. |
 | **Participation** (dailies, votes, comments) and **governance** (proposals, roadmap) | Feedback `Roadmap item` status; CMS revisions; audit log | New modules with their own tables; feedback can link to roadmap items. |

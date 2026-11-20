@@ -249,10 +249,10 @@ Every module's own diagram and columns follow.
 | Team (items) | — | — | `expertise_teams` → `teams` | |
 | Full path (items) | — | — | — (computed) | Domain > Field > Item, from the joins. |
 
-### 3.5 Relationship limits as database rules (planned: 0014)
+### 3.5 Relationship limits as database rules (planned)
 
 Today the 10 expertise / 5 organizations limits are enforced by the API
-and the importer (contracts, link endpoints, importer cap). Migration 0014
+and the CSV import (contracts, link endpoints, import cap). A planned migration
 (platform) adds a **deferrable constraint trigger** per link table so no code path —
 present or future, including a manual SQL fix — can exceed them:
 
@@ -826,7 +826,7 @@ erDiagram
 | `admin_roles` | key, label, sort_order | `owner` Rootadmin, `admin` Admin, `treasury` Treasury admin, `communication` Communication admin, `moderation` Moderator, `operations` Operation admin, `tech` Tech admin, `compliance` Compliance |
 | `admin_permissions` | key (`module.action`), module, action, description | Seeded from `apps/api/src/access-control/permissions.ts` (43 keys) |
 | `admin_role_permissions` | role_key, permission_key (PK both) | The matrix of overview §3.1; a test checks the seed against permissions.ts |
-| `admin_users` | adds `account_number` (identity, "GE-000001"), `role` → admin_roles, `status` (active, invited, deactivated), `password_hash` (null only while invited), `picture_key` and `picture_type` (PNG, JPEG, WebP), `time_zone` (IANA; null = the browser's), `appearance` (system, light, dark), `note`, `person_id` → people (unique, `set null`), `invited_by_id`, `deactivated_at` | Several Rootadmins allowed: the "one owner" index is gone |
+| `admin_users` | adds `account_number` (identity, "GE-000001"), `role` → admin_roles (null = no role yet, 0014), `status` (active, invited, deactivated), `password_hash` (required only while active: 0018, so an invited account can be deactivated), `picture_key` and `picture_type` (PNG, JPEG, WebP), `time_zone` (IANA; null = the browser's), `appearance` (system, light, dark), `description` (0014), `invited_by_id`, `deactivated_at`; `note` and `person_id` were dropped in 0014 | Several Rootadmins allowed: the "one owner" index is gone |
 | `admin_tokens` | id, admin_user_id, purpose (invite, reset), token_hash (unique), expires_at, used_at, created_by_id | One-time links: 72 h, single use; a new link expires the older ones; only the SHA-256 of the token is stored |
 
 **Never without a Rootadmin** (decision 14): a deferred constraint trigger
@@ -838,8 +838,11 @@ answers with a sentence. Accounts are deactivated, never deleted.
 role foreign key, so the existing owner row becomes account GE-000001,
 active, Rootadmin, with its password and sessions unchanged.
 
-v1.0 participant accounts are a **separate** `accounts` table (overview §7):
-staff access and participation are different concerns with different rules.
+Participants and admins share this table (ADR
+[022](./decisions/022-one-identity-for-participants-and-admins.md)): a
+participant is an account with no team membership. Team memberships, per-team
+permissions and individual permissions are designed with the teams and
+governance work (roadmap §4); they replace `admin_role_permissions` there.
 
 ## 11. Audit log, comments and views (built: migrations 0009–0010)
 
@@ -952,14 +955,22 @@ files; data steps and triggers are added to the generated file by hand.
 | **0011** | `link_order_and_description` | People, Organizations (built, detail-page review) | People and organizations `personal_note` → `description`; `position` on contact channels, organizations and expertise links (backfilled to the order shown) |
 | **0012** | `accounts_and_roles` | Accounts and roles (built, Delivery 2) | `admin_roles`, `admin_permissions`, `admin_role_permissions` (seeded), `admin_tokens`; `admin_users` account number, status, picture, time zone, appearance, note, person; the keep-a-Rootadmin trigger (§10) |
 | **0013** | `services_and_access` | Services and Permissions (built, Delivery 2) | Lookups (statuses, categories, hosting models, access levels, access statuses), `services`, `access_grants` (§9) |
-| **0014** | `feedback_batch_1` | Candide's first feedback (built, Delivery 4, 2026-11-03) | `admin_invitations` (OPS-141, decision 018); `admin_users.role` nullable (no role yet), `admin_users.description` (OPS-144), `admin_user_expertise` (OPS-135); dropped `admin_users.note` and `person_id` (OPS-142, OPS-136; no values in production); `service_category_tags` from `services.category_key` (OPS-149); `services.responsible_admin_id` dropped after an Active Owner permission was added for each responsible account without one (OPS-130, client 2026-11-03), with one History event each; every permission named "Service / Account / Permission level" (OPS-138); `contact_channels` += Other (OPS-153); `audit_events.action` += `link_revoked` |
+| **0014** | `feedback_batch_1` | The client's first feedback (built, Delivery 4, 2026-11-03) | `admin_invitations` (OPS-141, decision 018); `admin_users.role` nullable (no role yet), `admin_users.description` (OPS-144), `admin_user_expertise` (OPS-135); dropped `admin_users.note` and `person_id` (OPS-142, OPS-136; no values in production); `service_category_tags` from `services.category_key` (OPS-149); `services.responsible_admin_id` dropped after an Active Owner permission was added for each responsible account without one (OPS-130, client 2026-11-03), with one History event each; every permission named "Service / Account / Permission level" (OPS-138); `contact_channels` += Other (OPS-153); `audit_events.action` += `link_revoked` |
 | **0015** | `archive_only` | Platform (built, Delivery 6, ADR 017) | `admin_user_pictures` (current and past profile pictures); `archived_at` on comments and supporting documents (deleted comments become archived): archived and restored, never deleted |
 | **0016** | `native_cms` | Home and Documentation (built, Delivery 6, ADR 020) | `cms_documents`, `cms_revisions` (append-only), `cms_images` |
 | **0017** | `treasury_manage_permission` | Treasury (built, OPS-155, ADR 021) | `treasury.manage` (every business field of an expense), granted to the Rootadmin only; `treasury.update` no longer mentions documents. No table change |
-| **0018** | `platform` | Platform (rest) | `managed_by` on `people`, `organizations`, `expertise_domains`, `expertise_fields`, `expertise_items` (backfilled from `notion_page_id`); relationship-limit constraint triggers (§3.5) |
-| **0019** | `feedback` | Feedback and issues | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
-| **0020** | `waitlist` | Waitlist | `waitlist_entries` |
-| **0021** | `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| **0018** | `invited_account_deactivation` | Accounts (built, OPS-158) | `admin_users_password_when_active` requires a password only while active (it allowed a missing one only while invited), so an invited account can be deactivated. No table change |
+
+Planned, numbered when built (the next free number at that time):
+
+| Name | Module | Contents |
+|---|---|---|
+| `feedback` | Feedbacks and issues (next, roadmap §2) | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
+| Information notes | CMS | A new document kind in `cms_documents` (§5) |
+| Teams and governance | Accounts and roles (roadmap §4) | Team memberships, per-team and individual permissions, cases, ratings and assignments, after the hardening migrations of phase 0 |
+| `waitlist` | Waitlist | `waitlist_entries` |
+| `mail` | Messages and Emails | `mailboxes` (seeded), `mail_threads`, `mail_messages`, `email_outbox` |
+| `platform` | Platform | Relationship-limit constraint triggers (§3.5); `managed_by` on the directory and taxonomy tables only if still wanted, now that nothing is imported from Notion |
 
 Numbers follow the build order (roadmap §2); if a module moves, its
 migration takes the next free number at that time — numbers are never
