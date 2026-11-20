@@ -3,9 +3,9 @@
  * uploaded image, else the grey disc. `version` makes a just-changed
  * picture load at once; the API serves it revalidated (no-cache) anyway.
  */
-export function AccountAvatar({ id, hasPicture, size = 24, version }: { id: string; hasPicture: boolean; size?: number; version?: string | number }) {
-  const box = { width: size, height: size };
-  if (!hasPicture) return <span aria-hidden="true" style={box} className="shrink-0 rounded-full bg-avatar" />;
+export function AccountAvatar({ id, hasPicture, size = 24, version }: { id: string; hasPicture: boolean; size?: 24 | 32; version?: string | number }) {
+  const shape = `shrink-0 rounded-full bg-avatar ${size === 32 ? "size-8" : "size-6"}`;
+  if (!hasPicture) return <span aria-hidden="true" className={shape} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a same-origin API image behind the session cookie, not an optimisable asset
     <img
@@ -13,8 +13,7 @@ export function AccountAvatar({ id, hasPicture, size = 24, version }: { id: stri
       alt=""
       width={size}
       height={size}
-      style={box}
-      className="shrink-0 rounded-full bg-avatar object-cover"
+      className={`${shape} object-cover`}
     />
   );
 }
