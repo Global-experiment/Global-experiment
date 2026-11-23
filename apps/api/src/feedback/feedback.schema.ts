@@ -135,7 +135,7 @@ export const submissionTypeLinks = pgTable(
       name: "submission_type_links_submission_fk",
       columns: [table.submissionId, table.kind],
       foreignColumns: [submissions.id, submissions.submittedKind],
-    }).onDelete("cascade"),
+    }).onDelete("restrict"),
     foreignKey({ name: "submission_type_links_type_fk", columns: [table.typeKey, table.kind], foreignColumns: [submissionTypes.key, submissionTypes.kind] })
       .onDelete("restrict")
       .onUpdate("cascade"),
@@ -149,7 +149,7 @@ export const submissionExpertise = pgTable(
   {
     submissionId: uuid("submission_id")
       .notNull()
-      .references(() => submissions.id, { onDelete: "cascade" }),
+      .references(() => submissions.id, { onDelete: "restrict" }),
     expertiseId: uuid("expertise_id")
       .notNull()
       .references(() => expertiseItems.id, { onDelete: "restrict" }),

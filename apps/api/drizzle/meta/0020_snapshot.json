@@ -1,6 +1,6 @@
 {
-  "id": "f92b81e4-0dcc-4fd5-8119-f4b8ca9bbc8b",
-  "prevId": "b93ad5b0-9b81-4108-981b-337b59ed9a01",
+  "id": "0fd34fc8-e21e-4e0e-a0d5-8db390f61f4f",
+  "prevId": "ba5b21be-18d8-4b87-8115-e5edcb83ce3a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2698,7 +2698,7 @@
             "id"
           ],
           "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "restrict"
         },
         "submission_expertise_expertise_id_expertise_items_id_fk": {
           "name": "submission_expertise_expertise_id_expertise_items_id_fk",
@@ -2829,7 +2829,7 @@
             "submitted_kind"
           ],
           "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "restrict"
         },
         "submission_type_links_type_fk": {
           "name": "submission_type_links_type_fk",

@@ -76,9 +76,9 @@ CREATE TABLE "submissions" (
 	CONSTRAINT "submissions_decision_comment_length" CHECK ("submissions"."decision_comment" is null or length("submissions"."decision_comment") <= 5000)
 );
 --> statement-breakpoint
-ALTER TABLE "submission_expertise" ADD CONSTRAINT "submission_expertise_submission_id_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."submissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "submission_expertise" ADD CONSTRAINT "submission_expertise_submission_id_submissions_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."submissions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "submission_expertise" ADD CONSTRAINT "submission_expertise_expertise_id_expertise_items_id_fk" FOREIGN KEY ("expertise_id") REFERENCES "public"."expertise_items"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "submission_type_links" ADD CONSTRAINT "submission_type_links_submission_fk" FOREIGN KEY ("submission_id","kind") REFERENCES "public"."submissions"("id","submitted_kind") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "submission_type_links" ADD CONSTRAINT "submission_type_links_submission_fk" FOREIGN KEY ("submission_id","kind") REFERENCES "public"."submissions"("id","submitted_kind") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "submission_type_links" ADD CONSTRAINT "submission_type_links_type_fk" FOREIGN KEY ("type_key","kind") REFERENCES "public"."submission_types"("key","kind") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_status_key_submission_statuses_key_fk" FOREIGN KEY ("status_key") REFERENCES "public"."submission_statuses"("key") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_archived_by_id_admin_users_id_fk" FOREIGN KEY ("archived_by_id") REFERENCES "public"."admin_users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

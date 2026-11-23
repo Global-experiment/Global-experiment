@@ -5,7 +5,7 @@ import { auditEvents } from "../audit/audit.schema.js";
 import { expertiseDomains, expertiseFields, expertiseItems } from "../expertise/expertise.schema.js";
 import { signedInAdmin, signedInAs, type SignedInAdmin } from "../testing/admin-session.js";
 import { createTestApp, TEST_ORIGIN, type TestApp } from "../testing/test-app.js";
-import { submissions, submissionTypeLinks } from "./feedback.schema.js";
+import { submissionExpertise, submissions, submissionTypeLinks } from "./feedback.schema.js";
 import { FIXTURE_PASS_TOKEN, FIXTURE_SITE_KEY } from "./turnstile.service.js";
 
 /**
@@ -201,6 +201,13 @@ describe("feedbacks and issues", () => {
       await refusedBy(t.db.update(submissions).set({ typeKey: "crash" }).where(eq(submissions.id, row!.id)), "submissions_type_of_kind_fk");
       await refusedBy(t.db.update(submissions).set({ significanceScore: 10.5 }).where(eq(submissions.id, row!.id)), "submissions_significance_range");
       await refusedBy(t.db.update(submissions).set({ body: " " }).where(eq(submissions.id, row!.id)), "submissions_body_length");
+      // Archive only (ADR 017): a submission with links can't be deleted from under them.
+      await t.db.insert(submissionTypeLinks).values({ submissionId: row!.id, kind: "feedback", typeKey: "praise" });
+      await refusedBy(t.db.delete(submissions).where(eq(submissions.id, row!.id)), "submission_type_links_submission_fk");
+      await t.db.delete(submissionTypeLinks).where(eq(submissionTypeLinks.submissionId, row!.id));
+      await t.db.insert(submissionExpertise).values({ submissionId: row!.id, expertiseId: expertise[0]!.id });
+      await refusedBy(t.db.delete(submissions).where(eq(submissions.id, row!.id)), "submission_expertise_submission_id_submissions_id_fk");
+      await t.db.delete(submissionExpertise).where(eq(submissionExpertise.submissionId, row!.id));
     });
   });
 
