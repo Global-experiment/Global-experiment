@@ -6,6 +6,7 @@ export * from "../../audit/audit.schema.js";
 export * from "../../auth/auth.schema.js";
 export * from "../../cms/cms.schema.js";
 export * from "../../expertise/expertise.schema.js";
+export * from "../../feedback/feedback.schema.js";
 export * from "../../import/import.schema.js";
 export * from "../../organizations/organizations.schema.js";
 export * from "../../people/people.schema.js";
