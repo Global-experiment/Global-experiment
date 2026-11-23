@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCalendarDay, isEmail, isScore, isSlug, isWebLink, isWholeNumber } from "./field-rules.js";
+import { isCalendarDay, isEmail, isScore, isSignificanceScore, isSlug, isWebLink, isWholeNumber } from "./field-rules.js";
 
 /** The shared field rules (OPS-70): the admin pages and the API accept and refuse exactly these. */
 describe("field rules", () => {
@@ -60,6 +60,8 @@ describe("field rules", () => {
   it("scores, whole numbers, slugs and calendar days", () => {
     expect(["0", "7", "10", " 3 "].every(isScore)).toBe(true);
     expect(["11", "-1", "2.5", "seven", ""].some(isScore)).toBe(false);
+    expect(["0", "8", "8.2", "0.5", "10", "10.0", " 7.4 "].every(isSignificanceScore)).toBe(true);
+    expect(["10.1", "11", "-1", "8.25", "8.", ".5", "8,2", ""].some(isSignificanceScore)).toBe(false);
     expect(["0", "-12", "300"].every(isWholeNumber)).toBe(true);
     expect(["1.5", "x", "", "1234567890"].some(isWholeNumber)).toBe(false);
     expect(["version-0-1-scope", "home", "a1"].every(isSlug)).toBe(true);
