@@ -31,7 +31,14 @@ const STRIPE_SOURCES = {
   img: "https://*.stripe.com",
 } as const;
 
-export function getSecurityHeaders({ stripe = false }: { stripe?: boolean } = {}): SecurityHeader[] {
+/**
+ * Cloudflare Turnstile, the bot check of the feedback and issue forms (ADR 023): its script and its check frame,
+ * as Cloudflare documents for a CSP. Added on /feedback and /issue only.
+ */
+const TURNSTILE_SOURCE = "https://challenges.cloudflare.com";
+
+export function getSecurityHeaders({ stripe = false, turnstile = false }: { stripe?: boolean; turnstile?: boolean } = {}): SecurityHeader[] {
+  const frameSources = [...(stripe ? [STRIPE_SOURCES.frame] : []), ...(turnstile ? [TURNSTILE_SOURCE] : [])];
   const isDev = process.env.NODE_ENV !== "production";
 
   const headers: SecurityHeader[] = [
@@ -46,12 +53,12 @@ export function getSecurityHeaders({ stripe = false }: { stripe?: boolean } = {}
       key: "Content-Security-Policy",
       value: [
         "default-src 'self'",
-        `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${stripe ? ` ${STRIPE_SOURCES.script}` : ""}`,
+        `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}${stripe ? ` ${STRIPE_SOURCES.script}` : ""}${turnstile ? ` ${TURNSTILE_SOURCE}` : ""}`,
         "style-src 'self' 'unsafe-inline'",
         `img-src 'self' data:${stripe ? ` ${STRIPE_SOURCES.img}` : ""}`,
         "font-src 'self'",
         `connect-src 'self'${stripe ? ` ${STRIPE_SOURCES.connect}` : ""}`,
-        ...(stripe ? [`frame-src ${STRIPE_SOURCES.frame}`] : []),
+        ...(frameSources.length > 0 ? [`frame-src ${frameSources.join(" ")}`] : []),
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
