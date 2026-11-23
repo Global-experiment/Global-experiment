@@ -80,6 +80,7 @@ export class TurnstileService {
       return "failed";
     }
     // Cloudflare's test secret answers for any page and action; real keys must match this site and this form.
+    // Development only: production refuses Cloudflare's test keys at start-up (env.ts).
     if (secretKey === TURNSTILE_TEST_KEYS.secretKey) return "passed";
     if (result.hostname !== new URL(this.config.publicSiteUrl).hostname || result.action !== action) return "failed";
     return "passed";

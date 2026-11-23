@@ -20,6 +20,15 @@ const originList = z
  */
 export const TURNSTILE_TEST_KEYS = { siteKey: "1x00000000000000000000AA", secretKey: "1x0000000000000000000000000000000AA" } as const;
 
+/**
+ * Every Turnstile test key Cloudflare documents (always pass, always block, invisible, interactive; the secrets
+ * that pass, fail or report a spent token). None of them checks anything: production refuses them at start-up.
+ */
+export const TURNSTILE_DOCUMENTED_TEST_KEYS = {
+  siteKeys: ["1x00000000000000000000AA", "2x00000000000000000000AB", "1x00000000000000000000BB", "2x00000000000000000000BB", "3x00000000000000000000FF"],
+  secretKeys: ["1x0000000000000000000000000000000AA", "2x0000000000000000000000000000000AA", "3x0000000000000000000000000000000AA"],
+} as const;
+
 function turnstileConfig(nodeEnv: string, secretKey: string | undefined, siteKey: string | undefined, fixture: boolean) {
   if (nodeEnv === "development" && !secretKey && !siteKey) return { secretKey: TURNSTILE_TEST_KEYS.secretKey, siteKey: TURNSTILE_TEST_KEYS.siteKey, fixture };
   return { secretKey, siteKey, fixture };
@@ -155,6 +164,20 @@ const envSchema = z
     }
     if (env.TURNSTILE_FIXTURE && env.NODE_ENV !== "test") {
       context.addIssue({ code: "custom", path: ["TURNSTILE_FIXTURE"], message: "is only allowed when NODE_ENV is test" });
+    }
+    if (production && (TURNSTILE_DOCUMENTED_TEST_KEYS.secretKeys as readonly string[]).includes(env.TURNSTILE_SECRET_KEY ?? "")) {
+      context.addIssue({
+        code: "custom",
+        path: ["TURNSTILE_SECRET_KEY"],
+        message: "is one of Cloudflare's test keys, which check nothing; use the real secret in production",
+      });
+    }
+    if (production && (TURNSTILE_DOCUMENTED_TEST_KEYS.siteKeys as readonly string[]).includes(env.TURNSTILE_SITE_KEY ?? "")) {
+      context.addIssue({
+        code: "custom",
+        path: ["TURNSTILE_SITE_KEY"],
+        message: "is one of Cloudflare's test keys, which check nothing; use the real site key in production",
+      });
     }
     const stripeLive = Boolean(env.STRIPE_SECRET_KEY && /_live_/.test(env.STRIPE_SECRET_KEY));
     if (stripeLive && !env.STRIPE_LIVE_ENABLED) {

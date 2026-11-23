@@ -35,7 +35,8 @@ check before it saves one.
     the API gives it to the page (`GET /api/feedback/config`), so changing
     it needs no rebuild.
   - Development without keys uses Cloudflare's documented test keys, which
-    always pass. Production never does.
+    always pass. Production never does: it refuses every Cloudflare test
+    key at start-up.
   - Tests check tokens in-process (`TURNSTILE_FIXTURE`, refused unless
     `NODE_ENV` is `test`); the browser tests replace Cloudflare's script.
 - **CSP.** `/feedback` and `/issue`, and only those, allow
