@@ -1,11 +1,11 @@
 import { ReportComposer } from "../ReportComposer";
 
 /**
- * M1 navigation scaffold. Qualification, the paragraph and its session
- * draft are real UI state; submitting does not persist anything, call AI
- * qualification, or create a Notion entry — that pipeline is M2. Copy and
- * types live in src/shared/report/reportKinds.ts. See
- * docs/architecture/decisions/008-route-shells.md.
+ * The composer (ReportComposer): qualification, the paragraph and its
+ * session draft, then the send, checked by Cloudflare Turnstile (ADR 023)
+ * and saved by the API for the admins (Feedbacks and issues). The automatic
+ * qualification comes later. Copy and types live in
+ * src/shared/report/reportKinds.ts.
  */
 export default function IssuePage() {
   return <ReportComposer kind="issue" />;
