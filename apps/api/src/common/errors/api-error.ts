@@ -1,5 +1,14 @@
 export type ApiErrorCode =
-  "validation_failed" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "payload_too_large" | "rate_limited" | "provider_unavailable" | "internal";
+  | "validation_failed"
+  | "unauthenticated"
+  | "forbidden"
+  | "not_found"
+  | "conflict"
+  | "payload_too_large"
+  | "rate_limited"
+  | "provider_unavailable"
+  | "unavailable"
+  | "internal";
 
 export const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   validation_failed: 400,
@@ -10,6 +19,7 @@ export const STATUS_BY_CODE: Record<ApiErrorCode, number> = {
   payload_too_large: 413,
   rate_limited: 429,
   provider_unavailable: 502,
+  unavailable: 503,
   internal: 500,
 };
 
@@ -66,6 +76,13 @@ export class NotFoundError extends ApiError {
 export class ConflictError extends ApiError {
   constructor(message = "This conflicts with existing data.", details?: unknown) {
     super("conflict", message, details);
+  }
+}
+
+/** A feature that can't run on this server right now (a required setting is missing): 503, logged by the caller. */
+export class ServiceUnavailableError extends ApiError {
+  constructor(message = "This is not available right now. Please try again later.") {
+    super("unavailable", message);
   }
 }
 

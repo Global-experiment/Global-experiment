@@ -21,6 +21,7 @@ export const AUDITED_ENTITIES = [
   "admin_user",
   "admin_invitation",
   "cms_document",
+  "submission",
 ] as const;
 export type AuditedEntity = (typeof AUDITED_ENTITIES)[number];
 

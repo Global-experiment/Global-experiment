@@ -14,6 +14,17 @@ const originList = z
   )
   .pipe(z.array(z.url({ protocol: /^https?$/ }).transform((url) => new URL(url).origin)).min(1));
 
+/**
+ * Cloudflare's documented Turnstile test keys that always pass: local development works without real keys, with the
+ * real check. Used only when NODE_ENV is development and neither key is set; never in production or in tests.
+ */
+export const TURNSTILE_TEST_KEYS = { siteKey: "1x00000000000000000000AA", secretKey: "1x0000000000000000000000000000000AA" } as const;
+
+function turnstileConfig(nodeEnv: string, secretKey: string | undefined, siteKey: string | undefined, fixture: boolean) {
+  if (nodeEnv === "development" && !secretKey && !siteKey) return { secretKey: TURNSTILE_TEST_KEYS.secretKey, siteKey: TURNSTILE_TEST_KEYS.siteKey, fixture };
+  return { secretKey, siteKey, fixture };
+}
+
 /** `pglite:<folder>`: the local development database (zero install), never production. */
 export const PGLITE_URL = /^pglite:(.+)$/;
 
@@ -114,6 +125,15 @@ const envSchema = z
     // Hosted Stripe Checkout for every donation (client review 2026-10-21); the embedded card form stays behind "embedded".
     DONATIONS_CHECKOUT: z.enum(["embedded", "hosted"]).default("hosted"),
     DONATIONS_DEFAULT_CURRENCY: z.enum(["EUR", "USD", "CHF"]).default("USD"),
+    /**
+     * The bot check of the public feedback and issue forms (Cloudflare Turnstile, ADR 023). The secret stays on the
+     * server; the site key is public by design (the page shows the check with it). Without a secret in production,
+     * submissions are refused (503), never accepted unchecked.
+     */
+    TURNSTILE_SECRET_KEY: z.string().trim().max(255).optional(),
+    TURNSTILE_SITE_KEY: z.string().trim().max(255).optional(),
+    /** NODE_ENV=test only: tokens are checked in-process ("fixture-pass" passes), with no call to Cloudflare. */
+    TURNSTILE_FIXTURE: booleanFromString.default(false),
   })
   .transform((env, context) => {
     const production = env.NODE_ENV === "production";
@@ -132,6 +152,9 @@ const envSchema = z
     }
     if (env.STRIPE_FIXTURE && env.NODE_ENV !== "test") {
       context.addIssue({ code: "custom", path: ["STRIPE_FIXTURE"], message: "is only allowed when NODE_ENV is test" });
+    }
+    if (env.TURNSTILE_FIXTURE && env.NODE_ENV !== "test") {
+      context.addIssue({ code: "custom", path: ["TURNSTILE_FIXTURE"], message: "is only allowed when NODE_ENV is test" });
     }
     const stripeLive = Boolean(env.STRIPE_SECRET_KEY && /_live_/.test(env.STRIPE_SECRET_KEY));
     if (stripeLive && !env.STRIPE_LIVE_ENABLED) {
@@ -185,6 +208,7 @@ const envSchema = z
       },
       fileStorageDir: env.FILE_STORAGE_DIR ?? (production ? "/var/lib/global-experiment/files" : ".data/files"),
       jobsDriver: env.JOBS_DRIVER ?? (env.NODE_ENV === "test" || pglite ? "inprocess" : "pgboss"),
+      turnstile: turnstileConfig(env.NODE_ENV, id(env.TURNSTILE_SECRET_KEY), id(env.TURNSTILE_SITE_KEY), env.TURNSTILE_FIXTURE),
       donationPreviewToken: id(env.DONATIONS_PREVIEW_TOKEN),
       donationDefaults: {
         enabled: env.DONATIONS_ENABLED,
