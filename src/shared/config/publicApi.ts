@@ -14,9 +14,10 @@ import type { ContentBlock } from "@/shared/content/types";
  * fallback. The donation configuration (flags from settings) and Checkout
  * session checks are never cached. Home and Documentation (native since
  * Delivery 6, ADR 020) are cached the same way under the `home` and
- * `documentation` tags, revalidated on every publication.
+ * `documentation` tags, revalidated on every publication. Feedback and issue
+ * submissions (`feedback`) are sent by the browser and never cached.
  */
-export const PUBLIC_API_PREFIXES = ["donations", "stripe", "treasury", "cms"] as const;
+export const PUBLIC_API_PREFIXES = ["donations", "stripe", "treasury", "cms", "feedback"] as const;
 
 /** Tags the API may revalidate (apps/api/src/revalidation/revalidation.service.ts). */
 export const PUBLIC_CACHE_TAGS = { treasury: "treasury", home: "home", documentation: "documentation" } as const;

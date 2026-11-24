@@ -7,6 +7,7 @@ import { organizations } from "../organizations/organizations.schema.js";
 import { people } from "../people/people.schema.js";
 import { treasuryEntries } from "../treasury/treasury.schema.js";
 import { cmsDocuments, cmsRevisions } from "../cms/cms.schema.js";
+import { submissions } from "../feedback/feedback.schema.js";
 import type { Executor } from "./audit.service.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,6 +18,8 @@ export const moneyLabel = (minor: number, currency: string) =>
 
 export const personLabel = (row: { personNumber: number; name: string }) => `PER-${row.personNumber} · ${row.name}`;
 export const organizationLabel = (row: { orgNumber: number; name: string }) => `ORG-${row.orgNumber} · ${row.name}`;
+/** "#484 · Feedback": a submission by its number and kind, never its text (the visitor's words stay on the record). */
+export const submissionLabel = (row: { submissionNumber: number; kind: string }) => `#${row.submissionNumber} · ${row.kind === "issue" ? "Issue" : "Feedback"}`;
 export const entryLabel = (row: { entryNumber: number; grossAmount: number; currency: string }) =>
   `EXP-${row.entryNumber} · ${moneyLabel(row.grossAmount, row.currency)}`;
 
@@ -65,6 +68,14 @@ export async function entityLabel(db: Executor, entityType: string, entityId: st
     return row?.name;
   }
   if (entityType === "admin_invitation") return "Invitation link";
+  if (entityType === "submission") {
+    const [row] = await db
+      .select({ submissionNumber: submissions.submissionNumber, kind: submissions.kind })
+      .from(submissions)
+      .where(eq(submissions.id, entityId))
+      .limit(1);
+    return row ? submissionLabel(row) : undefined;
+  }
   if (entityType === "cms_document") {
     const [row] = await db
       .select({ kind: cmsDocuments.kind, documentNumber: cmsDocuments.documentNumber, title: cmsRevisions.title })
@@ -142,6 +153,14 @@ export async function entityTitles(db: Executor, refs: readonly { type: string; 
     for (const row of rows) titles.set(`admin_user:${row.id}`, row.name);
   }
   for (const id of idsOf("admin_invitation")) titles.set(`admin_invitation:${id}`, "Invitation link");
+  const submissionIds = idsOf("submission");
+  if (submissionIds.length > 0) {
+    const rows = await db
+      .select({ id: submissions.id, submissionNumber: submissions.submissionNumber, kind: submissions.kind })
+      .from(submissions)
+      .where(inArray(submissions.id, submissionIds));
+    for (const row of rows) titles.set(`submission:${row.id}`, submissionLabel(row));
+  }
   const documentIds = idsOf("cms_document");
   if (documentIds.length > 0) {
     const rows = await db

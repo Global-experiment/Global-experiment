@@ -92,7 +92,7 @@ test.describe("qualification opens over the page you came from (item 5)", () => 
 });
 
 test.describe("unsent paragraphs survive within the session (item 6)", () => {
-  test("restored on return, kept per kind + origin page, and not cleared by the inert CTA", async ({ page, browser }) => {
+  test("restored on return, and kept per kind + origin page", async ({ page, browser }) => {
     const composer = "/feedback?source=%2Ftreasury&qualified=1&type=Praise";
     await page.goto(composer);
     // Hydrated (the source is read client-side) before typing, so the input reaches the draft store.
@@ -101,11 +101,6 @@ test.describe("unsent paragraphs survive within the session (item 6)", () => {
     await field.fill("Half-written feedback about Treasury.");
 
     await page.goto("/treasury");
-    await page.goto(composer);
-    await expect(page.getByLabel("Your feedback")).toHaveValue("Half-written feedback about Treasury.");
-
-    // The M1 CTA is inert: it must not pretend a submission and clear the draft.
-    await page.getByRole("button", { name: "Send feedback" }).click();
     await page.goto(composer);
     await expect(page.getByLabel("Your feedback")).toHaveValue("Half-written feedback about Treasury.");
 

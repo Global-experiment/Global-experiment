@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnvValidationError, parseConfig } from "./env.js";
+import { EnvValidationError, parseConfig, TURNSTILE_DOCUMENTED_TEST_KEYS, TURNSTILE_TEST_KEYS } from "./env.js";
 
 const base = { DATABASE_URL: "postgres://fake_user@localhost:5432/fake_db" };
 
@@ -162,5 +162,57 @@ describe("parseConfig — donations opening", () => {
     expect(parseConfig({ ...base, DONATIONS_PREVIEW_TOKEN: token }).donationPreviewToken).toBe(token);
     expect(() => parseConfig({ ...base, DONATIONS_PREVIEW_TOKEN: "short" })).toThrow(/DONATIONS_PREVIEW_TOKEN/);
     expect(() => parseConfig({ ...base, DONATIONS_PREVIEW_TOKEN: "x".repeat(31) + "!" })).toThrow(/DONATIONS_PREVIEW_TOKEN/);
+  });
+});
+
+describe("parseConfig — feedback bot check (Turnstile)", () => {
+  const production = { ...base, NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://example.org" };
+
+  it("uses Cloudflare's always-pass test keys in development only, when no key is set", () => {
+    expect(parseConfig({ ...base }).turnstile).toEqual({ ...TURNSTILE_TEST_KEYS, fixture: false });
+    expect(parseConfig({ ...base, NODE_ENV: "test" }).turnstile).toEqual({ secretKey: undefined, siteKey: undefined, fixture: false });
+    expect(parseConfig(production).turnstile).toEqual({ secretKey: undefined, siteKey: undefined, fixture: false });
+  });
+
+  it("takes the keys from the environment, an empty value counting as unset", () => {
+    const keys = { TURNSTILE_SECRET_KEY: "secret-from-the-server", TURNSTILE_SITE_KEY: "site-key-from-the-server" };
+    expect(parseConfig({ ...production, ...keys }).turnstile).toEqual({
+      secretKey: keys.TURNSTILE_SECRET_KEY,
+      siteKey: keys.TURNSTILE_SITE_KEY,
+      fixture: false,
+    });
+    expect(parseConfig({ ...production, TURNSTILE_SECRET_KEY: "", TURNSTILE_SITE_KEY: "" }).turnstile.secretKey).toBeUndefined();
+  });
+
+  it("accepts the in-process fixture under NODE_ENV=test only", () => {
+    expect(parseConfig({ ...base, NODE_ENV: "test", TURNSTILE_FIXTURE: "1" }).turnstile.fixture).toBe(true);
+    expect(() => parseConfig({ ...base, TURNSTILE_FIXTURE: "1" })).toThrow(/TURNSTILE_FIXTURE/);
+    expect(() => parseConfig({ ...production, TURNSTILE_FIXTURE: "1" })).toThrow(/TURNSTILE_FIXTURE/);
+  });
+});
+
+describe("parseConfig — no Turnstile test keys in production", () => {
+  const production = { ...base, NODE_ENV: "production", ADMIN_ALLOWED_ORIGINS: "https://example.org" };
+
+  it.each(TURNSTILE_DOCUMENTED_TEST_KEYS.secretKeys)("refuses the test secret %s at start-up, without echoing it", (secret) => {
+    const parse = () => parseConfig({ ...production, TURNSTILE_SECRET_KEY: secret, TURNSTILE_SITE_KEY: "real-looking-site-key" });
+    expect(parse).toThrow(EnvValidationError);
+    expect(parse).toThrow(/TURNSTILE_SECRET_KEY: is one of Cloudflare's test keys/);
+    expect(parse).not.toThrow(new RegExp(secret));
+  });
+
+  it.each(TURNSTILE_DOCUMENTED_TEST_KEYS.siteKeys)("refuses the test site key %s at start-up", (siteKey) => {
+    expect(() => parseConfig({ ...production, TURNSTILE_SECRET_KEY: "real-looking-secret", TURNSTILE_SITE_KEY: siteKey })).toThrow(
+      /TURNSTILE_SITE_KEY: is one of Cloudflare's test keys/,
+    );
+  });
+
+  it("accepts them outside production, where development uses them by default", () => {
+    const keys = { TURNSTILE_SECRET_KEY: "2x0000000000000000000000000000000AA", TURNSTILE_SITE_KEY: "2x00000000000000000000AB" };
+    expect(parseConfig({ ...base, ...keys }).turnstile.secretKey).toBe(keys.TURNSTILE_SECRET_KEY);
+    expect(parseConfig({ ...base, NODE_ENV: "test", ...keys }).turnstile.siteKey).toBe(keys.TURNSTILE_SITE_KEY);
+    expect(parseConfig({ ...production, TURNSTILE_SECRET_KEY: "real-looking-secret", TURNSTILE_SITE_KEY: "real-looking-site-key" }).turnstile.secretKey).toBe(
+      "real-looking-secret",
+    );
   });
 });

@@ -10,6 +10,9 @@ export const API_PREFIX = "api";
 export const JSON_BODY_LIMIT = "100kb";
 /** Stripe signs the exact bytes it sends: this path gets the raw body, never parsed JSON. */
 export const STRIPE_WEBHOOK_PATH = `/${API_PREFIX}/stripe/webhook`;
+/** The public feedback and issue route: 5,000 characters fit in 20 KB of UTF-8; nothing bigger is read. */
+export const FEEDBACK_SUBMIT_PATH = `/${API_PREFIX}/feedback/submissions`;
+export const FEEDBACK_BODY_LIMIT = "32kb";
 
 /**
  * The Express instance is created here, before Nest registers any route,
@@ -51,6 +54,7 @@ export function configureApp(app: INestApplication, config: AppConfig): void {
   server.use(cookieParser());
   // Before the JSON parser, which then skips the already-read body.
   server.use(STRIPE_WEBHOOK_PATH, express.raw({ type: () => true, limit: "1mb" }));
+  server.use(FEEDBACK_SUBMIT_PATH, express.json({ limit: FEEDBACK_BODY_LIMIT }));
   server.useBodyParser("json", { limit: JSON_BODY_LIMIT });
   // Same-origin API behind the site's reverse proxy: no CORS is enabled.
 

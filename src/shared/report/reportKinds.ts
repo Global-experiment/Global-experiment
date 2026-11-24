@@ -1,6 +1,8 @@
 import type { ReportKind } from "@/shared/navigation/sourcePage";
 
 export interface ReportType {
+  /** What the API stores (migration 0020 seeds the same keys). */
+  key: string;
   label: string;
   description: string;
 }
@@ -14,6 +16,9 @@ export interface ReportKindConfig {
   ctaLabel: string;
   messageLabel: string;
   placeholder: string;
+  /** Once the API has saved it (Figma p7: "Feedback sent"). */
+  sentTitle: string;
+  sentBody: string;
   types: readonly ReportType[];
 }
 
@@ -31,13 +36,15 @@ export const REPORT_KINDS: Record<ReportKind, ReportKindConfig> = {
     ctaLabel: "Send feedback",
     messageLabel: "Your feedback",
     placeholder: "Please develop your feedback for a better administration of your request.",
+    sentTitle: "Feedback sent",
+    sentBody: "Thank you for your feedback.",
     types: [
-      { label: "Feature request", description: "Asks for new capability" },
-      { label: "Enhancement", description: "Improve existing capability" },
-      { label: "UX friction", description: "Usable but confusing/inefficient" },
-      { label: "Content suggestion", description: "Wording, documentation, copy" },
-      { label: "Comparison", description: "References a competitor product" },
-      { label: "Praise", description: "Unsolicited compliment" },
+      { key: "feature_request", label: "Feature request", description: "Asks for new capability" },
+      { key: "enhancement", label: "Enhancement", description: "Improve existing capability" },
+      { key: "ux_friction", label: "UX friction", description: "Usable but confusing/inefficient" },
+      { key: "content_suggestion", label: "Content suggestion", description: "Wording, documentation, copy" },
+      { key: "comparison", label: "Comparison", description: "References a competitor product" },
+      { key: "praise", label: "Praise", description: "Unsolicited compliment" },
     ],
   },
   issue: {
@@ -46,16 +53,18 @@ export const REPORT_KINDS: Record<ReportKind, ReportKindConfig> = {
     ctaLabel: "Report issue",
     messageLabel: "Your issue report",
     placeholder: "Please develop your issue for a better administration of your request.",
+    sentTitle: "Issue reported",
+    sentBody: "Thank you for reporting this issue.",
     types: [
-      { label: "Functional bug", description: "Feature doesn't behave as specified" },
-      { label: "Visual bug", description: "UI/rendering/layout defect" },
-      { label: "Crash", description: "Application termination or freeze" },
-      { label: "Performance", description: "Slowness, lag, timeout, resource usage" },
-      { label: "Data loss", description: "User data corrupted, missing, or deleted" },
-      { label: "Security vulnerability", description: "Exploitable flaw (routes to security team, not public triage)" },
-      { label: "Accessibility", description: "WCAG/a11y non-conformance" },
-      { label: "Broken link", description: "404, dead link, misrouted navigation" },
-      { label: "Compatibility", description: "Browser/OS/device-specific failure" },
+      { key: "functional_bug", label: "Functional bug", description: "Feature doesn't behave as specified" },
+      { key: "visual_bug", label: "Visual bug", description: "UI/rendering/layout defect" },
+      { key: "crash", label: "Crash", description: "Application termination or freeze" },
+      { key: "performance", label: "Performance", description: "Slowness, lag, timeout, resource usage" },
+      { key: "data_loss", label: "Data loss", description: "User data corrupted, missing, or deleted" },
+      { key: "security_vulnerability", label: "Security vulnerability", description: "Exploitable flaw (routes to security team, not public triage)" },
+      { key: "accessibility", label: "Accessibility", description: "WCAG/a11y non-conformance" },
+      { key: "broken_link", label: "Broken link", description: "404, dead link, misrouted navigation" },
+      { key: "compatibility", label: "Compatibility", description: "Browser/OS/device-specific failure" },
     ],
   },
 };
@@ -65,6 +74,12 @@ export function reportKindForHref(href: string): ReportKind | undefined {
   if (href === "/feedback") return "feedback";
   if (href === "/issue") return "issue";
   return undefined;
+}
+
+/** The API keys of these labels, in the kind's own order (unknown labels are dropped). */
+export function typeKeys(kind: ReportKind, labels: Iterable<string>): string[] {
+  const wanted = new Set(labels);
+  return REPORT_KINDS[kind].types.filter((type) => wanted.has(type.label)).map((type) => type.key);
 }
 
 /** Keeps only labels of this kind's types, in the kind's own order, without duplicates. */

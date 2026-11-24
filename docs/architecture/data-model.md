@@ -638,78 +638,83 @@ uses the image. Never deleted.
 
 ## 6. Feedback and issues
 
-Notion "Feedbacks and issues (1)" (19 properties, 10 demo rows) and the
-public composers (one free text + several categories of the chosen kind).
+Built in migrations 0019 (tables, generated) and 0020 (lookups, custom).
+What visitors send from the public composers (one text and the types they
+pick), and how the admins qualify it. Nothing about feedback is public
+(client, 2026-11-23). No IP address or other identifier of the sender is
+stored: the rate limit keeps the address in memory only, and the bot check
+(ADR 023) stores nothing.
 
 ### 6.1 `submissions`
 
-| Column | Type | Rules | Notion |
+| Column | Type | Rules | Figma |
 |---|---|---|---|
 | `id` | uuid PK | | |
-| `submission_number` | integer identity | Displayed `#n` | Submission ID |
-| `notion_page_id` | uuid null | Unique | |
-| `type` | text | `feedback`, `issue` (CHECK) | Type |
-| `title` | text null | ≤ 200; generated from the text or by an admin | Title |
-| `body` | text | 1–20 000 (the composer's limit) | Submission text |
-| `locale` | text null | BCP 47 | Locale |
-| `translation` | text null | Translation into English | Translation |
-| `source_page` | text null | Same-origin path (the composer sanitises it) | Source page |
-| `external_submission_id` | text null | Unique | External submission ID |
-| `status_key` | text → `submission_statuses` | Default `opened` | Status |
-| `decision_rationale` | text null | ≤ 5000, *private* | Decision rationale |
-| `ai_note` | text null | AI output, *private* | AI note |
-| `ai_significance_score` | numeric(4,2) null | Range Q7 (CHECK added once known) | AI significance score |
-| `significance_score` | numeric(4,2) null | Human value, range Q7 | Significance score |
-| `bot_score` | numeric(4,2) null | Range Q7 | Bot score |
-| `ai_model`, `ai_prompt_version` | text null | Provenance of AI fields | — |
-| `ai_assessed_at` | timestamptz null | | — |
-| `confidential` | boolean not null default false | True for "Security vulnerability" (set on insert) | — |
-| `public_summary` | text null | Only if not confidential (CHECK, Q31) | — |
-| `duplicate_of_id` | uuid null → submissions `set null` | ≠ id (CHECK) | — |
+| `submission_number` | integer identity | Unique, > 0 | Feedback issue ID |
+| `kind` | text | `feedback`, `issue` (CHECK); an admin may reclassify | Type |
+| `submitted_kind` | text | `feedback`, `issue` (CHECK); what the visitor chose, never changes | — |
+| `body` | text | 1–5,000 characters after trim | Submission text |
+| `source_page` | text null | Same-site path, ≤ 300, starts with `/` (the site's sanitizer, shared with the API) | Source page |
+| `locale` | text null | Language tag shape, ≤ 35 | Locale |
 | `submitted_at` | timestamptz | | Submitted at |
-| `created_at`, `updated_at` | timestamptz | | Last edited at |
+| `external_submission_id` | text null | 1–255, unique when set | External submission ID |
+| `translation` | text null | ≤ 20,000; filled by the automatic qualification (Q12) | Translation |
+| `bot_score` | numeric(4,3) null | 0–1; automatic (Q7) | Bot score |
+| `ai_significance_score` | numeric(3,1) null | 0–10; automatic (Q7) | AI significance score |
+| `ai_comment` | text null | ≤ 500; automatic | AI comment |
+| `ai_note` | text null | ≤ 5,000; automatic | AI note |
+| `type_key` | text null | The admins' feedback or issue type; `(type_key, kind)` → `submission_types(key, kind)` | Feedback type / Issue type |
+| `status_key` | text null → `submission_statuses` | None = new | Status |
+| `significance_score` | numeric(3,1) null | 0.0–10.0, one decimal, set by an admin | Significance score |
+| `decision_comment` | text null | ≤ 5,000 | Decision comment |
+| `created_at`, `updated_at` | timestamptz | `updated_at` moves only when an admin changes something | Last edited at |
+| `archived_at`, `archived_by_id` | | Archive only (ADR 017) | — |
 
-`submission_statuses` lookup: `opened` Opened (Figma case state; Notion's
-empty), `roadmap_item` Roadmap item, `discarded` Discarded, `archived`
-Archived (Notion options; Q6).
+`submission_statuses` lookup: `roadmap_item` Roadmap item, `discarded`
+Discarded. None means new; archiving is the archive action, not a status
+(client, 2026-11-23, Q6).
 
-### 6.2 Categories and expertise
+Indexes: `submitted_at` (newest first, the list's default), `kind`,
+`status_key`, `type_key`, `archived_at`.
+
+### 6.2 Types and expertise
 
 - `submission_types(key, kind, label, description, sort_order)`, unique
   `(key, kind)`: feedback — Feature request, Enhancement, UX friction,
   Content suggestion, Comparison, Praise; issue — Functional bug, Visual
   bug, Crash, Performance, Data loss, Security vulnerability,
-  Accessibility, Broken link, Compatibility (the composer's lists = Notion's
-  "Feedback type" / "Issue type").
-- `submission_type_links(submission_id, submission_type, type_key)` with
-  composite foreign keys `(submission_id, submission_type) → submissions(id,
-  type)` and `(type_key, submission_type) → submission_types(key, kind)` —
-  the database guarantees a feedback only gets feedback categories.
-  (Notion stores one; the composer allows several.)
-- `submission_expertise(submission_id, expertise_id)` — Notion's
-  "Expertise" labels mapped to taxonomy items by name (same 38-label list
-  as Documentation, Q29).
+  Accessibility, Broken link, Compatibility (the composers' lists, Figma
+  p12–p13).
+- `submission_type_links(submission_id, kind, type_key)`: the types the
+  visitor picked, kept as sent. Composite foreign keys
+  `(submission_id, kind) → submissions(id, submitted_kind)` and
+  `(type_key, kind) → submission_types(key, kind)`: the database
+  guarantees a feedback only holds feedback types.
+- `submission_expertise(submission_id, expertise_id, position)`: where an
+  admin routes the submission, up to 10, in the admin's order.
+
+History: the record type `submission` ("#484 · Feedback"), with views and
+comments; its creation is written by "Public form", every admin change by
+the admin. `feedback.read` reads, `feedback.update` qualifies, archives and
+restores; `feedback.publish` is unused while nothing is public (Q31).
 
 ```mermaid
 erDiagram
-  submissions }o--|| submission_statuses : status
-  submissions ||--o{ submission_type_links : ""
+  submissions }o--o| submission_statuses : status
+  submissions }o--o| submission_types : "admin type"
+  submissions ||--o{ submission_type_links : "picked"
   submission_types ||--o{ submission_type_links : ""
   submissions ||--o{ submission_expertise : ""
   expertise_items ||--o{ submission_expertise : ""
-  submissions |o--o{ submissions : "duplicate of"
   submissions {
     uuid id PK
     int submission_number UK
-    text type "feedback | issue"
-    text body "private"
-    text locale
+    text kind "feedback | issue"
+    text submitted_kind "feedback | issue"
+    text body
+    text type_key FK
     text status_key FK
-    numeric ai_significance_score
-    numeric significance_score
-    numeric bot_score
-    bool confidential
-    uuid duplicate_of_id FK
+    numeric significance_score "0.0-10.0"
   }
 ```
 
@@ -960,12 +965,13 @@ files; data steps and triggers are added to the generated file by hand.
 | **0016** | `native_cms` | Home and Documentation (built, Delivery 6, ADR 020) | `cms_documents`, `cms_revisions` (append-only), `cms_images` |
 | **0017** | `treasury_manage_permission` | Treasury (built, OPS-155, ADR 021) | `treasury.manage` (every business field of an expense), granted to the Rootadmin only; `treasury.update` no longer mentions documents. No table change |
 | **0018** | `invited_account_deactivation` | Accounts (built, OPS-158) | `admin_users_password_when_active` requires a password only while active (it allowed a missing one only while invited), so an invited account can be deactivated. No table change |
+| **0019** | `feedback_intake` | Feedbacks and issues (built, part 1) | `submission_statuses`, `submission_types`, `submissions`, `submission_type_links`, `submission_expertise` (§6). Generated |
+| **0020** | `feedback_lookups` | Feedbacks and issues (built, part 1) | The two statuses and the 15 types (§6). Custom migration: rows only, no table change |
 
 Planned, numbered when built (the next free number at that time):
 
 | Name | Module | Contents |
 |---|---|---|
-| `feedback` | Feedbacks and issues (next, roadmap §2) | `submission_statuses`, `submission_types` (seeded), `submissions`, `submission_type_links`, `submission_expertise` |
 | Information notes | CMS | A new document kind in `cms_documents` (§5) |
 | Teams and governance | Accounts and roles (roadmap §4) | Team memberships, per-team and individual permissions, cases, ratings and assignments, after the hardening migrations of phase 0 |
 | `waitlist` | Waitlist | `waitlist_entries` |

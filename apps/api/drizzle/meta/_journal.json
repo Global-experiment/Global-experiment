@@ -134,6 +134,20 @@
       "when": 1794997317586,
       "tag": "0018_invited_account_deactivation",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795452941691,
+      "tag": "0019_feedback_intake",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795452943917,
+      "tag": "0020_feedback_lookups",
+      "breakpoints": true
     }
   ]
 }

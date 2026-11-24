@@ -61,6 +61,7 @@ export default defineConfig({
               // Donate: scripted Checkout sessions instead of Stripe (also NODE_ENV=test only),
               // and this Next server as the public site (Checkout return links, origin check).
               STRIPE_FIXTURE: "1",
+              TURNSTILE_FIXTURE: "1", // Feedback bot check in-process (NODE_ENV=test only); feedback-intake.spec stubs Cloudflare's script.
               // Every suite signs in from this one IP (the owner, invitees, a reset): room above the 5 per 15 minutes.
               E2E_LOGIN_LIMIT: "50",
               // Open for the suites; donate-figma.spec closes them with the setting and uses the preview link.

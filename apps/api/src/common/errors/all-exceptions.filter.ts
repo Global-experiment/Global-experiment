@@ -12,6 +12,7 @@ const CODE_BY_HTTP_STATUS: Partial<Record<number, ApiErrorCode>> = {
   [HttpStatus.CONFLICT]: "conflict",
   [HttpStatus.PAYLOAD_TOO_LARGE]: "payload_too_large",
   [HttpStatus.TOO_MANY_REQUESTS]: "rate_limited",
+  [HttpStatus.SERVICE_UNAVAILABLE]: "unavailable",
 };
 
 const SAFE_MESSAGE: Record<ApiErrorCode, string> = {
@@ -23,6 +24,7 @@ const SAFE_MESSAGE: Record<ApiErrorCode, string> = {
   payload_too_large: "The request body is too large.",
   rate_limited: "Too many requests. Please try again later.",
   provider_unavailable: "An external service is temporarily unavailable.",
+  unavailable: "This is not available right now. Please try again later.",
   internal: "Something went wrong. Please try again later.",
 };
 

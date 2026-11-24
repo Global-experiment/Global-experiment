@@ -15,6 +15,7 @@ import { DonationsModule } from "./donations/donations.module.js";
 import { AllExceptionsFilter } from "./common/errors/all-exceptions.filter.js";
 import { LoggingModule } from "./common/logging/logging.module.js";
 import { ExpertiseModule } from "./expertise/expertise.module.js";
+import { FeedbackModule } from "./feedback/feedback.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { ImportsModule } from "./import/imports.module.js";
 import { FilesModule } from "./files/files.module.js";
@@ -58,6 +59,7 @@ export class AppModule {
         ServicesModule,
         AccountsModule,
         CmsModule,
+        FeedbackModule,
       ],
       providers: [
         // Global guards run in this order.

@@ -41,6 +41,15 @@ const nextConfig: NextConfig = {
         source: "/donate/:path*",
         headers: getSecurityHeaders({ stripe: true }),
       },
+      // The feedback and issue composers load Cloudflare Turnstile, the bot check of their submissions (ADR 023).
+      {
+        source: "/feedback",
+        headers: getSecurityHeaders({ turnstile: true }),
+      },
+      {
+        source: "/issue",
+        headers: getSecurityHeaders({ turnstile: true }),
+      },
     ];
   },
 };

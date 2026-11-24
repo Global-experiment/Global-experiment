@@ -14,6 +14,8 @@ export const FIELD_MESSAGES = {
   email: "Invalid email address.",
   link: "Invalid link. Use an address like https://example.org.",
   score: "Use a whole number from 0 to 10.",
+  // Feedbacks and issues: the significance score has one decimal (Figma shows 8.2; client, 2026-11-23).
+  significance: "Use a number from 0 to 10, with at most one decimal (like 8.2).",
   wholeNumber: "Use a whole number.",
   slug: "Use lowercase letters, numbers and single hyphens (like version-0-1-scope).",
   date: "Enter a valid date.",
@@ -72,6 +74,9 @@ export function isWebLink(value: string): boolean {
 
 /** A relevance score as typed: a whole number from 0 to 10. */
 export const isScore = (value: string) => /^(?:[0-9]|10)$/.test(value.trim());
+
+/** A significance score as typed: 0 to 10 with at most one decimal ("8", "8.2", "10.0"). */
+export const isSignificanceScore = (value: string) => /^(?:\d(?:\.\d)?|10(?:\.0)?)$/.test(value.trim());
 
 /** A whole number as typed, negative allowed ("-1", "12"). */
 export const isWholeNumber = (value: string) => /^-?\d{1,9}$/.test(value.trim());
