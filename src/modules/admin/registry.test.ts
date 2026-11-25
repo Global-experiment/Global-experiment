@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../../../apps/api/src/access-control/permissions";
-import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor } from "./registry";
+import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor, type AdminModule } from "./registry";
 
 describe("admin module registry", () => {
-  it("lists the Design System Desktop menu destinations once and in order", () => {
+  it("lists the Desktop menu destinations (Figma, 1 Master) once and in order", () => {
     expect(ADMIN_MODULES.map((entry) => entry.label)).toEqual([
       "Home",
       "Documentation",
@@ -19,6 +19,22 @@ describe("admin module registry", () => {
       "History",
     ]);
     expect(new Set(ADMIN_MODULES.map((entry) => entry.href)).size).toBe(ADMIN_MODULES.length);
+    expect(new Set(ADMIN_MODULES.map((entry) => entry.key)).size).toBe(ADMIN_MODULES.length);
+  });
+
+  it("lists a module only once it is live (ADR 024): the active flag, not the menu, switches it on", () => {
+    // A made-up module in Feedbacks and issues' place (after Home), to show the switch.
+    const upcoming: AdminModule = { key: "upcoming", label: "Upcoming", icon: "home", href: "/admin/upcoming", active: false };
+    const modules = [ADMIN_MODULES[0], upcoming, ...ADMIN_MODULES.slice(1)];
+    const owner = new Set(ROLE_PERMISSIONS.owner);
+    expect(modulesFor(modules, owner).map((entry) => entry.key)).not.toContain("upcoming");
+    const live = modules.map((entry) => (entry.key === "upcoming" ? { ...entry, active: true } : entry));
+    expect(
+      modulesFor(live, owner)
+        .map((entry) => entry.key)
+        .slice(0, 3),
+    ).toEqual(["home", "upcoming", "documentation"]);
+    expect(ADMIN_MODULES.every((entry) => entry.active)).toBe(true);
   });
 
   it("uses permissions defined by the API", () => {

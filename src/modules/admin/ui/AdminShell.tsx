@@ -7,19 +7,43 @@ import { adminApi, endSession } from "../api/client";
 import { adminDisplayName, type AdminPrincipal } from "../api/types";
 import { setPreferredTimeZone } from "@/shared/format/Timestamp";
 import { applyAppearance } from "@/shared/ui/appearance";
-import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor, type SidebarIconName } from "../registry";
+import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor } from "../registry";
 import { AdminSessionProvider } from "../session";
 import { AccountAvatar, accountPictureUrl } from "./AccountAvatar";
-import { focusRing } from "./controls";
+import { AdminIcon } from "./adminIcons";
+import { focusRing, focusRingInset } from "./controls";
 import { rememberSidebar } from "./sidebarPrefs";
 import { useRememberAdminPage } from "../record/navigationMemory";
 import { ToastProvider } from "./Toast";
-import styles from "./AdminShell.module.css";
 
 // Sidebar and row padding move together to keep the menu glyphs on the same axis.
 const paddingTransition = "transition-[padding] duration-150 motion-reduce:transition-none";
 
-/** The signed-in frame keeps the sidebar controls, destinations, and profile independently of page scrolling. */
+/**
+ * Admin frame: the menu follows the Figma component "Desktop menu" (Design
+ * system, page "1 Master"; client, 2026-11-24 and 25). Expanded, it is
+ * 240px wide (`--spacing-sidebar`) with a 1px rule inside its right edge:
+ * a 32px search box, "Collapse menu" below it, then one flat list of 32px
+ * rows 8px apart (16px glyph, the current row on the raised fill), and the
+ * 64px user card pinned to the bottom. Collapsed, it is a 40px rail
+ * (`--spacing-sidebar-rail`): the glyphs keep their place, the names stay
+ * as tooltips and for screen readers, and the search glyph re-opens the
+ * menu with the search focused. The choice is remembered in a cookie
+ * (sidebarPrefs.ts) so the server renders the right width from the first
+ * paint.
+ *
+ * The rows come from the module registry (../registry.ts): only live
+ * modules the signed-in role can read, no "Coming soon" rows (ADR 024).
+ * Rows draw their focus ring inside, because the list scrolls and would
+ * clip a ring drawn outside.
+ *
+ * Exactly one viewport tall (client, 2026-10-05): the page itself never
+ * scrolls; the menu and the content column scroll on their own, and list
+ * pages scroll only their table. Works from 1440 down to 1024px wide.
+ * `data-admin` scopes the admin-only rules in globals.css, including the
+ * menu width the toast follows. The signed-in account's appearance and
+ * time zone (Profile settings, p18) apply to every page.
+ */
 export function AdminShell({ admin, initialCollapsed = false, children }: { admin: AdminPrincipal; initialCollapsed?: boolean; children: ReactNode }) {
   const pathname = usePathname();
   useRememberAdminPage(pathname);
@@ -44,7 +68,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
       <div
         data-admin
         data-sidebar={collapsed ? "collapsed" : "expanded"}
-        className={`${styles.shell} grid h-dvh overflow-hidden bg-surface-base font-normal text-text-primary transition-[grid-template-columns] duration-150 motion-reduce:transition-none`}
+        className="grid h-dvh grid-cols-[var(--admin-sidebar-width)_minmax(0,1fr)] overflow-hidden bg-surface-base font-normal text-text-primary transition-[grid-template-columns] duration-150 motion-reduce:transition-none"
       >
         <ToastProvider>
           <div
@@ -55,7 +79,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
               <div
                 className={`relative flex h-8 min-w-0 items-center gap-1 rounded-control pr-1 text-text-muted inset-ring-1 transition-[padding,box-shadow] duration-150 motion-reduce:transition-none ${collapsed ? "pl-2 inset-ring-transparent hover:bg-surface-hover" : "pl-1 inset-ring-line focus-within:inset-ring-text-primary"}`}
               >
-                <SidebarIcon name="search" />
+                <AdminIcon name="search" />
                 {collapsed ? (
                   <button
                     type="button"
@@ -96,7 +120,7 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
                 data-sidebar-toggle
                 className={`flex h-6 cursor-pointer items-center gap-1 rounded-control pr-1 text-meta/4 font-bold text-text-muted hover:bg-surface-hover hover:text-text-primary ${collapsed ? "pl-2" : "pl-1"} ${paddingTransition} ${focusRing}`}
               >
-                <SidebarIcon name={collapsed ? "expand" : "collapse"} />
+                <AdminIcon name={collapsed ? "expand_menu" : "collapse_menu"} />
                 {collapsed ? null : <span className="truncate">Collapse menu</span>}
               </button>
             </div>
@@ -111,19 +135,14 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
                   {destinations.map((item) => {
                     const active = item.key === activeKey;
                     return (
-                      <li
-                        key={item.key}
-                        data-module={item.key}
-                        data-public-menu={item.publicPage || undefined}
-                        className={item.publicPage ? "[&+[data-public-menu]]:-mt-1" : undefined}
-                      >
+                      <li key={item.key} data-module={item.key}>
                         <Link
                           href={item.href}
                           aria-current={active ? "page" : undefined}
                           title={collapsed ? item.label : undefined}
-                          className={`flex h-8 items-center gap-1 rounded-control pr-1 text-body ${collapsed ? "pl-2" : "pl-1"} ${active ? "bg-surface-raised text-text-primary" : "text-text-muted hover:bg-surface-hover hover:text-text-primary"} ${paddingTransition} ${focusRing}`}
+                          className={`flex h-8 items-center gap-1 rounded-control pr-1 text-body ${collapsed ? "pl-2" : "pl-1"} ${active ? "bg-surface-raised text-text-primary" : "text-text-muted hover:bg-surface-hover hover:text-text-primary"} ${paddingTransition} ${focusRingInset}`}
                         >
-                          <SidebarIcon name={item.icon} />
+                          <AdminIcon name={item.icon} />
                           <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
                         </Link>
                       </li>
@@ -144,10 +163,13 @@ export function AdminShell({ admin, initialCollapsed = false, children }: { admi
   );
 }
 
-function SidebarIcon({ name }: { name: SidebarIconName }) {
-  return <span aria-hidden="true" data-sidebar-icon={name} className={`${styles.icon} size-4 shrink-0 bg-current mask-no-repeat`} />;
-}
-
+/**
+ * The user card of "Desktop menu" (client, 2026-11-24): a 64px outlined card.
+ * Expanded: the profile picture, the name and Sign out at the right.
+ * Collapsed: the picture only, no Sign out. Without a photo, the picture is
+ * the first letter of the name (AccountAvatar). The card leads to Profile
+ * settings.
+ */
 function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: boolean }) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -186,7 +208,7 @@ function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: bool
           title="Sign out"
           className={`absolute right-1 flex size-6 cursor-pointer items-center justify-center rounded-control text-text-muted hover:text-text-primary disabled:cursor-wait ${collapsed ? "invisible opacity-0" : "motion-safe:transition-opacity motion-safe:delay-75"} ${focusRing}`}
         >
-          <SidebarIcon name="sign-out" />
+          <AdminIcon name="login" />
         </button>
       </div>
       {failed ? (

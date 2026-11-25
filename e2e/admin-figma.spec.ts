@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { E2E_ADMIN } from "./admin-credentials";
 
@@ -116,10 +117,11 @@ test.describe("login (p1)", () => {
 test.describe("signed in", () => {
   test.use({ storageState: STATE, viewport: FRAME });
 
-  test("shell: Desktop menu order, sizes, active row, and profile card", async ({ page }) => {
+  test("shell: Desktop menu (Figma, 1 Master) order, sizes, glyphs, active row and user card", async ({ page }) => {
     await page.goto("/admin/people");
     await expect(rows(page).first()).toBeVisible();
 
+    // Live modules only (ADR 024): no "Coming soon" rows, each page once.
     await expect(nav(page).getByRole("link")).toHaveText([
       "Home",
       "Documentation",
@@ -135,36 +137,55 @@ test.describe("signed in", () => {
       "History",
     ]);
 
+    // Geometry: 32px search 8px in, "Collapse menu" (24px) 8px below it, then 32px rows 8px apart, 16px after the controls.
     const search = await box(page.getByRole("searchbox", { name: "Search the menu" }).locator(".."));
     expect([search.x, search.y, search.width, search.height]).toEqual([8, 8, 224, 32]);
     const collapse = await box(page.getByRole("button", { name: "Collapse menu" }));
     expect([collapse.x, collapse.y, collapse.width, collapse.height]).toEqual([8, 48, 224, 24]);
     await expect(page.getByText("Collapse menu", { exact: true })).toBeVisible();
+    const tops = await nav(page)
+      .getByRole("link")
+      .evaluateAll((links) => links.map((link) => Math.round(link.getBoundingClientRect().top)));
+    expect(tops).toEqual(tops.map((_, index) => 88 + index * 40));
     const home = await box(nav(page).getByRole("link", { name: "Home" }));
     expect([home.x, home.y, home.width, home.height]).toEqual([8, 88, 224, 32]);
-    const documentation = await box(nav(page).getByRole("link", { name: "Documentation" }));
-    expect(documentation.y).toBe(124);
-    const firstAdminRow = await box(nav(page).getByRole("link", { name: "People" }));
-    expect(firstAdminRow.y).toBe(200);
     const people = nav(page).getByRole("link", { name: "People" });
     await expect(people).toHaveAttribute("aria-current", "page");
-    await expect(people.locator("[data-sidebar-icon]")).toHaveCSS("mask-image", /\/assets\/icons\/figma\/admin\/sidebar\/groups-2\.svg/);
     expect(await people.evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color])).toEqual([
       "rgb(31, 31, 31)",
       "rgb(255, 255, 255)",
     ]);
+    // The Desktop menu's glyphs, drawn by the one admin icon set.
+    const glyphs = await nav(page)
+      .getByRole("link")
+      .evaluateAll((links) => links.map((link) => link.querySelector("svg[data-icon]")?.getAttribute("data-icon")));
+    expect(glyphs).toEqual([
+      "home",
+      "insert_drive_file",
+      "toll",
+      "groups_2",
+      "corporate_fare",
+      "services",
+      "lock",
+      "manage_accounts",
+      "view_column",
+      "view_column",
+      "view_column",
+      "history",
+    ]);
+    await expect(page.locator('#admin-sidebar svg[data-icon="search"]')).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Collapse menu" }).locator("svg[data-icon]")).toHaveAttribute("data-icon", "collapse_menu");
+
+    // The user card: picture (no photo: the name's first letter), name, Sign out.
     const card = await box(page.locator('a[href="/admin/profile"]').locator(".."));
     expect([card.x, card.width, card.height, card.y + card.height]).toEqual([8, 224, 64, FRAME.height - 8]);
     await expect(page.locator("[data-user-name]")).toHaveText("e2e-owner"); // no display name: the email's local part
-    await expect(page.locator('#admin-sidebar a[href="/admin/profile"] [aria-hidden="true"]')).toHaveCount(0);
-    await expect(nav(page).getByRole("link", { name: "Accounts", exact: true }).locator("[data-sidebar-icon]")).toHaveCSS(
-      "mask-image",
-      /\/assets\/icons\/figma\/admin\/manage-accounts\.svg/,
-    );
-    await expect(page.getByRole("button", { name: "Sign out", exact: true }).locator("[data-sidebar-icon]")).toHaveCSS(
-      "mask-image",
-      /\/assets\/icons\/figma\/admin\/logout\.svg/,
-    );
+    const initial = page.locator('#admin-sidebar a[href="/admin/profile"] [data-avatar-initial]');
+    await expect(initial).toHaveAttribute("data-avatar-initial", "e");
+    const disc = await box(initial);
+    expect([disc.width, disc.height, disc.x - card.x]).toEqual([24, 24, 8]);
+    near(disc.y + disc.height / 2, card.y + card.height / 2);
+    await expect(page.getByRole("button", { name: "Sign out", exact: true }).locator("svg[data-icon]")).toHaveAttribute("data-icon", "login");
 
     // The list page title and toolbar (p2).
     const title = await box(page.getByRole("heading", { name: "People", level: 1 }));
@@ -182,31 +203,40 @@ test.describe("signed in", () => {
     const sidebar = page.locator("#admin-sidebar");
     expect((await box(sidebar)).width).toBe(240);
 
+    // Sampled on every frame until the menu's transitions have finished, however long a slow machine takes.
     const frames = await page.getByRole("button", { name: "Collapse menu" }).evaluate(async (button: HTMLButtonElement) => {
-      const icons = [...button.closest("#admin-sidebar")!.querySelectorAll('[data-sidebar-icon="search"], nav a > [aria-hidden=true]')];
+      const shell = button.closest<HTMLElement>("[data-admin]")!;
+      const icons = [...shell.querySelectorAll('#admin-sidebar svg[data-icon="search"], #admin-sidebar nav a > svg')];
       const measure = () =>
         icons.map((icon) => {
           const { x } = icon.getBoundingClientRect();
           const { y, height, right } = icon.parentElement!.getBoundingClientRect();
           return { x, y, height, right };
         });
+      const frame = () => new Promise(requestAnimationFrame);
       const samples = [measure()];
+      let animated = 0;
       for (let toggle = 0; toggle < 3; toggle++) {
         button.click();
-        const start = performance.now();
-        do {
-          await new Promise(requestAnimationFrame);
+        await frame();
+        for (;;) {
+          const running = shell.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running");
           samples.push(measure());
-        } while (performance.now() - start < 200);
+          if (running.length === 0) break;
+          animated += 1;
+          await frame();
+        }
       }
-      return samples;
+      return { samples, animated };
     });
-    for (const frame of frames) {
+    // The transitions did run (and were sampled), and nothing moved at any point.
+    expect(frames.animated).toBeGreaterThan(0);
+    for (const frame of frames.samples) {
       frame.forEach(({ x, y, height, right }, index) => {
-        near(x, frames[0][index].x);
-        near(x, frames[0][0].x);
+        near(x, frames.samples[0][index].x);
+        near(x, frames.samples[0][0].x);
         near(right, frame[0].right);
-        expect([y, height]).toEqual([frames[0][index].y, frames[0][index].height]);
+        expect([y, height]).toEqual([frames.samples[0][index].y, frames.samples[0][index].height]);
       });
     }
     await expect(page.getByRole("button", { name: "Expand menu" })).toHaveAttribute("aria-expanded", "false");
@@ -217,12 +247,15 @@ test.describe("signed in", () => {
     await expect(people).toHaveAttribute("aria-current", "page");
     const home = await box(nav(page).getByRole("link", { name: "Home" }));
     const documentation = await box(nav(page).getByRole("link", { name: "Documentation" }));
-    expect([home.x, home.y, home.width, home.height, documentation.y]).toEqual([4, 88, 32, 32, 124]);
+    expect([home.x, home.y, home.width, home.height, documentation.y]).toEqual([4, 88, 32, 32, 128]);
+    // Collapsed user card: the picture only, centred on the rail; no Sign out (client, 2026-11-24).
     const profile = sidebar.getByRole("link", { name: "e2e-owner" });
-    await expect(profile.locator('[aria-hidden="true"]')).toHaveText("e");
+    await expect(profile.locator("[data-avatar-initial]")).toHaveAttribute("data-avatar-initial", "e");
     await expect(sidebar.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
     const card = await box(profile);
     expect([card.x, card.width, card.height, card.y + card.height]).toEqual([4, 32, 64, FRAME.height - 8]);
+    const disc = await box(profile.locator("[data-avatar-initial]"));
+    near(disc.x + disc.width / 2, card.x + card.width / 2);
     // The content column takes the freed width; nothing scrolls sideways.
     expect((await box(page.getByRole("heading", { name: "People", level: 1 }))).x).toBe(48);
     await noHorizontalScroll(page);
@@ -241,6 +274,61 @@ test.describe("signed in", () => {
     await expect(page.getByRole("searchbox", { name: "Search the menu" })).toBeFocused();
     await page.reload();
     expect((await box(sidebar)).width).toBe(240);
+  });
+
+  test("keyboard: Tab reaches every menu row in order, and each focus ring is drawn whole (not clipped by the scrolling list)", async ({ page }) => {
+    await page.goto("/admin/people");
+    await expect(rows(page).first()).toBeVisible();
+    const labels = await nav(page).getByRole("link").allInnerTexts();
+    for (const state of ["expanded", "collapsed"] as const) {
+      if (state === "collapsed") {
+        await page.getByRole("button", { name: "Collapse menu" }).click();
+        await expect.poll(async () => (await box(page.locator("#admin-sidebar"))).width).toBe(40);
+      }
+      await page.locator("[data-sidebar-toggle]").focus();
+      for (const label of labels) {
+        await page.keyboard.press("Tab");
+        const ring = await page.evaluate(() => {
+          const link = document.activeElement as HTMLElement;
+          const style = getComputedStyle(link);
+          const reach = Math.max(0, parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth));
+          const row = link.getBoundingClientRect();
+          const list = link.closest("nav")!.getBoundingClientRect();
+          return {
+            name: link.title || link.textContent?.trim(),
+            focusVisible: link.matches(":focus-visible"),
+            outline: [style.outlineStyle, style.outlineWidth],
+            inside: row.left - reach >= list.left && row.right + reach <= list.right && row.top - reach >= list.top && row.bottom + reach <= list.bottom,
+          };
+        });
+        expect(ring, `${state}: ${label}`).toEqual({ name: label, focusVisible: true, outline: ["solid", "2px"], inside: true });
+      }
+      await capture(page, `sidebar-focus-${state}`);
+    }
+    await page.getByRole("button", { name: "Expand menu" }).click();
+  });
+
+  test("menu and user card pass axe in dark and light, expanded and collapsed", async ({ page }) => {
+    await page.goto("/admin/people");
+    await expect(rows(page).first()).toBeVisible();
+    const scan = async () =>
+      (await new AxeBuilder({ page }).include("#admin-sidebar").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze()).violations.map(
+        (violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(", ")}`,
+      );
+    for (const state of ["expanded", "collapsed"]) {
+      if (state === "collapsed") await page.getByRole("button", { name: "Collapse menu" }).click();
+      for (const theme of ["dark", "light"]) {
+        await page.evaluate(
+          (value) =>
+            value === "light" ? document.documentElement.setAttribute("data-theme", "light") : document.documentElement.removeAttribute("data-theme"),
+          theme,
+        );
+        expect(await scan(), `${state}, ${theme}`).toEqual([]);
+        await expect(page.locator("#admin-sidebar [data-avatar-initial]")).toHaveAttribute("data-avatar-initial", "e");
+      }
+    }
+    await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
+    await page.getByRole("button", { name: "Expand menu" }).click();
   });
 
   test("data table: column labels without a band (client, 2026-10-19), a rule under every row, row hover", async ({ page }) => {
@@ -590,21 +678,25 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: "Save changes" }).click();
   });
 
-  test("display name: the collapsed profile initial preserves case", async ({ page }) => {
+  test("display name: the generic profile picture follows it, case kept, in the menu and in Profile settings", async ({ page }) => {
     await page.goto("/admin/profile");
+    const settingsInitial = page.locator('[data-property="Profile picture"] [data-avatar-initial]');
+    await expect(settingsInitial).toHaveAttribute("data-avatar-initial", "e");
     await page.getByLabel("Display name").fill("Candide Test");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Profile updated" })).toBeVisible();
     await expect(page.locator("[data-user-name]")).toHaveText("Candide Test");
+    await expect(settingsInitial).toHaveAttribute("data-avatar-initial", "C");
     await page.getByRole("button", { name: "Collapse menu" }).click();
-    const initial = page.locator('#admin-sidebar a[href="/admin/profile"] [aria-hidden="true"]');
-    await expect(initial).toHaveText("C");
+    const initial = page.locator('#admin-sidebar a[href="/admin/profile"] [data-avatar-initial]');
+    await expect(initial).toHaveAttribute("data-avatar-initial", "C");
     await page.getByLabel("Display name").fill("x".repeat(81));
     await expect(page.getByLabel("Display name")).toHaveValue("x".repeat(80)); // maxLength
     await page.getByLabel("Display name").fill("");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.locator("[data-user-name]")).toHaveText("e2e-owner");
-    await expect(initial).toHaveText("e");
+    await expect(initial).toHaveAttribute("data-avatar-initial", "e");
+    await page.getByRole("button", { name: "Expand menu" }).click();
   });
 
   test("other list screens fit 1024px without horizontal page scroll", async ({ page }) => {
