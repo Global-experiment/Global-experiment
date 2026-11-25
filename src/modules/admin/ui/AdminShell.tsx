@@ -9,7 +9,7 @@ import { setPreferredTimeZone } from "@/shared/format/Timestamp";
 import { applyAppearance } from "@/shared/ui/appearance";
 import { activeModuleKey, ADMIN_MODULES, filterModules, modulesFor, type SidebarIconName } from "../registry";
 import { AdminSessionProvider } from "../session";
-import { AccountAvatar } from "./AccountAvatar";
+import { AccountAvatar, accountPictureUrl } from "./AccountAvatar";
 import { focusRing } from "./controls";
 import { rememberSidebar } from "./sidebarPrefs";
 import { useRememberAdminPage } from "../record/navigationMemory";
@@ -172,13 +172,7 @@ function UserCard({ admin, collapsed }: { admin: AdminPrincipal; collapsed: bool
           title={collapsed ? `${name} — profile` : "Profile"}
           className={`flex h-full min-w-0 flex-1 items-center gap-2 rounded-control text-body text-text-muted hover:text-text-primary ${collapsed ? "pl-1" : "mr-7 pl-2"} ${paddingTransition} ${focusRing}`}
         >
-          {admin.hasPicture ? (
-            <AccountAvatar id={admin.id} hasPicture />
-          ) : collapsed ? (
-            <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full text-text-primary inset-ring-1 inset-ring-line">
-              {Array.from(name)[0]}
-            </span>
-          ) : null}
+          <AccountAvatar name={name} picture={admin.hasPicture ? accountPictureUrl(admin.id) : null} />
           <span data-user-name className={collapsed ? "sr-only" : "truncate"}>
             {name}
           </span>

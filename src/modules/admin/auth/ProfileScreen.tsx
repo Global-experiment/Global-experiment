@@ -12,7 +12,7 @@ import { useLeaveGuard } from "../record/useLeaveGuard";
 import { LIMIT_HINTS } from "../relationLimits";
 import { GrantChips } from "../services/accessDisplay";
 import { useCan } from "../session";
-import { AccountAvatar } from "../ui/AccountAvatar";
+import { AccountAvatar, accountPictureUrl } from "../ui/AccountAvatar";
 import { AdminIcon, type AdminIconName } from "../ui/adminIcons";
 import { AdminButton, focusRing, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, errorIdFor, FieldError, invalidProps, Pills, PropertyRow, ReadOnlyValue, recordInput, RecordLayout } from "../ui/RecordForm";
@@ -296,7 +296,11 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
         </PropertyRow>
         <PropertyRow icon="image" label="Profile picture">
           <div className="flex flex-wrap items-center gap-2">
-            {loaded.hasPicture ? <AccountAvatar id={loaded.id} hasPicture size={32} version={`${loaded.updatedAt}-${pictureVersion}`} /> : null}
+            <AccountAvatar
+              name={adminDisplayName(loaded)}
+              picture={loaded.hasPicture ? accountPictureUrl(loaded.id, `${loaded.updatedAt}-${pictureVersion}`) : null}
+              size={32}
+            />
             <input
               ref={fileInput}
               id="profile-picture"
@@ -334,8 +338,7 @@ export function ProfileScreen({ admin }: { admin: AdminPrincipal }) {
                     title="Use this picture again"
                     className={`flex rounded-full ${focusRing}`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a private admin image behind the session, not optimisable */}
-                    <img src={`/api/admin/profile/pictures/${picture.id}`} alt="" width={32} height={32} className="size-8 rounded-full object-cover" />
+                    <AccountAvatar name={adminDisplayName(loaded)} picture={`/api/admin/profile/pictures/${picture.id}`} size={32} />
                   </button>
                 </li>
               ))}

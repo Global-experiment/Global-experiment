@@ -10,7 +10,7 @@ import { RecordPage } from "../record/RecordPage";
 import { LIMIT_HINTS } from "../relationLimits";
 import { GrantChips } from "../services/accessDisplay";
 import { useAdmin, useCan } from "../session";
-import { AccountAvatar } from "../ui/AccountAvatar";
+import { AccountAvatar, accountPictureUrl } from "../ui/AccountAvatar";
 import { AdminButton, StatusMessage } from "../ui/controls";
 import { AutoGrowTextarea, formatPanelDate, PanelButton, Pills, PropertyRow, ReadOnlyValue } from "../ui/RecordForm";
 import type { RelationOption } from "../ui/RelationPicker";
@@ -176,7 +176,7 @@ export function AccountRecord({ id }: { id: string }) {
       </PropertyRow>
       <PropertyRow icon="image" label="Profile picture">
         <div className="flex h-8 items-center">
-          <AccountAvatar id={loaded.id} hasPicture={loaded.hasPicture} size={32} />
+          <AccountAvatar name={loaded.displayName ?? loaded.name} picture={loaded.hasPicture ? accountPictureUrl(loaded.id) : null} size={32} />
           {loaded.hasPicture ? null : <span className="ml-2 text-body text-text-muted">None</span>}
         </div>
       </PropertyRow>

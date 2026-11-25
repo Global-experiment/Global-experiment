@@ -7,6 +7,7 @@ import { formatInteger } from "@/shared/format/numbers";
 import { Timestamp, useViewerTimeZone } from "@/shared/format/Timestamp";
 import { adminApi, AdminApiError } from "../api/client";
 import type { HistoryChange, HistoryFieldKind, HistoryItem, HistoryValue } from "../api/types";
+import { AccountAvatar } from "../ui/AccountAvatar";
 import { AdminIcon, type AdminIconName } from "../ui/adminIcons";
 import { AdminButton, focusRing } from "../ui/controls";
 import { historyHeadline, historyPageHeadline, isEmptyValue, PRIVATE_NOTE_TEXT, relationDiff, shortUrl } from "./historyText";
@@ -387,7 +388,7 @@ export function HistoryEvent({
     <li data-history-item={item.action} className={`border-b border-line px-2 ${oneLine ? "py-2" : "pt-2 pb-3"}`}>
       {/* A div, not a p: the History page's ⋮ menu (a popover) sits in this line. */}
       <div className="flex items-start gap-2 text-meta">
-        <span aria-hidden="true" className="mt-px size-4 shrink-0 rounded-full bg-avatar" />
+        <AccountAvatar name={item.actor.label} size={16} className="mt-px" />
         <span className="min-w-0 flex-1">
           <span className="font-bold text-text-primary">{item.actor.label}</span>{" "}
           {page ? (
