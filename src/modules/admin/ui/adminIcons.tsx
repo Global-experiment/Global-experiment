@@ -136,17 +136,17 @@ export const adminIconPaths = {
   // NOT FROM FIGMA (temporary, reported): Material Symbols calendar_today — the prototype's date glyph exists only as a
   // screenshot. Replace with public/assets/icons/figma/admin/calendar.svg once supplied.
   calendar: "M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V10h16v11zm0-13H4V5h16v3z",
-  // ---- Desktop menu (Figma Design system, page "1 Master"; 2026-11-24): the 16px exports in
-  // public/assets/icons/figma/admin/sidebar/, scaled to the 24-unit grid. The menu's other glyphs
+  // ---- Desktop menu (Figma Design system, page "1 Master"; 2026-11-24): the component's 16px
+  // exports (PR #4; in the git history), scaled to the 24-unit grid. The menu's other glyphs
   // (home, insert_drive_file, toll, corporate_fare, services, lock, manage_accounts, view_column,
   // search, login) are the same outlines as the entries above.
-  // sidebar/groups-2.svg — People
+  // groups-2 — People
   groups_2:
     "M10.27 12H13.73C14.66 12 15.36 11.17 15.21 10.25L14.91 8.46C14.67 7.04 13.44 6 12 6C10.56 6 9.33 7.04 9.09 8.47L8.79 10.26C8.64 11.17 9.34 12 10.27 12ZM11.06 8.79C11.14 8.33 11.53 8 12 8C12.47 8 12.86 8.33 12.94 8.79L13.14 10H10.86L11.06 8.79ZM1.66 11.11C1.53 11.37 1.48 11.68 1.56 11.99C1.72 12.68 2.32 13.02 3.09 12.99C3.09 12.99 4.58 12.99 5.04 12.99C5.87 12.99 6.55 12.41 6.55 11.7C6.55 11.56 6.52 11.43 6.48 11.3C6.47 11.27 6.47 11.25 6.49 11.22C6.58 11.06 6.63 10.88 6.63 10.69C6.63 10.38 6.49 10.09 6.27 9.87C6.24 9.84 6.24 9.81 6.25 9.77C6.32 9.57 6.32 9.34 6.26 9.12C6.1 8.69 5.71 8.4 5.27 8.38C5.24 8.38 5.22 8.37 5.2 8.35C5.03 8.14 4.72 8 4.37 8C4.07 8 3.8 8.1 3.62 8.26C3.59 8.29 3.56 8.29 3.53 8.28C3.39 8.22 3.23 8.19 3.07 8.19C2.42 8.19 1.89 8.68 1.83 9.31C1.83 9.33 1.82 9.35 1.8 9.37C1.51 9.63 1.34 10.02 1.39 10.42C1.42 10.64 1.51 10.85 1.64 11.02C1.67 11.04 1.67 11.08 1.66 11.11ZM16.24 13.65C15.07 13.13 13.63 12.75 12 12.75C10.37 12.75 8.93 13.14 7.76 13.65C6.68 14.13 6 15.21 6 16.39V18H18V16.39C18 15.21 17.32 14.13 16.24 13.65ZM8.07 16C8.16 15.77 8.34 15.58 8.56 15.48C9.66 14.99 10.82 14.75 11.99 14.75C13.17 14.75 14.32 15 15.42 15.48C15.65 15.58 15.82 15.77 15.91 16H8.07ZM1.22 14.58C0.48 14.9 0 15.62 0 16.43V18H4.5V16.39C4.5 15.56 4.73 14.78 5.13 14.1C4.76 14.04 4.39 14 4 14C3.01 14 2.07 14.21 1.22 14.58ZM22.78 14.58C21.93 14.21 20.99 14 20 14C19.61 14 19.24 14.04 18.87 14.1C19.27 14.78 19.5 15.56 19.5 16.39V18H24V16.43C24 15.62 23.52 14.9 22.78 14.58ZM22 11V10.5C22 9.4 21.1 8.5 20 8.5H18C17.58 8.5 17.35 8.98 17.61 9.31L18.31 9.94C18.12 10.25 18 10.61 18 11C18 12.1 18.9 13 20 13C21.1 13 22 12.1 22 11Z",
-  // sidebar/history.svg — History
+  // history — History
   history:
     "M13.5 3C8.53 3 4.5 7.03 4.5 12H1.5L5.39 15.89L5.46 16.03L9.5 12H6.5C6.5 8.13 9.63 5 13.5 5C17.37 5 20.5 8.13 20.5 12C20.5 15.87 17.37 19 13.5 19C11.57 19 9.82 18.21 8.56 16.94L7.14 18.36C8.77 19.99 11.01 21 13.5 21C18.47 21 22.5 16.97 22.5 12C22.5 7.03 18.47 3 13.5 3ZM12.5 8V13L16.75 15.52L17.52 14.24L14 12.15V8H12.5Z",
-  // sidebar/collapse.svg and sidebar/expand.svg — Collapse menu / expand
+  // collapse and expand — Collapse menu / expand
   collapse_menu: "M17.59 18L19 16.59L14.42 12L19 7.41L17.59 6L11.59 12ZM11 18L12.41 16.59L7.83 12L12.41 7.41L11 6L5 12Z",
   expand_menu: "M6.41 6L5 7.41L9.58 12L5 16.59L6.41 18L12.41 12ZM13 6L11.59 7.41L16.17 12L11.59 16.59L13 18L19 12Z",
   // admin-desktop.pdf p7, the rich-text toolbar (Home editor; also p10): 20pt frames, scaled to the 24-unit grid.
