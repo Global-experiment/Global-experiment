@@ -13,6 +13,8 @@ import { AdminIcon, type AdminIconName } from "./adminIcons";
  */
 
 export const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-primary";
+/** The same ring drawn inside the box, for rows in a scrolling list, whose edge would clip a ring drawn outside. */
+export const focusRingInset = "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-text-primary";
 
 const buttonClasses = `inline-flex h-6 shrink-0 cursor-pointer items-center gap-2 rounded-control bg-surface-base px-2 text-body font-bold whitespace-nowrap text-text-primary ring-1 ring-line disabled:cursor-not-allowed disabled:text-text-muted ${focusRing}`;
 

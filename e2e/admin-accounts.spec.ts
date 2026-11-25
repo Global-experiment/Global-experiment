@@ -163,10 +163,7 @@ test("whoever opens the invitation link makes an account (email + password), lan
   await expect(newcomer.getByLabel("Display name")).toHaveValue("");
   await expect(newcomer.getByLabel("Description")).toHaveValue("");
   await expect(newcomer.locator("[data-record-main]")).toContainText("No role");
-  // Only the "Coming soon" placeholders, which need no permission; no module with data.
-  for (const hidden of ["people", "organizations", "treasury", "services", "permissions", "accounts", "history", "expertise"]) {
-    await expect(newcomer.locator(`#admin-sidebar nav li[data-module=${hidden}]`), hidden).toHaveCount(0);
-  }
+  await expect(newcomer.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveCount(0);
   await newcomer.screenshot({ path: join(SHOTS, "ops141-empty-profile-1440-dark.png") });
 
   // OPS-144 and OPS-135: the holder sets their description and expertise.
@@ -229,6 +226,10 @@ test("a Rootadmin gives the new account a role, edits its description and expert
   expect(fields).toEqual(expect.arrayContaining(["Role", "Description", "Expertise", "Service access"]));
   expect(fields).not.toContain("Note");
   expect(fields).not.toContain("Person");
+  // No photo: the generic picture, the name's first letter, and "None".
+  const picture = page.locator('[data-property="Profile picture"]');
+  await expect(picture.locator("[data-avatar-initial]")).toHaveAttribute("data-avatar-initial", NEWCOMER.name.slice(0, 1));
+  await expect(picture).toContainText("None");
   await expect(page.getByLabel("Description")).toHaveValue("Facilitates the citizen assemblies.");
   await page.getByLabel("Description").fill("Facilitates the citizen assemblies and the follow-ups.");
   await pick(page, "expertise", "UX research");
@@ -392,6 +393,9 @@ test("Profile settings (p18): display name, description, expertise, appearance (
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Profile updated" })).toBeVisible();
   await expect(page.locator("[data-user-name]")).toHaveText("E2E Rootadmin");
+  // No photo yet: the generic picture, the display name's first letter.
+  await expect(page.locator("#admin-sidebar [data-avatar-initial]")).toHaveAttribute("data-avatar-initial", "E");
+  await expect(page.locator('[data-property="Profile picture"] [data-avatar-initial]')).toHaveAttribute("data-avatar-initial", "E");
   // …and kept: on every page, after a reload.
   await page.goto("/admin/people");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -401,7 +405,19 @@ test("Profile settings (p18): display name, description, expertise, appearance (
   await page.locator("#profile-picture").setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
   await expect(page.getByRole("status").filter({ hasText: "Profile picture updated" })).toBeVisible();
   await expect(page.locator("#admin-sidebar img")).toHaveAttribute("src", /\/api\/admin\/accounts\/[0-9a-f-]{36}\/picture/);
+  await expect(page.locator("#admin-sidebar [data-avatar-initial]")).toHaveCount(0);
+  await expect(page.locator('[data-property="Profile picture"] img')).toHaveAttribute("src", /\/api\/admin\/accounts\/[0-9a-f-]{36}\/picture/);
   await page.screenshot({ path: join(SHOTS, "profile-p18-saved-light.png") });
+  // With a photo, expanded then collapsed (the photo only, no Sign out): dark and light, each checked with axe.
+  await page.evaluate(() => document.documentElement.removeAttribute("data-theme"));
+  await bothThemes("sidebar-photo-expanded");
+  await page.getByRole("button", { name: "Collapse menu" }).click();
+  const collapsedPicture = page.locator('[data-sidebar="collapsed"] #admin-sidebar img');
+  await expect(collapsedPicture).toBeVisible();
+  await expect(collapsedPicture).toHaveAttribute("width", "24");
+  await expect(page.locator("#admin-sidebar").getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
+  await bothThemes("sidebar-photo-collapsed");
+  await page.getByRole("button", { name: "Expand menu" }).click();
 
   // Back to the defaults (the display name renames the owner's permissions back too).
   await page.getByLabel("Display name").fill("");

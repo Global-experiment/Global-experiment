@@ -23,9 +23,11 @@ const WITH_ACTION_MS = 8000;
  * Figma's confirmation toast (p40–p43: "Notion imported 34 new entries",
  * "Filters applied", "People updated"): a 34px #1f1f1f pill, bold 14px
  * white text, 12px side padding, 24px above the bottom edge, centered on
- * the content area (right of the sidebar, 240px or the 56px rail). Announced politely.
+ * the content area: right of the admin menu, whose current width
+ * (`--admin-sidebar-width`, globals.css) the shell sets; without a menu,
+ * on the page. Announced politely.
  */
-export function ToastProvider({ sidebarWidth = 240, children }: { sidebarWidth?: number; children: ReactNode }) {
+export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -44,8 +46,7 @@ export function ToastProvider({ sidebarWidth = 240, children }: { sidebarWidth?:
         role="status"
         aria-live="polite"
         data-admin-toast
-        style={{ left: `calc(${sidebarWidth / 2}px + 50vw)` }}
-        className="pointer-events-none fixed bottom-6 z-50 -translate-x-1/2"
+        className="pointer-events-none fixed bottom-6 left-[calc(50vw+var(--admin-sidebar-width,0px)/2)] z-50 -translate-x-1/2"
       >
         {toast ? (
           <p

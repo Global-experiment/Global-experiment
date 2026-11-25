@@ -70,30 +70,30 @@ tables.
 
 **Built** (in production):
 
-| Module | Purpose | Owns (tables) | API boundary | Admin pages (sidebar) | Public pages | Depends on |
+| Module | Purpose | Owns (tables) | API boundary | Admin pages (menu row) | Public pages | Depends on |
 |---|---|---|---|---|---|---|
-| **Directory — People** | Contacts the experiment works with: state, source, follow-ups, contact details, expenses paid to them | `people`, `person_states`, `person_sources`, `people_organizations`, `people_expertise`, `contact_channels`, `person_contact_channels` | `/api/admin/people` | Admin → People (list, record) | none (never public) | Taxonomy, Organizations, Treasury (expense links), Audit |
-| **Directory — Organizations** | Organizations people belong to; expense recipients | `organizations`, `organization_expertise` | `/api/admin/organizations` | Other → Organizations | none | Taxonomy, People, Audit |
-| **Taxonomy** | Domain → Field → Expertise vocabulary, and the teams each expertise belongs to | `expertise_domains`, `expertise_fields`, `expertise_items`, `teams`, `expertise_teams`, `taxonomy_statuses` | `/api/admin/expertise/*` | Other → Expertise, Fields, Domains | none yet | Audit |
-| **Treasury** | Donations and expenses, review and publication, Stripe donations; Wise later | `treasury_entries`, `treasury_review_statuses`, `treasury_expense_types`, `treasury_entry_expense_types`, `stripe_events`, `stripe_subscriptions` (`treasury_documents` is kept for History only, ADR 021) | `/api/admin/treasury/*`, public `/api/treasury/*`, `/api/donations/*`, `/api/stripe/webhook` | Admin → Treasury | `/treasury`, expense and donation detail, `/donate`, `/donate/thank-you` | People, Organizations, Jobs, Audit |
-| **CMS** | Home and Documentation content, editor, revisions, versions, images | `cms_documents` (Home is the one of kind `home`), `cms_revisions`, `cms_images` (data-model §5) | `/api/admin/cms/*`, public `/api/cms/*` | Communication → Home, Documentation | `/`, `/documentation`, article and its history | Audit, Files |
-| **Services and access grants** | Which person and account hold which access to which outside tool | `services`, `access_grants` and their lookups | `/api/admin/services`, `/api/admin/access-grants` | Monitoring → Services, Permissions; People "Permissions" row | none | People, Accounts, Audit |
-| **Accounts and roles** | Admin identities, sessions, roles, permissions, invitation links, profiles | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_tokens`, `admin_user_expertise`, `admin_user_pictures` | `/api/admin/auth/*`, `/api/admin/accounts`, `/api/admin/invitations`, `/api/admin/profile` | Monitoring → Accounts; user card; Profile settings | `/admin/login`, `/admin/join`, `/admin/welcome`, `/admin/reset-password` | Expertise, Files, Audit (no People link, decision 018) |
-| **Audit / History** | Who changed what, when; before/after; comments and views | `audit_events`, `record_comments`, `record_views` | written by every module's service; `/api/admin/history/*` | Monitoring → History; History panel on record pages | none | — (used by all) |
+| **Directory — People** | Contacts the experiment works with: state, source, follow-ups, contact details, expenses paid to them | `people`, `person_states`, `person_sources`, `people_organizations`, `people_expertise`, `contact_channels`, `person_contact_channels` | `/api/admin/people` | People (list, record) | none (never public) | Taxonomy, Organizations, Treasury (expense links), Audit |
+| **Directory — Organizations** | Organizations people belong to; expense recipients | `organizations`, `organization_expertise` | `/api/admin/organizations` | Organizations | none | Taxonomy, People, Audit |
+| **Taxonomy** | Domain → Field → Expertise vocabulary, and the teams each expertise belongs to | `expertise_domains`, `expertise_fields`, `expertise_items`, `teams`, `expertise_teams`, `taxonomy_statuses` | `/api/admin/expertise/*` | Expertise, Fields, Domains | none yet | Audit |
+| **Treasury** | Donations and expenses, review and publication, Stripe donations; Wise later | `treasury_entries`, `treasury_review_statuses`, `treasury_expense_types`, `treasury_entry_expense_types`, `stripe_events`, `stripe_subscriptions` (`treasury_documents` is kept for History only, ADR 021) | `/api/admin/treasury/*`, public `/api/treasury/*`, `/api/donations/*`, `/api/stripe/webhook` | Treasury | `/treasury`, expense and donation detail, `/donate`, `/donate/thank-you` | People, Organizations, Jobs, Audit |
+| **CMS** | Home and Documentation content, editor, revisions, versions, images | `cms_documents` (Home is the one of kind `home`), `cms_revisions`, `cms_images` (data-model §5) | `/api/admin/cms/*`, public `/api/cms/*` | Home, Documentation | `/`, `/documentation`, article and its history | Audit, Files |
+| **Services and access grants** | Which person and account hold which access to which outside tool | `services`, `access_grants` and their lookups | `/api/admin/services`, `/api/admin/access-grants` | Services, Permissions; People "Permissions" row | none | People, Accounts, Audit |
+| **Accounts and roles** | Admin identities, sessions, roles, permissions, invitation links, profiles | `admin_users`, `admin_sessions`, `admin_roles`, `admin_permissions`, `admin_role_permissions`, `admin_invitations`, `admin_tokens`, `admin_user_expertise`, `admin_user_pictures` | `/api/admin/auth/*`, `/api/admin/accounts`, `/api/admin/invitations`, `/api/admin/profile` | Accounts; user card; Profile settings | `/admin/login`, `/admin/join`, `/admin/welcome`, `/admin/reset-password` | Expertise, Files, Audit (no People link, decision 018) |
+| **Audit / History** | Who changed what, when; before/after; comments and views | `audit_events`, `record_comments`, `record_views` | written by every module's service; `/api/admin/history/*` | History; History panel on record pages | none | — (used by all) |
 | **Imports** | People and Organizations only, from CSV (ADR 016): column and value matching, check, import, report | `import_runs` | `/api/admin/imports/*` | People / Organizations → More options → Import CSV; Imports page; report pages | none | Directory |
 | **Settings** | Typed settings and feature flags with environment defaults | `settings` | read by the modules; public donation config | none yet (changed by the owner outside the admin) | Donate page reads public flags | — |
 
-**Planned** (the sidebar shows them as "Coming soon"; order in the
-roadmap):
+**Planned** (not in the admin menu until they are live, ADR 024; order in
+the roadmap):
 
 | Module | Purpose | Tables (data-model) | Admin pages | Public pages |
 |---|---|---|---|---|
-| **Feedbacks and issues** | Public submissions, automatic qualification, decisions | `submissions`, `submission_types`, `submission_type_links`, `submission_statuses`, `submission_expertise` (§6) | Admin → Feedbacks and issues | Send feedback, Report issue composers (shells today) |
-| **Information notes** | News posts on the public site | CMS documents of a new kind (§5), not a new module | Communication | Information notes section |
-| **Waitlist** | Email sign-ups for the launch | `waitlist_entries` (§7) | Other → Waitlist | `/waitlist` (shell today) |
-| **Messages and Emails** | Inbound mail linked to people; outbound delivery log | `mailboxes`, `mail_threads`, `mail_messages`, `email_outbox` (§8) | Admin → Messages; Monitoring → Emails | `/contribute` (address only) |
-| **Analytics** | Visitor statistics, read from the analytics tool | none | Monitoring → Analytics | none |
-| **Technical dashboard** | Health of the stack, jobs, backups, integrations | none | Monitoring → Technical dashboard | none |
+| **Feedbacks and issues** | Public submissions, automatic qualification, decisions | `submissions`, `submission_types`, `submission_type_links`, `submission_statuses`, `submission_expertise` (§6) | Feedbacks and issues (after Home) | Send feedback, Report issue composers (shells today) |
+| **Information notes** | News posts on the public site | CMS documents of a new kind (§5), not a new module | to be designed | Information notes section |
+| **Waitlist** | Email sign-ups for the launch | `waitlist_entries` (§7) | Waitlist | `/waitlist` (shell today) |
+| **Messages and Emails** | Inbound mail linked to people; outbound delivery log | `mailboxes`, `mail_threads`, `mail_messages`, `email_outbox` (§8) | Messages; Emails | `/contribute` (address only) |
+| **Analytics** | Visitor statistics, read from the analytics tool | none | Analytics | none |
+| **Technical dashboard** | Health of the stack, jobs, backups, integrations | none | Technical dashboard | none |
 | **Teams and governance** | Teams, memberships, moderation tools, reviews, task assignment | roadmap §4 | — | — |
 
 Module notes:
@@ -189,8 +189,9 @@ Module specifics:
 
 **Built so far:**
 
-- the site's module registry (`src/modules/admin/registry.ts`): sidebar,
-  routes, required permission, "Coming soon";
+- the site's module registry (`src/modules/admin/registry.ts`): the menu's
+  rows, routes, required permission and the `active` flag (live modules
+  only, ADR 024);
 - the shared list engine and record page (`src/modules/admin/table/`,
   `record/`, `ui/`) used by every built module;
 - typed settings with environment defaults.
@@ -202,16 +203,16 @@ two are no longer needed. The plan below is kept for the record.
 So that a module or a field is added by configuration, not by a new screen:
 
 - **Module registry.** Each module declares, in one registry entry: its
-  sidebar entry (group, order, icon, label), its routes, the permissions
-  each route needs, its mode setting (if Notion-backed) and its feature
-  flags. The admin shell builds the sidebar from the registry plus
+  menu row (order, icon, label), its routes, the permissions each route
+  needs, its mode setting (if Notion-backed) and its feature flags. The
+  admin shell builds the menu from the registry plus
   `GET /api/admin/modules` (enabled state, mode, the user's permissions);
-  a module that isn't enabled shows as **"Coming soon"** (today's
-  behavior, now data-driven).
-  Built in Step 3 (2026-10-19) as `src/modules/admin/registry.ts`: the
-  sidebar's sections, order, glyphs, labels, routes and `live` /
-  `coming_soon` status; the API side (`/api/admin/modules`, permissions)
-  follows with accounts and roles (Step 7).
+  a module that isn't enabled isn't listed (ADR 024).
+  Built in Step 3 (2026-10-19) as `src/modules/admin/registry.ts`; since
+  2026-11-24 (ADR 024) it holds the menu's order, glyphs, labels, routes
+  and an `active` flag, in one flat list as the Figma "Desktop menu", with
+  no sections and no "Coming soon" rows. The permissions came with
+  accounts and roles (Step 7); `/api/admin/modules` isn't built.
 - **Config-driven list pages.** Per module: columns (type — text, select,
   relation, date, number, money, boolean, tags; width; icon; default
   visibility), filters with their operators and option sources, sorts,
@@ -262,7 +263,7 @@ later needs no code change. Built in the step named (plan:
 | 13 | No email server yet: invitations and password resets are one-time links (72 h; invitation links 7 days since decision 018) the owner copies and sends; "Forgot password?" says "Contact an administrator"; "Change email" needs the current password and is logged. With `email.enabled` the same flows send the links. | setting `email.enabled` | 7 |
 | 14 | Delete account = deactivate: the login is disabled, history keeps the name; the last Rootadmin can never be deactivated or deleted. | schema rule | 7 |
 | 15 | Accounts to create: those of admin p15; the existing owner is kept; missing ones get a Rootadmin invitation link (never committed or logged). | runbook | 7 |
-| 16 | Sidebar exactly as Figma, Organizations in both Admin and Other (same page); Waitlist, Messages, Cloud, History, Analytics, Technical dashboard and Emails "Coming soon" until built (History is live since the detail page of 2026-10-21: Monitoring → History). | module registry | 3 |
+| 16 | Sidebar exactly as Figma, Organizations in both Admin and Other (same page); Waitlist, Messages, Cloud, History, Analytics, Technical dashboard and Emails "Coming soon" until built (History is live since the detail page of 2026-10-21: Monitoring → History). **Changed 2026-11-24 (ADR 024):** one flat menu as the Figma "Desktop menu", live modules only, each page once; no "Coming soon" rows. | module registry | 3 |
 | 17 | (Changed by the client review of 2026-10-21: every donation uses Stripe's hosted Checkout — `donations.checkout` defaults to `hosted`, the embedded form is kept but off — and Checkout collects as little as Stripe allows; see docs/operations/stripe.md.) Donations: PayPal on Monthly when Stripe allows it, behind `donations.paypal_monthly` (the sandbox allows PayPal subscriptions; live needs PayPal recurring payments enabled). One-off card donations on our page with Stripe's card fields, no email, behind `donations.checkout` = `embedded` (default) \| `hosted`; monthly stays on hosted Checkout; the thank-you page shows a reference instead of an email receipt; webhooks and ledger rules unchanged (`payment_intent.succeeded` added). | settings | 2 |
 | 18 | Saved views: create, rename, delete and reorder per account, plus shared views (owner) on every list, stored in the database. | schema | 9 |
 

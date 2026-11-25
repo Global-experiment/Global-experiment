@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { formatDateOnly, formatFullDateTime, formatReference } from "@/shared/format/dates";
 import { useViewerTimeZone } from "@/shared/format/Timestamp";
 import { Icon } from "@/shared/ui/icons";
+import { AccountAvatar } from "./AccountAvatar";
 import { AdminIcon, type AdminIconName } from "./adminIcons";
 import { focusRing } from "./controls";
 import { DatePicker } from "./DatePicker";
@@ -238,11 +239,11 @@ export function ReadOnlyValue({ children }: { children: ReactNode }) {
   return <span className="flex h-8 items-center px-2 text-body text-text-primary">{children}</span>;
 }
 
-/** An admin as the record shows them (Last edited by, Created by): the avatar disc and the bold name. */
+/** An admin as the record shows them (Last edited by, Created by): the generic profile picture and the bold name. */
 export function PersonChip({ name }: { name: string }) {
   return (
     <span className="flex h-8 items-center gap-2 px-2 text-meta font-bold text-text-primary">
-      <span aria-hidden="true" className="size-4 rounded-full bg-avatar" />
+      <AccountAvatar name={name} size={16} />
       {name}
     </span>
   );

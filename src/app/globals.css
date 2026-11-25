@@ -49,7 +49,7 @@
   /* Admin data tables (client, 2026-10-14): the header band and the hovered row. */
   --color-surface-header: #1a1a1a;
   --color-surface-hover: #121212;
-  /* Admin user-card avatar placeholder (admin-desktop.pdf p2: 24px #d9d9d9 disc). */
+  /* Behind a profile photo while it loads (admin-desktop.pdf p2: #d9d9d9 disc). */
   --color-avatar: #d9d9d9;
 
   /* Geometry */
@@ -57,6 +57,8 @@
   --radius-sheet: 0.75rem; /* 12px — bottom sheet / desktop dialog */
   --spacing-gutter: 0.5rem; /* 8px page gutter on every frame */
   --spacing-paragraph: 1.125rem; /* 18px — one body line between paragraphs (figma.pdf p1, p4, p15) */
+  --spacing-sidebar: 15rem; /* 240px — admin menu, expanded (Figma "Desktop menu", 1 Master) */
+  --spacing-sidebar-rail: 2.5rem; /* 40px — admin menu, collapsed */
   --container-page: 41rem; /* 656px = 640px desktop content column + 2 × gutter */
   --container-dialog: 25rem; /* 400px desktop dialog (figma.pdf p34) */
 
@@ -219,6 +221,18 @@ dialog.sheet {
 html:has([data-admin]),
 html:has([data-admin]) body {
   overscroll-behavior-x: none;
+}
+
+/*
+ * The admin menu's current width, set once here for everything that follows
+ * it: the shell's first column and the toast, centred on the content area.
+ */
+[data-admin][data-sidebar] {
+  --admin-sidebar-width: var(--spacing-sidebar);
+}
+
+[data-admin][data-sidebar="collapsed"] {
+  --admin-sidebar-width: var(--spacing-sidebar-rail);
 }
 
 ::-webkit-scrollbar {

@@ -63,8 +63,8 @@ don't change until the client lifts the hold.
 4. **Visibility,** its own sprint later. Scoped when it starts.
 
 Other v0.1 modules (Waitlist, Messages and Emails, Technical dashboard,
-Analytics, People saved views) are not scheduled yet. They keep their
-place in the sidebar as "Coming soon".
+Analytics, People saved views) are not scheduled yet. Each joins the
+admin menu when it goes live (ADR 024).
 
 ## 3. Built modules: notes
 

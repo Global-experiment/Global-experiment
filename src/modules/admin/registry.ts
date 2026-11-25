@@ -1,117 +1,58 @@
 import type { AdminIconName } from "./ui/adminIcons";
 
 /**
- * Admin module registry: every module the admin knows about, in the
- * sidebar's sections and order (admin-desktop.pdf p2, 19 Oct; decision 16
- * of 2026-10-19). A module is `live` once its pages exist; until then the
- * sidebar lists it disabled with "Coming soon" and no route answers for
- * it. Turning a module on is one line here plus its pages. Each module
- * names the permission that shows it (Delivery 2): the menu only lists
- * what the signed-in role can read.
+ * Admin module registry: the destinations of the admin menu, in the order
+ * of the Figma component "Desktop menu" (Design system, page "1 Master").
+ * The menu shows only modules that are live (client, 2026-11-24; ADR 024):
+ * no "Coming soon" rows and each page listed once. A module joins the menu
+ * by being listed here with `active: true` once its pages exist; until then
+ * it is either not listed or listed with `active: false`, and no route
+ * answers for it. Feedbacks and issues goes after Home when it is live.
+ * Each module names the permission that shows it: the menu only lists what
+ * the signed-in role can read.
  */
-export type AdminModuleStatus = "live" | "coming_soon";
-
 export interface AdminModule {
-  /** Stable id (one per sidebar row: a page listed twice gets two ids). */
+  /** Stable id, one per menu row. */
   key: string;
   label: string;
   icon: AdminIconName;
+  href: string;
   /** The permission that shows it (`module.read`); a role without it doesn't see the row. */
   permission?: string;
-  status: AdminModuleStatus;
-  /** The module's page (live modules). */
-  href?: string;
+  /** Live: its pages exist and the menu lists it. */
+  active: boolean;
   /** Other paths that belong to this module (e.g. the Notion import page under People). */
   alsoActiveOn?: string[];
 }
 
-export interface AdminSection {
-  section: string;
-  modules: AdminModule[];
-}
-
-export const ADMIN_MODULES: AdminSection[] = [
-  {
-    section: "Communication",
-    modules: [
-      { key: "home", label: "Home", icon: "home", permission: "cms.read", status: "live", href: "/admin/home" },
-      { key: "documentation", label: "Documentation", icon: "insert_drive_file", permission: "cms.read", status: "live", href: "/admin/documentation" },
-      { key: "treasury", label: "Treasury", icon: "toll", permission: "treasury.read", status: "live", href: "/admin/treasury" },
-    ],
-  },
-  {
-    section: "Admin",
-    modules: [
-      { key: "feedback", label: "Feedbacks and issues", icon: "lightbulb", permission: "feedback.read", status: "coming_soon" },
-      { key: "people", label: "People", icon: "group", permission: "directory.read", status: "live", href: "/admin/people", alsoActiveOn: ["/admin/imports"] },
-      { key: "organizations", label: "Organizations", icon: "corporate_fare", permission: "directory.read", status: "live", href: "/admin/organizations" },
-      // Owner's addendum of 2026-10-19 (Step 8); not drawn in the Figma: the document glyph until a Figma icon exists.
-      { key: "contracting", label: "Contracting", icon: "insert_drive_file", status: "coming_soon" },
-      { key: "messages", label: "Messages", icon: "forum", permission: "messages.read", status: "coming_soon" },
-      { key: "cloud", label: "Cloud", icon: "cloud", status: "coming_soon" },
-    ],
-  },
-  {
-    section: "Monitoring",
-    modules: [
-      { key: "services", label: "Services", icon: "services", permission: "services.read", status: "live", href: "/admin/services" },
-      { key: "permissions", label: "Permissions", icon: "lock", permission: "access.read", status: "live", href: "/admin/permissions" },
-      { key: "accounts", label: "Accounts", icon: "manage_accounts", permission: "accounts.read", status: "live", href: "/admin/accounts" },
-      // Figma draws History with the lightbulb glyph.
-      { key: "history", label: "History", icon: "lightbulb", status: "live", href: "/admin/history" },
-      { key: "analytics", label: "Analytics", icon: "analytics", status: "coming_soon" },
-      { key: "technical_dashboard", label: "Technical dashboard", icon: "technical_dashboard", status: "coming_soon" },
-      { key: "emails", label: "Emails", icon: "alternate_email", permission: "messages.read", status: "coming_soon" },
-    ],
-  },
-  {
-    section: "Other",
-    modules: [
-      { key: "expertise", label: "Expertise", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/expertise" },
-      { key: "fields", label: "Fields", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/fields" },
-      { key: "domains", label: "Domains", icon: "view_column", permission: "taxonomy.read", status: "live", href: "/admin/domains" },
-      // The same page as Admin › Organizations (decision 16): highlighted there, not twice.
-      {
-        key: "organizations_other",
-        label: "Organizations",
-        icon: "corporate_fare",
-        permission: "directory.read",
-        status: "live",
-        href: "/admin/organizations",
-      },
-      { key: "waitlist", label: "Waitlist", icon: "approval", permission: "waitlist.read", status: "coming_soon" },
-    ],
-  },
+export const ADMIN_MODULES: AdminModule[] = [
+  { key: "home", label: "Home", icon: "home", href: "/admin/home", permission: "cms.read", active: true },
+  { key: "documentation", label: "Documentation", icon: "insert_drive_file", href: "/admin/documentation", permission: "cms.read", active: true },
+  { key: "treasury", label: "Treasury", icon: "toll", href: "/admin/treasury", permission: "treasury.read", active: true },
+  { key: "people", label: "People", icon: "groups_2", href: "/admin/people", permission: "directory.read", active: true, alsoActiveOn: ["/admin/imports"] },
+  { key: "organizations", label: "Organizations", icon: "corporate_fare", href: "/admin/organizations", permission: "directory.read", active: true },
+  { key: "services", label: "Services", icon: "services", href: "/admin/services", permission: "services.read", active: true },
+  { key: "permissions", label: "Permissions", icon: "lock", href: "/admin/permissions", permission: "access.read", active: true },
+  { key: "accounts", label: "Accounts", icon: "manage_accounts", href: "/admin/accounts", permission: "accounts.read", active: true },
+  { key: "expertise", label: "Expertise", icon: "view_column", href: "/admin/expertise", permission: "taxonomy.read", active: true },
+  { key: "fields", label: "Fields", icon: "view_column", href: "/admin/fields", permission: "taxonomy.read", active: true },
+  { key: "domains", label: "Domains", icon: "view_column", href: "/admin/domains", permission: "taxonomy.read", active: true },
+  { key: "history", label: "History", icon: "history", href: "/admin/history", active: true },
 ];
 
-/** The menu as this role sees it: modules it can't read drop out, and so do sections left empty. */
-export function modulesFor(sections: readonly AdminSection[], permissions: ReadonlySet<string>): AdminSection[] {
-  return (
-    sections
-      // A live module without a permission of its own (History) still needs a role: an account with none (OPS-141) has only its profile.
-      .map((group) => ({
-        ...group,
-        modules: group.modules.filter((entry) => (entry.permission ? permissions.has(entry.permission) : entry.status !== "live" || permissions.size > 0)),
-      }))
-      .filter((group) => group.modules.length > 0)
-  );
+/** The menu as this role sees it: live modules only, and only those it can read. */
+export function modulesFor(modules: readonly AdminModule[], permissions: ReadonlySet<string>): AdminModule[] {
+  // A module without a permission of its own (History) still needs a role: an account with none (OPS-141) has only its profile.
+  return modules.filter((entry) => entry.active && (entry.permission ? permissions.has(entry.permission) : permissions.size > 0));
 }
 
-/** The menu filtered by the sidebar search (case-insensitive, on the label); empty sections drop out. */
-export function filterModules(sections: readonly AdminSection[], query: string): AdminSection[] {
+/** The menu filtered by the sidebar search (case-insensitive, on the label), in menu order. */
+export function filterModules(modules: readonly AdminModule[], query: string): AdminModule[] {
   const needle = query.trim().toLowerCase();
-  if (!needle) return [...sections];
-  return sections
-    .map((group) => ({ ...group, modules: group.modules.filter((entry) => entry.label.toLowerCase().includes(needle)) }))
-    .filter((group) => group.modules.length > 0);
+  return modules.filter((entry) => entry.label.toLowerCase().includes(needle));
 }
 
-const matches = (entry: AdminModule, pathname: string) =>
-  entry.status === "live" &&
-  [entry.href, ...(entry.alsoActiveOn ?? [])].some((path) => path !== undefined && (pathname === path || pathname.startsWith(`${path}/`)));
-
-/** The one sidebar row for this path: the first match, so a page listed twice is highlighted once. */
-export function activeModuleKey(sections: readonly AdminSection[], pathname: string): string | undefined {
-  for (const group of sections) for (const entry of group.modules) if (matches(entry, pathname)) return entry.key;
-  return undefined;
+/** The one menu row for this path: its own page, a sub-page, or a page that belongs to it. */
+export function activeModuleKey(modules: readonly AdminModule[], pathname: string): string | undefined {
+  return modules.find((entry) => [entry.href, ...(entry.alsoActiveOn ?? [])].some((path) => pathname === path || pathname.startsWith(`${path}/`)))?.key;
 }
